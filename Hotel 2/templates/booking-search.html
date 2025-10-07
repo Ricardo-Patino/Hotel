@@ -4,7 +4,10 @@
   <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>Reservas – Buscar | Hotel Villa Grace</title>
   <meta name="description" content="Busca disponibilidad y tarifas en Hotel Villa Grace.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
 
   <!-- Fuentes -->
   <link href="https://fonts.googleapis.com" rel="preconnect">
@@ -65,32 +68,35 @@
       <div class="container" data-aos="fade-up">
         <div class="card shadow-sm border-0">
           <div class="card-body">
-            <form class="row g-3 align-items-end" action="booking-results.html" method="get">
+            <form id="search-form" class="row g-3 align-items-end" action="booking-results.html" method="get" novalidate>
               <div class="col-12 col-md-3">
-                <label class="form-label">Check-in</label>
-                <input type="date" class="form-control" name="checkin" required>
+                <label class="form-label" for="checkin">Check-in</label>
+                <input type="date" class="form-control" id="checkin" name="checkin" required>
               </div>
               <div class="col-12 col-md-3">
-                <label class="form-label">Check-out</label>
-                <input type="date" class="form-control" name="checkout" required>
+                <label class="form-label" for="checkout">Check-out</label>
+                <input type="date" class="form-control" id="checkout" name="checkout" required>
               </div>
               <div class="col-6 col-md-2">
-                <label class="form-label">Adultos</label>
-                <select class="form-select" name="adults">
+                <label class="form-label" for="adults">Adultos</label>
+                <select class="form-select" id="adults" name="adults">
                   <option>1</option><option selected>2</option><option>3</option><option>4</option>
                 </select>
               </div>
               <div class="col-6 col-md-2">
-                <label class="form-label">Niños</label>
-                <select class="form-select" name="children">
-                  <option selected>0</option><option>1</option><option>2</option>
+                <label class="form-label" for="children">Niños</label>
+                <select class="form-select" id="children" name="children">
+                  <option selected>0</option><option>1</option><option>2</option><option>3</option>
                 </select>
               </div>
               <div class="col-12 col-md-2 d-grid">
-                <!-- Forzamos el verde del sistema -->
-                <button class="btn btn-success">
+                <button id="btn-search" type="submit" class="btn btn-success">
                   <i class="bi bi-search me-1"></i> Buscar
                 </button>
+              </div>
+
+              <div class="col-12">
+                <div id="alert-error" class="alert alert-danger d-none"></div>
               </div>
             </form>
           </div>
@@ -125,5 +131,85 @@
   <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <!-- Lógica del buscador -->
+  <script>
+    (function () {
+      const $ = (s) => document.querySelector(s);
+      const form = $('#search-form');
+      const $in  = $('#checkin');
+      const $out = $('#checkout');
+      const $err = $('#alert-error');
+
+      function todayISO(d=0) {
+        const t = new Date();
+        t.setDate(t.getDate() + d);
+        const m = (t.getMonth()+1).toString().padStart(2,'0');
+        const day = t.getDate().toString().padStart(2,'0');
+        return `${t.getFullYear()}-${m}-${day}`;
+      }
+
+      // Defaults y límites
+      function setDefaults() {
+        const today = todayISO(0);
+        const tomorrow = todayISO(1);
+        $in.min  = today;
+        $out.min = tomorrow;
+
+        if (!$in.value)  $in.value  = today;
+        if (!$out.value) $out.value = tomorrow;
+      }
+
+      function showError(msg) {
+        $err.textContent = msg || 'Revisa los campos.';
+        $err.classList.remove('d-none');
+      }
+      function hideError() {
+        $err.classList.add('d-none');
+      }
+
+      function validDates() {
+        const ci = new Date($in.value);
+        const co = new Date($out.value);
+        if (!($in.value && $out.value)) return false;
+        return co > ci;
+      }
+
+      // Ajuste automático: si el usuario cambia check-in y deja inválido el check-out
+      $in.addEventListener('change', () => {
+        const ci = new Date($in.value);
+        const co = new Date($out.value);
+        const next = new Date(ci); next.setDate(ci.getDate()+1);
+        const nextISO = next.toISOString().slice(0,10);
+        $out.min = nextISO;
+        if (!($out.value) || co <= ci) $out.value = nextISO;
+      });
+
+      form.addEventListener('submit', (e) => {
+        hideError();
+        if (!validDates()) {
+          e.preventDefault();
+          showError('La fecha de salida debe ser posterior a la de llegada.');
+          return;
+        }
+
+        // Guardamos la búsqueda para que booking-results.html la use si quiere
+        const params = {
+          checkin:  $in.value,
+          checkout: $out.value,
+          adults:   document.getElementById('adults').value,
+          children: document.getElementById('children').value
+        };
+        try {
+          sessionStorage.setItem('villaGrace.search', JSON.stringify(params));
+        } catch(_) {}
+
+        // Deja que el formulario continúe hacia booking-results.html con GET
+        // (ya lleva action="booking-results.html" method="get")
+      });
+
+      setDefaults();
+    })();
+  </script>
 </body>
 </html>

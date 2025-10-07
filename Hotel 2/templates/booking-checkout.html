@@ -1,13 +1,28 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Finalizar reserva | Hotel Villa Grace</title>
-  <meta name="description" content="Datos del huésped, políticas y pago seguro.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <meta name="description" content="Datos del huésped, políticas y pago seguro." />
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
+
+  <!-- Vendors -->
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet" />
+  <style>
+    .card-summary img{width:88px;height:88px;object-fit:cover;border-radius:.5rem;border:1px solid #e9ecef}
+    .btn-success{background:#1b7a4e;border-color:#1b7a4e}
+    .btn-success:disabled{opacity:.7}
+  </style>
 </head>
 <body class="privacy-page">
 <header id="header" class="header d-flex align-items-center fixed-top">
@@ -15,6 +30,7 @@
     <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
     <nav id="navmenu" class="navmenu">
       <ul>
+        <li><a href="booking-search.html">Buscar</a></li>
         <li><a href="booking-results.html">Disponibilidad</a></li>
         <li><a href="booking-details.html">Detalle</a></li>
         <li><a href="booking-checkout.html" class="active">Finalizar</a></li>
@@ -25,27 +41,66 @@
 </header>
 
 <main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <!-- Hero -->
+  <div class="page-title dark-background" data-aos="fade"
+       style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
     <div class="container position-relative">
       <h1>Finalizar reserva</h1>
-      <p>Suite Junior Vista Mar · 12–15 Oct (3 noches)</p>
-      <nav class="breadcrumbs"><ol><li><a href="booking-results.html">Disponibilidad</a></li><li><a href="booking-details.html">Detalle</a></li><li class="current">Finalizar</li></ol></nav>
+      <p id="hdr-sub">—</p>
+      <nav class="breadcrumbs"><ol>
+        <li><a href="booking-results.html">Disponibilidad</a></li>
+        <li><a href="booking-details.html">Detalle</a></li>
+        <li class="current">Finalizar</li>
+      </ol></nav>
     </div>
   </div>
 
   <section class="section pt-3">
     <div class="container" data-aos="fade-up">
+
+      <!-- Mensajes -->
+      <div id="alert-ok" class="alert alert-success d-none" role="alert">
+        ¡Reserva confirmada! Redirigiendo…
+      </div>
+      <div id="alert-err" class="alert alert-danger d-none" role="alert">
+        No se pudo crear la reserva. <span id="err-txt"></span>
+      </div>
+
       <div class="row g-4">
+        <!-- Datos del huésped + pago -->
         <div class="col-lg-7">
+
           <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
               <h5 class="card-title">Datos del huésped</h5>
-              <form class="row g-3">
-                <div class="col-md-6"><label class="form-label">Nombre</label><input class="form-control" required></div>
-                <div class="col-md-6"><label class="form-label">Apellidos</label><input class="form-control" required></div>
-                <div class="col-md-6"><label class="form-label">Correo</label><input type="email" class="form-control" required></div>
-                <div class="col-md-6"><label class="form-label">Teléfono</label><input class="form-control"></div>
-                <div class="col-12"><label class="form-label">Observaciones</label><textarea class="form-control" rows="3" placeholder="Ej. llegada tarde, alergias..."></textarea></div>
+              <form id="guest-form" class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Nombre</label>
+                  <input id="fname" class="form-control" autocomplete="given-name" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Apellidos</label>
+                  <input id="lname" class="form-control" autocomplete="family-name" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Correo</label>
+                  <input id="email" type="email" class="form-control" placeholder="tucorreo@ejemplo.com" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Teléfono (WhatsApp)</label>
+                  <input id="phone" class="form-control" placeholder="+506 8xx xx xx" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Observaciones</label>
+                  <textarea id="notes" class="form-control" rows="3" placeholder="Ej. llegada tarde, alergias..."></textarea>
+                </div>
+                <div class="col-12 form-check">
+                  <input class="form-check-input" type="checkbox" id="pol" required />
+                  <label class="form-check-label" for="pol">Acepto las
+                    <a href="terms.html" target="_blank">políticas y términos</a> y la
+                    <a href="privacy.html" target="_blank">política de privacidad</a>.
+                  </label>
+                </div>
               </form>
             </div>
           </div>
@@ -53,29 +108,71 @@
           <div class="card shadow-sm border-0">
             <div class="card-body">
               <h5 class="card-title">Pago</h5>
+              <!-- UI simulada; el cobro real se integrará después -->
               <form class="row g-3">
-                <div class="col-12"><label class="form-label">Tarjeta</label><input class="form-control" placeholder="**** **** **** 4242"></div>
-                <div class="col-md-6"><label class="form-label">Vencimiento</label><input class="form-control" placeholder="MM/AA"></div>
-                <div class="col-md-6"><label class="form-label">CVC</label><input class="form-control" placeholder="***"></div>
-                <div class="col-12 form-check"><input class="form-check-input" type="checkbox" id="pol" required><label class="form-check-label" for="pol">Acepto las <a href="terms.html" target="_blank">políticas y términos</a>.</label></div>
+                <div class="col-12"><label class="form-label">Tarjeta</label>
+                  <input class="form-control" placeholder="**** **** **** 4242" />
+                </div>
+                <div class="col-md-6"><label class="form-label">Vencimiento</label>
+                  <input class="form-control" placeholder="MM/AA" />
+                </div>
+                <div class="col-md-6"><label class="form-label">CVC</label>
+                  <input class="form-control" placeholder="***" />
+                </div>
               </form>
+
               <div class="d-grid mt-3">
-                <a class="btn btn-primary" href="booking-confirmation.html"><i class="bi bi-shield-check me-1"></i>Confirmar y pagar</a>
+                <button id="btn-finalize" class="btn btn-success">
+                  <i class="bi bi-shield-check me-1"></i> Finalizar compra
+                </button>
               </div>
-              <small class="text-muted d-block mt-2"><i class="bi bi-lock me-1"></i>Pago seguro cifrado (PCI-DSS).</small>
+              <small class="text-muted d-block mt-2">
+                <i class="bi bi-lock me-1"></i> Pago seguro (demostración). El cargo puede procesarse en recepción.
+              </small>
             </div>
           </div>
         </div>
 
+        <!-- Resumen -->
         <div class="col-lg-5">
-          <div class="card shadow-sm border-0">
+          <div class="card shadow-sm border-0 card-summary">
             <div class="card-body">
               <h5 class="card-title">Resumen</h5>
-              <div class="d-flex justify-content-between"><span>Tarifa (3 x $299)</span><span>$897.00</span></div>
-              <div class="d-flex justify-content-between"><span>Impuestos</span><span>$53.82</span></div>
-              <div class="d-flex justify-content-between"><span>Cargos</span><span>$0.00</span></div>
-              <hr><div class="d-flex justify-content-between fw-semibold"><span>Total</span><span>$950.82</span></div>
+
+              <div class="d-flex gap-3 align-items-center mb-3">
+                <img id="sum-img" alt="Habitación" src="{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}" />
+                <div class="flex-grow-1">
+                  <div class="fw-semibold" id="sum-room">Habitación</div>
+                  <div class="text-muted small" id="sum-room-sub">—</div>
+                </div>
+              </div>
+
+              <div class="text-muted small mb-3">
+                <div id="sum-dates"><i class="bi bi-calendar-event me-1"></i>—</div>
+                <div id="sum-guests"><i class="bi bi-people me-1"></i>—</div>
+              </div>
+
+              <div class="d-flex justify-content-between">
+                <span>Tarifa (<span id="sum-nights">—</span> × <span id="sum-night-price">—</span>)</span>
+                <span id="sum-subtotal">—</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Impuestos (13%)</span><span id="sum-tax">—</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Cargos</span><span id="sum-fees">USD 0.00</span>
+              </div>
+              <hr />
+              <div class="d-flex justify-content-between fw-semibold">
+                <span>Total</span><span id="sum-total">—</span>
+              </div>
+
               <a class="btn btn-outline btn-sm mt-3" href="booking-details.html">Cambiar plan</a>
+
+              <div class="alert alert-info small mt-3 mb-0">
+                <i class="bi bi-info-circle me-1"></i>
+                Sin costo de cancelación hasta 48 h antes de la llegada (salvo tarifas NR).
+              </div>
             </div>
           </div>
         </div>
@@ -86,11 +183,216 @@
 </main>
 
 <footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong></div></div>
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
 </footer>
 
 <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
 <div id="preloader"></div>
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script><script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script><script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<!-- JS -->
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<!-- Lógica -->
+<script>
+  (function () {
+    const $ = (s) => document.querySelector(s);
+
+    // ---------- utils ----------
+    const money = (n) =>
+      new Intl.NumberFormat("es-CR", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(
+        Number(n || 0)
+      );
+    const fmtLong = (iso) => {
+      if (!iso) return "";
+      const d = new Date(iso + "T00:00:00");
+      return new Intl.DateTimeFormat("es-CR", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+        .format(d)
+        .replace(".", "");
+    };
+    const nightsDiff = (a, b) => {
+      const d1 = new Date(a + "T00:00:00");
+      const d2 = new Date(b + "T00:00:00");
+      return Math.max(1, Math.round((d2 - d1) / 86400000));
+    };
+
+    // ---------- carga selección ----------
+    function loadSelection() {
+      let sel = null;
+      try {
+        sel = JSON.parse(sessionStorage.getItem("villaGrace.selection") || "null");
+      } catch (_) {
+        sel = null;
+      }
+
+      // Permitir QS de respaldo
+      const p = new URLSearchParams(location.search);
+      if (!sel) {
+        sel = {
+          checkin: p.get("checkin"),
+          checkout: p.get("checkout"),
+          adults: p.get("adults") || "2",
+          children: p.get("children") || "0",
+          roomCode: p.get("room"),
+          roomName: "Habitación",
+          img: "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}",
+          priceNight: Number(p.get("price") || 0),
+          rateCode: p.get("rate") || "flex",
+          rateName: "Tarifa Flexible",
+          tipo: p.get("tipo") || "Sencilla",
+        };
+        sel.nights = nightsDiff(sel.checkin, sel.checkout);
+      } else {
+        sel.nights = sel.nights || nightsDiff(sel.checkin, sel.checkout);
+      }
+      return sel;
+    }
+
+    // ---------- render resumen ----------
+    function renderSummary(sel) {
+      $("#hdr-sub").textContent = `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${
+        sel.nights > 1 ? "s" : ""
+      })`;
+
+      $("#sum-img").src = sel.img || "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}";
+      $("#sum-room").textContent = sel.roomName || "Habitación seleccionada";
+      $("#sum-room-sub").textContent = sel.tipo ? `${sel.tipo}` : "—";
+      $("#sum-dates").innerHTML = `<i class="bi bi-calendar-event me-1"></i>${fmtLong(sel.checkin)} – ${fmtLong(
+        sel.checkout
+      )}`;
+      $("#sum-guests").innerHTML = `<i class="bi bi-people me-1"></i>${sel.adults || 2} adulto(s)${
+        parseInt(sel.children || "0", 10) ? ` · ${sel.children} niño(s)` : ""
+      }`;
+      $("#sum-nights").textContent = `${sel.nights}`;
+      $("#sum-night-price").textContent = money(sel.priceNight);
+
+      const subtotal = Number(sel.priceNight || 0) * sel.nights;
+      const tax = subtotal * 0.13;
+      const total = subtotal + tax;
+
+      $("#sum-subtotal").textContent = money(subtotal);
+      $("#sum-tax").textContent = money(tax);
+      $("#sum-total").textContent = money(total);
+    }
+
+    // ---------- crear cliente mínimo (mock/backoffice) ----------
+    async function ensureClient(fullName, email, phone) {
+      // En esta versión, asumimos cliente fijo ID=1 en la BD.
+      // Si en el futuro exponemos /clientes, podremos buscar/crear aquí.
+      return 1;
+    }
+
+    // ---------- POST /grr/reservas ----------
+    async function createReservation(sel, guest) {
+      const payload = {
+        // Requeridos por el servicio
+        Codigo_Cliente: await ensureClient(`${guest.fname} ${guest.lname}`, guest.email, guest.phone),
+        Codigo_Funcionario: 1, // recepcionista/sistema
+        Tipo: sel.tipo || "Sencilla",
+        Fecha_Entrada: sel.checkin,
+        Fecha_Salida: sel.checkout,
+
+        // Informativos
+        Huespedes: String(sel.adults || "2"),
+        Canal: "Web",
+        Observaciones: guest.notes || "",
+        Usuario: guest.email || undefined,
+      };
+
+      const res = await fetch("/grr/reservas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        const msg = json.error || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      return json; // {ok, reserva_id, numero, monto, habitacion}
+    }
+
+    // ---------- bind botón ----------
+    function bindFinalize(sel) {
+      $("#btn-finalize").addEventListener("click", async () => {
+        // Validar formulario html5
+        const form = $("#guest-form");
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return;
+        }
+
+        // Recoger datos huésped
+        const guest = {
+          fname: $("#fname").value.trim(),
+          lname: $("#lname").value.trim(),
+          email: $("#email").value.trim(),
+          phone: $("#phone").value.trim(),
+          notes: $("#notes").value.trim(),
+        };
+
+        // Guardar nombre para confirmar
+        const confirmPayload = {
+          name: `${guest.fname} ${guest.lname}`.trim(),
+          roomName: sel.roomName || "Habitación",
+          plan: sel.rateName || "Tarifa Flexible",
+          dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
+          guests: { adults: sel.adults || "2", children: sel.children || "0" },
+          // Totales mostrados (estimados)
+          priceNight: sel.priceNight || 0,
+        };
+
+        $("#btn-finalize").disabled = true;
+        $("#alert-err").classList.add("d-none");
+
+        try {
+          const result = await createReservation(sel, guest);
+
+          // Guardar para pantalla de confirmación
+          confirmPayload.numero = result.numero || "VG-PENDIENTE";
+          confirmPayload.total = Number(result.monto || 0);
+          confirmPayload.habitacion = result.habitacion || null;
+          confirmPayload.observaciones = guest.notes || "";
+
+          sessionStorage.setItem("villaGrace.confirm", JSON.stringify(confirmPayload));
+
+          $("#alert-ok").classList.remove("d-none");
+          // Redirigir
+          setTimeout(() => (location.href = "booking-confirmation.html"), 900);
+        } catch (err) {
+          $("#btn-finalize").disabled = false;
+          $("#err-txt").textContent = String(err.message || err);
+          $("#alert-err").classList.remove("d-none");
+        }
+      });
+    }
+
+    // ---------- init ----------
+    const selection = loadSelection();
+    // Si no hay fechas, volver al buscador
+    if (!selection || !selection.checkin || !selection.checkout) {
+      location.href = "booking-search.html";
+      return;
+    }
+    // Asegurar tipo básico si no viene de BD
+    if (!selection.tipo) {
+      // Inferencia simple a partir del nombre
+      const n = (selection.roomName || "").toLowerCase();
+      selection.tipo =
+        n.includes("suite") ? "Suite" : n.includes("deluxe") || n.includes("doble") ? "Doble" : "Sencilla";
+    }
+
+    renderSummary(selection);
+    bindFinalize(selection);
+  })();
+</script>
 </body>
 </html>

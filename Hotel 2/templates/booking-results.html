@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
   <title>Reservas – Resultados | Hotel Villa Grace</title>
-  <meta name="description" content="Resultados de disponibilidad y tarifas en Hotel Villa Grace.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <meta name="description" content="Resultados de disponibilidad y tarifas en Hotel Villa Grace." />
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
 
   <!-- Fuentes -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet" />
 
   <!-- Vendors -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet" />
 
-  <!-- Estilos del proyecto -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <!-- Estilos -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet" />
 </head>
 
 <body>
@@ -45,11 +48,14 @@
 
   <main class="main">
     <!-- Título -->
-    <div class="page-title dark-background" data-aos="fade"
-         style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div
+      class="page-title dark-background"
+      data-aos="fade"
+      style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
+    >
       <div class="container position-relative">
         <h1>Disponibilidad</h1>
-        <p class="mb-0">12–15 Oct · 2 adultos</p>
+        <p id="summary" class="mb-0">—</p>
         <nav class="breadcrumbs">
           <ol>
             <li><a href="booking-search.html">Buscar</a></li>
@@ -59,80 +65,31 @@
       </div>
     </div>
 
-    <!-- Filtros -->
+    <!-- Resultados -->
     <section class="section pt-0">
       <div class="container" data-aos="fade-up">
-        <div class="d-flex gap-4 align-items-center mb-3">
+        <div class="d-flex gap-3 align-items-center mb-3 flex-wrap">
           <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-sliders me-1"></i>Filtrar</button>
           <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-currency-dollar me-1"></i>Precio</button>
           <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-aspect-ratio me-1"></i>Tamaño</button>
+          <span id="nights-pill" class="badge text-bg-light ms-auto"></span>
         </div>
 
-        <!-- Resultados -->
-        <div class="vstack gap-4">
-
-          <!-- Habitación 1 -->
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="row g-3 align-items-center">
-                <div class="col-12 col-md-3">
-                  <img src="{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}" alt="Deluxe Garden"
-                       class="img-fluid rounded w-100" style="object-fit:cover; height:170px;">
-                </div>
-                <div class="col-12 col-md-6">
-                  <h5 class="mb-1">Deluxe Garden</h5>
-                  <div class="text-muted small mb-3">28 m² · Cama King · Jardín</div>
-
-                  <div class="border rounded-3 p-3">
-                    <div class="fw-semibold mb-1">Tarifa Flexible</div>
-                    <div class="text-muted small">Cancela gratis hasta 48 h antes.</div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-3 text-md-end">
-                  <div class="mb-2">
-                    <span class="fw-semibold">$189</span><span class="text-muted">/noche</span>
-                  </div>
-                  <!-- Botón verde consistente -->
-                  <a href="booking-details.html" class="btn btn-success w-100">
-                    Seleccionar
-                  </a>
-                </div>
-              </div>
-            </div>
+        <div id="results" class="vstack gap-4">
+          <div class="text-center text-muted py-4">
+            <div class="spinner-border me-2"></div>Cargando disponibilidad…
           </div>
+        </div>
 
-          <!-- Habitación 2 -->
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="row g-3 align-items-center">
-                <div class="col-12 col-md-3">
-                  <img src="{{ url_for('static', filename='assets/img/rooms/room-5.webp') }}" alt="Suite Junior Vista Mar"
-                       class="img-fluid rounded w-100" style="object-fit:cover; height:170px;">
-                </div>
-                <div class="col-12 col-md-6">
-                  <h5 class="mb-1">Suite Junior Vista Mar</h5>
-                  <div class="text-muted small mb-3">36 m² · King · Balcón con vista</div>
+        <div id="note" class="text-muted small mt-3 d-none">
+          <i class="bi bi-info-circle me-1"></i>
+          Impuestos no incluidos. Los precios son por noche.
+        </div>
 
-                  <div class="border rounded-3 p-3">
-                    <div class="fw-semibold mb-1">Desayuno incluido</div>
-                    <div class="text-muted small">Pago en el hotel.</div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-3 text-md-end">
-                  <div class="mb-2">
-                    <span class="fw-semibold">$299</span><span class="text-muted">/noche</span>
-                  </div>
-                  <a href="booking-details.html" class="btn btn-success w-100">
-                    Seleccionar
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <p class="text-muted small mb-0">
-            Impuestos no incluidos. Los precios son por noche.
-          </p>
+        <div id="alert" class="alert alert-warning d-none mt-4">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          No encontramos disponibilidad para las fechas indicadas. Intenta cambiar fechas o contáctanos por WhatsApp.
+          <details class="mt-2"><summary class="small">Detalles técnicos</summary><pre id="dbg" class="small mb-0"></pre></details>
         </div>
       </div>
     </section>
@@ -147,18 +104,228 @@
 
   <!-- Utilidades -->
   <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-    <i class="bi bi-arrow-up-short"></i></a>
+    <i class="bi bi-arrow-up-short"></i>
+  </a>
   <div id="preloader"></div>
 
   <!-- JS -->
   <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
   <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <!-- Lógica -->
+  <script>
+    (function () {
+      const $ = (s) => document.querySelector(s);
+
+      // ------------ Utilidades fecha/dinero -------------
+      const money = (n) =>
+        new Intl.NumberFormat("es-CR", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(
+          Number(n || 0)
+        );
+      const fmtLong = (iso) => {
+        if (!iso) return "";
+        const d = new Date(iso + "T00:00:00");
+        return new Intl.DateTimeFormat("es-CR", { day: "2-digit", month: "short" }).format(d).replace(".", "");
+      };
+      const diffNights = (a, b) => {
+        if (!a || !b) return 0;
+        const d1 = new Date(a + "T00:00:00");
+        const d2 = new Date(b + "T00:00:00");
+        return Math.max(0, Math.round((d2 - d1) / 86400000));
+      };
+
+      // ------------ Lectura de búsqueda -------------
+      function getSearch() {
+        const p = new URLSearchParams(location.search);
+        let search = {
+          checkin: p.get("checkin"),
+          checkout: p.get("checkout"),
+          adults: p.get("adults") || "2",
+          children: p.get("children") || "0",
+        };
+        // Guardar/usar backup
+        try { sessionStorage.setItem("villaGrace.search", JSON.stringify(search)); } catch(_) {}
+        if (!(search.checkin && search.checkout)) {
+          try {
+            const saved = JSON.parse(sessionStorage.getItem("villaGrace.search") || "{}");
+            search = { ...saved, ...search };
+          } catch (_) {}
+        }
+        return search;
+      }
+
+      // ------------ Construcción de card -------------
+      function roomCard(room, nights, search) {
+        const code = room.code || room.Codigo_Habitacion || room.id;
+        const numero = room.numero || room.Numero_Habitacion || code;
+        const tipo = room.tipo || room.Tipo || "Habitación";
+        const name = room.name || room.Nombre || `${tipo}${numero ? " " + numero : ""}`;
+        const desc = room.desc || room.Descripcion || "—";
+        const capacity = room.capacity || room.Capacidad || 2;
+
+        const priceNight = Number(room.price ?? room.Precio_Noche ?? room.Precio_Base ?? 0);
+        const img = room.img || room.Imagen_URL || "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}";
+        const total = priceNight * Math.max(1, nights || 1);
+
+        const payload = {
+          roomCode: code,
+          roomNumber: numero,
+          roomName: name,
+          tipo,
+          priceNight,
+          img,
+          rateName: "Tarifa Flexible",
+          checkin: search.checkin,
+          checkout: search.checkout,
+          nights: Math.max(1, nights || 1),
+          adults: search.adults,
+          children: search.children,
+        };
+
+        return `
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="row g-3 align-items-center">
+                <div class="col-12 col-md-3">
+                  <img src="${img}" alt="${name}"
+                       class="img-fluid rounded w-100" style="object-fit:cover;height:170px;">
+                </div>
+                <div class="col-12 col-md-6">
+                  <h5 class="mb-1">${name}</h5>
+                  <div class="text-muted small mb-2">${tipo}</div>
+                  <div class="text-muted small mb-3">Capacidad: ${capacity} · Régimen: —</div>
+
+                  <div class="border rounded-3 p-3">
+                    <div class="fw-semibold mb-1">${room.rateName || "Tarifa Flexible"}</div>
+                    <div class="text-muted small">Cancela gratis hasta 7 días antes.</div>
+                    <div class="text-muted small mt-1">Impuestos no incluidos.</div>
+                  </div>
+                </div>
+                <div class="col-12 col-md-3 text-md-end">
+                  <div class="mb-2">
+                    <div class="fw-semibold">${money(priceNight)}</div>
+                    <div class="text-muted">/noche</div>
+                    <div class="text-muted small">Total estimado: ${money(total)}</div>
+                  </div>
+                  <button class="btn btn-success w-100"
+                          data-select='${encodeURIComponent(JSON.stringify(payload))}'>
+                    Seleccionar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      async function fetchJSON(url) {
+        try {
+          const res = await fetch(url, { headers: { Accept: "application/json" } });
+          const text = await res.text();
+          try {
+            const json = JSON.parse(text);
+            return { okHTTP: res.ok, json, raw: text };
+          } catch {
+            return { okHTTP: res.ok, json: null, raw: text };
+          }
+        } catch (e) {
+          return { okHTTP: false, json: null, raw: String(e) };
+        }
+      }
+
+      // ------------ Render principal -------------
+      async function render() {
+        const search = getSearch();
+        const nights = diffNights(search.checkin, search.checkout);
+
+        // Encabezado
+        const sum = $("#summary");
+        if (search.checkin && search.checkout) {
+          const txt = `${fmtLong(search.checkin)} – ${fmtLong(search.checkout)} · ${search.adults} adulto(s)${
+            parseInt(search.children || "0", 10) ? ` · ${search.children} niño(s)` : ""
+          }`;
+          sum.textContent = txt;
+        } else {
+          sum.textContent = "Selecciona fechas para ver disponibilidad";
+        }
+        $("#nights-pill").textContent = nights ? `${nights} noche(s)` : "";
+
+        const box = $("#results");
+        box.innerHTML =
+          '<div class="text-center text-muted py-4"><div class="spinner-border me-2"></div>Cargando disponibilidad…</div>';
+
+        // Construye QS
+        const qs = new URLSearchParams({
+          checkin: search.checkin || "",
+          checkout: search.checkout || "",
+          adults: String(search.adults || "2"),
+          children: String(search.children || "0"),
+        }).toString();
+
+        // Prueba varios endpoints en orden
+        const attempts = [
+          `/grr/habitaciones/disponibles?${qs}`,
+          `/grr/availability?${qs}`,
+          `/grr/disponibilidad?${qs}`,
+          `/grr/habitaciones`, // fallback
+        ];
+
+        let rooms = [];
+        const debugLines = [];
+
+        for (const url of attempts) {
+          const r = await fetchJSON(url);
+          debugLines.push(`[${r.okHTTP ? "OK" : "ERR"}] ${url} → ${r.json ? "JSON" : "NO JSON"}`);
+          if (!r.okHTTP) continue;
+
+          if (r.json && r.json.ok && Array.isArray(r.json.rooms)) {
+            rooms = r.json.rooms;
+            break;
+          }
+
+          // Fallback cuando es /grr/habitaciones (lista completa):
+          if (url.endsWith("/habitaciones") && r.json && r.json.ok && Array.isArray(r.json.rooms)) {
+            const totalPax = Math.max(1, Number(search.adults||2) + Number(search.children||0));
+            rooms = r.json.rooms.filter(x => Number(x.Capacidad ?? x.capacity ?? 2) >= totalPax);
+            break;
+          }
+        }
+
+        if (!rooms.length) {
+          box.innerHTML = "";
+          $("#note").classList.add("d-none");
+          $("#alert").classList.remove("d-none");
+          $("#dbg").textContent = debugLines.join("\n");
+          return;
+        }
+
+        const html = rooms.map((r) => roomCard(r, nights || 1, search)).join("");
+        box.innerHTML = html;
+        $("#note").classList.remove("d-none");
+
+        // Manejar selección
+        box.addEventListener("click", (ev) => {
+          const btn = ev.target.closest("button[data-select]");
+          if (!btn) return;
+          const payload = JSON.parse(decodeURIComponent(btn.getAttribute("data-select")));
+          try { sessionStorage.setItem("villaGrace.selection", JSON.stringify(payload)); } catch (_){}
+          const qsSel = new URLSearchParams({
+            checkin: payload.checkin || "",
+            checkout: payload.checkout || "",
+            adults: String(payload.adults || "2"),
+            children: String(payload.children || "0"),
+            room: String(payload.roomCode || ""),
+            price: String(payload.priceNight || "")
+          }).toString();
+          location.href = `booking-details.html?${qsSel}`;
+        });
+      }
+
+      render();
+    })();
+  </script>
 </body>
 </html>
