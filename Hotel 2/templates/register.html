@@ -90,6 +90,22 @@
     <section class="section" id="register">
       <div class="container" data-aos="fade-up" data-aos-delay="100">
 
+        <!-- Mensajes del servidor (flash) -->
+        {% with msgs = get_flashed_messages(with_categories=true) %}
+          {% if msgs %}
+            <div class="row justify-content-center mb-3">
+              <div class="col-lg-7">
+                {% for cat, msg in msgs %}
+                  <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+                    {{ msg }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% endwith %}
+
         <div class="row justify-content-center">
           <div class="col-lg-7">
             <div class="card shadow-sm border-0">
@@ -101,7 +117,8 @@
                   <p class="text-muted mb-0">Es rápido y gratuito.</p>
                 </div>
 
-                <form action="#" method="post" class="row g-3">
+                <!-- FORM: respeta tu UI, mapeo a backend con inputs ocultos -->
+                <form action="{{ url_for('register') }}" method="post" class="row g-3" id="registerForm">
                   <div class="col-md-6">
                     <label for="nombre" class="form-label">Nombre</label>
                     <input type="text" id="nombre" name="nombre" class="form-control" required>
@@ -111,22 +128,30 @@
                     <input type="text" id="apellidos" name="apellidos" class="form-control" required>
                   </div>
 
+                  <!-- NUEVO: Cédula/Pasaporte para national_id -->
+                  <div class="col-md-6">
+                    <label for="cedula" class="form-label">Cédula / Pasaporte</label>
+                    <input type="text" id="cedula" name="cedula" class="form-control" placeholder="1-2345-6789">
+                    <div class="form-text">Opcional; si lo ingresas debe ser único.</div>
+                  </div>
+
                   <div class="col-md-6">
                     <label for="email" class="form-label">Correo electrónico</label>
                     <input type="email" id="email" name="email" class="form-control" placeholder="tucorreo@ejemplo.com" required>
                   </div>
                   <div class="col-md-6">
                     <label for="telefono" class="form-label">Teléfono</label>
-                    <input type="tel" id="telefono" name="telefono" class="form-control" placeholder="+506 0000 0000">
+                    <input type="tel" id="telefono" name="telefono" class="form-control" placeholder="+506 0000 0000" required>
                   </div>
 
                   <div class="col-md-6">
                     <label for="password" class="form-label">Contraseña</label>
-                    <input type="password" id="password" name="password" class="form-control" minlength="6" required>
+                    <input type="password" id="password" name="password" class="form-control" minlength="8" required>
+                    <div class="form-text">Mínimo 8 caracteres.</div>
                   </div>
                   <div class="col-md-6">
                     <label for="password2" class="form-label">Confirmar contraseña</label>
-                    <input type="password" id="password2" name="password2" class="form-control" minlength="6" required>
+                    <input type="password" id="password2" name="password2" class="form-control" minlength="8" required>
                   </div>
 
                   <div class="col-12">
@@ -137,6 +162,12 @@
                       </label>
                     </div>
                   </div>
+
+                  <!-- Inputs ocultos que el backend espera -->
+                  <input type="hidden" name="full_name" id="full_name">
+                  <input type="hidden" name="national_id" id="national_id">
+                  <input type="hidden" name="phone" id="phone">
+                  <input type="hidden" name="confirm_password" id="confirm_password">
 
                   <div class="col-12 d-grid">
                     <button type="submit" class="btn btn-primary">Crear cuenta</button>
@@ -241,5 +272,46 @@
 
   <!-- Main JS -->
   <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <!-- Script pequeño para mapear campos al backend sin cambiar tu UI -->
+  <script>
+    (function () {
+      const form = document.getElementById('registerForm');
+      if (!form) return;
+
+      form.addEventListener('submit', function (e) {
+        const nombre = document.getElementById('nombre')?.value?.trim() || '';
+        const apellidos = document.getElementById('apellidos')?.value?.trim() || '';
+        const fullName = (nombre + ' ' + apellidos).trim();
+
+        const telefono = document.getElementById('telefono')?.value?.trim() || '';
+        const cedula = document.getElementById('cedula')?.value?.trim() || '';
+
+        const pass1 = document.getElementById('password')?.value || '';
+        const pass2 = document.getElementById('password2')?.value || '';
+
+        // Validación rápida de contraseñas
+        if (pass1.length < 8) {
+          e.preventDefault();
+          alert('La contraseña debe tener al menos 8 caracteres.');
+          return false;
+        }
+        if (pass1 !== pass2) {
+          e.preventDefault();
+          alert('Las contraseñas no coinciden.');
+          return false;
+        }
+
+        // Volcar a los inputs ocultos que el backend espera
+        document.getElementById('full_name').value = fullName;
+        document.getElementById('phone').value = telefono;
+        document.getElementById('national_id').value = cedula;
+        document.getElementById('confirm_password').value = pass2;
+
+        // Continúa submit normal
+        return true;
+      });
+    })();
+  </script>
 </body>
 </html>

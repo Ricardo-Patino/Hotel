@@ -3,9 +3,15 @@
 
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, jsonify
+from functools import wraps
+from flask import (
+    Flask, render_template, jsonify,
+    request, redirect, url_for, flash, session
+)
 from sqlalchemy import text
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # ---------------------------------------------------------------------------
 # Bootstrap de ruta para imports absolutos (extensions, config, blueprints)
@@ -26,6 +32,32 @@ from config import Config
 from extensions import db, migrate
 
 
+# =========================
+# MODELOS
+# =========================
+# Modelo mapeado a tu tabla real "Usuario"
+class Usuario(db.Model):
+    __tablename__ = "Usuario"  # EXACTO como en tu esquema SQL
+
+    Codigo_Usuario     = db.Column(db.Integer, primary_key=True)
+    Nombre             = db.Column(db.String(100), nullable=False)      # full_name
+    Cedula_Pasaporte   = db.Column(db.String(40), unique=True)          # "username" práctico
+    Correo             = db.Column(db.String(120), unique=True, index=True, nullable=False)  # email
+    Telefono           = db.Column(db.String(25), nullable=False)
+    Contrasena         = db.Column(db.String(255), nullable=False)      # password hash
+    Rol                = db.Column(db.Enum('Administrador','Recepcionista','Limpieza','Cliente'), default='Cliente')
+    Estado             = db.Column(db.Enum('Activo','Inactivo'), default='Activo')
+    Fecha_Creacion     = db.Column(db.DateTime, default=datetime.utcnow)
+    Fecha_Modificacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Helpers
+    def set_password(self, raw: str):
+        self.Contrasena = generate_password_hash(raw)
+
+    def check_password(self, raw: str) -> bool:
+        return check_password_hash(self.Contrasena, raw)
+
+
 def create_app() -> Flask:
     app = Flask(
         __name__,
@@ -40,7 +72,6 @@ def create_app() -> Flask:
 
     # Blueprints
     from blueprints.grr.routes import grr_bp
-    # ✅ Prefijo SOLO aquí
     app.register_blueprint(grr_bp, url_prefix="/grr")
 
     # ---------------------------- Endpoints de salud -------------------------
@@ -111,10 +142,6 @@ def create_app() -> Flask:
     @app.route("/admin-taxes.html")
     def admin_taxes_html():
         return render_template("admin-taxes.html")
-
-    @app.route("/admin-users.html")
-    def admin_users_html():
-        return render_template("admin-users.html")
 
     @app.route("/amenities.html")
     def amenities_html():
@@ -188,10 +215,6 @@ def create_app() -> Flask:
     def location_html():
         return render_template("location.html")
 
-    @app.route("/login.html")
-    def login_html():
-        return render_template("login.html")
-
     @app.route("/offers.html")
     def offers_html():
         return render_template("offers.html")
@@ -254,7 +277,7 @@ def create_app() -> Flask:
 
     @app.route("/portal-reserva-detalle.html")
     def portal_reserva_detalle_html():
-        return render_template("portal-reserva-detalle.html")
+        return render_template("portal-reserva_detalle.html")
 
     @app.route("/portal-reservas.html")
     def portal_reservas_html():
@@ -267,10 +290,6 @@ def create_app() -> Flask:
     @app.route("/privacy.html")
     def privacy_html():
         return render_template("privacy.html")
-
-    @app.route("/register.html")
-    def register_html():
-        return render_template("register.html")
 
     @app.route("/restaurant.html")
     def restaurant_html():
@@ -291,6 +310,138 @@ def create_app() -> Flask:
     @app.route("/terms.html")
     def terms_html():
         return render_template("terms.html")
+
+    # ---------------------- REGISTRO DE USUARIOS (HU GPU-01-001) -------------
+    @app.route("/register", methods=["GET", "POST"])
+    def register():
+        if request.method == "POST":
+            full_name   = (request.form.get("full_name") or "").strip()
+            national_id = (request.form.get("national_id") or "").strip()
+            email       = (request.form.get("email") or "").strip().lower()
+            phone       = (request.form.get("phone") or "").strip()
+            password    = (request.form.get("password") or "").strip()
+            confirm     = (request.form.get("confirm_password") or "").strip()
+
+            # Validaciones mínimas
+            if not full_name or not email or not phone or not password:
+                flash("Por favor complete todos los campos obligatorios.", "warning")
+                return render_template("register.html")
+
+            if password != confirm:
+                flash("Las contraseñas no coinciden.", "warning")
+                return render_template("register.html")
+
+            if "@" not in email or "." not in email:
+                flash("Correo electrónico inválido.", "warning")
+                return render_template("register.html")
+
+            if len(password) < 8:
+                flash("La contraseña debe tener al menos 8 caracteres.", "warning")
+                return render_template("register.html")
+
+            # Unicidades según tu esquema
+            if Usuario.query.filter_by(Correo=email).first():
+                flash("El correo ya está registrado.", "danger")
+                return render_template("register.html")
+
+            if national_id and Usuario.query.filter_by(Cedula_Pasaporte=national_id).first():
+                flash("La cédula/pasaporte ya está registrada.", "danger")
+                return render_template("register.html")
+
+            # Crear y guardar (Cliente por defecto, Activo)
+            u = Usuario(
+                Nombre=full_name,
+                Cedula_Pasaporte=national_id or None,
+                Correo=email,
+                Telefono=phone,
+                Rol='Cliente',
+                Estado='Activo',
+            )
+            u.set_password(password)
+            db.session.add(u)
+            db.session.commit()
+
+            flash("Registro exitoso. Ya puedes iniciar sesión.", "success")
+            return redirect(url_for("login_html"))
+
+        return render_template("register.html")
+
+    # Compatibilidad con /register.html (GET)
+    @app.route("/register.html", methods=["GET"])
+    def register_html():
+        return render_template("register.html")
+
+    # ------------------ GPU-01-003: LOGIN por correo o "username" ------------
+    def role_redirect_endpoint(rol: str) -> str:
+        """
+        Devuelve el endpoint de Flask al que redirigir según el rol.
+        """
+        mapping = {
+            "Administrador": "admin_dashboard_html",
+            "Recepcionista": "ops_dashboard_html",     # Panel de operaciones
+            "Limpieza":      "ops_housekeeping_html",  # Housekeeping
+            "Cliente":       "portal_dashboard_html",  # Portal del cliente
+        }
+        return mapping.get(rol, "index")
+
+    @app.route("/login.html", methods=["GET", "POST"])
+    def login_html():
+        """
+        Permite iniciar sesión usando:
+        - Correo (Correo)  ó
+        - "Nombre de usuario" práctico: Cédula/Pasaporte (Cedula_Pasaporte)
+        """
+        if request.method == "POST":
+            # El input del formulario se llama "email" pero aceptamos email o cédula.
+            identifier = (request.form.get("email") or "").strip().lower()
+            password   = (request.form.get("password") or "").strip()
+
+            # Busca por correo
+            user = Usuario.query.filter_by(Correo=identifier).first()
+
+            # Si no fue correo, intenta como "username": cédula/pasaporte (sin lower)
+            if not user:
+                user = Usuario.query.filter_by(Cedula_Pasaporte=(request.form.get("email") or "").strip()).first()
+
+            if not user or user.Estado != 'Activo' or not user.check_password(password):
+                flash("Credenciales inválidas o usuario inactivo.", "danger")
+                return render_template("login.html")
+
+            # Guardar sesión mínima
+            session["user_id"] = user.Codigo_Usuario
+            session["user_name"] = user.Nombre
+            session["user_role"] = user.Rol
+
+            flash(f"Bienvenido/a {user.Nombre}.", "success")
+            return redirect(url_for(role_redirect_endpoint(user.Rol)))
+
+        return render_template("login.html")
+
+    # ---------------------------- Logout simple ------------------------------
+    @app.route("/logout")
+    def logout():
+        session.clear()
+        flash("Sesión cerrada correctamente.", "info")
+        return redirect(url_for("index"))
+
+    # ---------------------- Decorador opcional: login requerido --------------
+    def login_required(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not session.get("user_id"):
+                flash("Por favor inicia sesión para continuar.", "warning")
+                return redirect(url_for("login_html"))
+            return f(*args, **kwargs)
+        return wrapper
+
+    # Ejemplo de cómo proteger un panel (si lo deseas):
+    # @app.route("/admin/panel")
+    # @login_required
+    # def admin_panel():
+    #     if session.get("user_role") != "Administrador":
+    #         flash("Acceso denegado.", "danger")
+    #         return redirect(url_for("index"))
+    #     return render_template("admin-dashboard.html")
 
     return app
 

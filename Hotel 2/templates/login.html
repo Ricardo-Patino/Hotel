@@ -29,11 +29,6 @@
 
   <!-- Main CSS File -->
   <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-
-  <!-- =======================================================
-  * Template Name: LuxuryHotel (adaptado a Hotel Villa Grace)
-  * Updated: Jun 30 2025 with Bootstrap v5.3.7
-  ======================================================== -->
 </head>
 
 <body class="login-page">
@@ -114,6 +109,22 @@
     <section id="login" class="section">
       <div class="container" data-aos="fade-up" data-aos-delay="100">
 
+        <!-- Mensajes del servidor (flash) -->
+        {% with msgs = get_flashed_messages(with_categories=true) %}
+          {% if msgs %}
+            <div class="row justify-content-center mb-3">
+              <div class="col-lg-7">
+                {% for cat, msg in msgs %}
+                  <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+                    {{ msg }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% endwith %}
+
         <div class="row gy-4 justify-content-center">
           <div class="col-lg-7">
             <div class="card border-0 shadow-sm rounded-4">
@@ -133,20 +144,21 @@
                     <h3 class="mb-2">Bienvenido de vuelta</h3>
                     <p class="text-muted mb-4">Ingresa tus credenciales para continuar.</p>
 
-                    <form action="dashboard.html" method="post" class="php-email-form" novalidate>
+                    <!-- CAMBIO: action al endpoint de Flask y el identificador en type="text" -->
+                    <form action="{{ url_for('login_html') }}" method="post" class="needs-validation" novalidate>
                       <div class="row gy-3">
                         <div class="col-12">
-                          <label for="email" class="form-label">Correo electrónico</label>
-                          <input type="email" class="form-control" id="email" name="email"
-                            placeholder="tunombre@ejemplo.com" required>
-                          <div class="invalid-feedback">Ingresa un correo válido.</div>
+                          <label for="email" class="form-label">Correo o Cédula</label>
+                          <input type="text" class="form-control" id="email" name="email"
+                            placeholder="ej: tunombre@ejemplo.com o 1-2345-6789" required>
+                          <div class="invalid-feedback">Ingresa un correo o cédula.</div>
                         </div>
 
                         <div class="col-12">
                           <label for="password" class="form-label">Contraseña</label>
                           <div class="position-relative">
                             <input type="password" class="form-control pe-5" id="password" name="password"
-                              placeholder="••••••••" minlength="6" required>
+                              placeholder="••••••••" minlength="8" required>
                             <button type="button" class="btn position-absolute top-50 end-0 translate-middle-y me-2 p-0"
                               id="togglePass" aria-label="Mostrar u ocultar contraseña">
                               <i class="bi bi-eye-slash fs-5"></i>
@@ -185,7 +197,7 @@
                       <hr class="flex-grow-1">
                     </div>
 
-                    <!-- Optional social buttons (match theme icons) -->
+                    <!-- Optional social buttons -->
                     <div class="d-flex gap-2">
                       <a href="#" class="btn btn-outline-secondary w-50"><i class="bi bi-google me-2"></i>Google</a>
                       <a href="#" class="btn btn-outline-secondary w-50"><i class="bi bi-apple me-2"></i>Apple</a>
@@ -321,3 +333,4 @@
 </body>
 
 </html>
+
