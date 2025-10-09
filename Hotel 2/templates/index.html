@@ -114,19 +114,35 @@
           </ul>
         </li>
 
-        <!-- PERFIL / LOGIN -->
-        <li class="dropdown">
-          <a href="#" aria-label="Perfil">
-            <i class="bi bi-person-circle me-1"></i><span>Perfil</span>
-            <i class="bi bi-chevron-down toggle-dropdown"></i>
-          </a>
-          <ul>
-            <li><a href="login.html">Iniciar sesión</a></li>
-            <li><a href="register.html">Crear cuenta</a></li>
-            <li><a href="forgot-password.html">¿Olvidaste tu contraseña?</a></li>
-            <li><a href="404.html">Cerrar sesión</a></li>
-          </ul>
-        </li>
+        <!-- PERFIL / LOGIN condicional -->
+        {% if session.get('user_id') %}
+          <li class="dropdown">
+            <a href="portal-perfil.html" aria-label="Perfil">
+              <i class="bi bi-person-circle me-1"></i>
+              <span>{{ session.get('user_name', 'Perfil') }}</span>
+              <i class="bi bi-chevron-down toggle-dropdown"></i>
+            </a>
+            <ul>
+              <li><a href="portal-dashboard.html">Portal</a></li>
+              <li><a href="portal-reservas.html">Mis reservas</a></li>
+              <li><a href="portal-perfil.html">Perfil</a></li>
+              <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
+            </ul>
+          </li>
+        {% else %}
+          <li class="dropdown">
+            <a href="#" aria-label="Cuenta">
+              <i class="bi bi-person-circle me-1"></i>
+              <span>Cuenta</span>
+              <i class="bi bi-chevron-down toggle-dropdown"></i>
+            </a>
+            <ul>
+              <li><a href="login.html">Iniciar sesión</a></li>
+              <li><a href="register.html">Crear cuenta</a></li>
+              <li><a href="forgot-password.html">¿Olvidaste tu contraseña?</a></li>
+            </ul>
+          </li>
+        {% endif %}
 
       </ul>
       <i class="mobile-nav-toggle d-xl-none bi bi-list" aria-label="Abrir menú"></i>
@@ -137,6 +153,7 @@
 
   </div>
 </header>
+
 
 
 

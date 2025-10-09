@@ -4,25 +4,34 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi perfil | Hotel Villa Grace</title>
   <meta name="description" content="Actualiza tus datos, contraseña y preferencias de comunicación.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 </head>
 <body class="privacy-page">
 <header id="header" class="header d-flex align-items-center fixed-top">
   <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
     <nav id="navmenu" class="navmenu">
       <ul>
         <li><a href="portal-dashboard.html">Portal</a></li>
         <li><a href="portal-reservas.html">Reservas</a></li>
         <li><a href="portal-perfil.html" class="active">Perfil</a></li>
         <li><a href="portal-preferencias.html">Preferencias</a></li>
-      </ul><i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
     </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="login.html">Cerrar sesión</a>
+    <!-- usar tu ruta real de logout -->
+    <a class="btn-getstarted d-none d-sm-block" href="{{ url_for('logout') }}">Cerrar sesión</a>
   </div>
 </header>
 
@@ -31,74 +40,207 @@
     <div class="container position-relative">
       <h1>Mi perfil</h1>
       <p>Gestiona tu información personal y seguridad.</p>
-      <nav class="breadcrumbs"><ol><li><a href="portal-dashboard.html">Portal</a></li><li class="current">Perfil</li></ol></nav>
+      <nav class="breadcrumbs">
+        <ol>
+          <li><a href="portal-dashboard.html">Portal</a></li>
+          <li class="current">Perfil</li>
+        </ol>
+      </nav>
     </div>
   </div>
 
   <section class="section pt-3">
     <div class="container" data-aos="fade-up">
+      <div id="alertBox" class="alert d-none" role="alert"></div>
+
       <div class="row g-4">
 
+        <!-- Datos personales -->
         <div class="col-lg-7">
           <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
               <h5 class="card-title">Datos personales</h5>
-              <form class="row g-3">
-                <div class="col-md-6"><label class="form-label">Nombre</label><input class="form-control" value="María"></div>
-                <div class="col-md-6"><label class="form-label">Apellidos</label><input class="form-control" value="González"></div>
-                <div class="col-md-6"><label class="form-label">Correo</label><input type="email" class="form-control" value="maria@ejemplo.com"></div>
-                <div class="col-md-6"><label class="form-label">Teléfono</label><input class="form-control" placeholder="+506 0000 0000"></div>
-                <div class="col-12 d-grid d-md-flex gap-2"><button class="btn btn-primary">Guardar</button><button type="reset" class="btn btn-outline">Deshacer</button></div>
+              <form id="formProfile" class="row g-3" novalidate>
+                <div class="col-md-12">
+                  <label class="form-label">Nombre completo</label>
+                  <input id="fNombre" class="form-control" required minlength="2" placeholder="Tu nombre">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Correo</label>
+                  <input id="fCorreo" type="email" class="form-control" required placeholder="tucorreo@dominio.com">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Teléfono</label>
+                  <input id="fTelefono" class="form-control" placeholder="+506 0000 0000">
+                </div>
+
+                <div class="col-12 small text-muted">
+                  Tu <strong>rol</strong> es: <span id="fRol">—</span>. Si necesitas cambiarlo, por favor contacta a un administrador.
+                </div>
+
+                <div class="col-12 d-grid d-md-flex gap-2">
+                  <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-check-circle me-1"></i> Guardar
+                  </button>
+                  <button id="btnReset" type="button" class="btn btn-outline">Deshacer</button>
+                </div>
               </form>
             </div>
           </div>
 
+          <!-- Cambio de contraseña -->
           <div class="card shadow-sm border-0">
             <div class="card-body">
               <h5 class="card-title">Cambiar contraseña</h5>
-              <form class="row g-3">
-                <div class="col-md-6"><label class="form-label">Contraseña actual</label><input type="password" class="form-control"></div>
-                <div class="col-md-6"><label class="form-label">Nueva contraseña</label><input type="password" class="form-control"></div>
-                <div class="col-md-6"><label class="form-label">Confirmar nueva</label><input type="password" class="form-control"></div>
-                <div class="col-12 d-grid d-md-flex gap-2"><button class="btn btn-primary">Actualizar</button></div>
+              <form id="formPwd" class="row g-3" novalidate>
+                <div class="col-md-6">
+                  <label class="form-label">Contraseña actual</label>
+                  <input id="pwdCurrent" type="password" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Nueva contraseña</label>
+                  <input id="pwdNew" type="password" class="form-control" required minlength="8">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Confirmar nueva</label>
+                  <input id="pwdConfirm" type="password" class="form-control" required minlength="8">
+                </div>
+                <div class="col-12 d-grid d-md-flex gap-2">
+                  <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-shield-lock me-1"></i> Actualizar
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         </div>
 
+        <!-- Columna lateral (puedes mantenerla como en tu mockup) -->
         <div class="col-lg-5">
           <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
               <h5 class="card-title">Direcciones de factura</h5>
               <p class="mb-1">Cóbano, Puntarenas, Costa Rica</p>
               <p class="text-muted small">Usada para facturas y recibos.</p>
-              <button class="btn btn-outline btn-sm">Editar</button>
+              <button class="btn btn-outline btn-sm" type="button">Editar</button>
             </div>
           </div>
 
           <div class="card shadow-sm border-0">
             <div class="card-body">
               <h5 class="card-title">Comunicación</h5>
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="news" checked><label class="form-check-label" for="news">Recibir novedades y ofertas</label></div>
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="sms"><label class="form-check-label" for="sms">Recibir recordatorios por SMS</label></div>
-              <div class="mt-2"><a class="btn btn-outline btn-sm" href="portal-preferencias.html">Gestionar preferencias</a></div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="news" checked>
+                <label class="form-check-label" for="news">Recibir novedades y ofertas</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="sms">
+                <label class="form-check-label" for="sms">Recibir recordatorios por SMS</label>
+              </div>
+              <div class="mt-2">
+                <a class="btn btn-outline btn-sm" href="portal-preferencias.html">Gestionar preferencias</a>
+              </div>
             </div>
           </div>
         </div>
 
-      </div>
+      </div> <!-- row -->
     </div>
   </section>
 </main>
 
 <footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados</div></div>
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados</div>
+  </div>
 </footer>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+  <i class="bi bi-arrow-up-short"></i>
+</a>
 <div id="preloader"></div>
+
 <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+(function(){
+  const $ = s => document.querySelector(s);
+  const alertBox = $("#alertBox");
+
+  function showAlert(kind, msg){
+    alertBox.className = "alert alert-" + kind;
+    alertBox.textContent = msg;
+    alertBox.classList.remove("d-none");
+    // ocultar a los 4s
+    setTimeout(()=>alertBox.classList.add("d-none"), 4000);
+  }
+
+  async function loadMe(){
+    try{
+      const res = await fetch("/api/me", { headers: { "Accept":"application/json" }});
+      const json = await res.json();
+      if(!json.ok) throw new Error(json.msg || "No se pudieron cargar tus datos.");
+      const d = json.data || {};
+      $("#fNombre").value   = d.Nombre   || "";
+      $("#fCorreo").value   = d.Correo   || "";
+      $("#fTelefono").value = d.Telefono || "";
+      $("#fRol").textContent = d.Rol || "Cliente";
+    }catch(e){
+      showAlert("danger", e.message);
+    }
+  }
+
+  // Guardar perfil
+  $("#formProfile").addEventListener("submit", async (ev)=>{
+    ev.preventDefault();
+    const payload = {
+      Nombre:  $("#fNombre").value.trim(),
+      Correo:  $("#fCorreo").value.trim(),
+      Telefono:$("#fTelefono").value.trim()
+    };
+    try{
+      const res = await fetch("/api/me", {
+        method: "PUT",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if(!json.ok) throw new Error(json.msg || "No se pudo actualizar el perfil.");
+      showAlert("success", "Perfil actualizado correctamente.");
+    }catch(e){
+      showAlert("danger", e.message);
+    }
+  });
+
+  $("#btnReset").addEventListener("click", loadMe);
+
+  // Cambiar contraseña
+  $("#formPwd").addEventListener("submit", async (ev)=>{
+    ev.preventDefault();
+    const payload = {
+      current: $("#pwdCurrent").value,
+      new:     $("#pwdNew").value,
+      confirm: $("#pwdConfirm").value
+    };
+    try{
+      const res = await fetch("/api/me/password", {
+        method: "PUT",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if(!json.ok) throw new Error(json.msg || "No se pudo cambiar la contraseña.");
+      $("#pwdCurrent").value = $("#pwdNew").value = $("#pwdConfirm").value = "";
+      showAlert("success", "Contraseña actualizada.");
+    }catch(e){
+      showAlert("danger", e.message);
+    }
+  });
+
+  loadMe();
+})();
+</script>
 </body>
 </html>
