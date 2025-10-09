@@ -1,14 +1,16 @@
-from datetime import datetime
+# models/room.py
 from extensions import db
+from datetime import datetime
 
 class Room(db.Model):
-    __tablename__ = "rooms"
+    __tablename__ = "habitacion"
 
-    id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(50), unique=True, nullable=False)    
-    name = db.Column(db.String(120), nullable=False)                 
-    capacity = db.Column(db.Integer, nullable=False, default=2)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    Codigo_Habitacion = db.Column(db.Integer, primary_key=True)
+    Numero_Habitacion = db.Column(db.String(10), nullable=False)
+    Tipo = db.Column(db.String(50), nullable=False)
+    Precio_Noche = db.Column(db.Numeric(10, 2), nullable=False)
+    Estado = db.Column(db.String(50), nullable=False, default="Disponible")
+    Fecha_modificacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def __repr__(self) -> str:
-        return f"<Room {self.code} - {self.name}>"
+    def __repr__(self):
+        return f"<Room {self.Numero_Habitacion} ({self.Tipo})>"
