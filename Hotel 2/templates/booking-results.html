@@ -122,7 +122,7 @@
 
       // ------------ Utilidades fecha/dinero -------------
       const money = (n) =>
-        new Intl.NumberFormat("es-CR", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(
+        new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 }).format(
           Number(n || 0)
         );
       const fmtLong = (iso) => {

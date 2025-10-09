@@ -6,13 +6,13 @@ import sys
 import smtplib
 import ssl
 from email.message import EmailMessage
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from functools import wraps
 
 from flask import (
     Flask, render_template, jsonify,
-    request, redirect, url_for, flash, session
+    request, redirect, url_for, flash, session, current_app
 )
 from sqlalchemy import text
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -34,8 +34,8 @@ except Exception:
 # Imports del proyecto
 from config import Config
 from extensions import db, migrate
-from models_sql import Usuario, Rol, Habitacion  # 👈 Modelos importados
-from models.room import Room  # para compatibilidad
+from models_sql import Usuario, Rol, Habitacion
+from models.room import Room  # compatibilidad
 
 # =========================
 # Helpers GPU (roles/redirects)
@@ -66,10 +66,14 @@ def role_redirect_endpoint(role_name: str) -> str:
     mapping = {
         "Administrador": "admin_dashboard_html",
         "Recepcionista": "ops_dashboard_html",
-        "Limpieza": "ops_housekeeping_html",
-        "Cliente": "portal_dashboard_html",
+        "Limpieza":      "ops_housekeeping_html",
+        "Cliente":       "portal_dashboard_html",
     }
-    return mapping.get(role_name, "index")
+    # Fallback seguro por si el endpoint no existe
+    endpoint = mapping.get(role_name, "index_html")
+    if current_app and endpoint not in current_app.view_functions:
+        return "index_html"
+    return endpoint
 
 
 # =========================
@@ -80,8 +84,6 @@ def _get_serializer(app: Flask) -> URLSafeTimedSerializer:
 
 def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
     """Envía email con enlace de restablecimiento o cae a consola si no hay SMTP válido."""
-
-    # Remitente: prioriza MAIL_DEFAULT_SENDER, si no existe usa el usuario SMTP
     sender   = app.config.get("MAIL_DEFAULT_SENDER") or app.config.get("MAIL_USERNAME") or "no-reply@hotel.local"
     subject  = "Restablecimiento de contraseña — Hotel Villa Grace"
     body     = (
@@ -99,13 +101,11 @@ def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
     use_tls  = bool(app.config.get("MAIL_USE_TLS", False))
     use_ssl  = bool(app.config.get("MAIL_USE_SSL", False))
 
-    # Si no hay config SMTP completa, imprime el enlace en consola (útil en dev)
     if not (host and port and user and pwd):
         app.logger.warning("[MAIL] Config SMTP incompleta; usando consola.")
         app.logger.info(f"[RESET LINK] Para {to_email}: {reset_url}")
         return
 
-    # Si MAIL_DEFAULT_SENDER viene vacío o sin @, usa el usuario SMTP
     if not sender or ("@" not in sender):
         sender = user
 
@@ -131,9 +131,7 @@ def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
         app.logger.info(f"[MAIL SENT] Reset a {to_email} vía {host}:{port} (TLS={use_tls}, SSL={use_ssl})")
     except Exception as e:
         app.logger.error(f"[MAIL ERROR] {type(e).__name__}: {e}")
-        # Fallback: loguea el enlace para uso manual
         app.logger.info(f"[RESET LINK] Para {to_email}: {reset_url}")
-
 
 
 # =========================
@@ -156,9 +154,38 @@ def create_app() -> Flask:
         except Exception:
             pass
 
-    # Registrar blueprint
+    # Blueprint (reservas front GRR si lo usas)
     from blueprints.grr.routes import grr_bp
     app.register_blueprint(grr_bp, url_prefix="/grr")
+
+    # ---------------------- Helpers de sesión para plantillas ----------------------
+    @app.context_processor
+    def inject_session_flags():
+        def is_logged_in():
+            return bool(session.get("user_id"))
+        return {
+            "is_logged_in": is_logged_in,
+            "current_user_name": session.get("user_name"),
+            "current_user_role": session.get("user_role"),
+        }
+
+    # ---------------------- Proteger rutas de reserva si no hay sesión -------------
+    PROTECTED_BOOKING_PATHS = {
+        "/booking", "/booking.html",
+        "/booking-search", "/booking-search.html",
+        "/booking-results", "/booking-results.html",
+        "/booking-details", "/booking-details.html",
+        "/booking-checkout", "/booking-checkout.html",
+        "/booking-confirmation", "/booking-confirmation.html",
+    }
+
+    @app.before_request
+    def require_login_for_booking():
+        path = request.path
+        if path in PROTECTED_BOOKING_PATHS and not session.get("user_id"):
+            next_url = request.full_path if request.query_string else request.path
+            flash("Inicia sesión para continuar con tu reserva.", "warning")
+            return redirect(url_for("login_html", next=next_url))
 
     # ---------------------- RUTA DE HABITACIONES DINÁMICAS ----------------------
     @app.route("/rooms.html")
@@ -190,25 +217,179 @@ def create_app() -> Flask:
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})
 
-    # ---------------------- RUTAS ESTÁTICAS ----------------------
+    # ---------------------- RUTAS ESTÁTICAS / PÚBLICAS ----------------------
     @app.errorhandler(404)
-    def not_found(e): return render_template("404.html"), 404
+    def not_found(e):
+        return render_template("404.html"), 404
 
-    # Rutas principales
     @app.route("/")
     @app.route("/index.html")
-    def index_html(): return render_template("index.html")
+    def index_html():
+        return render_template("index.html")
 
     @app.route("/contact.html")
-    def contact_html(): return render_template("contact.html")
+    def contact_html():
+        return render_template("contact.html")
 
     @app.route("/about.html")
-    def about_html(): return render_template("about.html")
+    def about_html():
+        return render_template("about.html")
 
+    # /booking.html no existe como template: normalizamos al buscador
     @app.route("/booking.html")
-    def booking_html(): return render_template("booking.html")
+    def booking_html():
+        return redirect(url_for("booking_search"))
 
-    # --------- Recuperar contraseña ----------
+    # ---------------------- ENDPOINTS DE PORTAL / OPS / ADMIN ----------------
+    @app.route("/portal-dashboard.html")
+    def portal_dashboard_html():
+        return render_template("portal-dashboard.html")
+
+    @app.route("/portal-perfil.html")
+    def portal_perfil_html():
+        return render_template("portal-perfil.html")
+
+    @app.route("/portal-preferencias.html")
+    def portal_preferencias_html():
+        return render_template("portal-preferencias.html")
+
+    @app.route("/portal-reservas.html")
+    def portal_reservas_html():
+        return render_template("portal-reservas.html")
+
+    @app.route("/ops-dashboard.html")
+    def ops_dashboard_html():
+        return render_template("ops-dashboard.html")
+
+    @app.route("/ops-housekeeping.html")
+    def ops_housekeeping_html():
+        return render_template("ops-housekeeping.html")
+
+    @app.route("/admin-dashboard.html")
+    def admin_dashboard_html():
+        return render_template("admin-dashboard.html")
+
+    # ---------------------- API Disponibilidad (arreglo “sin fechas”) ----------
+    @app.get("/api/availability")
+    def api_availability():
+        """
+        Responde disponibilidad básica para el rango solicitado.
+        Parámetros: checkin=YYYY-MM-DD, checkout=YYYY-MM-DD, guests, rooms
+        """
+        from datetime import datetime as dt
+
+        checkin  = (request.args.get("checkin") or "").strip()
+        checkout = (request.args.get("checkout") or "").strip()
+        guests   = int((request.args.get("guests") or "1") or 1)
+        rooms_req= int((request.args.get("rooms")  or "1") or 1)
+
+        # Validación de fechas
+        try:
+            ci = dt.strptime(checkin, "%Y-%m-%d").date()
+            co = dt.strptime(checkout, "%Y-%m-%d").date()
+        except Exception:
+            return jsonify({"ok": False, "available": False, "message": "Fechas inválidas"}), 400
+
+        today = date.today()
+        if ci < today or co <= ci:
+            return jsonify({"ok": True, "available": False, "message": "Rango de fechas no válido"}), 200
+
+        # Capacidad: intenta leer de BD; si falla, usa un default
+        try:
+            total_rooms = db.session.query(Habitacion).count()
+            if not total_rooms:
+                total_rooms = 10  # fallback si tabla vacía
+        except Exception:
+            total_rooms = 10
+
+        available_rooms = total_rooms  # sin engine de inventario aún
+        nights = (co - ci).days
+        is_available = available_rooms >= rooms_req
+
+        return jsonify({
+            "ok": True,
+            "available": bool(is_available),
+            "nights": nights,
+            "rooms_available": available_rooms,
+            "rooms_requested": rooms_req,
+            "guests": guests,
+            "checkin": checkin,
+            "checkout": checkout,
+            "message": "Disponibilidad confirmada" if is_available else "Sin cupo para ese rango"
+        }), 200
+
+    @app.get("/booking/search")
+    def booking_search_alias():
+        return redirect(url_for("api_availability", **request.args))
+
+    # ---------------------- Búsqueda / resultados reserva ----------------------
+    @app.route("/booking-search", methods=["GET", "POST"])
+    @app.route("/booking-search.html", methods=["GET", "POST"])
+    def booking_search():
+        if request.method == "POST":
+            checkin  = request.form.get("checkin")
+            checkout = request.form.get("checkout")
+            guests   = request.form.get("guests", "1")
+            rooms    = request.form.get("rooms", "1")
+            return redirect(url_for("booking_results",
+                                    checkin=checkin, checkout=checkout,
+                                    guests=guests, rooms=rooms))
+        return render_template("booking-search.html")
+
+    @app.route("/booking-results", methods=["GET"])
+    @app.route("/booking-results.html", methods=["GET"])
+    def booking_results():
+        # Consulta la API interna para obtener disponibilidad
+        with app.test_client() as c:
+            resp = c.get(url_for("api_availability", **request.args))
+            data = resp.get_json() if resp.is_json else {"ok": False}
+        return render_template("booking-results.html", availability=data)
+
+    # ---------------------- Detalle / Checkout / Confirmación ------------------
+    @app.route("/booking-details", methods=["GET", "POST"])
+    @app.route("/booking-details.html", methods=["GET", "POST"])
+    def booking_details_html():
+        params = {
+            "checkin":  request.args.get("checkin"),
+            "checkout": request.args.get("checkout"),
+            "adults":   request.args.get("adults", "2"),
+            "children": request.args.get("children", "0"),
+            "room":     request.args.get("room", "1"),
+            "price":    request.args.get("price"),
+        }
+        return render_template("booking-details.html", **params)
+
+    @app.route("/booking-checkout", methods=["GET", "POST"])
+    @app.route("/booking-checkout.html", methods=["GET", "POST"])
+    def booking_checkout_html():
+        ctx = {
+            "checkin":  request.values.get("checkin"),
+            "checkout": request.values.get("checkout"),
+            "adults":   request.values.get("adults"),
+            "children": request.values.get("children"),
+            "room":     request.values.get("room"),
+            "price":    request.values.get("price"),
+            "full_name": request.values.get("full_name"),
+            "email":     request.values.get("email"),
+            "phone":     request.values.get("phone"),
+        }
+        return render_template("booking-checkout.html", **ctx)
+
+    @app.route("/booking-confirmation", methods=["GET"])
+    @app.route("/booking-confirmation.html", methods=["GET"])
+    def booking_confirmation_html():
+        data = {
+            "checkin":  request.args.get("checkin"),
+            "checkout": request.args.get("checkout"),
+            "adults":   request.args.get("adults"),
+            "children": request.args.get("children"),
+            "room":     request.args.get("room"),
+            "price":    request.args.get("price"),
+            "reservation_code": request.args.get("code", "VG-" + datetime.now().strftime("%Y%m%d-%H%M%S")),
+        }
+        return render_template("booking-confirmation.html", **data)
+
+    # ---------------------- Recuperar contraseña ----------------------
     @app.route("/forgot-password", methods=["GET", "POST"])
     def forgot_password():
         if request.method == "POST":
@@ -289,9 +470,13 @@ def create_app() -> Flask:
                 return render_template("login.html")
 
             role_name = _get_role_name(user)
-            session["user_id"] = user.Codigo_Usuario
+            session["user_id"]   = user.Codigo_Usuario
             session["user_name"] = user.Nombre
             session["user_role"] = role_name
+
+            nxt = request.args.get("next")
+            if nxt:
+                return redirect(nxt)
 
             flash(f"Bienvenido/a {user.Nombre}.", "success")
             return redirect(url_for(role_redirect_endpoint(role_name)))
@@ -302,7 +487,7 @@ def create_app() -> Flask:
     def logout():
         session.clear()
         flash("Sesión cerrada correctamente.", "info")
-        return redirect(url_for("index"))
+        return redirect(url_for("index_html"))
 
     # ---------------------- REGISTRO ----------------------
     @app.route("/register", methods=["GET", "POST"])
@@ -353,13 +538,13 @@ def create_app() -> Flask:
             return redirect(url_for("login_html"))
         return render_template("register.html")
 
-    # ---------------------- DECORADORES ----------------------
+    # ---------------------- Decoradores reutilizables ----------------------
     def login_required(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             if not session.get("user_id"):
                 flash("Por favor inicia sesión para continuar.", "warning")
-                return redirect(url_for("login_html"))
+                return redirect(url_for("login_html", next=request.path))
             return f(*args, **kwargs)
         return wrapper
 
@@ -369,11 +554,11 @@ def create_app() -> Flask:
             def wrapper(*args, **kwargs):
                 if not session.get("user_id"):
                     flash("Por favor inicia sesión para continuar.", "warning")
-                    return redirect(url_for("login_html"))
+                    return redirect(url_for("login_html", next=request.path))
                 role = session.get("user_role")
                 if role not in allowed_roles:
                     flash("No tienes permisos para ver esta página.", "danger")
-                    return redirect(url_for(role_redirect_endpoint(role) if role else "index"))
+                    return redirect(url_for(role_redirect_endpoint(role) if role else "index_html"))
                 return f(*args, **kwargs)
             return wrapper
         return decorator

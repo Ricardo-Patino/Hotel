@@ -196,6 +196,17 @@
 <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
+<!-- Inyecta datos de sesión disponibles (si existen) -->
+<script>
+  window.__user = {
+    id: "{{ session.get('user_id') or '' }}",
+    name: "{{ session.get('user_name') or '' }}",
+    role: "{{ session.get('user_role') or '' }}",
+    email: "{{ session.get('user_email','') if session else '' }}",
+    phone: "{{ session.get('user_phone','') if session else '' }}"
+  };
+</script>
+
 <!-- Lógica -->
 <script>
   (function () {
@@ -255,6 +266,37 @@
       return sel;
     }
 
+    // ---------- prefill huésped ----------
+    function splitName(full) {
+      if (!full) return { fname: "", lname: "" };
+      const parts = String(full).trim().split(/\s+/);
+      if (parts.length === 1) return { fname: parts[0], lname: "" };
+      return { fname: parts.slice(0, -1).join(" "), lname: parts.slice(-1).join(" ") };
+    }
+    function tryGetStoredProfile() {
+      try {
+        return JSON.parse(sessionStorage.getItem("villaGrace.profile") || "null");
+      } catch (_) {
+        return null;
+      }
+    }
+    function prefillGuestFields() {
+      // 1) sesión del servidor (inyectada)
+      const u = (window.__user || {});
+      const { fname: sFN, lname: sLN } = splitName(u.name || "");
+
+      // 2) perfil almacenado localmente (si existe)
+      const prof = tryGetStoredProfile() || {};
+
+      // 3) completar inputs si están vacíos
+      const f = $("#fname"), l = $("#lname"), e = $("#email"), p = $("#phone");
+
+      if (f && !f.value) f.value = sFN || prof.firstName || "";
+      if (l && !l.value) l.value = sLN || prof.lastName  || "";
+      if (e && !e.value) e.value = (u.email || prof.email || "");
+      if (p && !p.value) p.value = (u.phone || prof.phone || "");
+    }
+
     // ---------- render resumen ----------
     function renderSummary(sel) {
       $("#hdr-sub").textContent = `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${
@@ -285,21 +327,17 @@
     // ---------- crear cliente mínimo (mock/backoffice) ----------
     async function ensureClient(fullName, email, phone) {
       // En esta versión, asumimos cliente fijo ID=1 en la BD.
-      // Si en el futuro exponemos /clientes, podremos buscar/crear aquí.
       return 1;
     }
 
     // ---------- POST /grr/reservas ----------
     async function createReservation(sel, guest) {
       const payload = {
-        // Requeridos por el servicio
         Codigo_Cliente: await ensureClient(`${guest.fname} ${guest.lname}`, guest.email, guest.phone),
-        Codigo_Funcionario: 1, // recepcionista/sistema
+        Codigo_Funcionario: 1,
         Tipo: sel.tipo || "Sencilla",
         Fecha_Entrada: sel.checkin,
         Fecha_Salida: sel.checkout,
-
-        // Informativos
         Huespedes: String(sel.adults || "2"),
         Canal: "Web",
         Observaciones: guest.notes || "",
@@ -317,20 +355,18 @@
         const msg = json.error || `HTTP ${res.status}`;
         throw new Error(msg);
       }
-      return json; // {ok, reserva_id, numero, monto, habitacion}
+      return json;
     }
 
     // ---------- bind botón ----------
     function bindFinalize(sel) {
       $("#btn-finalize").addEventListener("click", async () => {
-        // Validar formulario html5
         const form = $("#guest-form");
         if (!form.checkValidity()) {
           form.reportValidity();
           return;
         }
 
-        // Recoger datos huésped
         const guest = {
           fname: $("#fname").value.trim(),
           lname: $("#lname").value.trim(),
@@ -339,14 +375,12 @@
           notes: $("#notes").value.trim(),
         };
 
-        // Guardar nombre para confirmar
         const confirmPayload = {
           name: `${guest.fname} ${guest.lname}`.trim(),
           roomName: sel.roomName || "Habitación",
           plan: sel.rateName || "Tarifa Flexible",
           dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
           guests: { adults: sel.adults || "2", children: sel.children || "0" },
-          // Totales mostrados (estimados)
           priceNight: sel.priceNight || 0,
         };
 
@@ -356,7 +390,6 @@
         try {
           const result = await createReservation(sel, guest);
 
-          // Guardar para pantalla de confirmación
           confirmPayload.numero = result.numero || "VG-PENDIENTE";
           confirmPayload.total = Number(result.monto || 0);
           confirmPayload.habitacion = result.habitacion || null;
@@ -365,7 +398,6 @@
           sessionStorage.setItem("villaGrace.confirm", JSON.stringify(confirmPayload));
 
           $("#alert-ok").classList.remove("d-none");
-          // Redirigir
           setTimeout(() => (location.href = "booking-confirmation.html"), 900);
         } catch (err) {
           $("#btn-finalize").disabled = false;
@@ -377,20 +409,18 @@
 
     // ---------- init ----------
     const selection = loadSelection();
-    // Si no hay fechas, volver al buscador
     if (!selection || !selection.checkin || !selection.checkout) {
       location.href = "booking-search.html";
       return;
     }
-    // Asegurar tipo básico si no viene de BD
     if (!selection.tipo) {
-      // Inferencia simple a partir del nombre
       const n = (selection.roomName || "").toLowerCase();
       selection.tipo =
         n.includes("suite") ? "Suite" : n.includes("deluxe") || n.includes("doble") ? "Doble" : "Sencilla";
     }
 
     renderSummary(selection);
+    prefillGuestFields();   // <<<<<< prellenado aquí
     bindFinalize(selection);
   })();
 </script>

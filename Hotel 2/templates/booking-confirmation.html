@@ -24,123 +24,146 @@
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 
   <style>
-    .conf-check { width: 64px; height: 64px; border-radius: 50%; display:inline-flex; align-items:center; justify-content:center; background:#e8f5ef; color:#1b7a4a; }
-    .conf-row { border-bottom: 1px solid rgba(0,0,0,.06); padding: .6rem 0; }
-    .conf-row span:first-child { color:#5f6b77; }
-    @media print { .no-print { display: none !important; } }
+    .conf-check{width:64px;height:64px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#e8f5ef;color:#1b7a4a}
+    .conf-row{border-bottom:1px solid rgba(0,0,0,.06);padding:.6rem 0}
+    .conf-row span:first-child{color:#5f6b77}
+    @media print{.no-print{display:none!important}}
   </style>
 </head>
 <body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="booking-search.html">Reservar</a></li>
-        <li><a href="portal-dashboard.html">Portal</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block no-print" href="portal-reserva-detalle.html">Ver en Portal</a>
-  </div>
-</header>
-
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>¡Reserva confirmada!</h1>
-      <p>Gracias por reservar directamente con nosotros.</p>
+  <header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container position-relative d-flex align-items-center justify-content-between">
+      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+        <h1 class="sitename">Hotel Villa Grace</h1>
+      </a>
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li><a href="booking-search.html">Reservar</a></li>
+          <li><a href="portal-dashboard.html">Portal</a></li>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
+      <a class="btn-getstarted d-none d-sm-block no-print" href="portal-reservas.html">Mis reservas</a>
     </div>
-  </div>
+  </header>
 
-  <section class="section">
-    <div class="container" data-aos="fade-up" id="content">
-      <!-- Rellenado por JS -->
+  <main class="main">
+    <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+      <div class="container position-relative">
+        <h1>¡Reserva confirmada!</h1>
+        <p>Gracias por reservar directamente con nosotros.</p>
+      </div>
     </div>
-  </section>
-</main>
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center">
-    <div class="container">© <strong><span>Hotel Villa Grace</span></strong> · Cóbano, Puntarenas</div>
-  </div>
-</footer>
+    <section class="section">
+      <div class="container" data-aos="fade-up" id="content">
+        <!-- Rellenado por JS -->
+      </div>
+    </section>
+  </main>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
+  <footer id="footer" class="footer position-relative dark-background">
+    <div class="copyright text-center">
+      <div class="container">© <strong><span>Hotel Villa Grace</span></strong> · Cóbano, Puntarenas</div>
+    </div>
+  </footer>
 
-<!-- JS -->
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+    <i class="bi bi-arrow-up-short"></i>
+  </a>
+  <div id="preloader"></div>
 
-<script>
-  // Utilidades
-  function money(n){ n=Number(n||0); return `USD ${n.toFixed(2)}`; }
+  <!-- JS -->
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
-  function renderConfirmation() {
-    const box = document.getElementById('content');
-    let data = null;
-    try { data = JSON.parse(sessionStorage.getItem('villaGrace.confirmation') || 'null'); } catch(_) {}
-
-    if (!data) {
-      box.innerHTML = `
-        <div class="alert alert-warning">
-          No encontramos los datos de la reserva en este dispositivo.
-          <a href="booking-search.html" class="alert-link">Inicia una nueva búsqueda</a>.
-        </div>`;
-      return;
+  <script>
+    // ---- Utilidades ----
+    function money(n){ n=Number(n||0); return `USD ${n.toFixed(2)}`; }
+    function fmtLong(iso){
+      try{
+        const d = new Date(String(iso)+'T00:00:00');
+        return new Intl.DateTimeFormat('es-CR',{day:'2-digit',month:'short',year:'numeric'}).format(d).replace('.','');
+      }catch(_){ return String(iso||''); }
+    }
+    function readConfirm(){
+      // Principal (checkout guarda esta)
+      let raw = sessionStorage.getItem('villaGrace.confirm');
+      // Respaldo por compatibilidad
+      if(!raw) raw = sessionStorage.getItem('villaGrace.confirmation');
+      try{ return JSON.parse(raw || 'null'); }catch(_){ return null; }
     }
 
-    const code   = data.code || 'VG-PENDIENTE';
-    const name   = data.name || '—';
-    const room   = data.room || '—';
-    const dates  = data.dates || '—';
-    const nights = data.nights || 1;
-    const guests = data.guests || '—';
-    const plan   = data.plan || 'Tarifa Flexible';
-    const total  = money(data.total || 0);
+    function renderConfirmation(){
+      const box = document.getElementById('content');
+      const data = readConfirm();
 
-    box.innerHTML = `
-      <div class="card shadow-sm border-0">
-        <div class="card-body text-center">
-          <div class="conf-check mb-3"><i class="bi bi-check-lg fs-3"></i></div>
-          <h3 class="mb-1">Código de reserva: <span class="fw-bold">${code}</span></h3>
-          <p class="text-muted">Tu reserva ha sido creada correctamente.</p>
+      if(!data){
+        box.innerHTML = `
+          <div class="alert alert-warning">
+            No encontramos los datos de la reserva en este dispositivo.
+            <a href="booking-search.html" class="alert-link">Inicia una nueva búsqueda</a>.
+          </div>`;
+        return;
+      }
 
-          <div class="row justify-content-center text-start mt-3">
-            <div class="col-md-8 col-lg-6">
-              <div class="conf-row d-flex justify-content-between"><span>Nombre</span><span>${name}</span></div>
-              <div class="conf-row d-flex justify-content-between"><span>Habitación</span><span>${room}</span></div>
-              <div class="conf-row d-flex justify-content-between"><span>Fechas</span><span>${dates}</span></div>
-              <div class="conf-row d-flex justify-content-between"><span>Noches</span><span>${nights}</span></div>
-              <div class="conf-row d-flex justify-content-between"><span>Huéspedes</span><span>${guests}</span></div>
-              <div class="conf-row d-flex justify-content-between"><span>Plan</span><span>${plan}</span></div>
-              <div class="d-flex justify-content-between align-items-center mt-3">
-                <h4 class="mb-0">Total</h4>
-                <h4 class="mb-0">${total}</h4>
-              </div>
-              <div class="text-muted small mt-2">Impuestos y cargos pueden variar según normativa local.</div>
+      // Mapeo según lo que almacena booking-checkout.html
+      const code   = data.numero || data.code || 'VG-PENDIENTE';
+      const name   = data.name || '—';
+      const room   = data.roomName || (data.habitacion && (data.habitacion.Nombre || data.habitacion.Numero_Habitacion)) || '—';
 
-              <div class="d-grid d-md-flex gap-2 justify-content-center mt-4 no-print">
-                <a class="btn btn-primary" href="portal-reserva-detalle.html"><i class="bi bi-person-badge me-1"></i> Ver detalle en Portal</a>
-                <button class="btn btn-outline" onclick="window.print()"><i class="bi bi-printer me-1"></i> Imprimir/Guardar PDF</button>
-                <a class="btn btn-outline-secondary" href="index.html"><i class="bi bi-house me-1"></i> Inicio</a>
-              </div>
+      const ini    = (data.dates && data.dates.ini) || data.checkin || '';
+      const fin    = (data.dates && data.dates.fin) || data.checkout || '';
+      const nights = (data.dates && data.dates.nights) || data.nights || 1;
+      const dates  = (ini && fin) ? `${fmtLong(ini)} – ${fmtLong(fin)}` : '—';
 
-              <div class="text-muted small mt-3">
-                ¿No recibiste el correo? Revisa spam o escríbenos a
-                <a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a>.
+      const guests = data.guests
+        ? `${data.guests.adults||2} adulto(s)` + (parseInt(data.guests.children||'0',10) ? ` · ${data.guests.children} niño(s)` : '')
+        : '—';
+
+      const plan   = data.plan || data.rateName || 'Tarifa Flexible';
+      const total  = money(Number(data.total || 0));
+
+      box.innerHTML = `
+        <div class="card shadow-sm border-0">
+          <div class="card-body text-center">
+            <div class="conf-check mb-3"><i class="bi bi-check-lg fs-3"></i></div>
+            <h3 class="mb-1">Código de reserva: <span class="fw-bold">${code}</span></h3>
+            <p class="text-muted">Tu reserva ha sido creada correctamente.</p>
+
+            <div class="row justify-content-center text-start mt-3">
+              <div class="col-md-8 col-lg-6">
+                <div class="conf-row d-flex justify-content-between"><span>Nombre</span><span>${name}</span></div>
+                <div class="conf-row d-flex justify-content-between"><span>Habitación</span><span>${room}</span></div>
+                <div class="conf-row d-flex justify-content-between"><span>Fechas</span><span>${dates}</span></div>
+                <div class="conf-row d-flex justify-content-between"><span>Noches</span><span>${nights}</span></div>
+                <div class="conf-row d-flex justify-content-between"><span>Huéspedes</span><span>${guests}</span></div>
+                <div class="conf-row d-flex justify-content-between"><span>Plan</span><span>${plan}</span></div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                  <h4 class="mb-0">Total</h4>
+                  <h4 class="mb-0">${total}</h4>
+                </div>
+                <div class="text-muted small mt-2">Impuestos y cargos pueden variar según normativa local.</div>
+
+                <div class="d-grid d-md-flex gap-2 justify-content-center mt-4 no-print">
+                  <a class="btn btn-primary" href="portal-reserva-detalle.html"><i class="bi bi-person-badge me-1"></i> Ver detalle en Portal</a>
+                  <button class="btn btn-outline" onclick="window.print()"><i class="bi bi-printer me-1"></i> Imprimir/Guardar PDF</button>
+                  <a class="btn btn-outline-secondary" href="index.html"><i class="bi bi-house me-1"></i> Inicio</a>
+                </div>
+
+                <div class="text-muted small mt-3">
+                  ¿No recibiste el correo? Revisa spam o escríbenos a
+                  <a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a>.
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>`;
-  }
+        </div>`;
+    }
 
-  renderConfirmation();
-</script>
+    renderConfirmation();
+  </script>
 </body>
 </html>
