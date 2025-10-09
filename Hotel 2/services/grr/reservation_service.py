@@ -17,7 +17,8 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Query
 
 from extensions import db
-from models_sql import Habitacion, Reserva, Cliente, Documento, ReservaDocumento
+from models_sql import Habitacion, Reserva, Cliente, DocumentoSQL as Documento, ReservaDocumento
+
 
 
 # ========= Fallbacks opcionales (no bloqueantes) =========

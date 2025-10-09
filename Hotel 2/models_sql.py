@@ -156,7 +156,7 @@ class Reserva(db.Model):
 # ---------------------------
 # Tablas opcionales para comprobantes
 # ---------------------------
-class Documento(db.Model):
+class DocumentoSQL(db.Model):
     __tablename__ = 'Documento'
 
     Id             = db.Column(db.Integer, primary_key=True, autoincrement=True)

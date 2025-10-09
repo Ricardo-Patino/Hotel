@@ -2,14 +2,14 @@
 from datetime import datetime
 from extensions import db
 
-class Documento(db.Model):
-    __tablename__ = "Documento"
-    Id = db.Column(db.BigInteger, primary_key=True)
-    Tipo = db.Column(db.Enum('Comprobante','IDFrontal','IDReverso','Firma','Otro'), nullable=False)
-    Ruta = db.Column(db.String(255), nullable=False)
-    MimeType = db.Column(db.String(80), nullable=False)
-    TamanoBytes = db.Column(db.BigInteger, nullable=False, default=0)
-    Fecha_Subida = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+#class Documento(db.Model):
+#    __tablename__ = "Documento"
+#    Id = db.Column(db.BigInteger, primary_key=True)
+#    Tipo = db.Column(db.Enum('Comprobante','IDFrontal','IDReverso','Firma','Otro'), nullable=False)
+#    Ruta = db.Column(db.String(255), nullable=False)
+#    MimeType = db.Column(db.String(80), nullable=False)
+#    TamanoBytes = db.Column(db.BigInteger, nullable=False, default=0)
+#    Fecha_Subida = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 class ReservaDocumento(db.Model):
     __tablename__ = "ReservaDocumento"
