@@ -85,7 +85,7 @@ def _build_reset_link(token: str) -> str:
 
 def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
     """Envía email con enlace o hace fallback a consola."""
-    # ✅ app.config es dict-like: usa .get()
+    
     sender   = app.config.get("MAIL_DEFAULT_SENDER") or app.config.get("MAIL_USERNAME") or "no-reply@hotel.local"
     subject  = "Restablecimiento de contraseña — Hotel Villa Grace"
     body     = (
