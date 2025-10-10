@@ -46,7 +46,7 @@
 <main class="main">
   <!-- Hero -->
   <div class="page-title dark-background" data-aos="fade"
-       style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
+       style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
     <div class="container position-relative">
       <h1>Finalizar reserva</h1>
       <p id="hdr-sub">—</p>
@@ -146,8 +146,8 @@
                 <img
                   id="sum-img"
                   alt="Habitación"
-                  src="{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}"
-                  data-fallback="{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}"
+                  src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}"
+                  data-fallback="{{ url_for('static', filename='assets/hotel') }}"
                 />
                 <div class="flex-grow-1">
                   <div class="fw-semibold" id="sum-room">Habitación</div>
@@ -271,7 +271,7 @@
           children: p.get("children") || "0",
           roomCode: p.get("room"),
           roomName: "Habitación seleccionada",
-          img: "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}",
+          img: "{{ url_for('static', filename='assets/img/hotelvillagraceimages/485630042_1169316618225875_2079195189444161788_n.jpg') }}",
           priceNight: Number(p.get("price") || 0),
           rateCode: p.get("rate") || "flex",
           rateName: "Tarifa Flexible",

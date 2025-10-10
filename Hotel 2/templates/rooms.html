@@ -23,10 +23,10 @@
         {% for h in habitaciones %}
           <div class="col-md-4 mb-4">
             <div class="card shadow-sm border-0">
-              <img src="{{ url_for('static', filename='assets/img/hotel/room-' + h.Tipo|lower + '.webp') }}"
+              <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}"
                    class="card-img-top"
                    alt="Habitación {{ h.Tipo }}"
-                   onerror="this.src='{{ url_for('static', filename='assets/img/hotel/default-room.webp') }}'">
+                   onerror="this.src={{ url_for('static', filename='assets/img/hotel/default-room.webp') | tojson }};">
               <div class="card-body">
                 <h5 class="card-title">Habitación {{ h.Numero_Habitacion }} — {{ h.Tipo }}</h5>
                 <p class="card-text"><strong>Estado:</strong> {{ h.Estado }}</p>
