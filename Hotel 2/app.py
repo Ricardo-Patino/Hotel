@@ -273,6 +273,59 @@ def _reserva_to_dict(r) -> dict:
         "updated_at":    updated.isoformat() if hasattr(updated, "isoformat") else (str(updated) if updated else None),
     }
 
+def _query_user_reservas(email: str, estado: str | None = None, f_ini: str | None = None, f_fin: str | None = None):
+    """
+    Devuelve las reservas ligadas al correo del usuario, ya sea por Cliente.Correo
+    o por el vínculo Usuario.Codigo_Cliente.
+    """
+    if not email:
+        return []
+    params = {"email": (email or "").strip().lower()}
+    conds = ["""
+        (
+          (C.Correo IS NOT NULL AND LOWER(C.Correo) = :email)
+          OR R.Codigo_Cliente IN (
+                SELECT COALESCE(U.Codigo_Cliente, -1)
+                  FROM Usuario U
+                 WHERE LOWER(U.Correo) = :email
+             )
+        )
+    """]
+    if estado:
+        conds.append("R.Estado = :estado")
+        params["estado"] = estado
+    if f_ini:
+        conds.append("R.Fecha_Entrada >= :fini")
+        params["fini"] = f_ini
+    if f_fin:
+        conds.append("R.Fecha_Salida <= :ffin")
+        params["ffin"] = f_fin
+    where = " AND ".join(conds)
+    stmt = text(f"""
+        SELECT
+          R.Codigo_Reserva,
+          R.Numero_Comprobante AS Numero,
+          R.Estado,
+          R.Canal,
+          R.Fecha_Entrada,
+          R.Fecha_Salida,
+          R.Monto_Total,
+          R.Observaciones,
+          R.Huespedes,
+          H.Precio_Noche,
+          H.Tipo,
+          R.Fecha_Registro      AS Fecha_Creacion,
+          R.Fecha_Registro      AS Fecha_Modificacion,
+          C.Correo              AS Usuario
+        FROM Reserva R
+        JOIN Cliente    C ON C.Codigo_Cliente    = R.Codigo_Cliente
+        JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+        WHERE {where}
+        ORDER BY R.Fecha_Entrada DESC
+    """)
+    rows = db.session.execute(stmt, params).mappings().all()
+    return [_reserva_to_dict(r) for r in rows]
+
 def _get_reserva_by_id(reserva_id: int):
     row = db.session.execute(text("""
         SELECT
@@ -596,13 +649,25 @@ def create_app() -> Flask:
     def api_portal_reservas_list():
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
+    
         email = _current_user_email()
+        if not email:
+            current_app.logger.warning("[PORTAL] Sin email asociado a user_id=%s", session.get("user_id"))
+            return jsonify({"ok": True, "items": []})  # mejor vacío que 500
+    
         estado = request.args.get("estado") or None
-        fini = request.args.get("fini") or None  # YYYY-MM-DD
-        ffin = request.args.get("ffin") or None
-        reservas = _query_user_reservas(email or "", estado, fini, ffin)
-        app.logger.info(f"[PORTAL] user={email}, cli_id={current_cliente_id()} -> {len(reservas)} reservas")
-        return jsonify({"ok": True, "items": reservas})
+        fini   = request.args.get("fini") or None
+        ffin   = request.args.get("ffin") or None
+    
+        try:
+            reservas = _query_user_reservas(email, estado, fini, ffin)
+            current_app.logger.info("[PORTAL] user=%s, cli_id=%s -> %d reservas",
+                                    email, current_cliente_id(), len(reservas))
+            return jsonify({"ok": True, "items": reservas})
+        except Exception as e:
+            current_app.logger.exception("[PORTAL] Error listando reservas para %s: %s", email, e)
+            # Devuelve vacío para no romper el portal del huésped
+            return jsonify({"ok": True, "items": [], "warning": "no_data"}), 200
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["GET"])
     @role_required("Cliente")
