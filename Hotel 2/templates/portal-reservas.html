@@ -4,14 +4,22 @@
   <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>Mis reservas | Hotel Villa Grace</title>
   <meta name="description" content="Consulta y gestiona tus reservas en Hotel Villa Grace.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <style>
+    .res-card .badge{vertical-align:middle}
+    .res-empty{opacity:.9}
+  </style>
 </head>
 <body class="privacy-page">
 <header id="header" class="header d-flex align-items-center fixed-top">
@@ -26,7 +34,7 @@
       </ul>
       <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
     </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="booking.html">Nueva reserva</a>
+    <a class="btn-getstarted d-none d-sm-block" href="booking-search.html">Nueva reserva</a>
   </div>
 </header>
 
@@ -52,53 +60,30 @@
       <div class="row g-3 align-items-end mb-3">
         <div class="col-md-4">
           <label class="form-label">Estado</label>
-          <select class="form-select">
+          <select id="flt-estado" class="form-select">
             <option value="">Todas</option>
-            <option>Confirmada</option>
-            <option>Cancelada</option>
-            <option>Completada</option>
+            <option value="Confirmada">Confirmada</option>
+            <option value="Cancelada">Cancelada</option>
+            <option value="Completada">Completada</option>
           </select>
         </div>
         <div class="col-md-4">
           <label class="form-label">Rango de fechas</label>
-          <input type="text" class="form-control" placeholder="Oct – Dic 2025">
+          <div class="d-flex gap-2">
+            <input id="flt-fini" type="date" class="form-control">
+            <input id="flt-ffin" type="date" class="form-control">
+          </div>
         </div>
         <div class="col-md-4 d-grid d-md-flex gap-2">
-          <a class="btn btn-primary" href="booking.html"><i class="bi bi-plus-lg me-1"></i>Nueva reserva</a>
-          <button class="btn btn-outline"><i class="bi bi-funnel me-1"></i>Aplicar</button>
+          <a class="btn btn-primary" href="booking-search.html"><i class="bi bi-plus-lg me-1"></i>Nueva reserva</a>
+          <button id="btn-aplicar" class="btn btn-outline"><i class="bi bi-funnel me-1"></i>Aplicar</button>
         </div>
       </div>
 
-      <!-- Lista -->
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-body d-md-flex justify-content-between align-items-center">
-          <div>
-            <h5 class="mb-1">#VG-2025-104 · Suite Junior Vista Mar</h5>
-            <div class="text-muted small">12–15 Oct 2025 · 2 adultos · Desayuno incluido</div>
-            <span class="badge bg-success mt-2">Confirmada</span>
-          </div>
-          <div class="mt-3 mt-md-0 d-grid gap-2 d-md-flex">
-            <a href="portal-reserva-detalle.html" class="btn btn-outline btn-sm"><i class="bi bi-eye me-1"></i>Ver</a>
-            <a href="booking.html" class="btn btn-primary btn-sm"><i class="bi bi-pencil-square me-1"></i>Modificar</a>
-          </div>
-        </div>
-      </div>
+      <!-- Lista dinámica -->
+      <div id="res-list"></div>
 
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-body d-md-flex justify-content-between align-items-center">
-          <div>
-            <h5 class="mb-1">#VG-2024-872 · Habitación Deluxe</h5>
-            <div class="text-muted small">04–06 Ago 2024 · 2 adultos · No reembolsable</div>
-            <span class="badge bg-secondary mt-2">Completada</span>
-          </div>
-          <div class="mt-3 mt-md-0 d-grid gap-2 d-md-flex">
-            <a href="portal-reserva-detalle.html" class="btn btn-outline btn-sm">Ver</a>
-            <a href="portal-facturas.html" class="btn btn-outline btn-sm"><i class="bi bi-receipt me-1"></i>Factura</a>
-          </div>
-        </div>
-      </div>
-
-      <p class="text-muted small">¿Necesitas ayuda? <a href="portal-soporte.html">Abre un ticket de soporte</a>.</p>
+      <p class="text-muted small mt-3">¿Necesitas ayuda? <a href="portal-soporte.html">Abre un ticket de soporte</a>.</p>
     </div>
   </section>
 </main>
@@ -131,9 +116,107 @@
 <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+(function(){
+  const $ = (s)=>document.querySelector(s);
+  const list = $("#res-list");
+  const estado = $("#flt-estado");
+  const fini = $("#flt-fini");
+  const ffin = $("#flt-ffin");
+
+  function fmtDate(iso){
+    if(!iso) return "—";
+    const d = new Date(iso+"T00:00:00");
+    return new Intl.DateTimeFormat("es-CR",{day:"2-digit",month:"short",year:"numeric"}).format(d).replace(".","");
+  }
+  function nights(a,b){
+    if(!a||!b) return 1;
+    const d1 = new Date(a+"T00:00:00"); const d2 = new Date(b+"T00:00:00");
+    return Math.max(1, Math.round((d2-d1)/86400000));
+  }
+  function badgeClass(e){
+    if(e==="Cancelada") return "bg-danger";
+    if(e==="Completada") return "bg-secondary";
+    return "bg-success";
+  }
+  function card(r){
+    const ns = nights(r.checkin, r.checkout);
+    const plan = r.plan || "Tarifa Flexible";
+    const gtxt = r.huespedes ? `${r.huespedes} huésped(es)` : "—";
+    const fechas = `${fmtDate(r.checkin)} – ${fmtDate(r.checkout)}`;
+    return `
+    <div class="card shadow-sm border-0 mb-3 res-card">
+      <div class="card-body d-md-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-1">#${r.numero || ("VG-" + r.id)} · ${r.tipo || "Habitación"}</h5>
+          <div class="text-muted small">${fechas} · ${gtxt} · ${plan}</div>
+          <span class="badge ${badgeClass(r.estado)} mt-2">${r.estado||"—"}</span>
+        </div>
+        <div class="mt-3 mt-md-0 d-grid gap-2 d-md-flex">
+          ${r.estado==="Cancelada" ? "" : `<button class="btn btn-outline btn-sm" data-act="edit" data-id="${r.id}"><i class="bi bi-pencil-square me-1"></i>Editar</button>`}
+          ${r.estado==="Cancelada" ? "" : `<button class="btn btn-outline btn-sm" data-act="cancel" data-id="${r.id}"><i class="bi bi-x-circle me-1"></i>Cancelar</button>`}
+          <button class="btn btn-outline btn-sm" data-act="export" data-id="${r.id}"><i class="bi bi-download me-1"></i>Exportar</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  function emptyState(){
+    list.innerHTML = `
+      <div class="alert alert-info res-empty">
+        Aún no encontramos reservas con los filtros actuales.
+        <a href="booking-search.html" class="alert-link">Crea una nueva</a>.
+      </div>`;
+  }
+  async function fetchItems(){
+    const p = new URLSearchParams();
+    if(estado.value) p.set("estado", estado.value);
+    if(fini.value)   p.set("fini", fini.value);
+    if(ffin.value)   p.set("ffin", ffin.value);
+    const res = await fetch("/api/portal/reservas?"+p.toString(), {headers:{"Accept":"application/json"}});
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    const json = await res.json();
+    return json.items || [];
+  }
+  async function render(){
+    list.innerHTML = `<div class="text-muted">Cargando…</div>`;
+    try{
+      const items = await fetchItems();
+      if(!items.length){ emptyState(); return; }
+      list.innerHTML = items.map(card).join("");
+      list.querySelectorAll("button[data-act]").forEach(btn=>{
+        btn.addEventListener("click", async (ev)=>{
+          const id = ev.currentTarget.getAttribute("data-id");
+          const act= ev.currentTarget.getAttribute("data-act");
+          if(act==="cancel"){
+            if(!confirm("¿Confirmas cancelar esta reserva?")) return;
+            const r = await fetch(`/api/portal/reservas/${id}`, {method:"DELETE", headers:{"Accept":"application/json"}});
+            const j = await r.json().catch(()=>({}));
+            if(!r.ok || !j.ok){ alert(j.message||"No se pudo cancelar."); return; }
+            render();
+          }else if(act==="export"){
+            const r = await fetch(`/api/portal/reservas/${id}/export`, {headers:{"Accept":"application/json"}});
+            const j = await r.json().catch(()=>({}));
+            if(!r.ok || !j.ok){ alert(j.message||"No se pudo exportar."); return; }
+            const blob = new Blob([JSON.stringify(j.comprobante,null,2)], {type:"application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `comprobante-${j.comprobante?.numero||id}.json`;
+            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+          }else if(act==="edit"){
+            location.href = `portal-reserva-detalle.html?id=${encodeURIComponent(id)}`;
+          }
+        });
+      });
+    }catch(err){
+      list.innerHTML = `<div class="alert alert-danger">No se pudieron cargar tus reservas.</div>`;
+      console.error(err);
+    }
+  }
+  document.getElementById("btn-aplicar").addEventListener("click", render);
+  render();
+})();
+</script>
 </body>
 </html>

@@ -6,11 +6,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, Tuple, List, Optional
 
-from flask import Blueprint, jsonify, request
-from sqlalchemy import func, select
+from flask import Blueprint, jsonify, request, session, current_app
+from sqlalchemy import func, select, text
 
 from extensions import db
-from models_sql import Habitacion, Reserva
+from models_sql import Habitacion, Reserva, Usuario  # <- usamos Usuario para resolver el cliente
 from services.grr.reservation_service import ReservationService
 
 # Se registra con: app.register_blueprint(grr_bp, url_prefix="/grr")
@@ -48,6 +48,89 @@ def _precio_noche(h: Habitacion) -> float:
         except Exception:
             continue
     return 0.0
+
+
+# ---------------------- Resolución de cliente desde la sesión -----------------
+
+def _current_user_email_and_cliente() -> Tuple[Optional[str], Optional[int]]:
+    """
+    Devuelve (email, codigo_cliente) del usuario logueado.
+    Si el usuario no tiene Codigo_Cliente, lo intenta resolver/crear por correo y lo vincula.
+    """
+    try:
+        uid = session.get("user_id")
+        if not uid:
+            return None, None
+
+        u: Optional[Usuario] = Usuario.query.filter_by(Codigo_Usuario=uid).first()
+        if not u:
+            return None, None
+
+        email = (u.Correo or "").strip().lower() or None
+        cli_id = getattr(u, "Codigo_Cliente", None)
+
+        if cli_id:
+            return email, int(cli_id)
+
+        # Intentar encontrar Cliente por correo
+        if email:
+            row = db.session.execute(
+                text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
+                {"e": email}
+            ).first()
+            if row and row[0]:
+                cli_id = int(row[0])
+                # Vincular al usuario (mantener consistencia)
+                u.Codigo_Cliente = cli_id
+                db.session.commit()
+                return email, cli_id
+
+            # Si no existe cliente, crearlo con mínimos
+            nombre = (u.Nombre or "Cliente Web").strip()
+            partes = nombre.split(" ", 1)
+            nom = partes[0][:50]
+            ape = (partes[1] if len(partes) > 1 else "").strip()[:50]
+            tel = (u.Telefono or "00000000")[:20]
+
+            db.session.execute(text("""
+                INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
+                VALUES (0, :n, :a, :t, :e, '1990-01-01')
+            """), {"n": nom, "a": ape, "t": tel, "e": email})
+            db.session.commit()
+
+            row2 = db.session.execute(
+                text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
+                {"e": email}
+            ).first()
+            if row2 and row2[0]:
+                cli_id = int(row2[0])
+                u.Codigo_Cliente = cli_id
+                db.session.commit()
+                return email, cli_id
+
+        return email, None
+    except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] _current_user_email_and_cliente error: {e}")
+        return None, None
+
+
+def _force_owner(reserva_id: int, cli_id: int) -> None:
+    """Asegura que la reserva pertenezca al cliente indicado."""
+    try:
+        db.session.execute(
+            text("""
+                UPDATE Reserva
+                   SET Codigo_Cliente = :cli,
+                       Fecha_Registro = COALESCE(Fecha_Registro, NOW())
+                 WHERE Codigo_Reserva = :rid AND Codigo_Cliente <> :cli
+            """),
+            {"cli": cli_id, "rid": reserva_id}
+        )
+        db.session.commit()
+    except Exception as e:
+        if current_app:
+            current_app.logger.warning(f"[GRR] No se pudo forzar propietario Reserva {reserva_id} -> Cliente {cli_id}: {e}")
 
 
 # ------------------------------- Health --------------------------------------
@@ -152,12 +235,41 @@ def disponibilidad():
 
 @grr_bp.post("/reservas")
 def crear_reserva():
+    """
+    Crea una reserva usando el ReservationService PERO
+    antes fuerza que el Codigo_Cliente sea el del usuario logueado.
+    Además, tras crear, valida que la fila quedó con el propietario correcto.
+    """
     try:
         payload = request.get_json(silent=True) or {}
         _normalize_dates(payload)
+
+        # 1) Resolver email y cliente desde la sesión
+        email, cli_id = _current_user_email_and_cliente()
+        if not cli_id:
+            return jsonify({"ok": False, "msg": "No se pudo resolver el cliente del usuario (inicia sesión)."}), 401
+
+        # 2) Inyectar datos de canal/fuente y Codigo_Cliente
+        payload.setdefault("Canal", "Web")
+        payload.setdefault("Fuente", "Portal")
+        payload["Codigo_Cliente"] = cli_id
+
+        # 3) Crear con el servicio
         res = _res_service.create(payload)
+
+        # 4) Si OK, asegurar pertenencia (por si el servicio impuso otro cliente)
+        if res.get("ok") and res.get("id"):
+            try:
+                rid = int(res["id"])
+                _force_owner(rid, cli_id)
+            except Exception:
+                pass
+
         return jsonify(res), (201 if res.get("ok") else 409)
+
     except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] crear_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
 
 
@@ -176,6 +288,8 @@ def listar_reservas():
         res = _res_service.list(filters=filtros, page=page, page_size=page_size)
         return _resp(res, status_ok=200, status_err=400)
     except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] listar_reservas error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
 
 
@@ -185,6 +299,8 @@ def obtener_reserva(reserva_id: int):
         res = _res_service.get(reserva_id)
         return _resp(res, status_ok=200, status_err=404)
     except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] obtener_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
 
 
@@ -193,10 +309,17 @@ def actualizar_reserva(reserva_id: int):
     try:
         payload = request.get_json(silent=True) or {}
         _normalize_dates(payload)
+
+        # Asegurar que no cambien el dueño desde el front
+        if "Codigo_Cliente" in payload:
+            payload.pop("Codigo_Cliente", None)
+
         res = _res_service.update(reserva_id, payload)
         code = 200 if res.get("ok") else (409 if res.get("code") == "conflict" else 404)
         return jsonify(res), code
     except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] actualizar_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
 
 
@@ -209,6 +332,8 @@ def cancelar_reserva(reserva_id: int):
         res = _res_service.cancel(reserva_id, motivo, usuario)
         return _resp(res, status_ok=200, status_err=404)
     except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] cancelar_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
 
 
@@ -221,6 +346,8 @@ def eliminar_reserva(reserva_id: int):
         res = _res_service.cancel(reserva_id, motivo, usuario)
         return _resp(res, status_ok=200, status_err=404)
     except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] eliminar_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
 
 

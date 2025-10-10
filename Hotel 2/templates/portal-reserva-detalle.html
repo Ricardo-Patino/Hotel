@@ -4,12 +4,21 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Detalle de reserva | Hotel Villa Grace</title>
   <meta name="description" content="Información completa de tu reserva con políticas y extras.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <style>
+    .badge.align{vertical-align:middle}
+    .muted{color:#6c757d}
+  </style>
 </head>
 <body class="privacy-page">
 <header id="header" class="header d-flex align-items-center fixed-top">
@@ -22,36 +31,37 @@
         <li><a href="portal-perfil.html">Perfil</a></li>
       </ul><i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
     </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="booking.html">Modificar</a>
+    <a id="btn-mod" class="btn-getstarted d-none d-sm-block" href="#">Modificar</a>
   </div>
 </header>
 
 <main class="main">
   <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
     <div class="container position-relative">
-      <h1>Reserva #VG-2025-104</h1>
-      <p>Suite Junior Vista Mar · 12–15 Oct 2025</p>
+      <h1 id="hdr-title">Reserva</h1>
+      <p id="hdr-sub" class="muted">—</p>
       <nav class="breadcrumbs"><ol><li><a href="portal-reservas.html">Mis reservas</a></li><li class="current">Detalle</li></ol></nav>
     </div>
   </div>
 
   <section class="section pt-3">
     <div class="container" data-aos="fade-up">
+      <div id="alert-box"></div>
       <div class="row g-4">
         <div class="col-lg-8">
           <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body">
+            <div class="card-body" id="sum-card">
               <h5 class="card-title">Resumen</h5>
               <div class="row">
                 <div class="col-md-6">
-                  <p class="mb-1"><strong>Check-in:</strong> Dom 12 Oct, 3:00 PM</p>
-                  <p class="mb-1"><strong>Check-out:</strong> Mié 15 Oct, 12:00 PM</p>
-                  <p class="mb-1"><strong>Noches:</strong> 3</p>
+                  <p class="mb-1"><strong>Check-in:</strong> —</p>
+                  <p class="mb-1"><strong>Check-out:</strong> —</p>
+                  <p class="mb-1"><strong>Noches:</strong> —</p>
                 </div>
                 <div class="col-md-6">
-                  <p class="mb-1"><strong>Huéspedes:</strong> 2 adultos</p>
-                  <p class="mb-1"><strong>Plan:</strong> Desayuno incluido</p>
-                  <p class="mb-1"><strong>Estado:</strong> <span class="badge bg-success">Confirmada</span></p>
+                  <p class="mb-1"><strong>Huéspedes:</strong> —</p>
+                  <p class="mb-1"><strong>Plan:</strong> —</p>
+                  <p class="mb-1"><strong>Estado:</strong> <span class="badge bg-secondary align">—</span></p>
                 </div>
               </div>
             </div>
@@ -59,19 +69,44 @@
 
           <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
-              <h5 class="card-title">Preferencias & solicitudes</h5>
-              <ul class="mb-3">
-                <li>Piso alto (si disponible)</li>
-                <li>Check-in temprano</li>
-              </ul>
-              <a href="portal-preferencias.html" class="btn btn-outline btn-sm"><i class="bi bi-sliders me-1"></i>Editar preferencias</a>
+              <h5 class="card-title">Editar reserva</h5>
+              <form id="edit-form" class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Check-in</label>
+                  <input type="date" id="ci" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Check-out</label>
+                  <input type="date" id="co" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Huéspedes</label>
+                  <input type="number" id="guests" min="1" class="form-control">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Observaciones</label>
+                  <textarea id="obs" rows="2" class="form-control" placeholder="Ej. llegada tarde, alergias…"></textarea>
+                </div>
+                <div class="col-12 d-grid d-md-flex gap-2">
+                  <button id="btn-save" type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-save me-1"></i>Guardar cambios
+                  </button>
+                  <button id="btn-cancel" type="button" class="btn btn-outline btn-sm">
+                    <i class="bi bi-x-circle me-1"></i>Cancelar reserva
+                  </button>
+                  <button id="btn-export" type="button" class="btn btn-outline btn-sm">
+                    <i class="bi bi-download me-1"></i>Exportar comprobante
+                  </button>
+                </div>
+              </form>
+              <small class="text-muted d-block mt-2"><i class="bi bi-shield-check me-1"></i>La edición valida disponibilidad en tiempo real.</small>
             </div>
           </div>
 
           <div class="card shadow-sm border-0">
             <div class="card-body">
               <h5 class="card-title">Políticas</h5>
-              <p class="mb-2"><strong>Cancelación:</strong> Gratis hasta 48 horas antes del check-in.</p>
+              <p class="mb-2"><strong>Cancelación:</strong> Gratis hasta 48 horas antes del check-in (excepto tarifas no reembolsables).</p>
               <p class="mb-0"><strong>No show:</strong> Cargo de 1 noche.</p>
             </div>
           </div>
@@ -81,12 +116,12 @@
           <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
               <h5 class="card-title">Total</h5>
-              <div class="d-flex justify-content-between"><span>Tarifa</span><span>$299 x 3</span></div>
-              <div class="d-flex justify-content-between"><span>Impuestos</span><span>$53.82</span></div>
+              <div class="d-flex justify-content-between"><span>Tarifa</span><span id="sum-tarifa">—</span></div>
+              <div class="d-flex justify-content-between"><span>Impuestos estimados</span><span id="sum-tax">—</span></div>
               <hr>
-              <div class="d-flex justify-content-between fw-semibold"><span>Gran total</span><span>$950.82</span></div>
+              <div class="d-flex justify-content-between fw-semibold"><span>Gran total</span><span id="sum-total">—</span></div>
               <div class="mt-3 d-grid gap-2">
-                <a class="btn btn-primary btn-sm" href="portal-pagos.html"><i class="bi bi-credit-card me-1"></i>Pagar ahora</a>
+                <!-- Eliminado: botón "Pagar ahora" -->
                 <a class="btn btn-outline btn-sm" href="portal-facturas.html"><i class="bi bi-receipt me-1"></i>Ver factura</a>
               </div>
             </div>
@@ -96,8 +131,8 @@
             <div class="card-body">
               <h5 class="card-title">Acciones</h5>
               <div class="d-grid gap-2">
-                <a href="booking.html" class="btn btn-outline btn-sm"><i class="bi bi-pencil-square me-1"></i>Modificar</a>
-                <button class="btn btn-outline btn-sm"><i class="bi bi-x-circle me-1"></i>Solicitar cancelación</button>
+                <a id="link-edit" class="btn btn-outline btn-sm" href="#"><i class="bi bi-pencil-square me-1"></i>Modificar</a>
+                <button id="link-cancel" class="btn btn-outline btn-sm" type="button"><i class="bi bi-x-circle me-1"></i>Solicitar cancelación</button>
                 <a class="btn btn-outline btn-sm" href="portal-soporte.html"><i class="bi bi-chat-text me-1"></i>Contactar</a>
               </div>
             </div>
@@ -119,5 +154,166 @@
 <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+(function(){
+  const $ = (s)=>document.querySelector(s);
+  const params = new URLSearchParams(location.search);
+  const id = params.get("id");
+  const TAX = 0.13;
+
+  const hdrTitle = $("#hdr-title");
+  const hdrSub   = $("#hdr-sub");
+  const sumCard  = $("#sum-card");
+  const ci = $("#ci"); const co = $("#co"); const guests = $("#guests"); const obs = $("#obs");
+  const btnSave = $("#btn-save"); const btnCancel = $("#btn-cancel"); const btnExport = $("#btn-export");
+  const linkEdit = $("#link-edit"); const linkCancel = $("#link-cancel"); const btnMod = $("#btn-mod");
+
+  const sTarifa = $("#sum-tarifa"); const sTax = $("#sum-tax"); const sTotal = $("#sum-total");
+  const alertBox = $("#alert-box");
+
+  function money(n){ n = Number(n||0); return "USD " + n.toFixed(2); }
+  function nights(a,b){
+    if(!a||!b) return 1;
+    const d1 = new Date(a+"T00:00:00"), d2 = new Date(b+"T00:00:00");
+    return Math.max(1, Math.round((d2-d1)/86400000));
+  }
+  function badgeClass(e){
+    if(e==="Cancelada") return "bg-danger";
+    if(e==="Completada") return "bg-secondary";
+    return "bg-success";
+  }
+  function flash(kind, msg){
+    alertBox.innerHTML = `<div class="alert alert-${kind}">${msg}</div>`;
+    setTimeout(()=>alertBox.innerHTML="", 2500);
+  }
+
+  async function load(){
+    if(!id){ hdrSub.textContent = "Reserva no especificada."; return; }
+    try{
+      const res = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}`, {headers:{"Accept":"application/json"}});
+      const j = await res.json();
+      if(!res.ok || !j.ok) throw new Error(j.error||"not found");
+      const r = j.item;
+
+      hdrTitle.textContent = `Reserva #${r.numero || ("VG-" + r.id)}`;
+      hdrSub.textContent = `${r.tipo || "Habitación"} · ${r.checkin} – ${r.checkout}`;
+
+      const n = nights(r.checkin, r.checkout);
+      sumCard.innerHTML = `
+        <h5 class="card-title">Resumen</h5>
+        <div class="row">
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Check-in:</strong> ${r.checkin}</p>
+            <p class="mb-1"><strong>Check-out:</strong> ${r.checkout}</p>
+            <p class="mb-1"><strong>Noches:</strong> ${n}</p>
+          </div>
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Huéspedes:</strong> ${r.huespedes||"—"}</p>
+            <p class="mb-1"><strong>Plan:</strong> ${r.plan||"Tarifa Flexible"}</p>
+            <p class="mb-1"><strong>Estado:</strong> <span class="badge ${badgeClass(r.estado)} align">${r.estado}</span></p>
+          </div>
+        </div>`;
+
+      // Rellena form edición
+      ci.value = r.checkin || "";
+      co.value = r.checkout || "";
+      guests.value = (r.huespedes && String(r.huespedes).match(/\d+/)) ? String(r.huespedes).match(/\d+/)[0] : "";
+      obs.value = r.observaciones || "";
+
+      // Totales estimados
+      const priceNight = Number(r.precio_noche || 0);
+      const subtotal = priceNight * n;
+      const tax = subtotal * TAX;
+      const total = (r.monto && r.monto>0) ? r.monto : subtotal + tax;
+      sTarifa.textContent = money(subtotal);
+      sTax.textContent = money(tax);
+      sTotal.textContent = money(total);
+
+      // Acciones
+      linkEdit.href = `#edit`;
+      linkCancel.addEventListener("click", ()=>btnCancel.click());
+      btnMod.href = `#edit`;
+
+      // Si está cancelada, deshabilita edición
+      if(r.estado === "Cancelada"){
+        [ci, co, guests, obs, btnSave].forEach(el=>el.disabled = true);
+      }
+    }catch(e){
+      hdrSub.textContent = "No pudimos cargar la reserva.";
+      console.error(e);
+    }
+  }
+
+  // Guardar (PUT)
+  document.getElementById("edit-form").addEventListener("submit", async (ev)=>{
+    ev.preventDefault();
+    btnSave.disabled = true;
+    try{
+      const payload = {
+        checkin: ci.value || undefined,
+        checkout: co.value || undefined,
+        huespedes: guests.value ? String(guests.value) : undefined,
+        observaciones: obs.value || ""
+      };
+      const r = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}`, {
+        method:"PUT",
+        headers:{"Content-Type":"application/json","Accept":"application/json"},
+        body: JSON.stringify(payload)
+      });
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok || !j.ok){
+        if(j.error==="availability"){
+          flash("warning", j.message || "No hay disponibilidad para el nuevo rango.");
+        }else{
+          flash("danger", j.message || "No se pudo guardar.");
+        }
+        return;
+      }
+      flash("success","Cambios guardados.");
+      await load();
+    }catch(e){
+      console.error(e); flash("danger","Error inesperado.");
+    }finally{
+      btnSave.disabled = false;
+    }
+  });
+
+  // Cancelar (DELETE)
+  btnCancel.addEventListener("click", async ()=>{
+    if(!confirm("¿Confirmas cancelar esta reserva?")) return;
+    btnCancel.disabled = true;
+    try{
+      const r = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}`, {method:"DELETE", headers:{"Accept":"application/json"}});
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok || !j.ok){ flash("danger", j.message||"No se pudo cancelar."); return; }
+      flash("success","Reserva cancelada.");
+      await load();
+    }catch(e){
+      console.error(e); flash("danger","Error inesperado.");
+    }finally{
+      btnCancel.disabled = false;
+    }
+  });
+
+  // Exportar comprobante
+  btnExport.addEventListener("click", async ()=>{
+    try{
+      const r = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}/export`, {headers:{"Accept":"application/json"}});
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok || !j.ok){ flash("danger", j.message||"No se pudo exportar."); return; }
+      const blob = new Blob([JSON.stringify(j.comprobante,null,2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `comprobante-${j.comprobante?.numero||id}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }catch(e){
+      console.error(e); flash("danger","Error al exportar.");
+    }
+  });
+
+  load();
+})();
+</script>
 </body>
 </html>
