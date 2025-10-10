@@ -5,10 +5,10 @@
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>Hotel Villa Grace | Cóbano, Puntarenas – Piscina, Restaurante y Parqueo Gratis</title>
-  <meta name="description"
-    content="Hotel Villa Grace en Cóbano, Puntarenas. Piscina para adultos y niños, restaurante y bar, Wi-Fi y parqueo gratis. A 7 km de Montezuma y 14 km de Santa Teresa.<a href="Tel: +50626420225">2642-0225</a>"
-  <meta name="keywords"
-    content="Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa, hotel con piscina, restaurante, hospedaje Costa Rica">
+
+  <!-- Meta SEO correctos -->
+  <meta name="description" content="Hotel Villa Grace en Cóbano, Puntarenas. Piscina para adultos y niños, restaurante y bar, Wi-Fi y parqueo gratis. A 7 km de Montezuma y 14 km de Santa Teresa. Tel: +506 2642 0225">
+  <meta name="keywords" content="Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa, hotel con piscina, restaurante, hospedaje Costa Rica">
 
   <!-- Favicons -->
   <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
@@ -17,11 +17,9 @@
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com" rel="preconnect">
   <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
 
-  <!-- Vendor CSS Files -->
+  <!-- Vendor CSS -->
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
@@ -29,24 +27,26 @@
   <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
 
-  <!-- Main CSS File -->
+  <!-- Main CSS -->
   <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
 
-  <!-- =======================================================
+  <!--
   * Template Name: LuxuryHotel
   * Template URL: https://bootstrapmade.com/luxury-hotel-bootstrap-template/
   * Updated: Jun 30 2025 with Bootstrap v5.3.7
   * Author: BootstrapMade.com
   * License: https://bootstrapmade.com/license/
-  ======================================================== -->
+  -->
 </head>
+
 
 <body class="index-page">
 
   <header id="header" class="header d-flex align-items-center fixed-top">
   <div class="container position-relative d-flex align-items-center justify-content-between">
 
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+    <!-- Logo enlazado con url_for -->
+    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0" aria-label="Hotel Villa Grace - Inicio">
       <!-- <img src="{{ url_for('static', filename='assets/img/logo.webp') }}" alt="Hotel Villa Grace"> -->
       <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="#000000" aria-hidden="true">
         <g id="SVGRepo_iconCarrier">
@@ -61,15 +61,16 @@
 
     <nav id="navmenu" class="navmenu">
       <ul>
-        <li><a href="index.html" class="active">Inicio</a></li>
-        <li><a href="about.html">Nosotros</a></li>
-        <li><a href="rooms.html">Habitaciones</a></li>
+        <!-- Principales con url_for -->
+        <li><a href="{{ url_for('index_html') }}" class="active">Inicio</a></li>
+        <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
+        <li><a href="{{ url_for('rooms_html') }}">Habitaciones</a></li>
         <li><a href="amenities.html">Servicios</a></li>
         <li><a href="location.html">Ubicación</a></li>
 
         <!-- DESPLEGABLE PÁGINAS -->
         <li class="dropdown">
-          <a href="#"><span>Páginas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+          <a href="#"><span>Páginas</span> <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
           <ul>
             <!-- Sitio público -->
             <li><a href="room-details.html">Detalle de habitación</a></li>
@@ -78,15 +79,23 @@
             <li><a href="events.html">Eventos</a></li>
             <li><a href="gallery.html">Galería</a></li>
             <!-- Reservas (front) -->
-            <li><a href="booking-search.html">Reservas – Buscar</a></li>
-            <!-- Portal del huésped -->
-            <li><a href="portal-dashboard.html">Portal del huésped</a></li>
-            <!-- Operaciones -->
-            <li><a href="ops-dashboard.html">Operaciones</a></li>
-            <!-- Pagos / facturas -->
-            <li><a href="fin-dashboard.html">Pagos &amp; facturas</a></li>
-            <!-- Administración -->
-            <li><a href="admin-dashboard.html">Administración</a></li>
+            <li><a href="{{ url_for('booking_search') }}">Reservas – Buscar</a></li>
+
+            <!-- Portal del huésped (solo Cliente) -->
+            {% if session.get('user_role') == 'Cliente' %}
+              <li><a href="{{ url_for('portal_dashboard_html') }}">Portal del huésped</a></li>
+            {% endif %}
+
+            <!-- Operaciones (Admin o Recepcionista) -->
+            {% if session.get('user_role') in ['Administrador', 'Recepcionista'] %}
+              <li><a href="{{ url_for('ops_dashboard_html') }}">Operaciones</a></li>
+            {% endif %}
+
+            <!-- Administración (solo Admin) -->
+            {% if session.get('user_role') == 'Administrador' %}
+              <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+            {% endif %}
+
             <!-- Legales / varios -->
             <li><a href="terms.html">Términos</a></li>
             <li><a href="privacy.html">Privacidad</a></li>
@@ -95,18 +104,16 @@
           </ul>
         </li>
 
-        <li><a href="contact.html">Contacto</a></li>
+        <li><a href="{{ url_for('contact_html') }}">Contacto</a></li>
 
         <!-- Selector de idioma -->
         <li class="dropdown">
-          <a href="#es">
+          <a href="#es" aria-label="Cambiar idioma">
             <svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path fill-rule="evenodd" clip-rule="evenodd"
-                d="M4 0H6V2H10V4H8.86807C8.57073 5.66996 7.78574 7.17117 6.6656 8.35112C7.46567 8.73941 8.35737 8.96842 9.29948 8.99697L10.2735 6H12.7265L15.9765 16H13.8735L13.2235 14H9.77647L9.12647 16H7.0235L8.66176 10.9592C7.32639 10.8285 6.08165 10.3888 4.99999 9.71246C3.69496 10.5284 2.15255 11 0.5 11H0V9H0.5C1.5161 9 2.47775 8.76685 3.33437 8.35112C2.68381 7.66582 2.14629 6.87215 1.75171 6H4.02179C4.30023 6.43491 4.62904 6.83446 4.99999 7.19044C5.88743 6.33881 6.53369 5.23777 6.82607 4H0V2H4V0ZM12.5735 12L11.5 8.69688L10.4265 12H12.5735Z"
-                fill="currentColor"></path>
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M4 0H6V2H10V4H8.86807C8.57073 5.66996 7.78574 7.17117 6.6656 8.35112C7.46567 8.73941 8.35737 8.96842 9.29948 8.99697L10.2735 6H12.7265L15.9765 16H13.8735L13.2235 14H9.77647L9.12647 16H7.0235L8.66176 10.9592C7.32639 10.8285 6.08165 10.3888 4.99999 9.71246C3.69496 10.5284 2.15255 11 0.5 11H0V9H0.5C1.5161 9 2.47775 8.76685 3.33437 8.35112C2.68381 7.66582 2.14629 6.87215 1.75171 6H4.02179C4.30023 6.43491 4.62904 6.83446 4.99999 7.19044C5.88743 6.33881 6.53369 5.23777 6.82607 4H0V2H4V0ZM12.5735 12L11.5 8.69688L10.4265 12H12.5735Z" fill="currentColor"></path>
             </svg>
             <span>Español</span>
-            <i class="bi bi-chevron-down toggle-dropdown"></i>
+            <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
           </a>
           <ul>
             <li><a href="#en">English</a></li>
@@ -117,42 +124,44 @@
         <!-- PERFIL / LOGIN condicional -->
         {% if session.get('user_id') %}
           <li class="dropdown">
-            <a href="portal-perfil.html" aria-label="Perfil">
-              <i class="bi bi-person-circle me-1"></i>
+            <a href="{{ url_for('portal_perfil_html') }}" aria-label="Perfil">
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
               <span>{{ session.get('user_name', 'Perfil') }}</span>
-              <i class="bi bi-chevron-down toggle-dropdown"></i>
+              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
             </a>
             <ul>
-              <li><a href="portal-dashboard.html">Portal</a></li>
-              <li><a href="portal-reservas.html">Mis reservas</a></li>
-              <li><a href="portal-perfil.html">Perfil</a></li>
+              <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
+              <li><a href="{{ url_for('portal_reservas_html') }}">Mis reservas</a></li>
+              <li><a href="{{ url_for('portal_perfil_html') }}">Perfil</a></li>
               <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
             </ul>
           </li>
         {% else %}
           <li class="dropdown">
             <a href="#" aria-label="Cuenta">
-              <i class="bi bi-person-circle me-1"></i>
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
               <span>Cuenta</span>
-              <i class="bi bi-chevron-down toggle-dropdown"></i>
+              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
             </a>
             <ul>
-              <li><a href="login.html">Iniciar sesión</a></li>
-              <li><a href="register.html">Crear cuenta</a></li>
-              <li><a href="forgot-password.html">¿Olvidaste tu contraseña?</a></li>
+              <li><a href="{{ url_for('login_html') }}">Iniciar sesión</a></li>
+              <li><a href="{{ url_for('register') }}">Crear cuenta</a></li>
+              <li><a href="{{ url_for('forgot_password') }}">¿Olvidaste tu contraseña?</a></li>
             </ul>
           </li>
         {% endif %}
 
       </ul>
+
       <i class="mobile-nav-toggle d-xl-none bi bi-list" aria-label="Abrir menú"></i>
     </nav>
 
-    <!-- Botón Reservar con margen a la izquierda para evitar solape -->
-    <a class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4" href="booking-search.html">Reservar</a>
+    <!-- Botón Reservar -->
+    <a class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4" href="{{ url_for('booking_search') }}">Reservar</a>
 
   </div>
 </header>
+
 
 
 

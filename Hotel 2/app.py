@@ -5,6 +5,7 @@ import os
 import sys
 import smtplib
 import ssl
+from functools import wraps
 from email.message import EmailMessage
 from datetime import datetime, date
 from pathlib import Path
@@ -88,6 +89,46 @@ def role_redirect_endpoint(role_name: str) -> str:
     if current_app and endpoint not in current_app.view_functions:
         return "index_html"
     return endpoint
+
+# =========================
+# Decoradores de acceso
+# =========================
+def _user_role() -> str:
+    try:
+        return (session.get("user_role") or "").strip() or "Cliente"
+    except Exception:
+        return "Cliente"
+
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            flash("Inicia sesión para continuar.", "warning")
+            return redirect(url_for("login_html", next=request.path))
+        return fn(*args, **kwargs)
+    return wrapper
+
+def role_required(*roles):
+    """
+    Permite el acceso solo si el rol actual está en 'roles'.
+    Uso: @role_required("Administrador") o @role_required("Administrador", "Recepcionista")
+    """
+    roles_norm = {r.lower() for r in roles if r}
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not session.get("user_id"):
+                flash("Inicia sesión para continuar.", "warning")
+                return redirect(url_for("login_html", next=request.path))
+            current = _user_role().lower()
+            if current not in roles_norm:
+                if request.path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "forbidden"}), 403
+                flash("No tienes permiso para acceder a esta sección.", "danger")
+                return redirect(url_for(role_redirect_endpoint(_user_role())))
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 # =========================
 # Reset Password
@@ -231,55 +272,6 @@ def _reserva_to_dict(r) -> dict:
         "created_at":    created.isoformat() if hasattr(created, "isoformat") else (str(created) if created else None),
         "updated_at":    updated.isoformat() if hasattr(updated, "isoformat") else (str(updated) if updated else None),
     }
-
-def _query_user_reservas(email: str, estado: str | None = None, f_ini: str | None = None, f_fin: str | None = None):
-    if not email:
-        return []
-    params = {"email": (email or "").strip().lower()}
-    conds = ["""
-        (
-          (C.Correo IS NOT NULL AND LOWER(C.Correo) = :email)
-          OR R.Codigo_Cliente IN (
-                SELECT COALESCE(U.Codigo_Cliente, -1)
-                  FROM Usuario U
-                 WHERE LOWER(U.Correo) = :email
-             )
-        )
-    """]
-    if estado:
-        conds.append("R.Estado = :estado")
-        params["estado"] = estado
-    if f_ini:
-        conds.append("R.Fecha_Entrada >= :fini")
-        params["fini"] = f_ini
-    if f_fin:
-        conds.append("R.Fecha_Salida <= :ffin")
-        params["ffin"] = f_fin
-    where = " AND ".join(conds)
-    stmt = text(f"""
-        SELECT
-          R.Codigo_Reserva,
-          R.Numero_Comprobante AS Numero,
-          R.Estado,
-          R.Canal,
-          R.Fecha_Entrada,
-          R.Fecha_Salida,
-          R.Monto_Total,
-          R.Observaciones,
-          R.Huespedes,
-          H.Precio_Noche,
-          H.Tipo,
-          R.Fecha_Registro      AS Fecha_Creacion,
-          R.Fecha_Registro      AS Fecha_Modificacion,
-          C.Correo              AS Usuario
-        FROM Reserva R
-        JOIN Cliente    C ON C.Codigo_Cliente    = R.Codigo_Cliente
-        JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
-        WHERE {where}
-        ORDER BY R.Fecha_Entrada DESC
-    """)
-    rows = db.session.execute(stmt, params).mappings().all()
-    return [_reserva_to_dict(r) for r in rows]
 
 def _get_reserva_by_id(reserva_id: int):
     row = db.session.execute(text("""
@@ -441,38 +433,48 @@ def create_app() -> Flask:
     def booking_html():
         return redirect(url_for("booking_search"))
 
-    # ---------------------- Portal / Ops / Admin ----------------
+    # ---------------------- Portal / Ops / Admin (protegidas por rol) ------------
+    # Portal (solo Cliente)
     @app.route("/portal-dashboard.html")
+    @role_required("Cliente")
     def portal_dashboard_html():
         return render_template("portal-dashboard.html")
 
     @app.route("/portal-perfil.html")
+    @role_required("Cliente")
     def portal_perfil_html():
         return render_template("portal-perfil.html")
 
     @app.route("/portal-preferencias.html")
+    @role_required("Cliente")
     def portal_preferencias_html():
         return render_template("portal-preferencias.html")
 
     @app.route("/portal-reservas.html")
+    @role_required("Cliente")
     def portal_reservas_html():
         return render_template("portal-reservas.html")
 
-    # Detalle de reserva
     @app.route("/portal-reserva-detalle.html")
     @app.route("/portal-reserva-detalle")
+    @role_required("Cliente")
     def portal_reserva_detalle_html():
         return render_template("portal-reserva-detalle.html")
 
+    # Operaciones
     @app.route("/ops-dashboard.html")
+    @role_required("Administrador", "Recepcionista")
     def ops_dashboard_html():
         return render_template("ops-dashboard.html")
 
     @app.route("/ops-housekeeping.html")
+    @role_required("Administrador", "Limpieza")
     def ops_housekeeping_html():
         return render_template("ops-housekeeping.html")
 
+    # Administración
     @app.route("/admin-dashboard.html")
+    @role_required("Administrador")
     def admin_dashboard_html():
         return render_template("admin-dashboard.html")
 
@@ -588,20 +590,22 @@ def create_app() -> Flask:
         }
         return render_template("booking-confirmation.html", **data)
 
-    # ---------------------- API Portal Reservas ----------------------
+    # ---------------------- API Portal Reservas (solo Cliente) ----------------------
     @app.route("/api/portal/reservas", methods=["GET"])
+    @role_required("Cliente")
     def api_portal_reservas_list():
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
         email = _current_user_email()
         estado = request.args.get("estado") or None
-        fini = request.args.get("fini") or None
+        fini = request.args.get("fini") or None  # YYYY-MM-DD
         ffin = request.args.get("ffin") or None
         reservas = _query_user_reservas(email or "", estado, fini, ffin)
         app.logger.info(f"[PORTAL] user={email}, cli_id={current_cliente_id()} -> {len(reservas)} reservas")
         return jsonify({"ok": True, "items": reservas})
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["GET"])
+    @role_required("Cliente")
     def api_portal_reserva_get(reserva_id: int):
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
@@ -614,6 +618,7 @@ def create_app() -> Flask:
         return jsonify({"ok": True, "item": _reserva_to_dict(r)})
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["PUT", "PATCH"])
+    @role_required("Cliente")
     def api_portal_reserva_update(reserva_id: int):
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
@@ -661,6 +666,7 @@ def create_app() -> Flask:
         return jsonify({"ok": True, "item": _reserva_to_dict(r2)})
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["DELETE"])
+    @role_required("Cliente")
     def api_portal_reserva_cancel(reserva_id: int):
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
@@ -676,6 +682,7 @@ def create_app() -> Flask:
         return jsonify({"ok": True})
 
     @app.route("/api/portal/reservas/<int:reserva_id>/export", methods=["GET"])
+    @role_required("Cliente")
     def api_portal_reserva_export(reserva_id: int):
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
@@ -817,14 +824,14 @@ def create_app() -> Flask:
                 flash("Usuario inactivo.", "danger")
                 return render_template("login.html")
 
-            # 3) Verificación de password con hash…
+            # 3) Verificación de password con hash
             ok = False
             try:
                 ok = bool(user.check_password(password))
             except Exception:
                 ok = False
 
-            # 4) Fallback “legacy”: si la BD trae una contraseña en claro (p.ej. columna Contrasena/Password)
+            # 4) Fallback “legacy”: si la BD trae una contraseña en claro
             if not ok:
                 legacy_plain = None
                 for col in ("Contrasena", "Password", "Password_Plain", "Pwd"):
@@ -835,7 +842,6 @@ def create_app() -> Flask:
                     # Rehash inmediato para dejar limpia la cuenta
                     try:
                         user.set_password(password)
-                        # Si existe una columna de txt plano, la vaciamos por seguridad
                         try:
                             for col in ("Contrasena", "Password", "Password_Plain", "Pwd"):
                                 if hasattr(user, col):
@@ -862,6 +868,9 @@ def create_app() -> Flask:
                 db.session.rollback()
 
             role_name = _get_role_name(user)
+            if role_name not in DEFAULT_ROLES:
+                role_name = "Cliente"
+
             session["user_id"]   = user.Codigo_Usuario
             session["user_name"] = user.Nombre
             session["user_role"] = role_name
