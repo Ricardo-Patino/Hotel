@@ -9,6 +9,7 @@ from email.message import EmailMessage
 from datetime import datetime, date
 from pathlib import Path
 from functools import wraps
+from sqlalchemy.exc import IntegrityError
 
 from flask import (
     Flask, render_template, jsonify,
@@ -35,7 +36,7 @@ except Exception:
 from config import Config
 from extensions import db, migrate
 from models_sql import Usuario, Rol, Habitacion
-from models.room import Room  # compatibilidad
+from models.room import Room  # compatibilidad (si se usa en algún template)
 
 # =========================
 # Helpers GPU (roles/redirects)
@@ -500,31 +501,42 @@ def create_app() -> Flask:
             password    = (request.form.get("password") or "").strip()
             confirm     = (request.form.get("confirm_password") or "").strip()
 
+            # Validaciones mínimas
             if not full_name or not email or not phone or not password:
                 flash("Por favor complete todos los campos obligatorios.", "warning")
                 return render_template("register.html")
             if password != confirm:
                 flash("Las contraseñas no coinciden.", "warning")
                 return render_template("register.html")
-            if "@" not in email:
+            if "@" not in email or "." not in email:
                 flash("Correo electrónico inválido.", "warning")
                 return render_template("register.html")
             if len(password) < 8:
                 flash("La contraseña debe tener al menos 8 caracteres.", "warning")
                 return render_template("register.html")
 
+            # Unicidades
             if Usuario.query.filter_by(Correo=email).first():
                 flash("El correo ya está registrado.", "danger")
                 return render_template("register.html")
 
+            if national_id:
+                if Usuario.query.filter_by(Cedula_Pasaporte=national_id).first():
+                    flash("La cédula/pasaporte ya está registrada.", "danger")
+                    return render_template("register.html")
+            else:
+                national_id = None
+
+            # Rol por defecto: Cliente
             role = _get_role_by_name("Cliente")
             if not role:
                 _ensure_seed_roles()
                 role = _get_role_by_name("Cliente")
 
+            # Crear usuario
             u = Usuario(
                 Nombre=full_name,
-                Cedula_Pasaporte=national_id or None,
+                Cedula_Pasaporte=national_id,
                 Correo=email,
                 Telefono=phone,
                 Rol_Id=role.Codigo_Rol if role else None,
@@ -532,11 +544,29 @@ def create_app() -> Flask:
             )
             u.set_password(password)
             db.session.add(u)
-            db.session.commit()
+
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                flash("Ya existe un usuario con ese correo o cédula/pasaporte.", "danger")
+                return render_template("register.html")
+            except Exception as e:
+                db.session.rollback()
+                flash("No se pudo completar el registro. Inténtalo de nuevo.", "danger")
+                current_app.logger.exception(f"[REGISTER] Error creando usuario: {e}")
+                return render_template("register.html")
 
             flash("Registro exitoso. Ya puedes iniciar sesión.", "success")
             return redirect(url_for("login_html"))
+
+        # GET
         return render_template("register.html")
+
+    # Alias para compatibilidad con enlaces que usan /register.html
+    @app.route("/register.html", methods=["GET", "POST"])
+    def register_html():
+        return register()
 
     # ---------------------- Decoradores reutilizables ----------------------
     def login_required(f):
