@@ -80,7 +80,9 @@
 
   <script>
     // ---- Utilidades ----
-    function money(n){ n=Number(n||0); return `USD ${n.toFixed(2)}`; }
+    function moneyCRC(n){
+      return new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC',minimumFractionDigits:2}).format(Number(n||0));
+    }
     function fmtLong(iso){
       try{
         const d = new Date(String(iso)+'T00:00:00');
@@ -88,14 +90,22 @@
       }catch(_){ return String(iso||''); }
     }
     function readConfirm(){
-      // Principal (checkout guarda esta)
       let raw = sessionStorage.getItem('villaGrace.confirm');
-      // Respaldo por compatibilidad
       if(!raw) raw = sessionStorage.getItem('villaGrace.confirmation');
       try{ return JSON.parse(raw || 'null'); }catch(_){ return null; }
     }
 
-    function renderConfirmation(){
+    async function findReservaIdByNumero(numero){
+      try{
+        const r = await fetch(`/api/portal/reservas?estado=Confirmada`, {headers:{Accept:'application/json'}});
+        const j = await r.json();
+        if(!j || !j.ok || !Array.isArray(j.items)) return null;
+        const hit = j.items.find(x => String((x.numero||'')).trim() === String(numero).trim());
+        return hit ? hit.id : null;
+      }catch(_){ return null; }
+    }
+
+    async function renderConfirmation(){
       const box = document.getElementById('content');
       const data = readConfirm();
 
@@ -108,7 +118,6 @@
         return;
       }
 
-      // Mapeo según lo que almacena booking-checkout.html
       const code   = data.numero || data.code || 'VG-PENDIENTE';
       const name   = data.name || '—';
       const room   = data.roomName || (data.habitacion && (data.habitacion.Nombre || data.habitacion.Numero_Habitacion)) || '—';
@@ -123,7 +132,14 @@
         : '—';
 
       const plan   = data.plan || data.rateName || 'Tarifa Flexible';
-      const total  = money(Number(data.total || 0));
+      const total  = moneyCRC(Number(data.total || 0));
+
+      // Intentar conocer el id para habilitar descarga de comprobante
+      let reservaId = data.reservaId || null;
+      if(!reservaId && code && code !== 'VG-PENDIENTE'){
+        reservaId = await findReservaIdByNumero(code);
+      }
+      const hasComprobante = !!reservaId;
 
       box.innerHTML = `
         <div class="card shadow-sm border-0">
@@ -148,9 +164,19 @@
                 <div class="text-muted small mt-2">Impuestos y cargos pueden variar según normativa local.</div>
 
                 <div class="d-grid d-md-flex gap-2 justify-content-center mt-4 no-print">
-                  <a class="btn btn-primary" href="portal-reserva-detalle.html"><i class="bi bi-person-badge me-1"></i> Ver detalle en Portal</a>
-                  <button class="btn btn-outline" onclick="window.print()"><i class="bi bi-printer me-1"></i> Imprimir/Guardar PDF</button>
-                  <a class="btn btn-outline-secondary" href="index.html"><i class="bi bi-house me-1"></i> Inicio</a>
+                  <a class="btn btn-primary" href="portal-reserva-detalle.html">
+                    <i class="bi bi-person-badge me-1"></i> Ver detalle en Portal
+                  </a>
+                  <button class="btn btn-outline" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Imprimir/Guardar PDF
+                  </button>
+                  <a class="btn btn-outline-secondary" href="index.html">
+                    <i class="bi bi-house me-1"></i> Inicio
+                  </a>
+                  <a class="btn btn-success ${hasComprobante?'':'disabled'}" id="btn-pdf" target="_blank"
+                     ${hasComprobante?`href="/api/reservas/${reservaId}/comprobante"`:''}>
+                    <i class="bi bi-filetype-pdf me-1"></i> Descargar comprobante
+                  </a>
                 </div>
 
                 <div class="text-muted small mt-3">

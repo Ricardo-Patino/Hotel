@@ -27,14 +27,17 @@
 <body class="privacy-page">
 <header id="header" class="header d-flex align-items-center fixed-top">
   <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
     <nav id="navmenu" class="navmenu">
       <ul>
         <li><a href="booking-search.html">Buscar</a></li>
         <li><a href="booking-results.html">Disponibilidad</a></li>
         <li><a href="booking-details.html">Detalle</a></li>
         <li><a href="booking-checkout.html" class="active">Finalizar</a></li>
-      </ul><i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
     </nav>
     <a class="btn-getstarted d-none d-sm-block" href="portal-dashboard.html">Portal Huésped</a>
   </div>
@@ -140,7 +143,12 @@
               <h5 class="card-title">Resumen</h5>
 
               <div class="d-flex gap-3 align-items-center mb-3">
-                <img id="sum-img" alt="Habitación" src="{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}" />
+                <img
+                  id="sum-img"
+                  alt="Habitación"
+                  src="{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}"
+                  data-fallback="{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}"
+                />
                 <div class="flex-grow-1">
                   <div class="fw-semibold" id="sum-room">Habitación</div>
                   <div class="text-muted small" id="sum-room-sub">—</div>
@@ -160,7 +168,7 @@
                 <span>Impuestos (13%)</span><span id="sum-tax">—</span>
               </div>
               <div class="d-flex justify-content-between">
-                <span>Cargos</span><span id="sum-fees">USD 0.00</span>
+                <span>Cargos</span><span id="sum-fees">₡ 0,00</span>
               </div>
               <hr />
               <div class="d-flex justify-content-between fw-semibold">
@@ -213,20 +221,13 @@
     const $ = (s) => document.querySelector(s);
 
     // ---------- utils ----------
+    const TAX_RATE = 0.13;
     const money = (n) =>
-      new Intl.NumberFormat("es-CR", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(
-        Number(n || 0)
-      );
+      new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 }).format(Number(n || 0));
     const fmtLong = (iso) => {
       if (!iso) return "";
       const d = new Date(iso + "T00:00:00");
-      return new Intl.DateTimeFormat("es-CR", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-        .format(d)
-        .replace(".", "");
+      return new Intl.DateTimeFormat("es-CR", { day: "2-digit", month: "short", year: "numeric" }).format(d).replace(".", "");
     };
     const nightsDiff = (a, b) => {
       const d1 = new Date(a + "T00:00:00");
@@ -234,17 +235,34 @@
       return Math.max(1, Math.round((d2 - d1) / 86400000));
     };
 
+    function normalizeImg(candidate) {
+      if (!candidate || typeof candidate !== "string") return "";
+      let c = candidate.trim();
+      if (c && !c.startsWith("/") && !/^https?:\/\//i.test(c)) {
+        c = c.startsWith("static/") ? "/" + c : "/" + c;
+      }
+      if (/^http:\/\//i.test(c)) c = c.replace(/^http:/i, "https:");
+      return c;
+    }
+
+    function setImgWithFallback(imgEl, candidate, fallback) {
+      if (!imgEl) return;
+      const cand = normalizeImg(candidate) || fallback;
+      const test = new Image();
+      test.onload = () => { imgEl.src = cand; };
+      test.onerror = () => { imgEl.src = fallback; };
+      test.src = cand;
+    }
+
     // ---------- carga selección ----------
     function loadSelection() {
       let sel = null;
       try {
         sel = JSON.parse(sessionStorage.getItem("villaGrace.selection") || "null");
-      } catch (_) {
-        sel = null;
-      }
+      } catch (_) { sel = null; }
 
-      // Permitir QS de respaldo
       const p = new URLSearchParams(location.search);
+
       if (!sel) {
         sel = {
           checkin: p.get("checkin"),
@@ -252,18 +270,35 @@
           adults: p.get("adults") || "2",
           children: p.get("children") || "0",
           roomCode: p.get("room"),
-          roomName: "Habitación",
+          roomName: "Habitación seleccionada",
           img: "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}",
           priceNight: Number(p.get("price") || 0),
           rateCode: p.get("rate") || "flex",
           rateName: "Tarifa Flexible",
           tipo: p.get("tipo") || "Sencilla",
+          total: Number(p.get("total") || 0),
         };
-        sel.nights = nightsDiff(sel.checkin, sel.checkout);
-      } else {
-        sel.nights = sel.nights || nightsDiff(sel.checkin, sel.checkout);
       }
+      sel.nights = sel.nights || nightsDiff(sel.checkin, sel.checkout);
       return sel;
+    }
+
+    // ---------- si faltan precio/imagen: intenta recuperar desde backend ----------
+    async function hydrateFromBackend(sel) {
+      if (sel.priceNight > 0 && sel.img) return sel;
+      try {
+        const r = await fetch("/grr/habitaciones", { headers: { Accept: "application/json" } });
+        const json = await r.json();
+        if (!json || !json.ok || !Array.isArray(json.rooms)) return sel;
+
+        const room = json.rooms.find(x => String(x.Codigo_Habitacion || x.code) === String(sel.roomCode));
+        if (room) {
+          if (!sel.roomName) sel.roomName = room.Nombre || room.name || sel.roomName;
+          if (!(sel.priceNight > 0)) sel.priceNight = Number(room.Precio_Noche ?? room.Precio_Base ?? room.price ?? 0) || 0;
+          if (!sel.img) sel.img = room.Imagen_URL || room.img || sel.img;
+        }
+        return sel;
+      } catch(_) { return sel; }
     }
 
     // ---------- prefill huésped ----------
@@ -274,23 +309,15 @@
       return { fname: parts.slice(0, -1).join(" "), lname: parts.slice(-1).join(" ") };
     }
     function tryGetStoredProfile() {
-      try {
-        return JSON.parse(sessionStorage.getItem("villaGrace.profile") || "null");
-      } catch (_) {
-        return null;
-      }
+      try { return JSON.parse(sessionStorage.getItem("villaGrace.profile") || "null"); }
+      catch(_) { return null; }
     }
     function prefillGuestFields() {
-      // 1) sesión del servidor (inyectada)
       const u = (window.__user || {});
       const { fname: sFN, lname: sLN } = splitName(u.name || "");
-
-      // 2) perfil almacenado localmente (si existe)
       const prof = tryGetStoredProfile() || {};
 
-      // 3) completar inputs si están vacíos
       const f = $("#fname"), l = $("#lname"), e = $("#email"), p = $("#phone");
-
       if (f && !f.value) f.value = sFN || prof.firstName || "";
       if (l && !l.value) l.value = sLN || prof.lastName  || "";
       if (e && !e.value) e.value = (u.email || prof.email || "");
@@ -299,24 +326,25 @@
 
     // ---------- render resumen ----------
     function renderSummary(sel) {
-      $("#hdr-sub").textContent = `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${
-        sel.nights > 1 ? "s" : ""
-      })`;
+      $("#hdr-sub").textContent =
+        `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${sel.nights>1?"s":""})`;
 
-      $("#sum-img").src = sel.img || "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}";
+      const imgEl = $("#sum-img");
+      const fallback = imgEl.getAttribute("data-fallback") || imgEl.src;
+      setImgWithFallback(imgEl, sel.img, fallback);
+
       $("#sum-room").textContent = sel.roomName || "Habitación seleccionada";
       $("#sum-room-sub").textContent = sel.tipo ? `${sel.tipo}` : "—";
-      $("#sum-dates").innerHTML = `<i class="bi bi-calendar-event me-1"></i>${fmtLong(sel.checkin)} – ${fmtLong(
-        sel.checkout
-      )}`;
-      $("#sum-guests").innerHTML = `<i class="bi bi-people me-1"></i>${sel.adults || 2} adulto(s)${
-        parseInt(sel.children || "0", 10) ? ` · ${sel.children} niño(s)` : ""
-      }`;
+      $("#sum-dates").innerHTML = `<i class="bi bi-calendar-event me-1"></i>${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)}`;
+      $("#sum-guests").innerHTML =
+        `<i class="bi bi-people me-1"></i>${sel.adults || 2} adulto(s)` +
+        (parseInt(sel.children || "0", 10) ? ` · ${sel.children} niño(s)` : "");
+
       $("#sum-nights").textContent = `${sel.nights}`;
       $("#sum-night-price").textContent = money(sel.priceNight);
 
       const subtotal = Number(sel.priceNight || 0) * sel.nights;
-      const tax = subtotal * 0.13;
+      const tax = subtotal * TAX_RATE;
       const total = subtotal + tax;
 
       $("#sum-subtotal").textContent = money(subtotal);
@@ -326,7 +354,6 @@
 
     // ---------- crear cliente mínimo (mock/backoffice) ----------
     async function ensureClient(fullName, email, phone) {
-      // En esta versión, asumimos cliente fijo ID=1 en la BD.
       return 1;
     }
 
@@ -390,6 +417,7 @@
         try {
           const result = await createReservation(sel, guest);
 
+          confirmPayload.reservaId = result.id || result.Codigo_Reserva || null;
           confirmPayload.numero = result.numero || "VG-PENDIENTE";
           confirmPayload.total = Number(result.monto || 0);
           confirmPayload.habitacion = result.habitacion || null;
@@ -408,20 +436,37 @@
     }
 
     // ---------- init ----------
-    const selection = loadSelection();
-    if (!selection || !selection.checkin || !selection.checkout) {
-      location.href = "booking-search.html";
-      return;
-    }
-    if (!selection.tipo) {
-      const n = (selection.roomName || "").toLowerCase();
-      selection.tipo =
-        n.includes("suite") ? "Suite" : n.includes("deluxe") || n.includes("doble") ? "Doble" : "Sencilla";
-    }
+    (async function init() {
+      const selection = loadSelection();
+      if (!selection || !selection.checkin || !selection.checkout) {
+        location.href = "booking-search.html";
+        return;
+      }
+      if (!selection.tipo) {
+        const n = (selection.roomName || "").toLowerCase();
+        selection.tipo =
+          n.includes("suite") ? "Suite" :
+          (n.includes("deluxe") || n.includes("doble")) ? "Doble" : "Sencilla";
+      }
 
-    renderSummary(selection);
-    prefillGuestFields();   // <<<<<< prellenado aquí
-    bindFinalize(selection);
+      await hydrateFromBackend(selection);
+
+      if (!(selection.priceNight > 0)) {
+        const backQS = new URLSearchParams({
+          checkin: selection.checkin || "",
+          checkout: selection.checkout || "",
+          adults: String(selection.adults || "2"),
+          children: String(selection.children || "0"),
+          room: selection.roomCode || ""
+        });
+        location.replace(`booking-details.html?${backQS.toString()}`);
+        return;
+      }
+
+      renderSummary(selection);
+      prefillGuestFields();
+      bindFinalize(selection);
+    })();
   })();
 </script>
 </body>

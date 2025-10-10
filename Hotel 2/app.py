@@ -5,15 +5,18 @@ import os
 import sys
 import smtplib
 import ssl
+import json
 from functools import wraps
 from email.message import EmailMessage
 from datetime import datetime, date
 from pathlib import Path
+from typing import Optional
+
 from sqlalchemy import text, func
 
 from flask import (
     Flask, render_template, jsonify,
-    request, redirect, url_for, flash, session, current_app
+    request, redirect, url_for, flash, session, current_app, send_file, abort
 )
 
 from sqlalchemy.exc import IntegrityError
@@ -43,6 +46,13 @@ except Exception:
     ReservaModel = None
 
 # =========================
+# Constantes / Paths
+# =========================
+STORAGE_DIR = BASE_DIR / "storage"
+COMPROBANTES_DIR = STORAGE_DIR / "comprobantes"
+COMPROBANTES_DIR.mkdir(parents=True, exist_ok=True)
+
+# =========================
 # Helpers (roles/redirects)
 # =========================
 DEFAULT_ROLES = ("Administrador", "Recepcionista", "Limpieza", "Cliente")
@@ -63,7 +73,6 @@ def _get_role_by_name(name: str):
     return Rol.query.filter_by(Nombre=name).first()
 
 def _get_role_name(user: Usuario) -> str:
-    # Si el relationship no está configurado, intentar resolver por Rol_Id
     try:
         if getattr(user, "rol", None) and getattr(user.rol, "Nombre", None):
             return user.rol.Nombre
@@ -109,10 +118,6 @@ def login_required(fn):
     return wrapper
 
 def role_required(*roles):
-    """
-    Permite el acceso solo si el rol actual está en 'roles'.
-    Uso: @role_required("Administrador") o @role_required("Administrador", "Recepcionista")
-    """
     roles_norm = {r.lower() for r in roles if r}
     def decorator(fn):
         @wraps(fn)
@@ -189,7 +194,7 @@ def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
 # =========================
 # Utilidades para reservas
 # =========================
-def _current_user_email() -> str | None:
+def _current_user_email() -> Optional[str]:
     try:
         uid = session.get("user_id")
         if not uid:
@@ -199,7 +204,7 @@ def _current_user_email() -> str | None:
     except Exception:
         return None
 
-def current_cliente_id() -> int | None:
+def current_cliente_id() -> Optional[int]:
     try:
         uid = session.get("user_id")
         if not uid:
@@ -217,7 +222,7 @@ def _get_first_attr(obj, names: list[str]):
             return getattr(obj, n)
     try:
         for n in names:
-            if n in obj:
+            if isinstance(obj, dict) and n in obj:
                 return obj[n]
     except Exception:
         pass
@@ -273,11 +278,7 @@ def _reserva_to_dict(r) -> dict:
         "updated_at":    updated.isoformat() if hasattr(updated, "isoformat") else (str(updated) if updated else None),
     }
 
-def _query_user_reservas(email: str, estado: str | None = None, f_ini: str | None = None, f_fin: str | None = None):
-    """
-    Devuelve las reservas ligadas al correo del usuario, ya sea por Cliente.Correo
-    o por el vínculo Usuario.Codigo_Cliente.
-    """
+def _query_user_reservas(email: str, estado: Optional[str] = None, f_ini: Optional[str] = None, f_fin: Optional[str] = None):
     if not email:
         return []
     params = {"email": (email or "").strip().lower()}
@@ -340,6 +341,9 @@ def _get_reserva_by_id(reserva_id: int):
           R.Huespedes,
           H.Precio_Noche,
           H.Tipo,
+          R.Codigo_Cliente,
+          R.Codigo_Habitacion,
+          R.Codigo_Funcionario,
           R.Fecha_Registro      AS Fecha_Creacion,
           R.Fecha_Registro      AS Fecha_Modificacion,
           C.Correo              AS Usuario
@@ -381,7 +385,7 @@ def _validate_no_overbooking(ci: str, co: str, rooms: int = 1) -> tuple[bool, st
         return False, data.get("message") or "Sin cupo para ese rango."
     return True, ""
 
-def ensure_cliente_for_email(nombre: str, correo: str, telefono: str | None = None) -> int | None:
+def ensure_cliente_for_email(nombre: str, correo: str, telefono: Optional[str] = None) -> Optional[int]:
     if not correo:
         return None
     correo = correo.strip().lower()
@@ -410,6 +414,198 @@ def ensure_cliente_for_email(nombre: str, correo: str, telefono: str | None = No
     return row2[0] if row2 else None
 
 # =========================
+# PDF / KPIs / Auditoría (GRR-01-002)
+# =========================
+
+def _make_unique_number(reserva_id: int, fecha_entrada: str) -> str:
+    """VG-YYYYMMDD-XXXX"""
+    ymd = fecha_entrada.replace("-", "")[:8] if fecha_entrada else datetime.utcnow().strftime("%Y%m%d")
+    return f"VG-{ymd}-{int(reserva_id):04d}"
+
+def _update_kpis(monto: float, fecha_entrada: str):
+    """
+    Upsert en KPI_Stats para day/week/month.
+    Clave day:  YYYY-MM-DD
+          week: ISO 'YYYY-Www'
+          month: YYYY-MM
+    """
+    try:
+        # Claves
+        dt = datetime.strptime(fecha_entrada[:10], "%Y-%m-%d")
+    except Exception:
+        dt = datetime.utcnow()
+    key_day = dt.strftime("%Y-%m-%d")
+    key_mon = dt.strftime("%Y-%m")
+    # ISO week
+    isoy, isow, _ = dt.isocalendar()
+    key_week = f"{isoy}-W{isow:02d}"
+
+    for periodo, clave in (('day', key_day), ('week', key_week), ('month', key_mon)):
+        db.session.execute(text("""
+            INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto)
+            VALUES (:p, :c, 1, :m)
+            ON DUPLICATE KEY UPDATE
+              Total_Reservas = Total_Reservas + 1,
+              Total_Monto    = Total_Monto + :m
+        """), {"p": periodo, "c": clave, "m": float(monto or 0)})
+    db.session.commit()
+
+def _audit_log(usuario: Optional[str], accion: str, detalles: dict):
+    try:
+        db.session.execute(text("""
+            INSERT INTO Audit_Log (Usuario, Accion, Detalles)
+            VALUES (:u, :a, :d)
+        """), {"u": (usuario or ""), "a": accion, "d": json.dumps(detalles, ensure_ascii=False)})
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.warning(f"[AUDIT] No se pudo registrar: {e}")
+        db.session.rollback()
+
+def _write_minimal_pdf(path: Path, title: str, lines: list[str]) -> None:
+    """
+    Genera un PDF válido sin dependencias externas (texto simple).
+    Si reportlab está disponible, la usa automáticamente.
+    """
+    try:
+        # Intentar con reportlab si está instalado
+        from reportlab.lib.pagesizes import LETTER  # type: ignore
+        from reportlab.pdfgen import canvas  # type: ignore
+        c = canvas.Canvas(str(path), pagesize=LETTER)
+        width, height = LETTER
+        y = height - 72
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(72, y, title)
+        y -= 24
+        c.setFont("Helvetica", 11)
+        for ln in lines:
+            if y < 72:
+                c.showPage()
+                y = height - 72
+                c.setFont("Helvetica", 11)
+            c.drawString(72, y, ln)
+            y -= 16
+        c.showPage()
+        c.save()
+        return
+    except Exception:
+        pass
+
+    # Fallback: PDF mínimo (Type1 Helvetica) con contenido básico
+    # (una sola página). Texto plano concatenado.
+    text_lines = [title, ""] + lines
+    content = ""
+    y = 750
+    for ln in text_lines:
+        ln = ln.replace("(", r"\(").replace(")", r"\)")
+        content += f"BT /F1 12 Tf 72 {y} Td ({ln}) Tj ET\n"
+        y -= 16
+        if y < 72:
+            # Para mantener simple, no creamos múltiples páginas en fallback
+            break
+
+    # Objetos
+    objects = []
+    xref = []
+    def _add(obj_str):
+        pos = sum(len(o) for o in objects)
+        xref.append(pos)
+        objects.append(obj_str)
+
+    # 1) Catalog
+    _add("1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n")
+    # 2) Pages
+    _add("2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n")
+    # 3) Page
+    _add("3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n")
+    # 4) Contents
+    stream = content.encode("latin-1", "ignore")
+    _add(f"4 0 obj << /Length {len(stream)} >> stream\n".encode("latin-1")+stream+b"\nendstream\nendobj\n")
+    # 5) Font
+    _add("5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n")
+
+    # Escribir PDF
+    with open(path, "wb") as f:
+        f.write(b"%PDF-1.4\n")
+        # objetos con offsets
+        offsets = []
+        cursor = f.tell()
+        for i, obj in enumerate(objects, start=1):
+            offsets.append(cursor)
+            if isinstance(obj, bytes):
+                f.write(obj)
+                cursor += len(obj)
+            else:
+                data = obj.encode("latin-1")
+                f.write(data)
+                cursor += len(data)
+        # xref
+        xref_pos = cursor
+        f.write(b"xref\n")
+        f.write(f"0 {len(objects)+1}\n".encode("latin-1"))
+        f.write(b"0000000000 65535 f \n")
+        for off in offsets:
+            f.write(f"{off:010d} 00000 n \n".encode("latin-1"))
+        # trailer
+        f.write(b"trailer\n")
+        f.write(f"<< /Size {len(objects)+1} /Root 1 0 R >>\n".encode("latin-1"))
+        f.write(b"startxref\n")
+        f.write(f"{xref_pos}\n".encode("latin-1"))
+        f.write(b"%%EOF")
+
+def _create_comprobante_pdf(reserva: dict) -> Path:
+    """
+    Crea el PDF de comprobante y devuelve la ruta.
+    También inserta registros en Documento y ReservaDocumento.
+    """
+    numero = reserva.get("Numero") or reserva.get("Numero_Comprobante") or reserva.get("numero")
+    rid    = int(reserva.get("Codigo_Reserva") or reserva.get("id"))
+    cliente_email = reserva.get("Usuario", "")
+    checkin  = reserva.get("Fecha_Entrada") or reserva.get("checkin")
+    checkout = reserva.get("Fecha_Salida")  or reserva.get("checkout")
+    tipo     = reserva.get("Tipo") or "Habitación"
+    monto    = float(reserva.get("Monto_Total") or reserva.get("monto") or 0.0)
+
+    filename = f"{numero}.pdf"
+    out_path = COMPROBANTES_DIR / filename
+
+    title = "Comprobante de Reserva — Hotel Villa Grace"
+    lines = [
+        f"Número:        {numero}",
+        f"Reserva ID:    {rid}",
+        f"Cliente:       {cliente_email or '-'}",
+        f"Check-in:      {checkin}",
+        f"Check-out:     {checkout}",
+        f"Habitación:    {tipo}",
+        f"Monto total:   ₡ {monto:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+        f"Canal:         {reserva.get('Canal') or reserva.get('canal') or 'Web'}",
+        f"Estado:        {reserva.get('Estado') or reserva.get('estado') or 'Confirmada'}",
+        "",
+        "Gracias por su preferencia.",
+    ]
+    _write_minimal_pdf(out_path, title, lines)
+
+    # Registrar en tablas Documento / ReservaDocumento (si existen)
+    try:
+        # Documento
+        res = db.session.execute(text("""
+            INSERT INTO Documento (Tipo, Ruta, MimeType, TamanoBytes)
+            VALUES ('Comprobante','/storage/comprobantes/:fn','application/pdf', :sz)
+        """).bindparams(fn=filename, sz=out_path.stat().st_size))
+        doc_id = res.lastrowid
+
+        # Relación
+        db.session.execute(text("""
+            INSERT INTO ReservaDocumento (Codigo_Reserva, Documento_Id)
+            VALUES (:r, :d)
+        """), {"r": rid, "d": doc_id})
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.warning(f"[COMPROBANTE] No se pudo registrar documento: {e}")
+        db.session.rollback()
+
+    return out_path
+
+# =========================
 # FACTORY PRINCIPAL
 # =========================
 from flask import url_for  # necesario en _validate_no_overbooking
@@ -434,6 +630,79 @@ def create_app() -> Flask:
     # Blueprint de GRR (creación de reservas)
     from blueprints.grr.routes import grr_bp
     app.register_blueprint(grr_bp, url_prefix="/grr")
+
+    # ---------------------- Hook GRR-01-002 ----------------------
+    @app.after_request
+    def grr_after_request(resp):
+        """
+        Si el POST /grr/reservas fue exitoso (JSON {ok:true, ...}),
+        generar comprobante PDF, actualizar KPIs y auditar.
+        """
+        try:
+            if request.method == "POST" and request.path.startswith("/grr/reservas") and resp.is_json:
+                data = resp.get_json(silent=True) or {}
+                if data.get("ok"):
+                    # Intentar obtener ID/numero/importe de la respuesta
+                    rid = data.get("id") or data.get("Codigo_Reserva") or data.get("reserva_id")
+                    numero = data.get("numero") or data.get("Numero_Comprobante")
+                    monto = float(data.get("monto") or data.get("Monto_Total") or 0)
+                    ci = (data.get("checkin") or data.get("Fecha_Entrada") or datetime.utcnow().strftime("%Y-%m-%d"))[:10]
+
+                    # Si no vino el id, intentar buscar la última reserva del cliente de sesión
+                    if not rid:
+                        email = _current_user_email()
+                        if email:
+                            row = db.session.execute(text("""
+                                SELECT Codigo_Reserva, Fecha_Entrada, Numero_Comprobante, Monto_Total
+                                  FROM Reserva R
+                                  JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
+                                 WHERE LOWER(C.Correo) = :e
+                                 ORDER BY R.Codigo_Reserva DESC
+                                 LIMIT 1
+                            """), {"e": email}).mappings().first()
+                            if row:
+                                rid = row["Codigo_Reserva"]
+                                ci  = _normalize_date_like(row["Fecha_Entrada"]) or ci
+                                numero = numero or row["Numero_Comprobante"]
+                                monto  = float(row["Monto_Total"] or 0)
+
+                    if not rid:
+                        return resp  # no podemos continuar
+
+                    # Asegurar número único en DB si no existe
+                    if not numero:
+                        row2 = db.session.execute(text("""
+                            SELECT Fecha_Entrada, Numero_Comprobante FROM Reserva WHERE Codigo_Reserva = :id LIMIT 1
+                        """), {"id": rid}).mappings().first()
+                        fe = _normalize_date_like(row2["Fecha_Entrada"]) if row2 else ci
+                        numero = _make_unique_number(int(rid), fe)
+                        db.session.execute(text("""
+                            UPDATE Reserva SET Numero_Comprobante = :n WHERE Codigo_Reserva = :id
+                        """), {"n": numero, "id": rid})
+                        db.session.commit()
+
+                    # Obtener datos completos de la reserva
+                    rfull = _get_reserva_by_id(int(rid))
+                    if rfull:
+                        # 1) PDF
+                        pdf_path = _create_comprobante_pdf(dict(rfull))
+                        current_app.logger.info(f"[COMPROBANTE] Generado: {pdf_path}")
+
+                        # 2) KPI
+                        _update_kpis(monto, rfull["Fecha_Entrada"])
+
+                        # 3) Auditoría
+                        _audit_log(_current_user_email(), "reserva.confirmada", {
+                            "reserva_id": int(rid),
+                            "numero": numero,
+                            "monto": monto,
+                            "checkin": rfull["Fecha_Entrada"],
+                            "checkout": rfull["Fecha_Salida"],
+                            "path": str(pdf_path)
+                        })
+        except Exception as e:
+            current_app.logger.exception(f"[GRR-01-002] Hook error: {e}")
+        return resp
 
     # ---------------------- Helpers de sesión para plantillas ----------------------
     @app.context_processor
@@ -487,7 +756,6 @@ def create_app() -> Flask:
         return redirect(url_for("booking_search"))
 
     # ---------------------- Portal / Ops / Admin (protegidas por rol) ------------
-    # Portal (solo Cliente)
     @app.route("/portal-dashboard.html")
     @role_required("Cliente")
     def portal_dashboard_html():
@@ -514,7 +782,6 @@ def create_app() -> Flask:
     def portal_reserva_detalle_html():
         return render_template("portal-reserva-detalle.html")
 
-    # Operaciones
     @app.route("/ops-dashboard.html")
     @role_required("Administrador", "Recepcionista")
     def ops_dashboard_html():
@@ -525,7 +792,6 @@ def create_app() -> Flask:
     def ops_housekeeping_html():
         return render_template("ops-housekeeping.html")
 
-    # Administración
     @app.route("/admin-dashboard.html")
     @role_required("Administrador")
     def admin_dashboard_html():
@@ -649,16 +915,16 @@ def create_app() -> Flask:
     def api_portal_reservas_list():
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
-    
+
         email = _current_user_email()
         if not email:
             current_app.logger.warning("[PORTAL] Sin email asociado a user_id=%s", session.get("user_id"))
-            return jsonify({"ok": True, "items": []})  # mejor vacío que 500
-    
+            return jsonify({"ok": True, "items": []})
+
         estado = request.args.get("estado") or None
         fini   = request.args.get("fini") or None
         ffin   = request.args.get("ffin") or None
-    
+
         try:
             reservas = _query_user_reservas(email, estado, fini, ffin)
             current_app.logger.info("[PORTAL] user=%s, cli_id=%s -> %d reservas",
@@ -666,7 +932,6 @@ def create_app() -> Flask:
             return jsonify({"ok": True, "items": reservas})
         except Exception as e:
             current_app.logger.exception("[PORTAL] Error listando reservas para %s: %s", email, e)
-            # Devuelve vacío para no romper el portal del huésped
             return jsonify({"ok": True, "items": [], "warning": "no_data"}), 200
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["GET"])
@@ -768,7 +1033,30 @@ def create_app() -> Flask:
             "emisor": {"hotel": "Hotel Villa Grace", "canal": data.get("canal", "Web")},
         }})
 
-    # ---------------------- RUTA DE HABITACIONES DINÁMICAS (opcional) ----------------------
+    # ---------------------- RUTA descarga comprobante ----------------------
+    @app.route("/api/reservas/<int:reserva_id>/comprobante", methods=["GET"])
+    @role_required("Cliente", "Administrador", "Recepcionista")
+    def api_reserva_comprobante(reserva_id: int):
+        r = _get_reserva_by_id(reserva_id)
+        if not r:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+
+        # Seguridad: si es Cliente, validar pertenencia
+        if _user_role().lower() == "cliente":
+            email = _current_user_email()
+            if not _reserva_belongs_to_email(reserva_id, email or ""):
+                return jsonify({"ok": False, "error": "forbidden"}), 403
+
+        numero = r.get("Numero") or _make_unique_number(reserva_id, _normalize_date_like(r.get("Fecha_Entrada")) or "")
+        pdf_path = COMPROBANTES_DIR / f"{numero}.pdf"
+        if not pdf_path.exists():
+            # Crear on-demand si no existe
+            _create_comprobante_pdf(dict(r))
+        if not pdf_path.exists():
+            return jsonify({"ok": False, "error": "not_available"}), 404
+        return send_file(str(pdf_path), as_attachment=True, download_name=f"{numero}.pdf")
+
+    # ---------------------- RUTA de HABITACIONES DINÁMICAS (opcional) ----------------------
     @app.route("/rooms.html")
     def rooms_html():
         try:
@@ -796,6 +1084,58 @@ def create_app() -> Flask:
             return jsonify({"ok": True, "habitaciones": data})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})
+
+    # ---------------------- KPIs para dashboards ----------------------
+    @app.get("/api/kpi/summary")
+    @role_required("Administrador", "Recepcionista")
+    def api_kpi_summary():
+        def _fetch(periodo, key_fmt_sql):
+            row = db.session.execute(text(f"""
+                SELECT Total_Reservas, Total_Monto
+                  FROM KPI_Stats
+                 WHERE Periodo = :p AND Clave = {key_fmt_sql}
+                 LIMIT 1
+            """), {"p": periodo}).first()
+            return {"reservas": int(row[0]) if row else 0,
+                    "monto": float(row[1]) if row else 0.0}
+
+        # Claves actuales
+        today = datetime.utcnow()
+        key_day_sql = "DATE_FORMAT(CURDATE(), '%Y-%m-%d')"
+        key_mon_sql = "DATE_FORMAT(CURDATE(), '%Y-%m')"
+        key_w_sql   = "DATE_FORMAT(CURDATE(), '%x-W%v')"
+
+        return jsonify({
+            "ok": True,
+            "day":   _fetch("day",   key_day_sql),
+            "week":  _fetch("week",  key_w_sql),
+            "month": _fetch("month", key_mon_sql),
+        })
+
+    # ---------------------- Auditoría reciente ----------------------
+    @app.get("/api/audit/recent")
+    @role_required("Administrador")
+    def api_audit_recent():
+        rows = db.session.execute(text("""
+            SELECT Id, Fecha, Usuario, Accion, Detalles
+              FROM Audit_Log
+             ORDER BY Id DESC
+             LIMIT 50
+        """)).mappings().all()
+        items = []
+        for r in rows:
+            try:
+                det = json.loads(r["Detalles"]) if r["Detalles"] else {}
+            except Exception:
+                det = {"raw": r["Detalles"]}
+            items.append({
+                "id": r["Id"],
+                "fecha": r["Fecha"].isoformat() if hasattr(r["Fecha"], "isoformat") else str(r["Fecha"]),
+                "usuario": r["Usuario"],
+                "accion": r["Accion"],
+                "detalles": det
+            })
+        return jsonify({"ok": True, "items": items})
 
     # ---------------------- Recuperar contraseña ----------------------
     @app.route("/forgot-password", methods=["GET", "POST"])
@@ -871,11 +1211,9 @@ def create_app() -> Flask:
 
             user = None
 
-            # 1) Buscar por correo, case-insensitive y sin espacios basura
             if identifier:
                 user = Usuario.query.filter(func.lower(Usuario.Correo) == identifier).first()
 
-            # 2) Si no está por correo, intentar por cédula/pasaporte EXACTA
             if not user:
                 ced = (request.form.get("email") or "").strip()
                 if ced:
@@ -889,14 +1227,12 @@ def create_app() -> Flask:
                 flash("Usuario inactivo.", "danger")
                 return render_template("login.html")
 
-            # 3) Verificación de password con hash
             ok = False
             try:
                 ok = bool(user.check_password(password))
             except Exception:
                 ok = False
 
-            # 4) Fallback “legacy”: si la BD trae una contraseña en claro
             if not ok:
                 legacy_plain = None
                 for col in ("Contrasena", "Password", "Password_Plain", "Pwd"):
@@ -904,7 +1240,6 @@ def create_app() -> Flask:
                         legacy_plain = getattr(user, col)
                         break
                 if legacy_plain and str(legacy_plain) == password:
-                    # Rehash inmediato para dejar limpia la cuenta
                     try:
                         user.set_password(password)
                         try:
@@ -922,7 +1257,6 @@ def create_app() -> Flask:
                 flash("Credenciales inválidas.", "danger")
                 return render_template("login.html")
 
-            # Vincula Usuario <-> Cliente por correo si no está vinculado
             try:
                 if not getattr(user, "Codigo_Cliente", None):
                     cid = ensure_cliente_for_email(user.Nombre, user.Correo, getattr(user, "Telefono", None))
@@ -1039,6 +1373,7 @@ if __name__ == "__main__":
     app = create_app()
     try:
         print(f"DB -> {os.getenv('DB_USER','root')} @ {os.getenv('DB_HOST','127.0.0.1')} : {os.getenv('DB_PORT','3306')} / {os.getenv('DB_NAME','Hotel_VillaGrace')}")
+        print(f"Comprobantes -> {COMPROBANTES_DIR}")
     except Exception:
         pass
     app.run(host="0.0.0.0", port=5000, debug=True)
