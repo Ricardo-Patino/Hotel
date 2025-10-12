@@ -3,27 +3,40 @@
 <head>
   <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
   <title>Finanzas – Facturas | Hotel Villa Grace</title>
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 </head>
 <body>
+
 <header id="header" class="header d-flex align-items-center fixed-top">
   <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
     <nav id="navmenu" class="navmenu">
       <ul>
-        <li class="dropdown"><a href="#" class="active"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+        <li class="dropdown">
+          <a href="#" class="active"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
           <ul>
-            <li><a href="fin-dashboard.html">Tablero</a></li>
-            <li><a href="fin-payments.html">Cobros y folios</a></li>
-            <li><a href="fin-invoices.html" class="active">Facturas</a></li>
-            <li><a href="fin-close.html">Cierre de caja</a></li>
+            <li><a href="#">Tablero</a></li>
+            <!-- Enlace estático para evitar BuildError si no existe el endpoint -->
+            <li><a href="/fin-payments.html">Cobros y folios</a></li>
+            <li><a href="{{ url_for('fin_invoices_html') }}" class="active">Facturas</a></li>
+            <li><a href="#">Cierre de caja</a></li>
           </ul>
         </li>
       </ul>
@@ -38,52 +51,158 @@
     <div class="container position-relative">
       <h1>Facturas</h1>
       <p>Emisión y historial de comprobantes.</p>
-      <nav class="breadcrumbs"><ol><li><a href="fin-dashboard.html">Finanzas</a></li><li class="current">Facturas</li></ol></nav>
+      <nav class="breadcrumbs">
+        <ol>
+          <li><a href="#">Finanzas</a></li>
+          <li class="current">Facturas</li>
+        </ol>
+      </nav>
     </div>
   </div>
 
   <section class="section">
     <div class="container" data-aos="fade-up">
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+          <div class="mb-3">
+            {% for category, msg in messages %}
+              <div class="alert alert-{{ 'warning' if category=='message' else category }} alert-dismissible fade show" role="alert">
+                {{ msg }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
       <div class="row g-4">
+        <!-- Formulario: Emitir factura -->
         <div class="col-lg-5">
           <div class="card shadow-sm border-0">
             <div class="card-header bg-white border-0"><h5 class="mb-0">Emitir factura</h5></div>
             <div class="card-body">
-              <form class="row g-3">
-                <div class="col-12"><label class="form-label">Folio</label><input class="form-control" placeholder="Ej. F-98215"></div>
-                <div class="col-12"><label class="form-label">Razón social / Nombre</label><input class="form-control"></div>
-                <div class="col-md-8"><label class="form-label">Correo</label><input type="email" class="form-control" placeholder="facturas@cliente.com"></div>
-                <div class="col-md-4"><label class="form-label">Identificación fiscal</label><input class="form-control" placeholder="NIF / RFC"></div>
-                <div class="col-12"><label class="form-label">Dirección</label><input class="form-control" placeholder="Calle, número, ciudad"></div>
-                <div class="col-md-6"><label class="form-label">Moneda</label><select class="form-select"><option>CRC</option><option>USD</option></select></div>
-                <div class="col-md-6"><label class="form-label">Forma de pago</label><select class="form-select"><option>Tarjeta</option><option>Efectivo</option><option>Transferencia</option></select></div>
-                <div class="col-12 d-flex justify-content-end"><button type="button" class="btn btn-success">Emitir</button></div>
+              <form class="row g-3" method="POST" action="{{ url_for('fin_invoice_nuevo') }}" enctype="multipart/form-data">
+                <div class="col-12">
+                  <label class="form-label">Número / Folio</label>
+                  <input name="numero" class="form-control" placeholder="Ej. VG-20251011-0001" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Razón social / Nombre</label>
+                  <input name="cliente_nombre" class="form-control">
+                </div>
+                <div class="col-md-8">
+                  <label class="form-label">Correo</label>
+                  <input name="cliente_email" type="email" class="form-control" placeholder="facturas@cliente.com">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Reserva (opcional)</label>
+                  <input name="id_reserva" type="number" class="form-control" min="1" placeholder="ID">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Moneda</label>
+                  <select name="moneda" class="form-select">
+                    <option value="CRC" selected>CRC</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Monto total</label>
+                  <input name="monto_total" type="number" step="0.01" class="form-control" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Descripción</label>
+                  <textarea name="descripcion" class="form-control" rows="2" placeholder="Detalle del servicio / concepto"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Adjuntar PDF (opcional)</label>
+                  <input name="archivo" type="file" accept=".pdf,.png,.jpg,.jpeg" class="form-control">
+                </div>
+                <div class="col-12 d-flex justify-content-end">
+                  <button type="submit" class="btn btn-success">Emitir</button>
+                </div>
               </form>
             </div>
           </div>
         </div>
 
+        <!-- Historial -->
         <div class="col-lg-7">
           <div class="card shadow-sm border-0 h-100">
             <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
               <h5 class="mb-0">Historial</h5>
               <div class="d-flex gap-2">
-                <input class="form-control form-control-sm" placeholder="Buscar factura…">
-                <button class="btn btn-success btn-sm"><i class="bi bi-search"></i></button>
+                <input id="q" class="form-control form-control-sm" placeholder="Buscar factura…" oninput="filterRows(this.value)">
+                <button class="btn btn-success btn-sm" type="button" onclick="filterRows(document.getElementById('q').value)">
+                  <i class="bi bi-search"></i>
+                </button>
               </div>
             </div>
             <div class="card-body p-0">
               <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                  <thead><tr><th>#</th><th>Fecha</th><th>Cliente</th><th>Folio</th><th class="text-end">Total</th><th></th></tr></thead>
+                <table class="table align-middle mb-0" id="tbl">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Fecha</th>
+                      <th>Cliente</th>
+                      <th>Folio</th>
+                      <th class="text-end">Total</th>
+                      <th class="text-center">Estado</th>
+                      <th class="text-end">Acciones</th>
+                    </tr>
+                  </thead>
                   <tbody>
-                    <tr><td>INV-1201</td><td>Hoy 10:32</td><td>María Gómez</td><td>F-98214</td><td class="text-end">$210.00</td>
-                      <td class="text-end"><button class="btn btn-outline-secondary btn-sm">PDF</button></td></tr>
-                    <tr><td>INV-1202</td><td>Hoy 11:08</td><td>Alex Ruiz</td><td>F-98215</td><td class="text-end">$246.00</td>
-                      <td class="text-end"><button class="btn btn-outline-secondary btn-sm">PDF</button></td></tr>
-                    <tr><td>INV-1203</td><td>Hoy 11:20</td><td>Lin Chen</td><td>F-98216</td><td class="text-end">$50.00</td>
-                      <td class="text-end"><button class="btn btn-outline-secondary btn-sm">PDF</button></td></tr>
+                    {% if facturas and facturas|length %}
+                      {% for f in facturas %}
+                        <tr>
+                          <td>{{ f.id_factura }}</td>
+                          <td>{{ f.fecha_emision.strftime('%Y-%m-%d %H:%M') if f.fecha_emision else '-' }}</td>
+                          <td>{{ f.cliente_nombre or '-' }}</td>
+                          <td class="fw-medium">{{ f.numero }}</td>
+                          <td class="text-end">
+                            {% if f.moneda == 'USD' %}$ {% else %}₡ {% endif %}
+                            {{ "%.2f"|format(f.monto_total) }}
+                          </td>
+                          <td class="text-center">
+                            {% set badge = 'secondary' %}
+                            {% if f.estado == 'Emitida' %}{% set badge='primary' %}
+                            {% elif f.estado == 'Pagada' %}{% set badge='success' %}
+                            {% elif f.estado == 'Anulada' %}{% set badge='danger' %}{% endif %}
+                            <span class="badge bg-{{ badge }}">{{ f.estado }}</span>
+                          </td>
+                          <td class="text-end d-flex gap-2 justify-content-end">
+                            {% if f.archivo_path %}
+                              <a class="btn btn-outline-secondary btn-sm"
+                                 href="{{ url_for('static', filename='uploads/invoices/' ~ f.archivo_path) }}"
+                                 target="_blank">PDF</a>
+                            {% else %}
+                              <button class="btn btn-outline-secondary btn-sm" disabled>PDF</button>
+                            {% endif %}
+
+                            {% if f.estado in ('Emitida','Borrador') %}
+                              <form method="POST" action="{{ url_for('fin_invoice_pagar', id=f.id_factura) }}">
+                                <button class="btn btn-outline-success btn-sm" type="submit" title="Marcar pagada">
+                                  <i class="bi bi-check2-circle"></i>
+                                </button>
+                              </form>
+                            {% endif %}
+
+                            {% if f.estado != 'Anulada' %}
+                              <form method="POST" action="{{ url_for('fin_invoice_anular', id=f.id_factura) }}"
+                                    onsubmit="return confirm('¿Anular esta factura?');">
+                                <button class="btn btn-outline-danger btn-sm" type="submit" title="Anular">
+                                  <i class="bi bi-slash-circle"></i>
+                                </button>
+                              </form>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    {% else %}
+                      <tr>
+                        <td colspan="7" class="text-center text-muted py-3">Sin facturas registradas.</td>
+                      </tr>
+                    {% endif %}
                   </tbody>
                 </table>
               </div>
@@ -98,11 +217,31 @@
 </main>
 
 <footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong></div></div>
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
 </footer>
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+  <i class="bi bi-arrow-up-short"></i>
+</a>
 <div id="preloader"></div>
+
 <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script><script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+<script>
+  function filterRows(q){
+    q = (q||'').toLowerCase();
+    document.querySelectorAll('#tbl tbody tr').forEach(r=>{
+      const txt = r.innerText.toLowerCase();
+      r.style.display = txt.includes(q) ? '' : 'none';
+    });
+  }
+</script>
 </body>
 </html>
+
+
+
+

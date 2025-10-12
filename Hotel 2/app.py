@@ -11,6 +11,8 @@ from email.message import EmailMessage
 from datetime import datetime, date
 from pathlib import Path
 from typing import Optional
+from werkzeug.utils import secure_filename
+
 
 from sqlalchemy import text, func
 
@@ -1363,6 +1365,116 @@ def create_app() -> Flask:
     @app.route("/register.html", methods=["GET", "POST"])
     def register_html():
         return register()
+    
+        # =========================
+    # FIN-INV-01 — Gestión de Facturas (fin-invoices)
+    # =========================
+    # Reutiliza: db, session, login_required, role_required, secure_filename, datetime
+
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'pdf'}
+
+
+    class FinInvoice(db.Model):
+        __tablename__ = "fin_invoices"
+        id_factura        = db.Column(db.Integer, primary_key=True)
+        numero            = db.Column(db.String(50), unique=True, nullable=False)  # Ej: VG-20251011-0001
+        cliente_nombre    = db.Column(db.String(120))
+        cliente_email     = db.Column(db.String(120), index=True)
+        moneda            = db.Column(db.String(10), default='CRC')
+        monto_total       = db.Column(db.Numeric(12,2), nullable=False)
+        descripcion       = db.Column(db.Text)
+        archivo_path      = db.Column(db.String(255))  # PDF subido (opcional)
+        id_reserva        = db.Column(db.Integer)      # vínculo opcional con reserva
+        id_usuario        = db.Column(db.Integer, nullable=False)  # quien la emitió
+        fecha_emision     = db.Column(db.DateTime, default=datetime.utcnow)
+        estado            = db.Column(db.Enum('Borrador','Emitida','Pagada','Anulada'), default='Emitida')
+
+    # Carpeta para archivos de facturas
+    INVOICE_UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads", "invoices")
+    os.makedirs(INVOICE_UPLOAD_FOLDER, exist_ok=True)
+
+    @app.route("/fin-invoices.html", methods=["GET"])
+    @login_required
+    @role_required('Administrador','Recepcionista')
+    def fin_invoices_html():
+        facturas = FinInvoice.query.order_by(FinInvoice.fecha_emision.desc()).limit(200).all()
+        return render_template("fin-invoices.html", facturas=facturas)
+
+    @app.route("/fin/invoices/nuevo", methods=["POST"])
+    @login_required
+    @role_required('Administrador','Recepcionista')
+    def fin_invoice_nuevo():
+        numero         = (request.form.get("numero") or "").strip()
+        cliente_nombre = (request.form.get("cliente_nombre") or "").strip()
+        cliente_email  = (request.form.get("cliente_email") or "").strip().lower()
+        moneda         = (request.form.get("moneda") or "CRC").strip()[:10]
+        monto_total    = request.form.get("monto_total")
+        descripcion    = (request.form.get("descripcion") or "").strip()
+        id_reserva     = request.form.get("id_reserva")
+
+        # Validaciones mínimas
+        if not numero or not monto_total:
+            flash("Debe indicar número de factura y monto.", "warning")
+            return redirect(url_for("fin_invoices_html"))
+
+        # Unicidad simple del número
+        if FinInvoice.query.filter_by(numero=numero).first():
+            flash("El número de factura ya existe.", "danger")
+            return redirect(url_for("fin_invoices_html"))
+
+        # Archivo (opcional, solo PDF/JPG/PNG permitidos por allowed_file())
+        archivo = request.files.get("archivo")
+        filename = None
+        if archivo and allowed_file(archivo.filename):
+            filename = secure_filename(archivo.filename)
+            save_path = os.path.join(INVOICE_UPLOAD_FOLDER, filename)
+            archivo.save(save_path)
+
+        factura = FinInvoice(
+            numero=numero,
+            cliente_nombre=cliente_nombre or None,
+            cliente_email=cliente_email or None,
+            moneda=moneda or "CRC",
+            monto_total=monto_total,
+            descripcion=descripcion or None,
+            archivo_path=filename,
+            id_reserva=int(id_reserva) if id_reserva else None,
+            id_usuario=session["user_id"],
+            estado='Emitida'
+        )
+        db.session.add(factura)
+        db.session.commit()
+
+        flash("Factura registrada correctamente.", "success")
+        return redirect(url_for("fin_invoices_html"))
+
+    @app.route("/fin/invoices/<int:id>/pagar", methods=["POST"])
+    @login_required
+    @role_required('Administrador','Recepcionista')
+    def fin_invoice_pagar(id):
+        factura = FinInvoice.query.get_or_404(id)
+        if factura.estado not in ('Emitida','Borrador'):
+            flash("Solo se pueden marcar como pagadas las facturas emitidas o en borrador.", "warning")
+            return redirect(url_for("fin_invoices_html"))
+        factura.estado = 'Pagada'
+        db.session.commit()
+        flash("Factura marcada como Pagada.", "success")
+        return redirect(url_for("fin_invoices_html"))
+
+    @app.route("/fin/invoices/<int:id>/anular", methods=["POST"])
+    @login_required
+    @role_required('Administrador')
+    def fin_invoice_anular(id):
+        factura = FinInvoice.query.get_or_404(id)
+        if factura.estado == 'Anulada':
+            flash("La factura ya está anulada.", "info")
+            return redirect(url_for("fin_invoices_html"))
+        factura.estado = 'Anulada'
+        db.session.commit()
+        flash("Factura anulada.", "info")
+        return redirect(url_for("fin_invoices_html"))
+
 
     return app
 
