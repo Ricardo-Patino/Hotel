@@ -11,6 +11,23 @@
 </head>
 
 <body class="rooms-page">
+  <header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="booking-search.html">Buscar</a></li>
+        <li><a href="booking-results.html">Disponibilidad</a></li>
+        <li><a href="booking-details.html">Detalle</a></li>
+        <li><a href="booking-checkout.html" class="active">Finalizar</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="portal-dashboard.html">Portal Huésped</a>
+  </div>
+</header>
 
   {% include 'partials/header.html' %}
 
@@ -24,9 +41,9 @@
           <div class="col-md-4 mb-4">
             <div class="card shadow-sm border-0">
               <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}"
-                   class="card-img-top"
-                   alt="Habitación {{ h.Tipo }}"
-                   onerror="this.src={{ url_for('static', filename='assets/img/hotel/default-room.webp') | tojson }};">
+                class="card-img-top"
+                alt="Habitación {{ h.Tipo }}"
+                onerror="this.onerror=null; this.src={{ url_for('static', filename='assets/img/hotel/default-room.webp') | tojson }};">
               <div class="card-body">
                 <h5 class="card-title">Habitación {{ h.Numero_Habitacion }} — {{ h.Tipo }}</h5>
                 <p class="card-text"><strong>Estado:</strong> {{ h.Estado }}</p>
