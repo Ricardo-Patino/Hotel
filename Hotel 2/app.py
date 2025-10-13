@@ -12,6 +12,7 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Optional
 from werkzeug.utils import secure_filename
+import reportlab
 
 
 from sqlalchemy import text, func
@@ -53,6 +54,11 @@ except Exception:
 STORAGE_DIR = BASE_DIR / "storage"
 COMPROBANTES_DIR = STORAGE_DIR / "comprobantes"
 COMPROBANTES_DIR.mkdir(parents=True, exist_ok=True)
+
+RECIBOS_DIR = STORAGE_DIR / "recibos"
+NOTAS_DIR   = STORAGE_DIR / "notas"
+RECIBOS_DIR.mkdir(parents=True, exist_ok=True)
+NOTAS_DIR.mkdir(parents=True, exist_ok=True)
 
 # =========================
 # Helpers (roles/redirects)
@@ -1674,6 +1680,363 @@ def create_app() -> Flask:
                 current_app.logger.warning(f"[POS] apply reserva failed: {e}")
 
         return jsonify({"ok": True, "id_tx": tx.id_tx})
+
+### HU 3 para finanzas
+
+    class FinReceipt(db.Model):
+        __tablename__ = "fin_receipts"
+        id_receipt  = db.Column(db.Integer, primary_key=True)
+        numero      = db.Column(db.String(40), unique=True, nullable=False)
+        reserva_id  = db.Column(db.Integer)
+        invoice_id  = db.Column(db.Integer)
+        tx_id       = db.Column(db.Integer)
+        metodo      = db.Column(db.String(30), default="Tarjeta", nullable=False)
+        currency    = db.Column(db.String(10), default="CRC", nullable=False)
+        monto       = db.Column(db.Numeric(14,2), nullable=False)
+        emitido_por = db.Column(db.Integer, nullable=False)
+        creado_en   = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+        estado      = db.Column(db.Enum('Emitido','Anulado'), default='Emitido', nullable=False)
+
+
+    class FinNote(db.Model):
+        __tablename__ = "fin_notes"
+        id_note     = db.Column(db.Integer, primary_key=True)
+        numero      = db.Column(db.String(40), unique=True, nullable=False)
+        tipo        = db.Column(db.Enum('Credito','Debito'), nullable=False)
+        ref_invoice = db.Column(db.Integer)
+        ref_reserva = db.Column(db.Integer)
+        currency    = db.Column(db.String(10), default='CRC', nullable=False)
+        monto_abs   = db.Column(db.Numeric(14,2), nullable=False)
+        motivo      = db.Column(db.String(255))
+        emitido_por = db.Column(db.Integer, nullable=False)
+        creado_en   = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+        estado      = db.Column(db.Enum('Emitida','Anulada'), default='Emitida', nullable=False)
+
+    def _make_seq(prefix: str, nid: int) -> str:
+        return f"{prefix}-{datetime.utcnow():%Y%m%d}-{nid:04d}"
+
+    def _create_receipt_pdf(recibo: FinReceipt) -> Path:
+        """
+        Genera un PDF con estilo para el Recibo (si reportlab está disponible).
+        Fallback: usa _write_minimal_pdf.
+        """
+        numero = recibo.numero
+        filename = f"{numero}.pdf"
+        out = RECIBOS_DIR / filename
+
+        try:
+            from reportlab.lib.pagesizes import LETTER
+            from reportlab.pdfgen import canvas as _cv
+
+            c = _cv.Canvas(str(out), pagesize=LETTER)
+            _draw_header(c, "Recibo de pago")
+
+            width, height = LETTER
+            y = height - 100
+
+            # Tarjeta resumen
+            c.setFillColorRGB(0.96,0.98,0.97)
+            c.roundRect(36, y-50, width-72, 50, 8, stroke=0, fill=1)
+            c.setFillColorRGB(0.09,0.33,0.25)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(48, y-20, f"Número: {numero}")
+            c.setFont("Helvetica", 10)
+            c.setFillColorRGB(0.2,0.2,0.2)
+            c.drawRightString(width-48, y-20, recibo.creado_en.strftime("%Y-%m-%d %H:%M"))
+
+            y -= 70
+
+            # Datos K/V
+            rows = [
+                ("Método",   recibo.metodo),
+                ("Moneda",   recibo.currency),
+                ("Monto",    _format_money_crc(recibo.monto, recibo.currency)),
+                ("Reserva ID", recibo.reserva_id or "-"),
+                ("Factura ID", recibo.invoice_id or "-"),
+                ("Tx POS ID",  recibo.tx_id or "-"),
+            ]
+            y = _kv_table(c, rows, y, title="Detalle del pago")
+
+            _footer(c, "Gracias por su pago.")
+            c.showPage()
+            c.save()
+            return out
+        except Exception:
+            # Fallback minimalista
+            lines = [
+                "COMPROBANTE DE PAGO", "",
+                f"Número:        {numero}",
+                f"Fecha:         {recibo.creado_en:%Y-%m-%d %H:%M}",
+                f"Método:        {recibo.metodo}",
+                f"Moneda:        {recibo.currency}",
+                f"Monto:         {_format_money_crc(recibo.monto, recibo.currency)}",
+                f"Reserva ID:    {recibo.reserva_id or '-'}",
+                f"Factura ID:    {recibo.invoice_id or '-'}",
+                f"Tx POS ID:     {recibo.tx_id or '-'}",
+                "",
+                "Gracias por su pago."
+            ]
+            _write_minimal_pdf(out, f"{_BRAND_NAME}  Recibo", lines)
+            return out
+
+
+    def _create_note_pdf(nota: FinNote) -> Path:
+        """
+        Genera PDF con estilo para Notas de Crédito/Débito.
+        """
+        numero = nota.numero
+        filename = f"{numero}.pdf"
+        out = NOTAS_DIR / filename
+        signo = "-" if nota.tipo == "Credito" else "+"
+
+        try:
+            from reportlab.lib.pagesizes import LETTER
+            from reportlab.pdfgen import canvas as _cv
+
+            c = _cv.Canvas(str(out), pagesize=LETTER)
+            title = f"Nota de {'Crédito' if nota.tipo=='Credito' else 'Débito'}"
+            _draw_header(c, title)
+
+            width, height = LETTER
+            y = height - 100
+
+            # Tarjeta resumen
+            c.setFillColorRGB(0.98,0.98,0.98)
+            c.roundRect(36, y-50, width-72, 50, 8, stroke=0, fill=1)
+            c.setFillColorRGB(0.09,0.33,0.25)
+            c.setFont("Helvetica-Bold", 12)
+            c.drawString(48, y-20, f"Número: {numero}")
+            c.setFont("Helvetica", 10)
+            c.setFillColorRGB(0.2,0.2,0.2)
+            c.drawRightString(width-48, y-20, nota.creado_en.strftime("%Y-%m-%d %H:%M"))
+
+            y -= 70
+
+            rows = [
+                ("Tipo",        "Crédito" if nota.tipo=="Credito" else "Débito"),
+                ("Moneda",      nota.currency),
+                ("Importe",     f"{signo}{_format_money_crc(nota.monto_abs, nota.currency)}"),
+                ("Reserva ID",  nota.ref_reserva or "-"),
+                ("Factura ID",  nota.ref_invoice or "-"),
+                ("Motivo",      nota.motivo or "-"),
+            ]
+            y = _kv_table(c, rows, y, title="Detalle")
+
+            _footer(c, "Documento generado digitalmente.")
+            c.showPage()
+            c.save()
+            return out
+        except Exception:
+            # Fallback minimalista
+            lines = [
+                f"NOTA DE {nota.tipo.upper()}", "",
+                f"Número:        {numero}",
+                f"Fecha:         {nota.creado_en:%Y-%m-%d %H:%M}",
+                f"Moneda:        {nota.currency}",
+                f"Importe:       {signo}{_format_money_crc(nota.monto_abs, nota.currency)}",
+                f"Aplica a Res.: {nota.ref_reserva or '-'}   Fact.: {nota.ref_invoice or '-'}",
+                f"Motivo:        {nota.motivo or '-'}",
+            ]
+            _write_minimal_pdf(out, f"{_BRAND_NAME} — Nota", lines)
+            return out
+
+
+    @app.post("/api/fin/receipts")
+    @login_required
+    @role_required('Administrador','Recepcionista')
+    def api_fin_receipts_new():
+        payload = request.get_json(silent=True) or {}
+        reserva_id = payload.get("reserva_id")
+        invoice_id = payload.get("invoice_id")
+        tx_id      = payload.get("tx_id")
+        metodo     = (payload.get("metodo") or "Tarjeta")[:30]
+        currency   = (payload.get("currency") or "CRC")[:10]
+        monto      = float(payload.get("monto") or 0)
+
+        if monto <= 0:
+            return jsonify({"ok": False, "error": "monto_invalid"}), 400
+
+        rec = FinReceipt(
+            numero="PENDING",  # temporal
+            reserva_id=int(reserva_id) if reserva_id else None,
+            invoice_id=int(invoice_id) if invoice_id else None,
+            tx_id=int(tx_id) if tx_id else None,
+            metodo=metodo, currency=currency, monto=monto,
+            emitido_por=session["user_id"]
+        )
+        db.session.add(rec)
+        db.session.flush()
+        rec.numero = _make_seq("RC", rec.id_receipt)
+
+        # efecto en reserva
+        if rec.reserva_id:
+            db.session.execute(text("""
+                UPDATE Reserva
+                SET Monto_Pagado = Monto_Pagado + :p,
+                    Fecha_Ultimo_Pago = NOW(),
+                    Estado = CASE
+                            WHEN Estado='Pendiente' AND (Monto_Pagado + :p) >= Monto_Total
+                            THEN 'Confirmada' ELSE Estado
+                            END
+                WHERE Codigo_Reserva = :r
+            """), {"p": monto, "r": rec.reserva_id})
+
+        db.session.commit()
+
+        pdf_path = _create_receipt_pdf(rec)
+        return jsonify({"ok": True, "id_receipt": rec.id_receipt, "numero": rec.numero, "pdf": f"/api/fin/receipts/{rec.id_receipt}/pdf"})
+
+    @app.get("/api/fin/receipts/<int:rid>/pdf")
+    @login_required
+    @role_required('Administrador','Recepcionista','Cliente')
+    def api_fin_receipt_pdf(rid: int):
+        rec = FinReceipt.query.get_or_404(rid)
+        path = RECIBOS_DIR / f"{rec.numero}.pdf"
+        if not path.exists():
+            _create_receipt_pdf(rec)
+        return send_file(str(path), as_attachment=True, download_name=f"{rec.numero}.pdf")
+
+## NC
+
+    @app.post("/api/fin/notes")
+    @login_required
+    @role_required('Administrador','Recepcionista')
+    def api_fin_notes_new():
+        payload   = request.get_json(silent=True) or {}
+        tipo      = (payload.get("tipo") or "").capitalize()  # 'Credito' | 'Debito'
+        if tipo not in ("Credito","Debito"):
+            return jsonify({"ok": False, "error": "tipo_invalid"}), 400
+
+        ref_invoice = payload.get("invoice_id")
+        ref_reserva = payload.get("reserva_id")
+        currency    = (payload.get("currency") or "CRC")[:10]
+        monto_abs   = float(payload.get("monto_abs") or 0)
+        motivo      = (payload.get("motivo") or "").strip()[:255]
+
+        if monto_abs <= 0:
+            return jsonify({"ok": False, "error": "monto_invalid"}), 400
+
+        note = FinNote(
+            numero="PENDING",
+            tipo=tipo,
+            ref_invoice=int(ref_invoice) if ref_invoice else None,
+            ref_reserva=int(ref_reserva) if ref_reserva else None,
+            currency=currency,
+            monto_abs=monto_abs,
+            motivo=motivo,
+            emitido_por=session["user_id"]
+        )
+        db.session.add(note)
+        db.session.flush()
+        prefix = "NC" if tipo == "Credito" else "ND"
+        note.numero = _make_seq(prefix, note.id_note)
+        db.session.commit()
+
+        pdf_path = _create_note_pdf(note)
+        return jsonify({"ok": True, "id_note": note.id_note, "numero": note.numero, "pdf": f"/api/fin/notes/{note.id_note}/pdf"})
+
+    @app.get("/api/fin/notes/<int:nid>/pdf")
+    @login_required
+    @role_required('Administrador','Recepcionista','Cliente')
+    def api_fin_note_pdf(nid: int):
+        note = FinNote.query.get_or_404(nid)
+        path = NOTAS_DIR / f"{note.numero}.pdf"
+        if not path.exists():
+            _create_note_pdf(note)
+        return send_file(str(path), as_attachment=True, download_name=f"{note.numero}.pdf")
+
+    # ====== PDF helpers con ReportLab (bonitos) ======
+    _BRAND_NAME = "Hotel Villa Grace"
+
+    def _asset_logo_path() -> Optional[str]:
+        """Devuelve una ruta de logo si existe (no rompe si no)."""
+        for rel in [
+            "static/assets/img/favicon.png",
+            "static/assets/img/apple-touch-icon.png",
+            "static/assets/img/logo.png",
+        ]:
+            p = BASE_DIR / rel
+            if p.exists():
+                return str(p)
+        return None
+
+    def _format_money_crc(v: float, currency: str = "CRC") -> str:
+        s = f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        if (currency or "CRC").upper() == "USD":
+            return f"$ {s}"
+        return f"₡ {s}"
+
+    def _draw_header(canvas, title: str):
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import LETTER
+        width, height = LETTER
+        logo = _asset_logo_path()
+
+        # Franja superior
+        canvas.setFillColorRGB(0.09, 0.33, 0.25)  # verde oscuro
+        canvas.rect(0, height-60, width, 60, stroke=0, fill=1)
+
+        # Logo si existe
+        x = 36
+        y = height-54
+        if logo:
+            try:
+                canvas.drawImage(logo, x, y-24, width=24, height=24, preserveAspectRatio=True, mask='auto')
+                x += 32
+            except Exception:
+                pass
+
+        # Nombre
+        canvas.setFillColorRGB(1,1,1)
+        canvas.setFont("Helvetica-Bold", 14)
+        canvas.drawString(x, height-40, _BRAND_NAME)
+
+        # Título a la derecha
+        canvas.setFont("Helvetica-Bold", 12)
+        canvas.drawRightString(width-36, height-40, title)
+
+    def _kv_table(canvas, rows, y_start, title=None):
+        """Dibuja tabla simple K/V. rows=[('Campo','Valor'),...] -> devuelve y_final."""
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import LETTER
+        width, height = LETTER
+        left = 48
+        right = width - 48
+        y = y_start
+
+        if title:
+            canvas.setFont("Helvetica-Bold", 11)
+            canvas.setFillColorRGB(0.09, 0.33, 0.25)
+            canvas.drawString(left, y, title)
+            y -= 10
+
+        canvas.setFillColorRGB(0,0,0)
+        canvas.setFont("Helvetica", 10)
+        for k, v in rows:
+            if y < 90:  # margen pie
+                canvas.showPage()
+                _draw_header(canvas, title or "")
+                y = height - 100
+                canvas.setFont("Helvetica", 10)
+            canvas.setFillColorRGB(0.15,0.15,0.15)
+            canvas.drawString(left, y, str(k))
+            canvas.setFillColorRGB(0,0,0)
+            canvas.drawRightString(right, y, str(v))
+            y -= 16
+
+        # línea separadora
+        canvas.setStrokeColorRGB(0.85,0.85,0.85)
+        canvas.line(left, y, right, y)
+        y -= 10
+        return y
+
+    def _footer(canvas, note=""):
+        from reportlab.lib.pagesizes import LETTER
+        width, height = LETTER
+        canvas.setFont("Helvetica-Oblique", 9)
+        canvas.setFillColorRGB(0.35,0.35,0.35)
+        canvas.drawString(48, 60, note or "Gracias por su preferencia.")
+
 
     return app
 

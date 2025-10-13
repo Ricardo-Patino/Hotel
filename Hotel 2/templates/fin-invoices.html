@@ -33,7 +33,6 @@
           <a href="#" class="active"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
           <ul>
             <li><a href="#">Tablero</a></li>
-            <!-- Enlace estático para evitar BuildError si no existe el endpoint -->
             <li><a href="/fin-payments.html">Cobros y folios</a></li>
             <li><a href="{{ url_for('fin_invoices_html') }}" class="active">Facturas</a></li>
             <li><a href="#">Cierre de caja</a></li>
@@ -62,7 +61,6 @@
 
   <section class="section">
     <div class="container" data-aos="fade-up">
-      {# === LÍNEA NUEVA PARA EVITAR UNDEFINED Y DESACTIVAR FILAS QUEMADAS === #}
       {% set facturas = facturas|default([], true) %}
 
       {% with messages = get_flashed_messages(with_categories=True) %}
@@ -174,14 +172,51 @@
                             <span class="badge bg-{{ badge }}">{{ f.estado }}</span>
                           </td>
                           <td class="text-end d-flex gap-2 justify-content-end">
+                            {# PDF factura cargado manualmente (si existe) #}
                             {% if f.archivo_path %}
                               <a class="btn btn-outline-secondary btn-sm"
                                  href="{{ url_for('static', filename='uploads/invoices/' ~ f.archivo_path) }}"
-                                 target="_blank">PDF</a>
+                                 target="_blank" title="Ver PDF adjunto">PDF</a>
                             {% else %}
                               <button class="btn btn-outline-secondary btn-sm" disabled>PDF</button>
                             {% endif %}
 
+                            {# Recibo de pago #}
+                            {% if f.estado in ('Emitida','Pagada') %}
+                            <button class="btn btn-outline-dark btn-sm"
+                                    title="Generar recibo de pago"
+                                    data-invoice="{{ f.id_factura }}"
+                                    data-reserva="{{ f.id_reserva or '' }}"
+                                    data-moneda="{{ f.moneda or 'CRC' }}"
+                                    onclick="openReceiptModal(this)">
+                              <i class="bi bi-receipt"></i>
+                            </button>
+                            {% endif %}
+
+                            {# Nota Crédito #}
+                            {% if f.estado != 'Anulada' %}
+                            <button class="btn btn-outline-primary btn-sm"
+                                    title="Nota de Crédito"
+                                    data-invoice="{{ f.id_factura }}"
+                                    data-reserva="{{ f.id_reserva or '' }}"
+                                    data-moneda="{{ f.moneda or 'CRC' }}"
+                                    data-tipo="Credito"
+                                    onclick="openNoteModal(this)">
+                              NC
+                            </button>
+                            {# Nota Débito #}
+                            <button class="btn btn-outline-warning btn-sm"
+                                    title="Nota de Débito"
+                                    data-invoice="{{ f.id_factura }}"
+                                    data-reserva="{{ f.id_reserva or '' }}"
+                                    data-moneda="{{ f.moneda or 'CRC' }}"
+                                    data-tipo="Debito"
+                                    onclick="openNoteModal(this)">
+                              ND
+                            </button>
+                            {% endif %}
+
+                            {# Pagar / Anular nativo de facturas #}
                             {% if f.estado in ('Emitida','Borrador') %}
                               <form method="POST" action="{{ url_for('fin_invoice_pagar', id=f.id_factura) }}">
                                 <button class="btn btn-outline-success btn-sm" type="submit" title="Marcar pagada">
@@ -189,7 +224,6 @@
                                 </button>
                               </form>
                             {% endif %}
-
                             {% if f.estado != 'Anulada' %}
                               <form method="POST" action="{{ url_for('fin_invoice_anular', id=f.id_factura) }}"
                                     onsubmit="return confirm('¿Anular esta factura?');">
@@ -219,6 +253,99 @@
   </section>
 </main>
 
+<!-- ========== MODAL: RECIBO ========== -->
+<div class="modal fade" id="modalReceipt" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="frmReceipt" class="needs-validation" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title">Generar recibo de pago</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="invoice_id" id="rc_invoice_id">
+          <input type="hidden" name="reserva_id" id="rc_reserva_id">
+          <div class="mb-3">
+            <label class="form-label">Método de pago</label>
+            <select name="metodo" id="rc_metodo" class="form-select" required>
+              <option>Tarjeta</option>
+              <option>Efectivo</option>
+              <option>Transferencia</option>
+              <option>Sinpe</option>
+            </select>
+            <div class="invalid-feedback">Selecciona el método.</div>
+          </div>
+          <div class="row g-2">
+            <div class="col-4">
+              <label class="form-label">Moneda</label>
+              <select name="currency" id="rc_currency" class="form-select">
+                <option value="CRC">CRC</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div class="col-8">
+              <label class="form-label">Monto</label>
+              <input type="number" step="0.01" min="0.01" class="form-control" name="monto" id="rc_monto" required>
+              <div class="invalid-feedback">Ingresa un monto mayor a 0.</div>
+            </div>
+          </div>
+          <small class="text-muted d-block mt-2">
+            Se guardará el recibo y se actualizará el pago de la reserva (si aplica).
+          </small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Generar recibo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MODAL: NOTA (Crédito/Débito) ========== -->
+<div class="modal fade" id="modalNote" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="frmNote" class="needs-validation" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title"><span id="nt_title_tipo">Nota</span> para factura</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="invoice_id" id="nt_invoice_id">
+          <input type="hidden" name="reserva_id" id="nt_reserva_id">
+          <input type="hidden" name="tipo" id="nt_tipo">
+          <div class="row g-2">
+            <div class="col-4">
+              <label class="form-label">Moneda</label>
+              <select name="currency" id="nt_currency" class="form-select">
+                <option value="CRC">CRC</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+            <div class="col-8">
+              <label class="form-label">Importe</label>
+              <input type="number" step="0.01" min="0.01" class="form-control" name="monto_abs" id="nt_monto" required>
+              <div class="invalid-feedback">Ingresa un importe válido.</div>
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">Motivo</label>
+            <textarea class="form-control" id="nt_motivo" name="motivo" rows="2" placeholder="Ej. Descuento por fidelidad"></textarea>
+          </div>
+          <small class="text-muted d-block mt-2">
+            Se generará el PDF de la nota y podrás descargarlo.
+          </small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="nt_btn_submit">Generar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <footer id="footer" class="footer position-relative dark-background">
   <div class="copyright text-center">
     <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
@@ -241,9 +368,108 @@
       r.style.display = txt.includes(q) ? '' : 'none';
     });
   }
+
+  // ====== Helpers Bootstrap Modal ======
+  const receiptModal = new bootstrap.Modal('#modalReceipt');
+  const noteModal    = new bootstrap.Modal('#modalNote');
+
+  // Abrir modal de Recibo con datos de la factura
+  function openReceiptModal(btn){
+    const inv = btn.dataset.invoice;
+    const res = btn.dataset.reserva || '';
+    const cur = btn.dataset.moneda || 'CRC';
+    document.getElementById('rc_invoice_id').value = inv;
+    document.getElementById('rc_reserva_id').value = res;
+    document.getElementById('rc_currency').value  = cur;
+    document.getElementById('rc_monto').value     = '';
+    document.getElementById('rc_metodo').value    = 'Tarjeta';
+    receiptModal.show();
+  }
+
+  // Abrir modal de Nota (Crédito/Débito)
+  function openNoteModal(btn){
+    const inv = btn.dataset.invoice;
+    const res = btn.dataset.reserva || '';
+    const cur = btn.dataset.moneda || 'CRC';
+    const tipo = btn.dataset.tipo; // Credito | Debito
+    document.getElementById('nt_invoice_id').value = inv;
+    document.getElementById('nt_reserva_id').value = res;
+    document.getElementById('nt_currency').value   = cur;
+    document.getElementById('nt_monto').value      = '';
+    document.getElementById('nt_motivo').value     = '';
+    document.getElementById('nt_tipo').value       = tipo;
+    document.getElementById('nt_title_tipo').innerText = 'Nota de ' + (tipo === 'Credito' ? 'Crédito' : 'Débito');
+    document.getElementById('nt_btn_submit').className = 'btn ' + (tipo === 'Credito' ? 'btn-primary' : 'btn-warning');
+    noteModal.show();
+  }
+
+  // ====== Submit Recibo ======
+  document.getElementById('frmReceipt').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const form = e.currentTarget;
+    if(!form.checkValidity()){
+      form.classList.add('was-validated');
+      return;
+    }
+    const payload = {
+      invoice_id: Number(document.getElementById('rc_invoice_id').value),
+      reserva_id: document.getElementById('rc_reserva_id').value ? Number(document.getElementById('rc_reserva_id').value) : null,
+      metodo:     document.getElementById('rc_metodo').value,
+      currency:   document.getElementById('rc_currency').value,
+      monto:      Number(document.getElementById('rc_monto').value)
+    };
+    try{
+      const r = await fetch('/api/fin/receipts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if(!r.ok || !data.ok) throw new Error(data.error || 'Error generando recibo');
+      receiptModal.hide();
+      if(data.pdf){ window.open(data.pdf, '_blank'); }
+      // recarga para ver cambios
+      setTimeout(()=>location.reload(), 600);
+    }catch(err){
+      alert('No se pudo generar el recibo: ' + err.message);
+    }
+  });
+
+  // ====== Submit Nota ======
+  document.getElementById('frmNote').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const form = e.currentTarget;
+    if(!form.checkValidity()){
+      form.classList.add('was-validated');
+      return;
+    }
+    const payload = {
+      tipo:       document.getElementById('nt_tipo').value, // Credito | Debito
+      invoice_id: Number(document.getElementById('nt_invoice_id').value),
+      reserva_id: document.getElementById('nt_reserva_id').value ? Number(document.getElementById('nt_reserva_id').value) : null,
+      currency:   document.getElementById('nt_currency').value,
+      monto_abs:  Number(document.getElementById('nt_monto').value),
+      motivo:     document.getElementById('nt_motivo').value
+    };
+    try{
+      const r = await fetch('/api/fin/notes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if(!r.ok || !data.ok) throw new Error(data.error || 'Error generando nota');
+      noteModal.hide();
+      if(data.pdf){ window.open(data.pdf, '_blank'); }
+      setTimeout(()=>location.reload(), 600);
+    }catch(err){
+      alert('No se pudo generar la nota: ' + err.message);
+    }
+  });
 </script>
 </body>
 </html>
+
 
 
 
