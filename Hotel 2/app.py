@@ -1475,6 +1475,205 @@ def create_app() -> Flask:
         flash("Factura anulada.", "info")
         return redirect(url_for("fin_invoices_html"))
 
+    # ====== FAC-07-002: Libro Mayor ======
+    class FinLedgerTx(db.Model):
+        __tablename__ = "fin_ledger_tx"
+        id_tx       = db.Column(db.Integer, primary_key=True)
+        external_id = db.Column(db.String(64), unique=True, nullable=False)
+        source      = db.Column(db.Enum('POS','BACKOFFICE'), default='POS', nullable=False)
+        reserva_id  = db.Column(db.Integer)  # FK opcional a Reserva
+        currency    = db.Column(db.String(10), default='CRC', nullable=False)
+        total       = db.Column(db.Numeric(14,2), default=0, nullable=False)
+        status      = db.Column(db.Enum('posted','voided'), default='posted', nullable=False)
+        created_at  = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+        meta        = db.Column(db.JSON)
+
+        lines = db.relationship("FinLedgerLine", backref="tx", cascade="all, delete-orphan")
+
+
+    class FinLedgerLine(db.Model):
+        __tablename__ = "fin_ledger_line"
+        id_line     = db.Column(db.Integer, primary_key=True)
+        id_tx       = db.Column(db.Integer, db.ForeignKey("fin_ledger_tx.id_tx"), nullable=False)
+        line_no     = db.Column(db.Integer, nullable=False)
+        account     = db.Column(db.String(64), nullable=False)
+        debit       = db.Column(db.Numeric(14,2), default=0, nullable=False)
+        credit      = db.Column(db.Numeric(14,2), default=0, nullable=False)
+        description = db.Column(db.String(255))
+
+            # ============== FAC-07-002: Webhook POS ==================
+    @app.post("/api/pos/tx")
+    def api_pos_tx():
+        """
+        JSON esperado:
+        {
+          "external_id": "POS-12345",
+          "reserva_id": 42,            # opcional
+          "currency": "CRC",
+          "total": 113000.00,
+          "lines": [
+            {"line_no":1,"account":"VENTA_HAB","debit":0,"credit":100000,"description":"Noche"},
+            {"line_no":2,"account":"IVA","debit":0,"credit":13000},
+            {"line_no":3,"account":"TPV","debit":113000,"credit":0,"description":"Tarjeta"}
+          ],
+          "meta": {"pos_device":"X-01"}
+        }
+        Regla: el monto cobrado = SUM(debit); se acumula en Reserva.Monto_Pagado si hay reserva_id.
+        """
+        # Autenticación simple
+        api_key = request.headers.get("X-POS-KEY")
+        if not api_key or api_key != current_app.config.get("POS_API_KEY", "dev-pos-key"):
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+
+        payload = request.get_json(silent=True) or {}
+        ext_id = (payload.get("external_id") or "").strip()
+        if not ext_id:
+            return jsonify({"ok": False, "error": "external_id_required"}), 400
+
+        if FinLedgerTx.query.filter_by(external_id=ext_id).first():
+            return jsonify({"ok": True, "duplicate": True})
+
+        reserva_id = payload.get("reserva_id")
+        currency   = (payload.get("currency") or "CRC")[:10]
+        total      = float(payload.get("total") or 0)
+        lines_in   = payload.get("lines") or []
+        meta       = payload.get("meta") or {}
+
+        if not lines_in:
+            return jsonify({"ok": False, "error": "lines_required"}), 400
+
+        tx = FinLedgerTx(
+            external_id=ext_id,
+            source='POS',
+            reserva_id=int(reserva_id) if reserva_id else None,
+            currency=currency,
+            total=total,
+            status='posted',
+            meta=meta
+        )
+        db.session.add(tx)
+        db.session.flush()
+
+        total_debit = 0.0
+        total_credit = 0.0
+        for ln in lines_in:
+            line = FinLedgerLine(
+                id_tx=tx.id_tx,
+                line_no=int(ln.get("line_no") or 0),
+                account=(ln.get("account") or "").strip()[:64] or "UNDEF",
+                debit=float(ln.get("debit") or 0),
+                credit=float(ln.get("credit") or 0),
+                description=(ln.get("description") or "").strip()[:255] or None
+            )
+            total_debit  += float(line.debit or 0)
+            total_credit += float(line.credit or 0)
+            db.session.add(line)
+
+        if round(total_debit - total_credit, 2) != 0.00:
+            current_app.logger.warning(f"[POS] Descuadre {ext_id}: debit={total_debit} credit={total_credit}")
+
+        if tx.reserva_id:
+            db.session.execute(
+                text("UPDATE Reserva SET Monto_Pagado = Monto_Pagado + :p WHERE Codigo_Reserva = :r"),
+                {"p": total_debit, "r": tx.reserva_id}
+            )
+
+        db.session.commit()
+        return jsonify({"ok": True, "id_tx": tx.id_tx, "posted_debit": total_debit, "posted_credit": total_credit})
+
+    # === Helper: aplica efecto POS a la reserva (estado/canal + auditoría) ===
+    def _apply_pos_tx_to_reserva(reserva_id: int, total: float, external_id: str):
+        try:
+            # Actualiza estado/canal de la reserva
+            db.session.execute(text("""
+                UPDATE Reserva
+                SET Estado = CASE WHEN Estado='Pendiente' THEN 'Confirmada' ELSE Estado END,
+                    Canal  = 'POS'
+                WHERE Codigo_Reserva = :rid
+                LIMIT 1
+            """), {"rid": reserva_id})
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[POS][RESERVA] No se pudo actualizar R={reserva_id}: {e}")
+            db.session.rollback()
+
+        # Auditoría
+        try:
+            _audit_log(None, "pos.tx.posted", {
+                "reserva_id": reserva_id,
+                "external_id": external_id,
+                "total": float(total)
+            })
+        except Exception:
+            pass
+
+    # === FAC-07-002: Endpoint para recibir transacciones del POS ===
+    @app.post("/api/pos/ledger")
+    def api_pos_ledger():
+        # Autenticación por API Key en header
+        api_key = request.headers.get("X-Api-Key") or request.headers.get("Authorization", "").replace("Bearer ", "")
+        expected = app.config.get("POS_API_KEY") or os.getenv("POS_API_KEY") or "dev-pos-key"
+        if not api_key or api_key != expected:
+            return jsonify({"ok": False, "error": "unauthorized"}), 401
+
+        payload = request.get_json(silent=True) or {}
+        external_id = (payload.get("external_id") or "").strip()
+        reserva_id  = payload.get("reserva_id")
+        currency    = (payload.get("currency") or "CRC").strip()[:10]
+        lines       = payload.get("lines") or []  # [{account,debit,credit,description}]
+        meta        = payload.get("meta") or {}
+
+        if not external_id or not isinstance(lines, list) or not lines:
+            return jsonify({"ok": False, "error": "invalid_payload"}), 400
+
+        # Idempotencia por external_id
+        existing = db.session.query(FinLedgerTx).filter_by(external_id=external_id).first()
+        if existing:
+            return jsonify({"ok": True, "id_tx": existing.id_tx, "status": "already_posted"})
+
+        # Validación de doble partida
+        total_debit  = sum(float(x.get("debit") or 0) for x in lines)
+        total_credit = sum(float(x.get("credit") or 0) for x in lines)
+        if round(total_debit - total_credit, 2) != 0.00:
+            return jsonify({"ok": False, "error": "unbalanced_entry",
+                            "debit": total_debit, "credit": total_credit}), 422
+
+        # Total como importe neto cobranzas (opcional, aquí usamos el mayor de debit/credit)
+        total = max(total_debit, total_credit)
+
+        # Crear TX y líneas
+        tx = FinLedgerTx(
+            external_id=external_id,
+            source='POS',
+            reserva_id=int(reserva_id) if reserva_id else None,
+            currency=currency,
+            total=total,
+            status='posted',
+            meta=meta
+        )
+        db.session.add(tx)
+        db.session.flush()  # para obtener id_tx
+
+        for idx, ln in enumerate(lines, start=1):
+            db.session.add(FinLedgerLine(
+                id_tx=tx.id_tx,
+                line_no=idx,
+                account=(ln.get("account") or "").strip()[:64] or "UNASSIGNED",
+                debit=float(ln.get("debit") or 0),
+                credit=float(ln.get("credit") or 0),
+                description=(ln.get("description") or "")[:255] or None
+            ))
+
+        db.session.commit()
+
+        # Si viene reserva_id, aplicar efecto sobre la reserva
+        if reserva_id:
+            try:
+                _apply_pos_tx_to_reserva(int(reserva_id), total, external_id)
+            except Exception as e:
+                current_app.logger.warning(f"[POS] apply reserva failed: {e}")
+
+        return jsonify({"ok": True, "id_tx": tx.id_tx})
 
     return app
 

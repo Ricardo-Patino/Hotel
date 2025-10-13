@@ -62,6 +62,9 @@
 
   <section class="section">
     <div class="container" data-aos="fade-up">
+      {# === LÍNEA NUEVA PARA EVITAR UNDEFINED Y DESACTIVAR FILAS QUEMADAS === #}
+      {% set facturas = facturas|default([], true) %}
+
       {% with messages = get_flashed_messages(with_categories=True) %}
         {% if messages %}
           <div class="mb-3">
@@ -241,6 +244,7 @@
 </script>
 </body>
 </html>
+
 
 
 

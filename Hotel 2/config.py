@@ -42,6 +42,8 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    POS_API_KEY = os.environ.get("POS_API_KEY", "dev-pos-key")
+
     print(
     "DB ->",
     os.environ.get("DB_USER", "root"),
