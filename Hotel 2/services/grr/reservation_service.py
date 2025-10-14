@@ -19,6 +19,9 @@ from sqlalchemy.orm import Query
 from extensions import db
 from models_sql import Habitacion, Reserva, Cliente, DocumentoSQL as Documento, ReservaDocumento
 
+from extensions import db
+from models_sql import Reserva
+from services.grr.housekeeping_sync import on_checkout_transition
 
 
 # ========= Fallbacks opcionales (no bloqueantes) =========
@@ -122,6 +125,16 @@ def _save_pdf_reserva(reserva: Reserva, habitacion: Habitacion) -> Tuple[bytes, 
     with open(path, "wb") as f:
         f.write(blob)
     return blob, path, "application/pdf"
+
+
+def marcar_checkout(reserva_id: int):
+    r = Reserva.query.get(reserva_id)
+    if not r:
+        raise ValueError("Reserva no existe")
+    r.Estado = 'Finalizada'
+    on_checkout_transition(r)
+    db.session.commit()
+    return r
 
 
 # =========================
@@ -530,3 +543,17 @@ class ReservationService:
         if not h:
             return 0.0
         return float(self._coalesce_price(h))
+
+
+from datetime import date
+from models_sql import TarifaTemporada, Temporada
+
+def precio_noche_vigente(hab_id: int, fecha: date, precio_base: float) -> float:
+    t = (db.session.query(TarifaTemporada)
+         .join(Temporada, TarifaTemporada.Temporada_Id == Temporada.Id)
+         .filter(TarifaTemporada.Codigo_Habitacion == hab_id,
+                 Temporada.Fecha_Inicio <= fecha,
+                 Temporada.Fecha_Fin   >= fecha)
+         .first())
+    return float(t.Precio_Noche) if t else float(precio_base)
+

@@ -137,4 +137,29 @@
   <div id="preloader"></div>
   <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script><script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script><script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 </body>
+
+<script>
+async function loadBoard() {
+  const res = await fetch("/grr/api/rooms/status");
+  const data = await res.json();
+  for (const estado of ["Disponible","Ocupada","Limpieza","Mantenimiento"]) {
+    const col = document.getElementById("col-" + estado);
+    if (!col) continue;
+    col.innerHTML = "";
+    (data[estado] || []).forEach(h => {
+      const card = document.createElement("div");
+      card.className = "card mb-2";
+      card.innerHTML = `
+        <div class="card-body">
+          <div class="fw-bold">Hab. ${h.numero} — ${h.tipo}</div>
+          <small>₡${h.precio.toLocaleString()}</small>
+        </div>`;
+      col.appendChild(card);
+    });
+  }
+}
+loadBoard();
+setInterval(loadBoard, 30000); 
+</script>
+
 </html>

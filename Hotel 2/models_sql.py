@@ -173,3 +173,55 @@ class ReservaDocumento(db.Model):
     Id             = db.Column(db.Integer, primary_key=True, autoincrement=True)
     Codigo_Reserva = db.Column(db.Integer, db.ForeignKey('Reserva.Codigo_Reserva'), nullable=False, index=True)
     Documento_Id   = db.Column(db.Integer, db.ForeignKey('Documento.Id'), nullable=False, index=True)
+
+class LimpiezaOrden(db.Model):
+    __tablename__ = 'LimpiezaOrden'
+    Id                = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Codigo_Habitacion = db.Column(db.Integer, db.ForeignKey('Habitacion.Codigo_Habitacion'), nullable=False, index=True)
+    Estado            = db.Column(db.String(20), nullable=False, default='Pendiente')  # Enum en MySQL
+    Notas             = db.Column(db.String(255))
+    Fecha_Creacion    = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    Fecha_Actualiza   = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp(),
+                                  server_onupdate=func.current_timestamp())
+
+    Habitacion = db.relationship('Habitacion', lazy='joined')
+
+class LimpiezaInsumo(db.Model):
+    __tablename__ = 'LimpiezaInsumo'
+    Id       = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Orden_Id = db.Column(db.Integer, db.ForeignKey('LimpiezaOrden.Id'), nullable=False, index=True)
+    Insumo   = db.Column(db.String(120), nullable=False)
+    Cantidad = db.Column(db.Numeric(10,2), nullable=False, default=1)
+
+    Orden = db.relationship('LimpiezaOrden', backref='Insumos', lazy='joined')
+
+class Temporada(db.Model):
+    __tablename__ = 'Temporada'
+    Id           = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Nombre       = db.Column(db.String(60), nullable=False)
+    Fecha_Inicio = db.Column(db.Date, nullable=False)
+    Fecha_Fin    = db.Column(db.Date, nullable=False)
+
+class TarifaTemporada(db.Model):
+    __tablename__ = 'TarifaTemporada'
+    Id                = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Codigo_Habitacion = db.Column(db.Integer, db.ForeignKey('Habitacion.Codigo_Habitacion'), nullable=False, index=True)
+    Temporada_Id      = db.Column(db.Integer, db.ForeignKey('Temporada.Id'), nullable=False, index=True)
+    Precio_Noche      = db.Column(db.Numeric(12,2), nullable=False)
+    Habitacion        = db.relationship('Habitacion', lazy='joined')
+    Temporada         = db.relationship('Temporada',  lazy='joined')
+
+
+class MantenimientoSolicitud(db.Model):
+    __tablename__ = 'MantenimientoSolicitud'
+    Id                = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Codigo_Habitacion = db.Column(db.Integer, db.ForeignKey('Habitacion.Codigo_Habitacion'), nullable=False, index=True)
+    Titulo            = db.Column(db.String(120), nullable=False)
+    Descripcion       = db.Column(db.String(500))
+    Prioridad         = db.Column(db.String(10), nullable=False, default='Media')
+    Estado            = db.Column(db.String(12), nullable=False, default='Abierta')
+    Fecha_Creacion    = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    Fecha_Actualiza   = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp(),
+                                  server_onupdate=func.current_timestamp())
+    Habitacion        = db.relationship('Habitacion', lazy='joined')
+

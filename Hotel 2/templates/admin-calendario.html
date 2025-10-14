@@ -8,6 +8,8 @@
   <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.js"></script>
   <style>
     /* Placeholder simple para el calendario tipo Gantt */
     .cal-row{display:flex;gap:.25rem;align-items:center}
@@ -55,6 +57,20 @@
           <span class="badge bg-secondary">Bloqueo</span>
         </div>
       </div>
+      <div id="calendar"></div>
+      <script>
+      document.addEventListener('DOMContentLoaded', async () => {
+        const params = new URLSearchParams(location.search);
+        const room_id = params.get('room_id') || '';
+        const calendarEl = document.getElementById('calendar');
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'dayGridMonth',
+          height: 'auto',
+          events: '/grr/api/rooms/calendar' + (room_id ? ('?room_id='+room_id) : '')
+        });
+        calendar.render();
+      });
+      </script>
 
       <div class="card shadow-sm border-0">
         <div class="card-body">

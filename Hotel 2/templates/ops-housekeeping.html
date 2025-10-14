@@ -70,7 +70,7 @@
             <div class="table-responsive">
               <table class="table align-middle mb-0">
                 <thead><tr><th>Hab.</th><th>Tipo</th><th>Asignado</th><th>Estado</th><th>Inicio</th><th>Fin</th><th></th></tr></thead>
-                <tbody>
+                <tbody id="hk-tbody">
                   <tr><td>105</td><td>Salida</td><td>Laura</td><td><span class="badge text-bg-warning">En curso</span></td><td>12:10</td><td>—</td>
                     <td class="text-end"><button class="btn btn-success btn-sm">Marcar lista</button></td></tr>
                   <tr><td>221</td><td>Diaria</td><td>Marcos</td><td><span class="badge text-bg-secondary">Pendiente</span></td><td>—</td><td>—</td>
@@ -86,6 +86,39 @@
       </div>
     </section>
   </main>
+
+  <script>
+async function loadOrdenes(){
+  const r = await fetch('/grr/housekeeping/api/ordenes');
+  const data = await r.json();
+  const tbody = document.getElementById('hk-tbody');
+  tbody.innerHTML = '';
+  data.forEach(o => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${o.id}</td>
+      <td>${o.habitacion ?? '-'}</td>
+      <td><span class="badge bg-secondary">${o.estado}</span></td>
+      <td>${o.notas ?? ''}</td>
+      <td>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary" onclick="setEstado(${o.id}, 'Pendiente')">Pendiente</button>
+          <button class="btn btn-outline-primary"   onclick="setEstado(${o.id}, 'EnProceso')">En proceso</button>
+          <button class="btn btn-outline-success"   onclick="setEstado(${o.id}, 'Terminado')">Terminado</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+async function setEstado(id, estado){
+  const form = new FormData(); form.append('estado', estado);
+  await fetch(`/grr/housekeeping/orden/${id}/estado`, {method:'POST', body: form});
+  loadOrdenes();
+}
+loadOrdenes();
+setInterval(loadOrdenes, 30000);
+</script>
+
 
   <footer id="footer" class="footer position-relative dark-background">
     <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong></div></div>

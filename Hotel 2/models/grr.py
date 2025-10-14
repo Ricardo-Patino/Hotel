@@ -11,11 +11,11 @@ from extensions import db
 #    TamanoBytes = db.Column(db.BigInteger, nullable=False, default=0)
 #    Fecha_Subida = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-class ReservaDocumento(db.Model):
-    __tablename__ = "ReservaDocumento"
-    Id = db.Column(db.BigInteger, primary_key=True)
-    Codigo_Reserva = db.Column(db.Integer, db.ForeignKey('Reserva.Codigo_Reserva'), nullable=False)
-    Documento_Id = db.Column(db.BigInteger, db.ForeignKey('Documento.Id'), nullable=False)
+#class ReservaDocumento(db.Model):
+#    __tablename__ = "ReservaDocumento"
+#    Id = db.Column(db.BigInteger, primary_key=True)
+#    Codigo_Reserva = db.Column(db.Integer, db.ForeignKey('Reserva.Codigo_Reserva'), nullable=False)
+#    Documento_Id = db.Column(db.BigInteger, db.ForeignKey('Documento.Id'), nullable=False)
 
 class AuditoriaLog(db.Model):
     __tablename__ = "Auditoria_Log"

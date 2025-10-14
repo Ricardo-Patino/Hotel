@@ -361,3 +361,127 @@ def grr_not_found(e):
 @grr_bp.app_errorhandler(405)
 def grr_method_not_allowed(e):
     return jsonify({"ok": False, "error": "Method Not Allowed", "path": request.path}), 405
+
+
+# =========================
+# GHL-02-001: Board + Calendario
+# =========================
+from datetime import date
+from flask import request
+from models_sql import Habitacion, Reserva
+from sqlalchemy import and_, or_
+from extensions import db
+
+def _habs_ocupadas_hoy_ids():
+    hoy = date.today()
+    # rango [Entrada, Salida) => ocupada si hoy pertenece a ese rango
+    sub = db.session.query(Reserva.Codigo_Habitacion).filter(
+        and_(Reserva.Fecha_Entrada <= hoy, Reserva.Fecha_Salida > hoy),
+        Reserva.Estado.in_(('Confirmada','CheckIn','EnCurso','Pagada'))
+    ).distinct()
+    return {row[0] for row in sub.all()}
+
+@grr_bp.get("/api/rooms/status")
+def api_rooms_status():
+    ocupadas_ids = _habs_ocupadas_hoy_ids()
+    data = {"Disponible": [], "Ocupada": [], "Limpieza": [], "Mantenimiento": []}
+    for h in Habitacion.query.order_by(Habitacion.Numero_Habitacion.asc()).all():
+        if h.Codigo_Habitacion in ocupadas_ids:
+            estado = "Ocupada"
+        else:
+            # Estado del registro manda si no está ocupada por reserva
+            estado = h.Estado if h.Estado in data else "Disponible"
+        data[estado].append({
+            "id": h.Codigo_Habitacion,
+            "numero": h.Numero_Habitacion,
+            "tipo": h.Tipo,
+            "precio": float(h.Precio_Noche),
+        })
+    return jsonify(data)
+
+@grr_bp.get("/api/rooms/calendar")
+def api_rooms_calendar():
+    """Eventos de reservas para un calendario. Parámetros:
+       - room_id (opcional) => sólo esa habitación
+    """
+    room_id = request.args.get("room_id", type=int)
+    q = Reserva.query
+    if room_id:
+        q = q.filter(Reserva.Codigo_Habitacion == room_id)
+    eventos = []
+    for r in q.all():
+        eventos.append({
+            "id": r.Codigo_Reserva,
+            "title": f"H#{r.Codigo_Habitacion} / {r.Estado}",
+            "start": r.Fecha_Entrada.isoformat(),
+            "end":   r.Fecha_Salida.isoformat(),  # FullCalendar usa end-excl
+        })
+    return jsonify(eventos)
+
+
+from models_sql import LimpiezaOrden
+
+@grr_bp.get("/housekeeping/api/ordenes")
+def hk_list():
+    ordenes = (LimpiezaOrden.query
+               .order_by(LimpiezaOrden.Fecha_Creacion.desc())
+               .all())
+    return jsonify([{
+        "id": o.Id,
+        "habitacion": o.Habitacion.Numero_Habitacion if o.Habitacion else None,
+        "estado": o.Estado,
+        "notas": o.Notas,
+        "creado": o.Fecha_Creacion.isoformat(),
+    } for o in ordenes])
+
+@grr_bp.post("/housekeeping/orden/<int:orden_id>/estado")
+def hk_set_estado(orden_id):
+    nuevo = (request.form.get("estado") or "").strip()
+    if nuevo not in ("Pendiente","EnProceso","Terminado"):
+        return jsonify({"ok": False, "error": "Estado inválido"}), 400
+    o = LimpiezaOrden.query.get_or_404(orden_id)
+    o.Estado = nuevo
+    if nuevo == "Terminado" and o.Habitacion:
+        o.Habitacion.Estado = "Disponible"
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+from models_sql import MantenimientoSolicitud
+
+@grr_bp.post("/mant/solicitudes")
+def mant_crear():
+    hab_id     = request.form.get("habitacion_id", type=int)
+    titulo     = (request.form.get("titulo") or "").strip()
+    desc       = (request.form.get("descripcion") or "").strip()
+    prioridad  = (request.form.get("prioridad") or "Media").strip()
+    if not hab_id or not titulo:
+        return jsonify({"ok": False, "error": "Datos incompletos"}), 400
+    s = MantenimientoSolicitud(
+        Codigo_Habitacion=hab_id, Titulo=titulo,
+        Descripcion=desc, Prioridad=prioridad, Estado='Abierta'
+    )
+    db.session.add(s)
+    db.session.commit()
+    return jsonify({"ok": True, "id": s.Id})
+
+@grr_bp.post("/mant/solicitudes/<int:sid>/estado")
+def mant_set_estado(sid):
+    nuevo = (request.form.get("estado") or "").strip()
+    if nuevo not in ("Abierta","EnProceso","Cerrada"):
+        return jsonify({"ok": False, "error": "Estado inválido"}), 400
+    s = MantenimientoSolicitud.query.get_or_404(sid)
+    s.Estado = nuevo
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@grr_bp.get("/mant/api/solicitudes")
+def mant_list():
+    q = (MantenimientoSolicitud.query
+         .order_by(MantenimientoSolicitud.Fecha_Creacion.desc()))
+    data = [{
+        "id": m.Id, "hab": m.Habitacion.Numero_Habitacion if m.Habitacion else None,
+        "titulo": m.Titulo, "prioridad": m.Prioridad,
+        "estado": m.Estado, "creado": m.Fecha_Creacion.isoformat(),
+    } for m in q.all()]
+    return jsonify(data)
