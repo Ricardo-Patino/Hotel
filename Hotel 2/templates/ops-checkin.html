@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recepción – Check-in | Hotel Villa Grace</title>
+  <meta name="description" content="Módulo de check-in para recepción, validación por cédula/pasaporte.">
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <!-- Fuentes & Vendors -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+
+  <!-- Estilos -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .soft{color:#6c757d}
+    .hint{font-size:.9rem;color:#6c757d}
+    .card+.card{margin-top:1rem}
+    .doc-preview{max-height:180px;object-fit:contain;border:1px dashed #ced4da;border-radius:.5rem;padding:.25rem;background:#fafafa}
+    .sig-pad{border:1px dashed #ced4da;border-radius:.5rem;background:#fff}
+    .toggleable{display:none}
+    .toggleable.show{display:block}
+    .result-row:hover{background:#f9fafb}
+    .badge-pill{border-radius:50rem}
+  </style>
+</head>
+<body class="inner-page">
+
+  <!-- Header -->
+  <header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container position-relative d-flex align-items-center justify-content-between">
+      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li><a href="ops-dashboard.html">Tablero</a></li>
+          <li><a href="ops-arrivals-departures.html">Llegadas/Salidas</a></li>
+          <li><a href="ops-rooms-status.html">Estado Hab.</a></li>
+          <li><a href="ops-housekeeping.html">Limpieza</a></li>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
+      <a class="btn-getstarted d-none d-sm-block" href="ops-dashboard.html">Volver al tablero</a>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- Título -->
+    <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+      <div class="container position-relative">
+        <h1>Check-in de Huéspedes</h1>
+        <p class="mb-0">Primero valida por <strong>cédula/pasaporte</strong>. Firma e imagen del documento son <strong>opcionales</strong>.</p>
+        <nav class="breadcrumbs"><ol><li><a href="index.html">Inicio</a></li><li><a href="ops-dashboard.html">Recepción</a></li><li class="current">Check-in</li></ol></nav>
+      </div>
+    </div>
+
+    <!-- Contenido -->
+    <section class="section">
+      <div class="container" data-aos="fade-up">
+
+        <!-- Búsqueda por documento -->
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <h5 class="mb-0"><i class="bi bi-search me-2"></i>Validar documento</h5>
+          </div>
+          <div class="card-body">
+            <form id="frm-search" class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Cédula o Pasaporte <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="doc" placeholder="Ej: 1-1234-5678 o P1234567" required>
+                <div class="hint mt-1">Debe coincidir con el documento del <em>perfil</em> que realizó la reserva.</div>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Fecha (opcional)</label>
+                <input type="date" class="form-control" id="when">
+                <div class="hint mt-1">Por defecto busca reservas activas para hoy.</div>
+              </div>
+              <div class="col-md-3 d-grid align-items-end">
+                <button class="btn btn-primary" id="btn-search"><i class="bi bi-search me-1"></i> Buscar reserva</button>
+              </div>
+            </form>
+
+            <div id="search-alert" class="alert alert-info d-none mt-3"></div>
+          </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="card shadow-sm border-0" id="card-results" style="display:none;">
+          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Resultado de la búsqueda</h5>
+            <span class="soft small" id="result-count">0 coincidencias</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th># Reserva</th>
+                    <th>Huésped</th>
+                    <th>Fechas</th>
+                    <th>Hab.</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-results">
+                  <!-- filas dinámicas -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Walk-in (crear estancia sin reserva) -->
+        <div class="card shadow-sm border-0" id="card-walkin">
+          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>Crear estancia sin reserva (Walk-in)</h5>
+            <span class="soft small">Úsalo cuando no exista una reserva para el documento indicado.</span>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Documento (usado arriba)</label>
+                <input type="text" readonly class="form-control-plaintext" id="walkin-doc" value="">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Nombre del huésped</label>
+                <input type="text" class="form-control" id="walkin-name" placeholder="Nombre y Apellido">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Check-in</label>
+                <input type="date" class="form-control" id="walkin-ci">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Check-out</label>
+                <input type="date" class="form-control" id="walkin-co">
+              </div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-outline-secondary" id="btn-walkin"><i class="bi bi-plus-circle me-1"></i> Crear y asignar</button>
+                <span class="hint align-self-center">Se intentará auto-asignar habitación disponible según GRR-01-003.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sección opcional: Firma y documento -->
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <h5 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Datos opcionales</h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-4">
+              <!-- Firma digital (opcional) -->
+              <div class="col-lg-6">
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" role="switch" id="toggle-sign">
+                  <label class="form-check-label" for="toggle-sign">Capturar firma digital del huésped (opcional)</label>
+                </div>
+                <div id="sign-wrap" class="toggleable">
+                  <canvas id="sign-pad" class="w-100 sig-pad" height="180"></canvas>
+                  <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-clear-sign"><i class="bi bi-eraser me-1"></i> Limpiar</button>
+                    <button class="btn btn-sm btn-outline-primary" id="btn-save-sign"><i class="bi bi-check2 me-1"></i> Guardar firma</button>
+                    <span class="hint align-self-center">Se adjunta a la reserva/estancia si decides guardarla.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Foto del documento (opcional) -->
+              <div class="col-lg-6">
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" role="switch" id="toggle-docimg">
+                  <label class="form-check-label" for="toggle-docimg">Adjuntar imagen del documento (opcional)</label>
+                </div>
+                <div id="docimg-wrap" class="toggleable">
+                  <input type="file" id="docimg" accept="image/*,application/pdf" class="form-control">
+                  <img id="docimg-preview" class="doc-preview mt-2 d-none" alt="Preview">
+                  <div class="hint mt-2">La imagen (o PDF) se guardará en “guest_docs”.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Acciones finales -->
+        <div class="card shadow-sm border-0">
+          <div class="card-body d-flex flex-wrap gap-2">
+            <button class="btn btn-success" id="btn-checkin" disabled><i class="bi bi-box-arrow-in-right me-1"></i> Realizar Check-in</button>
+            <a class="btn btn-outline-secondary" href="ops-dashboard.html"><i class="bi bi-arrow-left me-1"></i> Volver</a>
+            <div class="ms-auto soft small">Requiere documento válido + reserva encontrada (o walk-in creado).</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <footer id="footer" class="footer position-relative dark-background">
+    <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong></div></div>
+  </footer>
+
+  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+  <div id="preloader"></div>
+
+  <!-- JS -->
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <script>
+    // -------- Utilidades --------
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+    const fmtDate = (s) => s ? new Date(s).toLocaleDateString('es-CR') : '—';
+
+    function setAlert(msg, type='info'){
+      const el = $('#search-alert');
+      el.className = `alert alert-${type} mt-3`;
+      el.textContent = msg;
+      if(!msg){ el.classList.add('d-none'); } else { el.classList.remove('d-none'); }
+    }
+
+    function enableCheckin(enable){
+      $('#btn-checkin').disabled = !enable;
+    }
+
+    function readQuery(k){
+      const u = new URL(window.location.href);
+      return u.searchParams.get(k);
+    }
+
+    // -------- Firma (opcional) --------
+    let isDrawing=false, last={x:0,y:0};
+    const canvas = document.createElement('canvas');
+    function setupSignPad(){
+      const pad = $('#sign-pad');
+      if(!pad) return;
+      const ctx = pad.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const w = pad.clientWidth;
+      const h = pad.getAttribute('height');
+      pad.width = w*dpr;
+      pad.height = h*dpr;
+      ctx.scale(dpr,dpr);
+      ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222';
+
+      const pos = (e) => {
+        const r = pad.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+        return {x, y};
+      };
+
+      const start = (e)=>{ isDrawing=true; last=pos(e); };
+      const move = (e)=>{ if(!isDrawing) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
+      const end = ()=>{ isDrawing=false; };
+
+      pad.addEventListener('mousedown', start);
+      pad.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      pad.addEventListener('touchstart', start, {passive:true});
+      pad.addEventListener('touchmove', move, {passive:true});
+      pad.addEventListener('touchend', end);
+      $('#btn-clear-sign').addEventListener('click',()=>{ ctx.clearRect(0,0,pad.width,pad.height); });
+      $('#btn-save-sign').addEventListener('click',()=>{ try{ sessionStorage.setItem('ops.sign', pad.toDataURL('image/png')); }catch(_){ } });
+    }
+
+    // -------- Doc image (opcional) --------
+    function setupDocImg(){
+      $('#docimg')?.addEventListener('change', (e)=>{
+        const f = e.target.files?.[0];
+        const prev = $('#docimg-preview');
+        if(!f){ prev.classList.add('d-none'); return; }
+        if(f.type.startsWith('image/')){
+          const url = URL.createObjectURL(f);
+          prev.src = url; prev.classList.remove('d-none');
+        }else{
+          prev.classList.add('d-none'); // PDF u otros
+        }
+      });
+    }
+
+    // -------- Toggle opcionales --------
+    function bindToggles(){
+      $('#toggle-sign').addEventListener('change', (e)=> $('#sign-wrap').classList.toggle('show', e.target.checked));
+      $('#toggle-docimg').addEventListener('change', (e)=> $('#docimg-wrap').classList.toggle('show', e.target.checked));
+    }
+
+    // -------- Render resultados --------
+    let selectedReserva = null;
+
+    function renderResults(items){
+      const tbody = $('#tbody-results');
+      tbody.innerHTML = '';
+      const card = $('#card-results');
+      $('#result-count').textContent = `${items.length} coincidencia(s)`;
+      if(!items.length){
+        card.style.display = 'block';
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center soft">No se encontraron reservas para el documento indicado.</td></tr>`;
+        enableCheckin(false);
+        return;
+      }
+      items.forEach(it=>{
+        const tr = document.createElement('tr');
+        tr.className = 'result-row';
+        tr.innerHTML = `
+          <td><strong>${it.numero || ('VG-' + it.id)}</strong></td>
+          <td>${it.huesped || '—'}</td>
+          <td>${fmtDate(it.checkin)} → ${fmtDate(it.checkout)}</td>
+          <td>${it.habitacion || '—'}</td>
+          <td><span class="badge ${String(it.estado||'').toLowerCase()==='confirmada'?'text-bg-success':'text-bg-secondary'}">${it.estado || '—'}</span></td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary btn-select" data-id="${it.id}"><i class="bi bi-check2-circle me-1"></i> Seleccionar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      card.style.display = 'block';
+
+      // seleccionar
+      $$('.btn-select').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const id = Number(btn.dataset.id);
+          selectedReserva = items.find(x=> Number(x.id)===id) || null;
+          enableCheckin(!!selectedReserva);
+          $$('.result-row').forEach(r=> r.classList.remove('table-success'));
+          btn.closest('tr').classList.add('table-success');
+        });
+      });
+    }
+
+    // -------- Búsqueda por documento --------
+    async function doSearch(){
+      setAlert('');
+      enableCheckin(false);
+      selectedReserva = null;
+
+      const doc = $('#doc').value.trim();
+      const when = $('#when').value || '';
+
+      if(!doc){
+        setAlert('Debes ingresar la cédula o pasaporte para validar la reserva.', 'warning');
+        return;
+      }
+
+      $('#walkin-doc').value = doc;
+
+      try{
+        // Endpoint esperado en backend:
+        // GET /api/ops/checkin/search?doc=XXXXX&when=YYYY-MM-DD
+        const url = `/api/ops/checkin/search?doc=${encodeURIComponent(doc)}${when?`&when=${encodeURIComponent(when)}`:''}`;
+        const r = await fetch(url, {headers:{Accept:'application/json'}});
+        if(!r.ok){ throw new Error('Respuesta no OK'); }
+        const j = await r.json();
+
+        if(!j || !j.ok){
+          renderResults([]);
+          setAlert('No se encontraron reservas asociadas a ese documento.', 'warning');
+          return;
+        }
+        const items = Array.isArray(j.items) ? j.items : [];
+        renderResults(items);
+        if(!items.length){
+          setAlert('No se encontraron reservas asociadas a ese documento.', 'warning');
+        }
+      }catch(e){
+        console.warn('search error', e);
+        renderResults([]);
+        setAlert('No se pudo consultar la reserva. Verifica la conexión o el endpoint /api/ops/checkin/search.', 'danger');
+      }
+    }
+
+    // -------- Check-in --------
+    async function doCheckin(){
+      const doc = $('#doc').value.trim();
+      if(!doc){
+        setAlert('El documento es obligatorio para realizar el check-in.', 'warning');
+        return;
+      }
+      if(!selectedReserva){
+        setAlert('Debes seleccionar una reserva encontrada o crear una estancia de walk-in.', 'warning');
+        return;
+      }
+
+      // Construcción de payload
+      const payload = {
+        reserva_id: selectedReserva.id,
+        documento: doc,
+        guardar_firma: $('#toggle-sign').checked ? (sessionStorage.getItem('ops.sign') || null) : null,
+        adjunto_doc: null, // se mandará por FormData si corresponde
+      };
+
+      try{
+        // Si hay doc adjunto y el switch está activo, usamos FormData
+        const docFileInput = $('#docimg');
+        const useDocImg = $('#toggle-docimg').checked && docFileInput && docFileInput.files && docFileInput.files[0];
+        let resp;
+        if(useDocImg){
+          const fd = new FormData();
+          fd.append('reserva_id', String(payload.reserva_id));
+          fd.append('documento', payload.documento);
+          if(payload.guardar_firma){ fd.append('firma_base64', payload.guardar_firma); }
+          fd.append('docfile', docFileInput.files[0]); // backend: guardar en guest_docs
+          resp = await fetch('/api/ops/checkin/complete', { method:'POST', body: fd });
+        }else{
+          resp = await fetch('/api/ops/checkin/complete', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+          });
+        }
+
+        if(!resp.ok){ throw new Error('Respuesta no OK'); }
+        const j = await resp.json();
+        if(!j || !j.ok){
+          setAlert(j.message || 'No se pudo completar el check-in.', 'danger');
+          return;
+        }
+
+        // Éxito
+        setAlert('Check-in realizado correctamente.', 'success');
+        enableCheckin(false);
+
+        // Opcional: abrir comprobante si backend lo devuelve
+        if(j.comprobante_reserva_id){
+          try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){}
+        }
+      }catch(e){
+        console.warn('checkin error', e);
+        setAlert('No se pudo completar el check-in. Revisa el endpoint /api/ops/checkin/complete.', 'danger');
+      }
+    }
+
+    // -------- Walk-in --------
+    async function doWalkin(){
+      const doc = $('#walkin-doc').value.trim();
+      const name = $('#walkin-name').value.trim();
+      const ci = $('#walkin-ci').value;
+      const co = $('#walkin-co').value;
+
+      if(!doc){
+        setAlert('Para un walk-in, indica al menos el documento.', 'warning');
+        return;
+      }
+      if(!ci || !co){
+        setAlert('Para un walk-in, debes indicar fechas de entrada y salida.', 'warning');
+        return;
+      }
+
+      try{
+        const r = await fetch('/api/ops/walkin', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ documento: doc, nombre: name || null, checkin: ci, checkout: co })
+        });
+        if(!r.ok) throw new Error('Respuesta no OK');
+        const j = await r.json();
+        if(!j || !j.ok){ setAlert(j.message || 'No se pudo crear la estancia de walk-in.', 'danger'); return; }
+
+        // Seleccionar automáticamente la nueva "reserva/estancia"
+        selectedReserva = { id: j.reserva_id, numero: j.numero, huesped: name || 'Walk-in', checkin: ci, checkout: co, habitacion: j.habitacion || '—', estado:'Confirmada' };
+        renderResults([selectedReserva]);
+        enableCheckin(true);
+        setAlert('Walk-in creado y habitación auto-asignada (si disponible).', 'success');
+      }catch(e){
+        console.warn('walkin error', e);
+        setAlert('No se pudo crear la estancia de walk-in. Verifica el endpoint /api/ops/walkin.', 'danger');
+      }
+    }
+
+    // -------- Bind & init --------
+    function prefillFromQuery(){
+      const q = readQuery('q');
+      if(q){ $('#doc').value = q; }
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      // toggles opcionales
+      bindToggles();
+      setupSignPad();
+      setupDocImg();
+
+      // acciones
+      $('#frm-search').addEventListener('submit', (e)=>{ e.preventDefault(); doSearch(); });
+      $('#btn-search').addEventListener('click', (e)=>{ e.preventDefault(); doSearch(); });
+      $('#btn-checkin').addEventListener('click', (e)=>{ e.preventDefault(); doCheckin(); });
+      $('#btn-walkin').addEventListener('click', (e)=>{ e.preventDefault(); doWalkin(); });
+
+      // prefill
+      prefillFromQuery();
+
+      // si viene ?q=DOC, dispara búsqueda
+      if($('#doc').value.trim()){ doSearch(); }
+    });
+  </script>
+</body>
+</html>

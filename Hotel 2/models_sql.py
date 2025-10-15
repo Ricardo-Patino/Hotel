@@ -11,6 +11,44 @@ from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
+
+
+
+class ReservaEstancia(db.Model):
+    __tablename__ = "ReservaEstancia"
+    Id = db.Column(db.Integer, primary_key=True)
+    Codigo_Reserva = db.Column(db.Integer, nullable=False, index=True)
+    Habitacion_Id = db.Column(db.Integer, nullable=False, index=True)
+    Fecha_Desde = db.Column(db.Date, nullable=False)
+    Fecha_Hasta = db.Column(db.Date, nullable=False)  # checkout (exclusivo)
+    Estado = db.Column(db.Enum("Asignada","Ocupada","Cerrada","Cancelada"), default="Asignada")
+
+class ReglaAsignacion(db.Model):
+    __tablename__ = "ReglaAsignacion"
+    Id = db.Column(db.Integer, primary_key=True)
+    Nombre = db.Column(db.String(80), nullable=False, unique=True)
+    Prioridad = db.Column(db.Integer, default=100, index=True)
+    Activa = db.Column(db.Boolean, default=True, index=True)
+    # Condición/pesos (JSON libre: puede incluir 'peso_tipo', 'peso_mant', 'peso_prefs', etc.)
+    Condicion = db.Column(db.JSON)
+
+class AsignacionDecision(db.Model):
+    __tablename__ = "AsignacionDecision"
+    Id = db.Column(db.Integer, primary_key=True)
+    Codigo_Reserva = db.Column(db.Integer, nullable=False, index=True)
+    Fecha = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
+    Tipo = db.Column(db.String(30), nullable=False)  # 'auto', 'manual', 'reassign', 'split', 'merge'
+    Resultado = db.Column(db.Enum("ok","fallback","sin_disponibilidad","error"), default="ok")
+    Detalle = db.Column(db.JSON)  # scoring, candidatos, selección final
+
+class PreferenciaHuesped(db.Model):
+    __tablename__ = "PreferenciaHuesped"
+    Id = db.Column(db.Integer, primary_key=True)
+    Codigo_Cliente = db.Column(db.Integer, nullable=False, index=True)
+    Clave = db.Column(db.String(40), nullable=False)   # p.ej. 'vista', 'piso', 'ruido'
+    Valor = db.Column(db.String(120), nullable=False)  # p.ej. 'mar', 'alto', 'bajo'
+    UNIQUE_KEY = db.UniqueConstraint("Codigo_Cliente","Clave","Valor", name="UQ_pref_cliente_clave_valor")
+
 # ---------------------------
 # Tabla: Rol
 # ---------------------------
