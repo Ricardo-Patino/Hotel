@@ -1,0 +1,620 @@
+/* ============================================================================
+   Hotel Villa Grace — Esquema MySQL 8.x (InnoDB, UTF8MB4)
+   Script limpio para recrear la BD con seeds mínimos
+   ============================================================================ */
+
+-- Recomendado: modo estricto
+SET sql_mode = 'STRICT_ALL_TABLES';
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+
+-- 0) Eliminar base de datos previa (opcional si quieres full reset)
+DROP DATABASE IF EXISTS Hotel_VillaGrace;
+
+-- 1) Crear base de datos y seleccionar
+CREATE DATABASE IF NOT EXISTS Hotel_VillaGrace
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE Hotel_VillaGrace;
+
+-- 2) Limpieza segura (por si solo ejecutas desde aquí hacia abajo)
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS ReservaDocumento;
+DROP TABLE IF EXISTS Documento;
+DROP TABLE IF EXISTS Reserva;
+DROP TABLE IF EXISTS Usuario;
+DROP TABLE IF EXISTS Rol;
+DROP TABLE IF EXISTS Cliente;
+DROP TABLE IF EXISTS Funcionario;
+DROP TABLE IF EXISTS Habitacion;
+DROP TABLE IF EXISTS KPI_Stats;
+DROP TABLE IF EXISTS Audit_Log;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- 3) Tablas base
+/* ------------------------------------------------------------------------- */
+/* Tabla: Habitacion */
+CREATE TABLE Habitacion (
+    Codigo_Habitacion   INT NOT NULL AUTO_INCREMENT,
+    Numero_Habitacion   VARCHAR(10) NOT NULL,
+    Tipo                ENUM('Sencilla','Doble','Suite') NOT NULL,
+    Precio_Noche        DECIMAL(12,2) NOT NULL,
+    Estado              ENUM('Disponible','Ocupada','Mantenimiento') NOT NULL DEFAULT 'Disponible',
+    Fecha_modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT PK_Habitacion PRIMARY KEY (Codigo_Habitacion),
+    CONSTRAINT UQ_Habitacion_Numero UNIQUE (Numero_Habitacion),
+    KEY IX_Habitacion_Tipo (Tipo),
+    KEY IX_Habitacion_Estado (Estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Tabla: Funcionario */
+CREATE TABLE Funcionario (
+    Codigo_Funcionario  INT NOT NULL AUTO_INCREMENT,
+    Cedula              VARCHAR(20) NOT NULL,
+    Nombre              VARCHAR(50) NOT NULL,
+    Apellido            VARCHAR(50) NOT NULL,
+    Puesto              VARCHAR(50) NOT NULL,
+    Fecha_Nacimiento    DATE NOT NULL,
+    Fecha_modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT PK_Funcionario PRIMARY KEY (Codigo_Funcionario),
+    KEY IX_Funcionario_Cedula (Cedula)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Tabla: Cliente */
+CREATE TABLE Cliente (
+    Codigo_Cliente      INT NOT NULL AUTO_INCREMENT,
+    Cedula              VARCHAR(20) NOT NULL,
+    Nombre              VARCHAR(50) NOT NULL,
+    Apellido            VARCHAR(50) NOT NULL,
+    Telefono            VARCHAR(20) NOT NULL,
+    Correo              VARCHAR(120),
+    Fecha_Nacimiento    DATE NOT NULL,
+    Fecha_modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT PK_Cliente PRIMARY KEY (Codigo_Cliente),
+    KEY IX_Cliente_Correo (Correo),
+    KEY IX_Cliente_Cedula (Cedula)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Tabla: Rol */
+CREATE TABLE Rol (
+    Codigo_Rol          INT NOT NULL AUTO_INCREMENT,
+    Nombre              VARCHAR(30) NOT NULL UNIQUE,
+    Descripcion         VARCHAR(200),
+    Estado              ENUM('Activo','Inactivo') DEFAULT 'Activo',
+    Fecha_Creacion      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Fecha_Modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT PK_Rol PRIMARY KEY (Codigo_Rol)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Tabla: Usuario  (con FK a Rol y (opcional) a Cliente) */
+CREATE TABLE Usuario (
+    Codigo_Usuario     INT NOT NULL AUTO_INCREMENT,
+    Nombre             VARCHAR(100) NOT NULL,
+    Cedula_Pasaporte   VARCHAR(40)  UNIQUE,
+    Correo             VARCHAR(120) NOT NULL UNIQUE,
+    Telefono           VARCHAR(25)  NOT NULL,
+    Contrasena         VARCHAR(255) NOT NULL,
+    Rol_Id             INT NULL,
+    Estado             ENUM('Activo','Inactivo') DEFAULT 'Activo',
+    Fecha_Creacion     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Fecha_Modificacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    Codigo_Cliente     INT NULL,
+    CONSTRAINT PK_Usuario PRIMARY KEY (Codigo_Usuario),
+    CONSTRAINT FK_Usuario_Rol
+        FOREIGN KEY (Rol_Id) REFERENCES Rol(Codigo_Rol)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT FK_Usuario_Cliente
+        FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+        ON UPDATE CASCADE ON DELETE SET NULL,
+    KEY IX_Usuario_Rol (Rol_Id),
+    KEY IX_Usuario_Cli (Codigo_Cliente)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Tabla: Reserva (incluye Huespedes y Observaciones para que coincida con la app) */
+CREATE TABLE Reserva (
+    Codigo_Reserva       INT NOT NULL AUTO_INCREMENT,
+    Codigo_Cliente       INT NOT NULL,
+    Codigo_Habitacion    INT NOT NULL,
+    Codigo_Funcionario   INT NOT NULL, -- quién registró la reserva
+    Fecha_Entrada        DATE NOT NULL,
+    Fecha_Salida         DATE NOT NULL,
+    Monto_Total          DECIMAL(12,2) NOT NULL,
+    Estado               ENUM('Confirmada','Cancelada','Pendiente') NOT NULL DEFAULT 'Confirmada',
+    Canal                VARCHAR(30) NULL,
+    Numero_Comprobante   VARCHAR(40) NULL,
+    Fuente               VARCHAR(30) NULL,
+    Politica_Cancelacion VARCHAR(200) NULL,
+    Observaciones        VARCHAR(255) NULL,
+    Huespedes            VARCHAR(50)  NULL,   -- usado por la app para mostrar/editar
+    Descuento_Id         VARCHAR(50)  NULL,
+    Fecha_Registro       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PK_Reserva PRIMARY KEY (Codigo_Reserva),
+    CONSTRAINT FK_Reserva_Cliente
+        FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_Reserva_Habitacion
+        FOREIGN KEY (Codigo_Habitacion) REFERENCES Habitacion(Codigo_Habitacion)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT FK_Reserva_Funcionario
+        FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+        ON UPDATE CASCADE ON DELETE RESTRICT,
+    CONSTRAINT UQ_Reserva_Comprobante UNIQUE (Numero_Comprobante),
+    KEY IX_Reserva_Cliente (Codigo_Cliente),
+    KEY IX_Reserva_Fechas (Fecha_Entrada, Fecha_Salida),
+    KEY IX_Reserva_Estado (Estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Tablas opcionales para documentación de reserva */
+CREATE TABLE Documento (
+    Id              INT NOT NULL AUTO_INCREMENT,
+    Tipo            VARCHAR(50) NOT NULL,
+    Ruta            VARCHAR(255) NOT NULL,
+    MimeType        VARCHAR(100) NOT NULL DEFAULT 'application/pdf',
+    TamanoBytes     INT NULL,
+    Fecha_Creacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT PK_Documento PRIMARY KEY (Id),
+    KEY IX_Documento_Tipo (Tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE ReservaDocumento (
+    Id               INT NOT NULL AUTO_INCREMENT,
+    Codigo_Reserva   INT NOT NULL,
+    Documento_Id     INT NOT NULL,
+    CONSTRAINT PK_ReservaDocumento PRIMARY KEY (Id),
+    CONSTRAINT FK_ResDoc_Reserva
+        FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT FK_ResDoc_Documento
+        FOREIGN KEY (Documento_Id) REFERENCES Documento(Id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    KEY IX_ResDoc_Reserva (Codigo_Reserva),
+    KEY IX_ResDoc_Documento (Documento_Id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Tablas para KPIs y Auditoría (GRR-01-002) */
+CREATE TABLE KPI_Stats (
+  Id             INT NOT NULL AUTO_INCREMENT,
+  Periodo        ENUM('day','week','month') NOT NULL,
+  Clave          VARCHAR(16) NOT NULL,  -- 'YYYY-MM-DD' | 'YYYY-Www' | 'YYYY-MM'
+  Total_Reservas INT NOT NULL DEFAULT 0,
+  Total_Monto    DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  Fecha_Ultima   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_KPI_Stats PRIMARY KEY (Id),
+  CONSTRAINT UQ_KPI UNIQUE (Periodo, Clave),
+  KEY IX_KPI_Periodo (Periodo),
+  KEY IX_KPI_Clave (Clave)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE Audit_Log (
+  Id        INT NOT NULL AUTO_INCREMENT,
+  Fecha     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Usuario   VARCHAR(120),
+  Accion    VARCHAR(60) NOT NULL,
+  Detalles  JSON NULL,
+  CONSTRAINT PK_Audit_Log PRIMARY KEY (Id),
+  KEY IX_Audit_Accion (Accion),
+  KEY IX_Audit_Usuario (Usuario),
+  KEY IX_Audit_Fecha (Fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+
+-- 1) Tabla de compatibilidad esperada por el código legado
+CREATE TABLE IF NOT EXISTS Auditoria_Log (
+  Id         INT NOT NULL AUTO_INCREMENT,
+  Usuario    VARCHAR(120) NULL,
+  Entidad    VARCHAR(60)  NOT NULL,
+  Entidad_Id VARCHAR(40)  NULL,
+  Accion     VARCHAR(60)  NOT NULL,
+  Datos      JSON NULL,              -- si tu server no tiene JSON, usa TEXT
+  Fecha      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_Auditoria_Entidad (Entidad),
+  KEY IX_Auditoria_Accion (Accion),
+  KEY IX_Auditoria_Fecha (Fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2) Trigger para mantener también Audit_Log (tu tabla oficial)
+DROP TRIGGER IF EXISTS trg_auditoria_log_after_ins;
+DELIMITER $$
+CREATE TRIGGER trg_auditoria_log_after_ins
+AFTER INSERT ON Auditoria_Log
+FOR EACH ROW
+BEGIN
+  INSERT INTO Audit_Log (Fecha, Usuario, Accion, Detalles)
+  VALUES (
+    COALESCE(NEW.Fecha, NOW()),
+    NEW.Usuario,
+    -- formateo de acción, puedes ajustar si prefieres conservar tal cual
+    CONCAT(NEW.Entidad, '.', LOWER(NEW.Accion)),
+    -- Detalles como JSON consistente
+    JSON_OBJECT(
+      'Entidad', NEW.Entidad,
+      'Entidad_Id', NEW.Entidad_Id,
+      'Datos', NEW.Datos
+    )
+  );
+END$$
+DELIMITER ;
+
+
+-- 4) Datos de ejemplo (SEED)
+ /* ------------------------------------------------------------------------- */
+
+-- 4.1 Roles
+INSERT INTO Rol (Nombre, Descripcion, Estado) VALUES
+  ('Administrador','Rol Administrador','Activo'),
+  ('Recepcionista','Rol Recepción','Activo'),
+  ('Limpieza','Rol Limpieza','Activo'),
+  ('Cliente','Rol Cliente','Activo');
+
+-- 4.2 Habitaciones
+INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado) VALUES
+  ('101','Sencilla', 15000.00,'Disponible'),
+  ('102','Doble',    30000.00,'Disponible'),
+  ('201','Suite',    45000.00,'Mantenimiento'),
+  ('202','Suite',    45000.00,'Disponible');
+
+-- 4.3 Funcionarios
+INSERT INTO Funcionario (Cedula,Nombre,Apellido,Puesto,Fecha_Nacimiento) VALUES
+  ('305410583','Juan','Jiménez','Recepcionista','1998-03-21'),
+  ('107720872','María','Jimenez','Administrador','1991-04-11'),
+  ('105440693','Ana','Coto','Limpieza','1993-02-22');
+
+-- 4.4 Clientes (usa correos reales para que el portal filtre por email)
+INSERT INTO Cliente (Cedula,Nombre,Apellido,Telefono,Correo,Fecha_Nacimiento) VALUES
+  ('407550891','Rosa','Coto','88889999','rosa@mail.com','1994-04-01'),
+  ('308220992','Ana','Porras','88776655','ana@mail.com','1998-06-01'),
+  ('507660893','Catalina','Rojas','88112233','cata@mail.com','2001-05-15');
+
+-- 4.5 Usuario admin (opcional)
+
+INSERT INTO Usuario (Nombre, Cedula_Pasaporte, Correo, Telefono, Contrasena, Rol_Id, Estado)
+VALUES ('Admin General','ADM001','admin@hotel.test','00000000','PBKDF2_HASH_AQUI',
+         (SELECT Codigo_Rol FROM Rol WHERE Nombre='Administrador'),'Activo');
+
+-- 4.6 Reservas de ejemplo (una cancelada y dos confirmadas)
+-- IMPORTANTE: El portal mostrará reservas según el correo del Cliente relacionado.
+-- Regístrate con el MISMO correo de uno de estos clientes para verlas en el portal.
+INSERT INTO Reserva (
+  Codigo_Cliente, Codigo_Habitacion, Codigo_Funcionario,
+  Fecha_Entrada, Fecha_Salida, Monto_Total, Estado, Canal, Numero_Comprobante,
+  Observaciones, Huespedes, Fuente, Politica_Cancelacion
+) VALUES
+  -- Cliente 1: rosa@mail.com (cancelada)
+  (1, 1, 1, '2025-09-20','2025-09-23', 45000.00,'Cancelada','Web','VG-20250920-0001',
+   'Cancelada por cliente','2 adultos','Web','48h antes sin costo'),
+  -- Cliente 2: ana@mail.com (confirmada)
+  (2, 2, 2, '2025-10-01','2025-10-05', 120000.00,'Confirmada','Web','VG-20251001-0001',
+   'Vista al jardín','2 adultos, 1 niño','Web','48h antes sin costo'),
+  -- Cliente 3: cata@mail.com (confirmada)
+  (3, 4, 1, '2025-11-10','2025-11-12', 90000.00,'Confirmada','Web','VG-20251110-0001',
+   'Late checkout','2 adultos','Web','48h antes sin costo');
+
+-- 4.7 KPI seeds (opcionales, se irán actualizando desde la app)
+INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto)
+VALUES
+ ('day',   DATE_FORMAT(CURDATE(), '%Y-%m-%d'), 0, 0),
+ ('week',  DATE_FORMAT(CURDATE(), '%x-W%v'),   0, 0),
+ ('month', DATE_FORMAT(CURDATE(), '%Y-%m'),    0, 0)
+ON DUPLICATE KEY UPDATE Total_Reservas=VALUES(Total_Reservas), Total_Monto=VALUES(Total_Monto);
+
+-- 5) Objetos de apoyo
+/* ------------------------------------------------------------------------- */
+
+-- Vista útil para reportes rápidos
+CREATE OR REPLACE VIEW v_reservas_ext AS
+SELECT 
+    r.Codigo_Reserva, 
+    r.Numero_Comprobante,
+    r.Estado,
+    r.Canal,
+    r.Fecha_Entrada,
+    r.Fecha_Salida,
+    r.Monto_Total,
+    r.Fecha_Registro,
+    r.Observaciones,
+    r.Huespedes,
+    c.Codigo_Cliente,
+    c.Correo          AS ClienteCorreo,
+    CONCAT(c.Nombre,' ',c.Apellido) AS ClienteNombre,
+    h.Codigo_Habitacion,
+    h.Numero_Habitacion,
+    h.Tipo            AS Tipo_Habitacion,
+    h.Precio_Noche
+FROM Reserva r
+JOIN Cliente c     ON r.Codigo_Cliente    = c.Codigo_Cliente
+JOIN Habitacion h  ON r.Codigo_Habitacion = h.Codigo_Habitacion;
+
+-- 6) Consultas de verificación rápidas
+/* ------------------------------------------------------------------------- */
+
+-- Vista rápida de reservas con joins (similar a lo que usa la app)
+SELECT 
+    r.Codigo_Reserva, 
+    c.Correo          AS ClienteCorreo,
+    c.Nombre          AS ClienteNombre, 
+    h.Numero_Habitacion,
+    h.Tipo,
+    r.Fecha_Entrada, r.Fecha_Salida, r.Monto_Total,
+    r.Estado, r.Canal, r.Numero_Comprobante,
+    r.Observaciones, r.Huespedes
+FROM Reserva r
+JOIN Cliente c     ON r.Codigo_Cliente    = c.Codigo_Cliente
+JOIN Habitacion h  ON r.Codigo_Habitacion = h.Codigo_Habitacion
+ORDER BY r.Fecha_Entrada DESC;
+
+-- Índices presentes
+SHOW INDEX FROM Reserva;
+SHOW INDEX FROM Usuario;
+SHOW INDEX FROM Cliente;
+
+-- Comprobaciones básicas
+SELECT * FROM Usuario;
+SELECT Codigo_Cliente, Correo FROM Cliente;
+SELECT Codigo_Reserva, Codigo_Cliente, Fecha_Entrada, Estado FROM Reserva ORDER BY Codigo_Reserva;
+
+SELECT * FROM Documento ORDER BY Id DESC LIMIT 1;
+SELECT * FROM ReservaDocumento ORDER BY Id DESC LIMIT 1;
+
+/* Tabla: fin_invoices (para FIN-INV-01) */
+CREATE TABLE fin_invoices (
+    id_factura      INT NOT NULL AUTO_INCREMENT,
+    numero          VARCHAR(50) NOT NULL,              -- único (ej: VG-20251011-0001)
+    cliente_nombre  VARCHAR(120) NULL,
+    cliente_email   VARCHAR(120) NULL,
+    moneda          VARCHAR(10)  NOT NULL DEFAULT 'CRC',
+    monto_total     DECIMAL(12,2) NOT NULL,
+    descripcion     TEXT NULL,
+    archivo_path    VARCHAR(255) NULL,                 -- nombre del archivo subido (PDF/imagen)
+    id_reserva      INT NULL,                          -- vínculo opcional a Reserva
+    id_usuario      INT NOT NULL,                      -- quien la emitió (Usuario)
+    fecha_emision   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado          ENUM('Borrador','Emitida','Pagada','Anulada') NOT NULL DEFAULT 'Emitida',
+    CONSTRAINT PK_fin_invoices PRIMARY KEY (id_factura),
+    CONSTRAINT UQ_fin_invoices_numero UNIQUE (numero),
+    KEY IX_fin_invoices_email (cliente_email),
+    KEY IX_fin_invoices_estado (estado),
+    KEY IX_fin_invoices_fecha (fecha_emision),
+    KEY IX_fin_invoices_reserva (id_reserva),
+    KEY IX_fin_invoices_usuario (id_usuario)
+    -- Si deseas FKs duras, descomenta según tu política de integridad:
+    -- ,CONSTRAINT FK_fin_inv_reserva FOREIGN KEY (id_reserva) REFERENCES Reserva(Codigo_Reserva)
+    --      ON UPDATE CASCADE ON DELETE SET NULL
+    -- ,CONSTRAINT FK_fin_inv_usuario FOREIGN KEY (id_usuario) REFERENCES Usuario(Codigo_Usuario)
+    --      ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+### Factura de prueba
+INSERT INTO fin_invoices (numero, cliente_nombre, cliente_email, moneda, monto_total, descripcion, id_usuario, estado)
+VALUES ('VG-TEST-0001','Cliente Demo','demo@mail.com','CRC',12345.67,'Factura de prueba', 1, 'Emitida');
+
+
+SELECT DATABASE();            -- Debe devolver hotel_villagrace
+SHOW TABLES LIKE 'fin_invoices';
+
+/* ========= FAC-07-002: Libro mayor + pagos de POS ========= */
+
+/* 1.1) Columna para acumular pagos en la Reserva */
+ALTER TABLE Reserva 
+  ADD COLUMN Monto_Pagado DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  ADD KEY IX_Reserva_MontoPagado (Monto_Pagado);
+
+/* 1.2) Cabecera de transacción de libro mayor (una por transacción POS) */
+CREATE TABLE IF NOT EXISTS fin_ledger_tx (
+  id_tx        INT NOT NULL AUTO_INCREMENT,
+  external_id  VARCHAR(64) NOT NULL,                -- ID de la transacción en el POS (único)
+  source       ENUM('POS','BACKOFFICE') NOT NULL DEFAULT 'POS',
+  reserva_id   INT NULL,
+  currency     VARCHAR(10) NOT NULL DEFAULT 'CRC',
+  total        DECIMAL(14,2) NOT NULL DEFAULT 0.00, -- total de la transacción
+  status       ENUM('posted','voided') NOT NULL DEFAULT 'posted',
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  meta         JSON NULL,
+  CONSTRAINT PK_fin_ledger_tx PRIMARY KEY (id_tx),
+  CONSTRAINT UQ_fin_ledger_tx_ext UNIQUE (external_id),
+  KEY IX_fin_ledger_tx_reserva (reserva_id),
+  KEY IX_fin_ledger_tx_status (status)
+  -- Si quieres FK dura, descomenta:
+  -- ,CONSTRAINT FK_fin_ledger_tx_reserva
+  --   FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+  --   ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* 1.3) Líneas contables (doble partida) para cada transacción */
+CREATE TABLE IF NOT EXISTS fin_ledger_line (
+  id_line    INT NOT NULL AUTO_INCREMENT,
+  id_tx      INT NOT NULL,
+  line_no    INT NOT NULL,                           -- 1,2,3...
+  account    VARCHAR(64) NOT NULL,                   -- p.ej. 'VENTA_HAB', 'IVA', 'TPV', 'CAJA'
+  debit      DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  credit     DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  description VARCHAR(255) NULL,
+  CONSTRAINT PK_fin_ledger_line PRIMARY KEY (id_line),
+  CONSTRAINT UQ_fin_ledger_line UNIQUE (id_tx, line_no),
+  KEY IX_fin_ledger_line_account (account),
+  CONSTRAINT FK_fin_ledger_line_tx
+    FOREIGN KEY (id_tx) REFERENCES fin_ledger_tx(id_tx)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* (Opcional) Vista rápida por reserva: total pagado vía POS */
+CREATE OR REPLACE VIEW v_reserva_pagos_pos AS
+SELECT
+  t.reserva_id,
+  SUM(CASE WHEN l.debit > 0 THEN l.debit ELSE 0 END) AS total_pagado_pos
+FROM fin_ledger_tx t
+JOIN fin_ledger_line l ON l.id_tx = t.id_tx
+WHERE t.status = 'posted'
+GROUP BY t.reserva_id;
+
+ALTER TABLE Reserva ADD COLUMN Fecha_Ultimo_Pago DATETIME NULL;
+
+
+
+select * from usuario
+
+
+#### para pruebas
+
+INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
+VALUES ('208990123', 'Carlos', 'Mora', '88887777', 'carlos@test.com', '1990-05-15');
+
+INSERT INTO Reserva (
+  Codigo_Cliente,
+  Codigo_Habitacion,
+  Codigo_Funcionario,
+  Fecha_Entrada,
+  Fecha_Salida,
+  Monto_Total,
+  Estado,
+  Canal,
+  Numero_Comprobante,
+  Fuente,
+  Politica_Cancelacion,
+  Observaciones,
+  Huespedes
+)
+VALUES (
+  1,                -- Cliente #1 (Rosa Coto o el que prefieras)
+  2,                -- Habitación 102 (Doble)
+  1,                -- Funcionario Juan Jiménez
+  '2025-10-15',
+  '2025-10-17',
+  60000.00,
+  'Pendiente',
+  'Web',
+  'VG-20251015-0001',
+  'Web',
+  '48h antes sin costo',
+  'Reserva generada para prueba POS',
+  '2 adultos'
+);
+## Tabla necesaria
+
+CREATE TABLE IF NOT EXISTS fin_receipts (
+  id_receipt   INT NOT NULL AUTO_INCREMENT,
+  numero       VARCHAR(40) NOT NULL,              -- RC-YYYYMMDD-#### (único)
+  reserva_id   INT NULL,                          -- opcional, amarra a reserva
+  invoice_id   INT NULL,                          -- opcional, amarra a factura (fin_invoices)
+  tx_id        INT NULL,                          -- opcional, amarra a fin_ledger_tx
+  metodo       VARCHAR(30) NOT NULL DEFAULT 'Tarjeta', -- Tarjeta/Efectivo/Transferencia/…
+  currency     VARCHAR(10) NOT NULL DEFAULT 'CRC',
+  monto        DECIMAL(14,2) NOT NULL,
+  emitido_por  INT NOT NULL,                      -- Usuario
+  creado_en    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  estado       ENUM('Emitido','Anulado') NOT NULL DEFAULT 'Emitido',
+  PRIMARY KEY (id_receipt),
+  UNIQUE KEY UQ_fin_receipts_numero (numero),
+  KEY IX_fin_receipts_reserva (reserva_id),
+  KEY IX_fin_receipts_invoice (invoice_id),
+  KEY IX_fin_receipts_tx (tx_id)
+);
+
+CREATE TABLE IF NOT EXISTS fin_notes (
+  id_note      INT NOT NULL AUTO_INCREMENT,
+  numero       VARCHAR(40) NOT NULL,                -- NC/ND-YYYYMMDD-####
+  tipo         ENUM('Credito','Debito') NOT NULL,
+  ref_invoice  INT NULL,                             -- contra factura
+  ref_reserva  INT NULL,                             -- o contra reserva
+  currency     VARCHAR(10) NOT NULL DEFAULT 'CRC',
+  monto_abs    DECIMAL(14,2) NOT NULL,               -- importe absoluto de la nota
+  motivo       VARCHAR(255) NULL,
+  emitido_por  INT NOT NULL,
+  creado_en    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  estado       ENUM('Emitida','Anulada') NOT NULL DEFAULT 'Emitida',
+  PRIMARY KEY (id_note),
+  UNIQUE KEY UQ_fin_notes_numero (numero),
+  KEY IX_fin_notes_invoice (ref_invoice),
+  KEY IX_fin_notes_reserva (ref_reserva)
+);
+
+### Nuevas tablas 14-10-2025
+
+-- 1) Sesión de caja (apertura/cierre por día y usuario)
+CREATE TABLE IF NOT EXISTS fin_cash_session (
+  id_session            INT NOT NULL AUTO_INCREMENT,
+  fecha                 DATE NOT NULL,
+  opened_by             INT NOT NULL,
+  opening_cash          DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  notes_open            VARCHAR(255) NULL,
+  status                ENUM('open','closed','reopened') NOT NULL DEFAULT 'open',
+  created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  closed_at             DATETIME NULL,
+  closed_by             INT NULL,
+  closing_cash_counted  DECIMAL(14,2) NULL,
+  notes_close           VARCHAR(255) NULL,
+  PRIMARY KEY (id_session),
+  UNIQUE KEY UQ_fin_cash_session_day (fecha, opened_by),
+  KEY IX_fin_cash_session_status (status)
+);
+
+-- 2) Movimientos manuales (ingreso/egreso/ajuste)
+CREATE TABLE IF NOT EXISTS fin_cash_movement (
+  id_move       INT NOT NULL AUTO_INCREMENT,
+  session_id    INT NOT NULL,
+  tipo          ENUM('Ingreso','Egreso','Ajuste') NOT NULL,
+  metodo        ENUM('Efectivo','Tarjeta','Transferencia','Otro') NOT NULL DEFAULT 'Efectivo',
+  concepto      VARCHAR(160) NOT NULL,
+  referencia    VARCHAR(60) NULL,
+  monto         DECIMAL(14,2) NOT NULL, -- positivo suma; negativo resta
+  created_by    INT NOT NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  source        ENUM('Manual','POS','BackOffice') NOT NULL DEFAULT 'Manual',
+  link_receipt  INT NULL,
+  link_invoice  INT NULL,
+  link_note     INT NULL,
+  estado        ENUM('Aplicado','Anulado') NOT NULL DEFAULT 'Aplicado',
+  PRIMARY KEY (id_move),
+  KEY IX_fin_cash_movement_session (session_id),
+  CONSTRAINT FK_fin_cash_movement_session
+    FOREIGN KEY (session_id) REFERENCES fin_cash_session(id_session)
+    ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+-- 3) Vista de conciliación diaria (esperado vs contado y descuadre)
+CREATE OR REPLACE VIEW v_fin_caja_resumen AS
+SELECT
+  s.id_session,
+  s.fecha,
+  s.opening_cash,
+  IFNULL(r.ingresos_efectivo, 0.00) AS ingresos_efectivo,
+  IFNULL(m.egresos_efectivo, 0.00)  AS egresos_efectivo,
+  IFNULL(m.ajustes_mas, 0.00)       AS ajustes_mas,
+  IFNULL(m.ajustes_menos, 0.00)     AS ajustes_menos,
+  (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
+    + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0)) AS efectivo_esperado,
+  s.closing_cash_counted AS efectivo_contado,
+  (IFNULL(s.closing_cash_counted,0) - 
+   (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
+     + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0))) AS descuadre
+FROM fin_cash_session s
+LEFT JOIN (
+  SELECT DATE(creado_en) AS fecha, SUM(monto) AS ingresos_efectivo
+    FROM fin_receipts
+   WHERE estado='Emitido' AND metodo='Efectivo'
+   GROUP BY DATE(creado_en)
+) r ON r.fecha = s.fecha
+LEFT JOIN (
+  SELECT DATE(created_at) AS fecha,
+         SUM(CASE WHEN tipo='Egreso' AND metodo='Efectivo' AND estado='Aplicado' THEN monto ELSE 0 END) AS egresos_efectivo,
+         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto >= 0 AND tipo IN ('Ingreso','Ajuste') THEN monto ELSE 0 END) AS ajustes_mas,
+         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto < 0  AND tipo='Ajuste' THEN -monto ELSE 0 END) AS ajustes_menos
+  FROM fin_cash_movement
+  GROUP BY DATE(created_at)
+) m ON m.fecha = s.fecha;
+
+-- Índice útil si no existiera:
+CREATE INDEX IF NOT EXISTS IX_fin_receipts_fecha ON fin_receipts (creado_en);
+
+SELECT Codigo_Reserva, Estado, Canal, Monto_Total
+FROM Reserva
+ORDER BY Codigo_Reserva DESC
+LIMIT 5;
+
+Select * from Reserva;
+Select * from Usuario;
+Select * from Auditoria_Log;
+
