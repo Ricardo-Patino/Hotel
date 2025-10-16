@@ -699,6 +699,33 @@ WHERE NOT EXISTS (
   SELECT 1 FROM Usuario WHERE LOWER(Correo) = LOWER('recepcion@hotel.test')
 );
 
+-- Cierres mensuales e historial
+CREATE TABLE IF NOT EXISTS fin_period_lock (
+  id_lock        INT AUTO_INCREMENT PRIMARY KEY,
+  period_key     CHAR(7) NOT NULL,              -- 'YYYY-MM'
+  period_start   DATE     NOT NULL,             -- primer día del mes
+  period_end     DATE     NOT NULL,             -- último día del mes
+  status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
+  note           VARCHAR(255) NULL,
+  closed_by      INT NULL,
+  closed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reopened_by    INT NULL,
+  reopened_at    DATETIME NULL,
+  UNIQUE KEY uq_fin_period_lock (period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Snapshot de totales del mes (para auditoría/consulta)
+CREATE TABLE IF NOT EXISTS fin_monthly_close (
+  id_close       INT AUTO_INCREMENT PRIMARY KEY,
+  period_key     CHAR(7) NOT NULL,
+  totals_json    JSON NOT NULL,                 -- resumen por cuentas/métodos/efectivo
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by     INT NULL,
+  hash_sum       CHAR(64) NULL,                 -- opcional: hash de integridad
+  UNIQUE KEY uq_fin_monthly_close (period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 -- Verificaciones rápidas
 SELECT DATABASE();
 SHOW TABLES LIKE 'fin_invoices';

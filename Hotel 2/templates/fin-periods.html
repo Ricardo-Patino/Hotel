@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Finanzas – Periodos | Hotel Villa Grace</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li class="dropdown">
+          <a href="#" class="active"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+          <ul>
+            <li><a href="#">Tablero</a></li>
+            <li><a href="/fin-payments.html">Cobros y folios</a></li>
+            <li><a href="{{ url_for('fin_invoices_html') }}">Facturas</a></li>
+            <li><a href="{{ url_for('fin_cash.ui') }}">Cierre de caja</a></li>
+            <li><a class="active" href="{{ url_for('fin_periods.ui_periods') }}">Periodos (cierres mensuales)</a></li>
+            <li><a href="{{ url_for('fin_reports.ui_reports') }}">Reportes contables</a></li>
+          </ul>
+        </li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="#" onclick="window.print()">Imprimir</a>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="container position-relative">
+      <h1>Periodos (cierres mensuales)</h1>
+      <p>Bloquear/desbloquear meses contables. Solo el Administrador puede cambiar el estado.</p>
+      <nav class="breadcrumbs">
+        <ol>
+          <li><a href="#">Finanzas</a></li>
+          <li class="current">Periodos</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container" data-aos="fade-up">
+      <div id="alerts"></div>
+
+      <div class="row g-4">
+        <!-- Panel de acciones -->
+        <div class="col-lg-5">
+          <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0">
+              <h5 class="mb-0">Acciones</h5>
+            </div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label class="form-label">Periodo (YYYY-MM)</label>
+                <input id="period" type="month" class="form-control">
+                <div class="form-text">Selecciona el mes a gestionar.</div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button id="btnStatus" class="btn btn-outline-secondary">
+                  <i class="bi bi-info-circle"></i> Ver estado
+                </button>
+                <button id="btnLock" class="btn btn-danger">
+                  <i class="bi bi-lock"></i> Bloquear mes
+                </button>
+                <button id="btnUnlock" class="btn btn-success">
+                  <i class="bi bi-unlock"></i> Desbloquear mes
+                </button>
+              </div>
+
+              <hr>
+              <div id="statusBox" class="mt-2 small text-muted">Selecciona un periodo y pulsa “Ver estado”.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Listado últimos meses -->
+        <div class="col-lg-7">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">Últimos periodos</h5>
+              <button id="btnReload" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-repeat"></i> Recargar
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Periodo</th>
+                      <th class="text-center">Estado</th>
+                      <th>Notas</th>
+                      <th class="text-end">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tblPeriods">
+                    <tr><td colspan="4" class="text-center text-muted py-3">Cargando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="p-3 small text-muted">
+                * Solo usuarios con rol <strong>Administrador</strong> pueden bloquear/desbloquear.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+  <i class="bi bi-arrow-up-short"></i>
+</a>
+<div id="preloader"></div>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+<script>
+  // Helpers UI
+  function alertBox(type, msg){
+    const div = document.createElement('div');
+    div.className = `alert alert-${type} alert-dismissible fade show`;
+    div.innerHTML = `${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.getElementById('alerts').appendChild(div);
+    setTimeout(()=>{ try{div.remove();}catch{} }, 6000);
+  }
+
+  function badgeFor(status){
+    switch((status||'').toLowerCase()){
+      case 'closed': return '<span class="badge bg-danger">Cerrado</span>';
+      case 'open':
+      default: return '<span class="badge bg-success">Abierto</span>';
+    }
+  }
+
+  // Cargar lista inicial
+  async function loadList(){
+    const tbody = document.getElementById('tblPeriods');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Cargando…</td></tr>';
+    try{
+      const r = await fetch('/fin/periods/list');
+      const data = await r.json();
+      if(!data.ok) throw new Error(data.error || 'Error');
+      const rows = (data.items||[]).map(it=>{
+        const notes = it.notes || '';
+        return `
+          <tr>
+            <td class="fw-medium">${it.period_key}</td>
+            <td class="text-center">${badgeFor(it.status)}</td>
+            <td class="text-truncate" style="max-width:260px" title="${notes}">${notes}</td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" onclick="viewStatus('${it.period_key}')">
+                  <i class="bi bi-info-circle"></i>
+                </button>
+                <button class="btn btn-outline-danger" onclick="lockPeriod('${it.period_key}')">
+                  <i class="bi bi-lock"></i>
+                </button>
+                <button class="btn btn-outline-success" onclick="unlockPeriod('${it.period_key}')">
+                  <i class="bi bi-unlock"></i>
+                </button>
+              </div>
+            </td>
+          </tr>`;
+      });
+      if(!rows.length){
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sin datos</td></tr>';
+      }else{
+        tbody.innerHTML = rows.join('');
+      }
+    }catch(err){
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-3">No se pudo cargar</td></tr>';
+    }
+  }
+
+  async function viewStatus(period){
+    try{
+      const qs = new URLSearchParams({period});
+      const r = await fetch('/fin/periods/status?'+qs.toString());
+      const data = await r.json();
+      if(!data.ok) throw new Error();
+      document.getElementById('statusBox').innerHTML =
+        `<div><strong>Periodo:</strong> ${data.period}</div>
+         <div><strong>Estado:</strong> ${badgeFor(data.status)}</div>
+         <div class="small text-muted mt-1">${data.lock ? ('Actualizado: '+(data.lock.locked_at||'')) : '—'}</div>`;
+    }catch{
+      alertBox('danger','No se pudo obtener el estado.');
+    }
+  }
+
+  async function lockPeriod(period, notes=null){
+    try{
+      const payload = {period, notes: notes || ''};
+      const r = await fetch('/fin/periods/lock', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if(r.status === 403){ alertBox('warning','Solo Administrador puede bloquear periodos.'); return; }
+      if(r.status === 409){ alertBox('warning', data.message || 'No se puede bloquear (hay cajas abiertas).'); return; }
+      if(!data.ok) throw new Error(data.error||'Error');
+      alertBox('success','Periodo bloqueado.');
+      loadList(); viewStatus(period);
+    }catch(err){
+      alertBox('danger','No se pudo bloquear el periodo.');
+    }
+  }
+  async function unlockPeriod(period, notes=null){
+    try{
+      const payload = {period, notes: notes || ''};
+      const r = await fetch('/fin/periods/unlock', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const data = await r.json();
+      if(r.status === 403){ alertBox('warning','Solo Administrador puede desbloquear periodos.'); return; }
+      if(!data.ok) throw new Error(data.error||'Error');
+      alertBox('success','Periodo desbloqueado.');
+      loadList(); viewStatus(period);
+    }catch(err){
+      alertBox('danger','No se pudo desbloquear el periodo.');
+    }
+  }
+
+  // Botones del panel
+  document.getElementById('btnReload').addEventListener('click', loadList);
+  document.getElementById('btnStatus').addEventListener('click', ()=>{
+    const v = document.getElementById('period').value || new Date().toISOString().slice(0,7);
+    viewStatus(v);
+  });
+  document.getElementById('btnLock').addEventListener('click', ()=>{
+    const v = document.getElementById('period').value || new Date().toISOString().slice(0,7);
+    lockPeriod(v);
+  });
+  document.getElementById('btnUnlock').addEventListener('click', ()=>{
+    const v = document.getElementById('period').value || new Date().toISOString().slice(0,7);
+    unlockPeriod(v);
+  });
+
+  // Inicial
+  (function init(){
+    const m = new Date().toISOString().slice(0,7);
+    document.getElementById('period').value = m;
+    loadList();
+    viewStatus(m);
+  })();
+</script>
+</body>
+</html>
+
+
+
+

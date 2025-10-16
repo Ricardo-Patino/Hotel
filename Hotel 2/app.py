@@ -759,6 +759,11 @@ def create_app() -> Flask:
         except Exception:
             pass
 
+    # Blueprint de cierres mensuales
+    from blueprints.fin_periods import fin_periods_bp
+    app.register_blueprint(fin_periods_bp)
+
+
     # Blueprint de FAC-07-005 (reportes contables)
     from blueprints.fin_reports import fin_reports_bp
     app.register_blueprint(fin_reports_bp)
