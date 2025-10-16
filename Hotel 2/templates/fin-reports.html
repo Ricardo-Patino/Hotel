@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Finanzas – Reportes | Hotel Villa Grace</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <style>
+    .card { border: 0; box-shadow: 0 10px 30px rgba(0,0,0,.06); border-radius: 16px; }
+    .form-control, .form-select, .btn { border-radius: 12px; }
+  </style>
+</head>
+<body>
+
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li class="dropdown">
+          <a href="#"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+          <ul>
+            <li><a href="{{ url_for('fin_invoices_html') }}">Facturas</a></li>
+            <li><a href="/fin-invoices.html#">Cobros y folios</a></li>
+            <li><a href="{{ url_for('fin_cash.ui') }}">Cierre de caja</a></li>
+            <li><a href="{{ url_for('fin_reports.ui_reports') }}" class="active">Reportes contables</a></li>
+          </ul>
+        </li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="#" onclick="window.print()">Imprimir</a>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="container position-relative">
+      <h1>Reportes contables</h1>
+      <p>Libro Diario, Mayor, Estado de Resultados y Balance General.</p>
+      <nav class="breadcrumbs">
+        <ol>
+          <li><a href="#">Finanzas</a></li>
+          <li class="current">Reportes</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container" data-aos="fade-up">
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-header bg-white">
+              <h5 class="mb-0">Generar reporte</h5>
+            </div>
+            <div class="card-body">
+              <form id="frmReport" class="row g-3" onsubmit="return false;">
+                <div class="col-12">
+                  <label class="form-label">Tipo de reporte</label>
+                  <div class="d-grid d-sm-flex gap-2">
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="rtype" id="r1" value="diario" checked>
+                      <label class="form-check-label" for="r1">Libro Diario</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="rtype" id="r2" value="mayor">
+                      <label class="form-check-label" for="r2">Libro Mayor</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="rtype" id="r3" value="er">
+                      <label class="form-check-label" for="r3">Estado de Resultados</label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="rtype" id="r4" value="bg">
+                      <label class="form-check-label" for="r4">Balance General</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label">Formato</label>
+                  <select id="fmt" class="form-select">
+                    <option value="csv">CSV</option>
+                    <option value="pdf" selected>PDF</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Desde</label>
+                  <input id="from" type="date" class="form-control">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Hasta</label>
+                  <input id="to" type="date" class="form-control">
+                </div>
+
+                <div class="col-12 d-flex gap-2 justify-content-end">
+                  <button class="btn btn-outline-secondary" type="button" onclick="setThisMonth()">Este mes</button>
+                  <button class="btn btn-success" type="button" onclick="generate()">Generar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header bg-white">
+              <h5 class="mb-0">Instrucciones</h5>
+            </div>
+            <div class="card-body">
+              <ol class="mb-3">
+                <li>Selecciona tipo, formato y rango de fechas.</li>
+                <li>Haz clic en <strong>Generar</strong>. El archivo se abre en una pestaña nueva.</li>
+                <li>Una copia queda guardada en <code>storage/fin_reports/YYYY/MM</code> y en <em>Documento</em>.</li>
+              </ol>
+              <div class="alert alert-info mb-0">
+                Consejo: el <b>Libro Mayor</b> resume débitos y créditos por cuenta en el periodo.
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+  <i class="bi bi-arrow-up-short"></i>
+</a>
+<div id="preloader"></div>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+<script>
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  function setThisMonth(){
+    const d = new Date();
+    const from = `${d.getFullYear()}-${pad(d.getMonth()+1)}-01`;
+    const to   = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(new Date(d.getFullYear(), d.getMonth()+1, 0).getDate())}`;
+    document.getElementById('from').value = from;
+    document.getElementById('to').value   = to;
+  }
+  setThisMonth();
+
+  function generate(){
+    const type = document.querySelector('input[name="rtype"]:checked').value;
+    const fmt  = document.getElementById('fmt').value;
+    const f    = document.getElementById('from').value;
+    const t    = document.getElementById('to').value;
+    if(!f || !t){ alert('Selecciona el rango de fechas.'); return; }
+    const url = `/fin/reports?type=${encodeURIComponent(type)}&fmt=${encodeURIComponent(fmt)}&from=${f}&to=${t}`;
+    window.open(url, '_blank');
+  }
+</script>
+</body>
+</html>
+
+
+
