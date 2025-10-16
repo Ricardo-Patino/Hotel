@@ -12,6 +12,7 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Optional
 from werkzeug.utils import secure_filename
+import reportlab
 
 from sqlalchemy import text, func, inspect
 from sqlalchemy.exc import IntegrityError
@@ -757,6 +758,10 @@ def create_app() -> Flask:
             _ensure_seed_roles()
         except Exception:
             pass
+
+    # Blueprint de FAC (cierre de caja)
+    from blueprints.fin_cash import fin_cash_bp
+    app.register_blueprint(fin_cash_bp)
 
     # Blueprint de GRR (creación de reservas)
     from blueprints.grr.routes import grr_bp
