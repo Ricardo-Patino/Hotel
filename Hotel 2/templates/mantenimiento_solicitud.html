@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+  <h2 class="text-center text-primary mb-4">Registro de Solicitudes de Mantenimiento</h2>
+
+  <div class="card shadow-sm p-4 mb-4">
+    <form method="POST">
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label for="codigo_habitacion" class="form-label fw-bold">Habitación / Área</label>
+          <select class="form-select" id="codigo_habitacion" name="codigo_habitacion" required>
+            <option value="">Seleccione...</option>
+            {% for h in habitaciones %}
+              <option value="{{ h.Codigo_Habitacion }}">
+                Habitación {{ h.Numero_Habitacion }} - {{ h.Tipo }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label for="titulo" class="form-label fw-bold">Título</label>
+          <input type="text" class="form-control" id="titulo" name="titulo" placeholder="Ej: Fuga de agua en baño" required>
+        </div>
+
+        <div class="col-md-4">
+          <label for="prioridad" class="form-label fw-bold">Prioridad</label>
+          <select class="form-select" id="prioridad" name="prioridad" required>
+            <option value="Baja">Baja</option>
+            <option value="Media" selected>Media</option>
+            <option value="Alta">Alta</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="descripcion" class="form-label fw-bold">Descripción del fallo</label>
+        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"
+          placeholder="Detalle el fallo detectado..." required></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">Registrar Solicitud</button>
+    </form>
+  </div>
+
+  <h4 class="text-secondary mb-3">Solicitudes Registradas</h4>
+
+  <table class="table table-bordered table-hover align-middle shadow-sm">
+    <thead class="table-primary text-center">
+      <tr>
+        <th>ID</th>
+        <th>Habitación</th>
+        <th>Título</th>
+        <th>Descripción</th>
+        <th>Prioridad</th>
+        <th>Estado</th>
+        <th>Fecha</th>
+      </tr>
+    </thead>
+    <tbody class="text-center">
+      {% for s in solicitudes %}
+      <tr>
+        <td>{{ s.Id }}</td>
+        <td>{{ s.Habitacion.Numero_Habitacion }}</td>
+        <td>{{ s.Titulo }}</td>
+        <td>{{ s.Descripcion }}</td>
+        <td>
+          {% if s.Prioridad == 'Alta' %}
+            <span class="badge bg-danger">{{ s.Prioridad }}</span>
+          {% elif s.Prioridad == 'Media' %}
+            <span class="badge bg-warning text-dark">{{ s.Prioridad }}</span>
+          {% else %}
+            <span class="badge bg-success">{{ s.Prioridad }}</span>
+          {% endif %}
+        </td>
+        <td>{{ s.Estado }}</td>
+        <td>{{ s.Fecha_Creacion.strftime('%Y-%m-%d %H:%M') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-muted">No hay solicitudes registradas.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}
