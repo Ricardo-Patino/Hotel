@@ -74,6 +74,11 @@ GUEST_DOCS_DIR = STORAGE_DIR / "guest_docs"
 GUEST_DOCS_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_DOC_EXTS = {"png", "jpg", "jpeg", "pdf"}
 
+# --- Impuestos / Reglas de cálculo para Check-out (ajustables por config/env) ---
+DEFAULT_IVA = float(os.getenv("IVA_RATE", "0.13"))              # 13% CR por defecto
+APPLY_TAX_ON_CONSUMOS = os.getenv("APPLY_TAX_ON_CONSUMOS", "1") in ("1", "true", "True")
+ROOM_TOTAL_INCLUDES_TAX = os.getenv("ROOM_TOTAL_INCLUDES_TAX", "1") in ("1", "true", "True")
+
 # =========================
 # Helpers (roles/redirects)
 # =========================
@@ -1965,6 +1970,12 @@ def create_app() -> Flask:
     def ops_checkin_html():
         return render_template("ops-checkin.html")
 
+    # UI de Check-out (opcional, para navegación del front)
+    @app.route("/ops-checkout.html", methods=["GET"])
+    @role_required("Administrador", "Recepcionista")
+    def ops_checkout_html():
+        return render_template("ops-checkout.html")
+
     # ------------ ENDPOINTS COMPATIBLES CON EL FRONT (ops/*) ----------------
 
     @app.get("/api/ops/checkin/search")
@@ -2230,6 +2241,274 @@ def create_app() -> Flask:
                 p["documento"] = p["doc_number"]
             with app.test_request_context("/api/ops/checkin/complete", method="POST", json=p):
                 return api_ops_checkin_complete()
+
+    # ========= GRR-01-005 — Check-out (helpers + endpoints) =========
+
+    def _reservas_checkout_hoy_por_documento(doc_number: str):
+        """Reservas que salen HOY por documento (Cliente o Usuario enlazado).
+           Estados válidos para check-out: 'En Casa', 'Confirmada', 'Pendiente'."""
+        doc = _normalize_docnum(doc_number)
+        rows = (
+            db.session.execute(
+                text("""
+                    SELECT
+                        R.Codigo_Reserva           AS reserva_id,
+                        R.Codigo_Cliente           AS cliente_id,
+                        R.Codigo_Habitacion        AS habitacion_id,
+                        R.Estado                   AS estado,
+                        R.Fecha_Entrada            AS checkin,
+                        R.Fecha_Salida             AS checkout,
+                        R.Monto_Total              AS monto_total,
+                        C.Cedula                   AS cliente_doc,
+                        C.Correo                   AS cliente_email
+                    FROM Reserva R
+                    JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
+                    LEFT JOIN Usuario U ON U.Codigo_Cliente = C.Codigo_Cliente
+                    WHERE DATE(R.Fecha_Salida) = CURDATE()
+                      AND R.Estado IN ('En Casa', 'Confirmada', 'Pendiente')
+                      AND (
+                           C.Cedula = :doc
+                           OR U.Cedula_Pasaporte = :doc
+                      )
+                    ORDER BY R.Fecha_Salida ASC
+                """),
+                {"doc": doc},
+            ).mappings().all()
+        )
+        return [dict(r) for r in rows]
+
+    def _sum_pos_consumos(reserva_id: int) -> float:
+        """Suma neta de consumos desde el libro mayor POS.
+           Si las tablas no existen aún, devuelve 0.0 silenciosamente."""
+        try:
+            row = db.session.execute(
+                text("""
+                    SELECT COALESCE(SUM(l.debit),0) AS d, COALESCE(SUM(l.credit),0) AS c
+                      FROM fin_ledger_tx t
+                      JOIN fin_ledger_line l ON l.id_tx = t.id_tx
+                     WHERE t.reserva_id = :rid AND t.status = 'posted'
+                """),
+                {"rid": reserva_id}
+            ).first()
+            if not row:
+                return 0.0
+            d = float(row[0] or 0.0)
+            c = float(row[1] or 0.0)
+            return max(d - c, 0.0)
+        except Exception:
+            return 0.0
+
+    def _checkout_breakdown(reserva_id: int) -> Optional[dict]:
+        """Retorna el desglose para check-out sin modificar estado."""
+        r = _get_reserva_by_id(reserva_id)
+        if not r:
+            return None
+
+        room_total = float(r.get("Monto_Total") or 0.0)
+        consumos = _sum_pos_consumos(reserva_id)
+        iva_rate = float(current_app.config.get("IVA_RATE", DEFAULT_IVA))
+
+        # Impuestos: por defecto aplicamos IVA sobre consumos; asumimos que room_total ya incluye impuestos.
+        imp_consumos = round(consumos * iva_rate, 2) if APPLY_TAX_ON_CONSUMOS else 0.0
+        imp_room = 0.0 if ROOM_TOTAL_INCLUDES_TAX else round(room_total * iva_rate, 2)
+
+        subtotal = room_total + consumos
+        impuestos = imp_consumos + imp_room
+        total = subtotal + impuestos
+
+        try:
+            pagado = db.session.execute(
+                text("SELECT COALESCE(Monto_Pagado,0) FROM Reserva WHERE Codigo_Reserva=:r"),
+                {"r": reserva_id}
+            ).scalar() or 0.0
+        except Exception:
+            pagado = 0.0
+
+        saldo = round(total - float(pagado), 2)
+
+        return {
+            "reserva_id": reserva_id,
+            "room_total": round(room_total, 2),
+            "consumos": round(consumos, 2),
+            "impuestos": round(impuestos, 2),
+            "total": round(total, 2),
+            "pagado": round(float(pagado), 2),
+            "saldo": saldo,
+            "checkin": _normalize_date_like(r.get("Fecha_Entrada")),
+            "checkout": _normalize_date_like(r.get("Fecha_Salida")),
+            "estado": r.get("Estado"),
+            "habitacion_id": r.get("Codigo_Habitacion"),
+            "cliente_id": r.get("Codigo_Cliente"),
+            "usuario": r.get("Usuario"),
+        }
+
+    def _crear_tarea_limpieza(habitacion_id: int, reserva_id: int):
+        """Crea tarea de housekeeping 'Pendiente' por check-out. No rompe si la tabla no existe."""
+        try:
+            db.session.execute(
+                text("""
+                    INSERT INTO HousekeepingTask (Habitacion_Id, Estado, Fecha_Creacion, Observaciones)
+                    VALUES (:hid, 'Pendiente', NOW(), :obs)
+                """),
+                {"hid": habitacion_id, "obs": f"Limpieza por check-out de la reserva {reserva_id}"}
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[HK] No se pudo crear tarea de limpieza: {e}")
+            db.session.rollback()
+
+    def _marcar_hab_limpieza(habitacion_id: Optional[int]):
+        if not habitacion_id:
+            return
+        try:
+            db.session.execute(
+                text("UPDATE Habitacion SET Estado='Limpieza' WHERE Codigo_Habitacion=:h"),
+                {"h": int(habitacion_id)}
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[ROOM] No se pudo marcar limpieza: {e}")
+            db.session.rollback()
+
+    # ================== GRR-01-005 — Check-out ==================
+
+    @app.get("/api/ops/checkout/search")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_checkout_search():
+        """Buscar reservas que salen HOY por documento (cédula/pasaporte)."""
+        doc = _normalize_docnum(request.args.get("doc"))
+        if not doc:
+            return jsonify({"ok": False, "error": "doc_required"}), 400
+
+        items = _reservas_checkout_hoy_por_documento(doc)
+        return jsonify({"ok": True, "items": items})
+
+    @app.get("/api/ops/checkout/preview")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_checkout_preview():
+        """Previa de cargos de una reserva antes de confirmar el check-out."""
+        try:
+            rid = int(request.args.get("reserva_id", "0") or "0")
+        except Exception:
+            rid = 0
+        if not rid:
+            return jsonify({"ok": False, "error": "reserva_id_required"}), 400
+
+        bd = _checkout_breakdown(rid)
+        if not bd:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+        return jsonify({"ok": True, "breakdown": bd})
+
+    @app.post("/api/ops/checkout")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_checkout_confirm():
+        """
+        Confirma el check-out:
+          - Opcionalmente registra un pago final (si se envía monto/metodo) como Recibo.
+          - Actualiza estado de Reserva a 'Check-out' (o 'Finalizada').
+          - Marca habitación en 'Limpieza' y crea tarea de housekeeping.
+        Payload JSON/form:
+          - reserva_id   (int, requerido)
+          - pago_monto   (float, opcional)
+          - pago_metodo  (str, opcional; p.ej. 'Efectivo', 'Tarjeta')
+        """
+        p = request.get_json(silent=True) or request.form or {}
+        try:
+            reserva_id = int(p.get("reserva_id") or 0)
+        except Exception:
+            reserva_id = 0
+        if not reserva_id:
+            return jsonify({"ok": False, "error": "reserva_id_required"}), 400
+
+        bd = _checkout_breakdown(reserva_id)
+        if not bd:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+
+        # (1) Pago final opcional
+        pago_monto = float(p.get("pago_monto") or 0.0)
+        pago_metodo = (p.get("pago_metodo") or "").strip() or "Efectivo"
+        receipt = None
+        if pago_monto > 0.0:
+            try:
+                # Insert directo vía modelo para evitar roundtrip HTTP:
+                rec_obj = FinReceipt(
+                    numero="PENDING",
+                    reserva_id=reserva_id,
+                    invoice_id=None,
+                    tx_id=None,
+                    metodo=pago_metodo[:30],
+                    currency="CRC",
+                    monto=pago_monto,
+                    emitido_por=session["user_id"],
+                )
+                db.session.add(rec_obj)
+                db.session.flush()
+                rec_obj.numero = _make_seq("RC", rec_obj.id_receipt)
+
+                # Actualizar pagado en reserva
+                db.session.execute(
+                    text("""
+                        UPDATE Reserva
+                           SET Monto_Pagado = COALESCE(Monto_Pagado,0) + :p,
+                               Fecha_Ultimo_Pago = NOW()
+                         WHERE Codigo_Reserva = :r
+                    """),
+                    {"p": pago_monto, "r": reserva_id}
+                )
+                db.session.commit()
+                _create_receipt_pdf(rec_obj)
+                receipt = {"id": rec_obj.id_receipt, "numero": rec_obj.numero}
+            except Exception as e:
+                current_app.logger.warning(f"[CHECKOUT] No se pudo registrar recibo: {e}")
+                db.session.rollback()
+
+        # (2) Cerrar la estancia: estado de reserva
+        try:
+            db.session.execute(
+                text("""
+                    UPDATE Reserva
+                       SET Estado = CASE
+                                      WHEN Estado IN ('En Casa','Confirmada','Pendiente') THEN 'Check-out'
+                                      ELSE Estado
+                                    END
+                     WHERE Codigo_Reserva = :r
+                """),
+                {"r": reserva_id}
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[CHECKOUT] No se pudo actualizar estado de la reserva: {e}")
+            db.session.rollback()
+
+        # (3) Marcar habitación y disparar housekeeping
+        _marcar_hab_limpieza(bd.get("habitacion_id"))
+        _crear_tarea_limpieza(bd.get("habitacion_id"), reserva_id)
+
+        # Auditoría
+        try:
+            _audit_log(
+                _current_user_email(),
+                "checkout.completed",
+                {
+                    "reserva_id": reserva_id,
+                    "habitacion_id": bd.get("habitacion_id"),
+                    "saldo_previo": bd.get("saldo"),
+                    "pago_registrado": float(pago_monto or 0.0),
+                    "metodo": pago_metodo,
+                },
+                entidad_id=str(reserva_id)
+            )
+        except Exception:
+            pass
+
+        # Recalcular para devolver saldo final actualizado
+        final_bd = _checkout_breakdown(reserva_id) or bd
+        return jsonify({
+            "ok": True,
+            "reserva_id": reserva_id,
+            "receipt": receipt,
+            "breakdown": final_bd
+        })
 
     # ========= FIN-INV-01 — Gestión de Facturas =========
     def allowed_file(filename):
@@ -2709,6 +2988,7 @@ def create_app() -> Flask:
                 ("Factura ID", nota.ref_invoice or "-"),
                 ("Motivo", nota.motivo or "-"),
             ]
+
             _kv_table(c, rows, y, title="Detalle")
 
             _footer(c, "Documento generado digitalmente.")

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operaciones – Check-out | Hotel Villa Grace</title>
+  <meta name="description" content="Check-out de huéspedes con cálculo de cargos.">
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <style>
+    .kpi{border:1px solid rgba(0,0,0,.06);border-radius:10px;padding:12px}
+    .muted{color:#6c757d}
+  </style>
+</head>
+<body class="inner-page">
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="ops-dashboard.html" class="active">Operaciones</a></li>
+        <li><a href="ops-checkin.html">Check-in</a></li>
+        <li><a href="ops-checkout.html" class="active">Check-out</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="ops-rooms-status.html">Estado Habitaciones</a>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title dark-background" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="container position-relative"><h1>Check-out</h1><p>Calcula cargos, registra pago y envía a Limpieza.</p></div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+              <label class="form-label">Cédula o Pasaporte</label>
+              <input id="doc" type="text" class="form-control" placeholder="Ej. 1-1234-5678 / A1234567">
+            </div>
+            <div class="col-md-3">
+              <button id="btnSearch" class="btn btn-success w-100"><i class="bi bi-search"></i> Buscar salidas hoy</button>
+            </div>
+          </div>
+          <div id="results" class="mt-3"></div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 mt-4 d-none" id="boxPreview">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Desglose de cargos</h5>
+          <small class="muted" id="reservaInfo"></small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-6 col-lg-3"><div class="kpi"><div class="muted">Habitación</div><div class="fs-5 fw-bold" id="kRoom">₡ 0,00</div></div></div>
+            <div class="col-sm-6 col-lg-3"><div class="kpi"><div class="muted">Consumos</div><div class="fs-5 fw-bold" id="kCons">₡ 0,00</div></div></div>
+            <div class="col-sm-6 col-lg-3"><div class="kpi"><div class="muted">Impuestos</div><div class="fs-5 fw-bold" id="kTax">₡ 0,00</div></div></div>
+            <div class="col-sm-6 col-lg-3"><div class="kpi"><div class="muted">Saldo</div><div class="fs-5 fw-bold" id="kSaldo">₡ 0,00</div></div></div>
+          </div>
+
+          <div class="row g-3 mt-3 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Pago (opcional)</label>
+              <input id="pagoMonto" type="number" min="0" step="0.01" class="form-control" placeholder="₡">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Método</label>
+              <select id="pagoMetodo" class="form-select">
+                <option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option>
+              </select>
+            </div>
+            <div class="col-md-6 d-grid d-md-flex gap-2">
+              <button id="btnCheckout" class="btn btn-primary"><i class="bi bi-box-arrow-right"></i> Confirmar Check-out</button>
+              <a class="btn btn-outline-secondary" href="ops-rooms-status.html"><i class="bi bi-bucket"></i> Ver tablero de Limpieza</a>
+            </div>
+          </div>
+
+          <div class="alert alert-success mt-3 d-none" id="okMsg"></div>
+          <div class="alert alert-danger mt-3 d-none" id="errMsg"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script>
+const fmtCRC = n => new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(Number(n||0));
+
+let selectedReserva = null;
+
+document.getElementById('btnSearch').addEventListener('click', async () => {
+  const doc = document.getElementById('doc').value.trim();
+  const results = document.getElementById('results');
+  results.innerHTML = '';
+  document.getElementById('boxPreview').classList.add('d-none');
+
+  if(!doc){ results.innerHTML = '<div class="alert alert-warning">Ingresa una cédula o pasaporte.</div>'; return; }
+
+  try{
+    const r = await fetch(`/api/ops/checkout/search?doc=${encodeURIComponent(doc)}`);
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Error');
+    if(!j.items || !j.items.length){
+      results.innerHTML = '<div class="alert alert-info">No hay salidas para hoy con ese documento.</div>';
+      return;
+    }
+    results.innerHTML = j.items.map(m => `
+      <button class="btn btn-light border w-100 text-start mb-2" data-rid="${m.reserva_id}">
+        <div class="d-flex justify-content-between">
+          <div>
+            <div class="fw-bold">Reserva #${m.reserva_id}</div>
+            <div class="small text-muted">Check-in ${String(m.checkin).substring(0,10)} · Check-out ${String(m.checkout).substring(0,10)}</div>
+          </div>
+          <div><i class="bi bi-chevron-right"></i></div>
+        </div>
+      </button>
+    `).join('');
+
+    results.querySelectorAll('button[data-rid]').forEach(btn=>{
+      btn.addEventListener('click', ()=> loadPreview(btn.getAttribute('data-rid')));
+    });
+  }catch(_){
+    results.innerHTML = '<div class="alert alert-danger">No se pudo buscar. Revisa tu conexión.</div>';
+  }
+});
+
+async function loadPreview(rid){
+  selectedReserva = Number(rid);
+  const box = document.getElementById('boxPreview');
+  const ok = document.getElementById('okMsg'); const err = document.getElementById('errMsg');
+  ok.classList.add('d-none'); err.classList.add('d-none');
+  try{
+    const r = await fetch(`/api/ops/checkout/preview?reserva_id=${selectedReserva}`);
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Error');
+    const b = j.breakdown;
+    document.getElementById('kRoom').textContent = fmtCRC(b.room_total);
+    document.getElementById('kCons').textContent = fmtCRC(b.consumos);
+    document.getElementById('kTax').textContent  = fmtCRC(b.impuestos);
+    document.getElementById('kSaldo').textContent= fmtCRC(b.saldo);
+    document.getElementById('reservaInfo').textContent = `Reserva #${b.reserva_id} · Hab. ${b.habitacion_id ?? '-'}`;
+    box.classList.remove('d-none');
+  }catch(e){
+    document.getElementById('results').innerHTML = '<div class="alert alert-danger">No se pudo calcular el desglose.</div>';
+  }
+}
+
+document.getElementById('btnCheckout').addEventListener('click', async ()=>{
+  if(!selectedReserva) return;
+  const pago = Number(document.getElementById('pagoMonto').value || '0');
+  const metodo = document.getElementById('pagoMetodo').value;
+  const ok = document.getElementById('okMsg'); const err = document.getElementById('errMsg');
+  ok.classList.add('d-none'); err.classList.add('d-none');
+  try{
+    const r = await fetch('/api/ops/checkout', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({reserva_id:selectedReserva, pago_monto:pago, pago_metodo:metodo})
+    });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Error');
+    ok.textContent = `Check-out completado. Habitación enviada a Limpieza.${j.receipt ? ' Recibo: '+j.receipt.numero : ''}`;
+    ok.classList.remove('d-none');
+    await loadPreview(selectedReserva);
+  }catch(e){
+    err.textContent = 'No se pudo completar el check-out.'; err.classList.remove('d-none');
+  }
+});
+</script>
+</body>
+</html>
