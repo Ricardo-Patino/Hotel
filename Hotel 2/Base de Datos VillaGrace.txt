@@ -699,6 +699,12 @@ WHERE NOT EXISTS (
   SELECT 1 FROM Usuario WHERE LOWER(Correo) = LOWER('recepcion@hotel.test')
 );
 
+INSERT INTO Inv_Categoria (Nombre, Descripcion, Activa)
+VALUES ('Limpieza', 'Insumos de limpieza y desinfección', 1)
+     , ('Cocina', 'Insumos de cocina y alimentos no perecederos', 1)
+     , ('Amenities', 'Amenities para habitaciones', 1)
+ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion);
+
 -- Cierres mensuales e historial
 CREATE TABLE IF NOT EXISTS fin_period_lock (
   id_lock        INT AUTO_INCREMENT PRIMARY KEY,
