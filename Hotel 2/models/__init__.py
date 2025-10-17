@@ -1,1 +1,3 @@
-from .room import Room  
+from .room import Room
+from .inv import InvCategoria
+

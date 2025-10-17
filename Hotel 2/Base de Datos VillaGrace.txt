@@ -726,6 +726,22 @@ CREATE TABLE IF NOT EXISTS fin_monthly_close (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+/* ------------------------------------------------------------------------- */
+/* INV-07-001 - Creación de categorías de insumos                            */
+/* ------------------------------------------------------------------------- */
+
+CREATE TABLE Inv_Categoria (
+  Id                 INT AUTO_INCREMENT PRIMARY KEY,
+  Nombre             VARCHAR(80)  NOT NULL,
+  Descripcion        VARCHAR(255) NULL,
+  Activa             TINYINT(1)   NOT NULL DEFAULT 1,
+  Fecha_Creacion     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualizacion DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_inv_categoria_nombre (Nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
 -- Verificaciones rápidas
 SELECT DATABASE();
 SHOW TABLES LIKE 'fin_invoices';
