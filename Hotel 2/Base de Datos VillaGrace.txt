@@ -699,6 +699,12 @@ WHERE NOT EXISTS (
   SELECT 1 FROM Usuario WHERE LOWER(Correo) = LOWER('recepcion@hotel.test')
 );
 
+INSERT INTO Inv_Categoria (Nombre, Descripcion, Activa)
+VALUES ('Limpieza', 'Insumos de limpieza y desinfección', 1)
+     , ('Cocina', 'Insumos de cocina y alimentos no perecederos', 1)
+     , ('Amenities', 'Amenities para habitaciones', 1)
+ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion);
+
 -- Cierres mensuales e historial
 CREATE TABLE IF NOT EXISTS fin_period_lock (
   id_lock        INT AUTO_INCREMENT PRIMARY KEY,
@@ -724,6 +730,22 @@ CREATE TABLE IF NOT EXISTS fin_monthly_close (
   hash_sum       CHAR(64) NULL,                 -- opcional: hash de integridad
   UNIQUE KEY uq_fin_monthly_close (period_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+/* ------------------------------------------------------------------------- */
+/* INV-07-001 - Creación de categorías de insumos                            */
+/* ------------------------------------------------------------------------- */
+
+CREATE TABLE Inv_Categoria (
+  Id                 INT AUTO_INCREMENT PRIMARY KEY,
+  Nombre             VARCHAR(80)  NOT NULL,
+  Descripcion        VARCHAR(255) NULL,
+  Activa             TINYINT(1)   NOT NULL DEFAULT 1,
+  Fecha_Creacion     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualizacion DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_inv_categoria_nombre (Nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 
 -- Verificaciones rápidas

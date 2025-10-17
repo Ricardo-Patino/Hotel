@@ -381,23 +381,46 @@ def _habs_ocupadas_hoy_ids():
     ).distinct()
     return {row[0] for row in sub.all()}
 
+#-----Comentado por Leidy porque hace que no se muestren las habitaciones desde la DB
+#_bp.get("/api/rooms/status")
+#def api_rooms_status():
+#    ocupadas_ids = _habs_ocupadas_hoy_ids()
+#    data = {"Disponible": [], "Ocupada": [], "Limpieza": [], "Mantenimiento": []}
+#    for h in Habitacion.query.order_by(Habitacion.Numero_Habitacion.asc()).all():
+#        if h.Codigo_Habitacion in ocupadas_ids:
+#            estado = "Ocupada"
+#        else:
+#            # Estado del registro manda si no está ocupada por reserva
+#            estado = h.Estado if h.Estado in data else "Disponible"
+#        data[estado].append({
+#            "id": h.Codigo_Habitacion,
+#            "numero": h.Numero_Habitacion,
+#            "tipo": h.Tipo,
+#            "precio": float(h.Precio_Noche),
+#        })
+#   return jsonify(data)
+
+
+#Cambiando por este.
 @grr_bp.get("/api/rooms/status")
 def api_rooms_status():
     ocupadas_ids = _habs_ocupadas_hoy_ids()
-    data = {"Disponible": [], "Ocupada": [], "Limpieza": [], "Mantenimiento": []}
+    rooms = []
     for h in Habitacion.query.order_by(Habitacion.Numero_Habitacion.asc()).all():
         if h.Codigo_Habitacion in ocupadas_ids:
             estado = "Ocupada"
         else:
-            # Estado del registro manda si no está ocupada por reserva
-            estado = h.Estado if h.Estado in data else "Disponible"
-        data[estado].append({
+            estado = h.Estado if h.Estado else "Disponible"
+        rooms.append({
             "id": h.Codigo_Habitacion,
             "numero": h.Numero_Habitacion,
             "tipo": h.Tipo,
             "precio": float(h.Precio_Noche),
+            "estado": estado
         })
-    return jsonify(data)
+    return jsonify(rooms)
+
+
 
 @grr_bp.get("/api/rooms/calendar")
 def api_rooms_calendar():

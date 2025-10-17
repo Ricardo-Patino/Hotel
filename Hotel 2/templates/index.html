@@ -94,6 +94,25 @@
             <!-- Administración (solo Admin) -->
             {% if session.get('user_role') == 'Administrador' %}
               <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+
+              <!-- ========================= -->
+              <!-- Inventario (solo Admin)   -->
+              <!-- ========================= -->
+              <li class="dropdown">
+                <a href="#"><span>Inventario</span> <i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li>
+                    <a href="{{ url_for('inv.categorias_list') }}">
+                      <i class="bi bi-tags me-1" aria-hidden="true"></i> Categorías de insumos
+                    </a>
+                  </li>
+                  <li>
+                    <a href="{{ url_for('inv.categorias_new') }}">
+                      <i class="bi bi-plus-square me-1" aria-hidden="true"></i> Nueva categoría
+                    </a>
+                  </li>
+                </ul>
+              </li>
             {% endif %}
 
             <!-- Legales / varios -->
@@ -161,6 +180,7 @@
 
   </div>
 </header>
+
 
 
 

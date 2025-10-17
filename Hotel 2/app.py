@@ -781,6 +781,11 @@ def create_app() -> Flask:
     from blueprints.grr.routes import grr_bp
     app.register_blueprint(grr_bp, url_prefix="/grr")
 
+    from blueprints.inv import inv_bp
+    app.register_blueprint(inv_bp, url_prefix="/inv")
+
+
+
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:
         data = None
