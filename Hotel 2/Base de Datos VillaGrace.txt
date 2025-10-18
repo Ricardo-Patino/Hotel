@@ -1,7 +1,10 @@
 /* ============================================================================
-   Hotel Villa Grace — Esquema MySQL 8.x (InnoDB, UTF8MB4)
-   Script limpio para recrear la BD con seeds mínimos
-   Incluye GRR-01-002 (KPIs/Auditoría) y GRR-01-003 (Auto-asignación)
+   Hotel Villa Grace — Esquema Unificado MySQL 8.x (InnoDB, UTF8MB4)
+   Combina: Script 1 + Script 2
+   - Mantiene todo el contenido original
+   - Corrige orden de creación/seed de Inv_Categoria
+   - Incluye nuevas tablas: LimpiezaOrden, LimpiezaInsumo, Temporada,
+     TarifaTemporada, MantenimientoSolicitud
    ============================================================================ */
 
 SET sql_mode = 'STRICT_ALL_TABLES';
@@ -25,6 +28,7 @@ DROP TRIGGER IF EXISTS trg_auditoria_log_after_ins;
 DROP TRIGGER IF EXISTS trg_reserva_sync_before_ins;
 DROP TRIGGER IF EXISTS trg_reserva_sync_before_upd;
 
+/* Tablas Finanzas */
 DROP TABLE IF EXISTS fin_cash_movement;
 DROP TABLE IF EXISTS fin_cash_session;
 DROP TABLE IF EXISTS fin_notes;
@@ -32,7 +36,10 @@ DROP TABLE IF EXISTS fin_receipts;
 DROP TABLE IF EXISTS fin_ledger_line;
 DROP TABLE IF EXISTS fin_ledger_tx;
 DROP TABLE IF EXISTS fin_invoices;
+DROP TABLE IF EXISTS fin_period_lock;
+DROP TABLE IF EXISTS fin_monthly_close;
 
+/* GRR-01-003 y operativas */
 DROP TABLE IF EXISTS AsignacionDecision;
 DROP TABLE IF EXISTS ReglaAsignacion;
 DROP TABLE IF EXISTS PreferenciaHuesped;
@@ -42,8 +49,11 @@ DROP TABLE IF EXISTS MaintenanceRequest;
 DROP TABLE IF EXISTS HousekeepingTask;
 DROP TABLE IF EXISTS Villa;
 
+/* Documentación */
 DROP TABLE IF EXISTS ReservaDocumento;
 DROP TABLE IF EXISTS Documento;
+
+/* Seguridad / base */
 DROP TABLE IF EXISTS Reserva;
 DROP TABLE IF EXISTS Usuario;
 DROP TABLE IF EXISTS Rol;
@@ -51,9 +61,20 @@ DROP TABLE IF EXISTS Cliente;
 DROP TABLE IF EXISTS Funcionario;
 DROP TABLE IF EXISTS Habitacion;
 
+/* KPIs y auditoría */
 DROP TABLE IF EXISTS KPI_Stats;
 DROP TABLE IF EXISTS Audit_Log;
 DROP TABLE IF EXISTS Auditoria_Log;
+
+/* Inventario */
+DROP TABLE IF EXISTS Inv_Categoria;
+
+/* NUEVO (Script 2) */
+DROP TABLE IF EXISTS LimpiezaInsumo;
+DROP TABLE IF EXISTS LimpiezaOrden;
+DROP TABLE IF EXISTS TarifaTemporada;
+DROP TABLE IF EXISTS Temporada;
+DROP TABLE IF EXISTS MantenimientoSolicitud;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -156,7 +177,7 @@ CREATE TABLE Reserva (
   KEY IX_Reserva_Habitacion_Id (Habitacion_Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Triggers para mantener Habitacion_Id sincronizado
+/* Triggers para mantener Habitacion_Id sincronizado */
 DELIMITER $$
 CREATE TRIGGER trg_reserva_sync_before_ins
 BEFORE INSERT ON Reserva
@@ -175,7 +196,7 @@ BEGIN
 END$$
 DELIMITER ;
 
--- FKs tras tener todas las tablas base
+/* FKs tras tener todas las tablas base */
 ALTER TABLE Usuario
   ADD CONSTRAINT FK_Usuario_Rol
     FOREIGN KEY (Rol_Id) REFERENCES Rol(Codigo_Rol)
@@ -247,7 +268,6 @@ CREATE TABLE AsignacionDecision (
   KEY IX_AD_Resultado (Resultado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Preferencias por huésped (usada por seeds y reglas)
 CREATE TABLE PreferenciaHuesped (
   Id_Pref        INT NOT NULL AUTO_INCREMENT,
   Codigo_Cliente INT NOT NULL,
@@ -277,7 +297,7 @@ ALTER TABLE PreferenciaHuesped
     ON UPDATE CASCADE ON DELETE CASCADE;
 
 /* ------------------------------------------------------------------------- */
-/* Tablas operativas adicionales                                             */
+/* Tablas operativas adicionales (Script 1)                                  */
 /* ------------------------------------------------------------------------- */
 CREATE TABLE Villa (
   Id         INT NOT NULL AUTO_INCREMENT,
@@ -317,7 +337,110 @@ CREATE TABLE MaintenanceRequest (
   KEY IX_MR_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* Documentación */
+/* ------------------------------------------------------------------------- */
+/* NUEVAS TABLAS (Script 2)                                                  */
+/* ------------------------------------------------------------------------- */
+CREATE TABLE LimpiezaOrden (
+  Id                INT NOT NULL AUTO_INCREMENT,
+  Codigo_Habitacion INT NOT NULL,
+  Estado            ENUM('Pendiente','EnProceso','Terminado') NOT NULL DEFAULT 'Pendiente',
+  Notas             VARCHAR(255) NULL,
+  Fecha_Creacion    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_LimpiezaOrden PRIMARY KEY (Id),
+  CONSTRAINT FK_LimpiezaOrden_Hab FOREIGN KEY (Codigo_Habitacion)
+    REFERENCES Habitacion(Codigo_Habitacion)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE LimpiezaInsumo (
+  Id        INT NOT NULL AUTO_INCREMENT,
+  Orden_Id  INT NOT NULL,
+  Insumo    VARCHAR(120) NOT NULL,
+  Cantidad  DECIMAL(10,2) NOT NULL DEFAULT 1,
+  CONSTRAINT PK_LimpiezaInsumo PRIMARY KEY (Id),
+  CONSTRAINT FK_LimpiezaInsumo_Orden FOREIGN KEY (Orden_Id)
+    REFERENCES LimpiezaOrden(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE Temporada (
+  Id             INT NOT NULL AUTO_INCREMENT,
+  Nombre         VARCHAR(60) NOT NULL,
+  Fecha_Inicio   DATE NOT NULL,
+  Fecha_Fin      DATE NOT NULL,
+  CONSTRAINT PK_Temporada PRIMARY KEY (Id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE TarifaTemporada (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Habitacion  INT NOT NULL,
+  Temporada_Id       INT NOT NULL,
+  Precio_Noche       DECIMAL(12,2) NOT NULL,
+  CONSTRAINT PK_TarifaTemporada PRIMARY KEY (Id),
+  CONSTRAINT FK_Tarifa_Hab FOREIGN KEY (Codigo_Habitacion)
+    REFERENCES Habitacion(Codigo_Habitacion)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_Tarifa_Temp FOREIGN KEY (Temporada_Id)
+    REFERENCES Temporada(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  UNIQUE KEY uq_hab_temp (Codigo_Habitacion, Temporada_Id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE MantenimientoSolicitud (
+  Id                INT NOT NULL AUTO_INCREMENT,
+  Codigo_Habitacion INT NOT NULL,
+  Titulo            VARCHAR(120) NOT NULL,
+  Descripcion       VARCHAR(500),
+  Prioridad         ENUM('Baja','Media','Alta') NOT NULL DEFAULT 'Media',
+  Estado            ENUM('Abierta','EnProceso','Cerrada') NOT NULL DEFAULT 'Abierta',
+  Fecha_Creacion    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_Mant PRIMARY KEY (Id),
+  CONSTRAINT FK_Mant_Hab FOREIGN KEY (Codigo_Habitacion)
+    REFERENCES Habitacion(Codigo_Habitacion)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* ------------------------------------------------------------------------- */
+/* GRR-01-004 y GRR-01-005                                               */
+/* ------------------------------------------------------------------------- */
+
+CREATE TABLE IF NOT EXISTS `key_activation` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `reserva_id` INT NOT NULL,
+  `habitacion_id` INT NULL,
+  `cliente_id` INT NULL,
+  `activated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `status` ENUM('activated','failed') NOT NULL DEFAULT 'activated',
+  `meta` JSON NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_key_activation_reserva` (`reserva_id`),
+  KEY `ix_key_activation_habitacion` (`habitacion_id`),
+  KEY `ix_key_activation_cliente` (`cliente_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `guest_checkin` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `reserva_id` INT NOT NULL,
+  `cliente_id` INT NULL,
+  `recep_user_id` INT NOT NULL,
+  `doc_type` VARCHAR(20) NULL,
+  `doc_number` VARCHAR(64) NOT NULL,
+  `doc_image_path` VARCHAR(255) NULL,
+  `signature_path` VARCHAR(255) NULL,
+  `key_activated` TINYINT(1) NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `meta` JSON NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_guest_checkin_reserva` (`reserva_id`),
+  KEY `ix_guest_checkin_docnum` (`doc_number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+/* ------------------------------------------------------------------------- */
+/* Documentación                                                             */
+/* ------------------------------------------------------------------------- */
 CREATE TABLE Documento (
   Id              INT NOT NULL AUTO_INCREMENT,
   Tipo            VARCHAR(50) NOT NULL,
@@ -344,7 +467,9 @@ CREATE TABLE ReservaDocumento (
   KEY IX_ResDoc_Documento (Documento_Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* KPIs y Auditoría */
+/* ------------------------------------------------------------------------- */
+/* KPIs y Auditoría                                                          */
+/* ------------------------------------------------------------------------- */
 CREATE TABLE KPI_Stats (
   Id             INT NOT NULL AUTO_INCREMENT,
   Periodo        ENUM('day','week','month') NOT NULL,
@@ -493,7 +618,7 @@ CREATE TABLE fin_notes (
   KEY IX_fin_notes_reserva (ref_reserva)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Caja: sesiones y movimientos (CREADOS ANTES de la vista)
+/* Caja */
 CREATE TABLE fin_cash_session (
   id_session            INT NOT NULL AUTO_INCREMENT,
   fecha                 DATE NOT NULL,
@@ -531,6 +656,44 @@ CREATE TABLE fin_cash_movement (
   CONSTRAINT FK_fin_cash_movement_session
     FOREIGN KEY (session_id) REFERENCES fin_cash_session(id_session)
     ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Cierres mensuales e historial */
+CREATE TABLE IF NOT EXISTS fin_period_lock (
+  id_lock        INT AUTO_INCREMENT PRIMARY KEY,
+  period_key     CHAR(7) NOT NULL,              -- 'YYYY-MM'
+  period_start   DATE     NOT NULL,             -- primer día del mes
+  period_end     DATE     NOT NULL,             -- último día del mes
+  status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
+  note           VARCHAR(255) NULL,
+  closed_by      INT NULL,
+  closed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reopened_by    INT NULL,
+  reopened_at    DATETIME NULL,
+  UNIQUE KEY uq_fin_period_lock (period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fin_monthly_close (
+  id_close       INT AUTO_INCREMENT PRIMARY KEY,
+  period_key     CHAR(7) NOT NULL,
+  totals_json    JSON NOT NULL,                 -- resumen por cuentas/métodos/efectivo
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by     INT NULL,
+  hash_sum       CHAR(64) NULL,                 -- opcional: hash de integridad
+  UNIQUE KEY uq_fin_monthly_close (period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* ------------------------------------------------------------------------- */
+/* Inventario (crear antes del seed)                                         */
+/* ------------------------------------------------------------------------- */
+CREATE TABLE Inv_Categoria (
+  Id                  INT AUTO_INCREMENT PRIMARY KEY,
+  Nombre              VARCHAR(80)  NOT NULL,
+  Descripcion         VARCHAR(255) NULL,
+  Activa              TINYINT(1)   NOT NULL DEFAULT 1,
+  Fecha_Creacion      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualizacion DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_inv_categoria_nombre (Nombre)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* ------------------------------------------------------------------------- */
@@ -640,7 +803,6 @@ INSERT INTO Reserva (
  (3, 4, 4, 1, '2025-11-10','2025-11-12', 90000.00,'Confirmada','Web','VG-20251110-0001',
   'Late checkout','2 adultos','Web','48h antes sin costo');
 
--- Preferencias (la tabla ya existe)
 INSERT INTO PreferenciaHuesped (Codigo_Cliente, Clave, Valor) VALUES
  (2,'piso_alto','true'),
  (2,'cuna','true'),
@@ -661,7 +823,7 @@ ON DUPLICATE KEY UPDATE Total_Reservas=VALUES(Total_Reservas), Total_Monto=VALUE
 INSERT INTO fin_invoices (numero, cliente_nombre, cliente_email, moneda, monto_total, descripcion, id_usuario, estado)
 VALUES ('VG-TEST-0001','Cliente Demo','demo@mail.com','CRC',12345.67,'Factura de prueba', 1, 'Emitida');
 
--- Extra para pruebas de POS
+/* Extra para pruebas de POS */
 INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
 VALUES ('208990123', 'Carlos', 'Mora', '88887777', 'carlos@test.com', '1990-05-15');
 
@@ -674,7 +836,7 @@ INSERT INTO Reserva (
   'Web', '48h antes sin costo', 'Reserva generada para prueba POS', '2 adultos'
 );
 
--- Decisión + estancia ejemplo
+/* Decisión + estancia ejemplo */
 INSERT INTO AsignacionDecision (Codigo_Reserva, Tipo, Resultado, Score_Total, Detalle_JSON)
 VALUES (2, 'Auto', 'OK', 4.50, JSON_OBJECT('candidatos', JSON_ARRAY(101,102,202), 'seleccion', 102));
 
@@ -684,8 +846,8 @@ VALUES (2, 2, '2025-10-01','2025-10-05','Automatico',
         4.50,
         JSON_OBJECT('tipo','match','capacidad','ok','mantenimiento','ok'),
         JSON_OBJECT('piso_alto','true','cuna','true'));
-        
-        
+
+/* Usuario Recepción si no existe */
 INSERT INTO Usuario (Nombre, Cedula_Pasaporte, Correo, Telefono, Rol_Id, Estado, Contrasena)
 SELECT
   'Laura Recepción'        AS Nombre,
@@ -694,62 +856,21 @@ SELECT
   '+506 6000 0000'         AS Telefono,
   (SELECT Codigo_Rol FROM Rol WHERE Nombre = 'Recepcionista' LIMIT 1) AS Rol_Id,
   'Activo'                 AS Estado,
-  'Recep1234!'             AS Contrasena       -- contraseña temporal (legada)
+  'Recep1234!'             AS Contrasena
 WHERE NOT EXISTS (
   SELECT 1 FROM Usuario WHERE LOWER(Correo) = LOWER('recepcion@hotel.test')
 );
 
+/* Seeds de Inventario (ahora sí, después de crear la tabla) */
 INSERT INTO Inv_Categoria (Nombre, Descripcion, Activa)
-VALUES ('Limpieza', 'Insumos de limpieza y desinfección', 1)
-     , ('Cocina', 'Insumos de cocina y alimentos no perecederos', 1)
-     , ('Amenities', 'Amenities para habitaciones', 1)
+VALUES ('Limpieza', 'Insumos de limpieza y desinfección', 1),
+       ('Cocina', 'Insumos de cocina y alimentos no perecederos', 1),
+       ('Amenities', 'Amenities para habitaciones', 1)
 ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion);
 
--- Cierres mensuales e historial
-CREATE TABLE IF NOT EXISTS fin_period_lock (
-  id_lock        INT AUTO_INCREMENT PRIMARY KEY,
-  period_key     CHAR(7) NOT NULL,              -- 'YYYY-MM'
-  period_start   DATE     NOT NULL,             -- primer día del mes
-  period_end     DATE     NOT NULL,             -- último día del mes
-  status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
-  note           VARCHAR(255) NULL,
-  closed_by      INT NULL,
-  closed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  reopened_by    INT NULL,
-  reopened_at    DATETIME NULL,
-  UNIQUE KEY uq_fin_period_lock (period_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Snapshot de totales del mes (para auditoría/consulta)
-CREATE TABLE IF NOT EXISTS fin_monthly_close (
-  id_close       INT AUTO_INCREMENT PRIMARY KEY,
-  period_key     CHAR(7) NOT NULL,
-  totals_json    JSON NOT NULL,                 -- resumen por cuentas/métodos/efectivo
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_by     INT NULL,
-  hash_sum       CHAR(64) NULL,                 -- opcional: hash de integridad
-  UNIQUE KEY uq_fin_monthly_close (period_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
 /* ------------------------------------------------------------------------- */
-/* INV-07-001 - Creación de categorías de insumos                            */
+/* Verificaciones rápidas                                                    */
 /* ------------------------------------------------------------------------- */
-
-CREATE TABLE Inv_Categoria (
-  Id                 INT AUTO_INCREMENT PRIMARY KEY,
-  Nombre             VARCHAR(80)  NOT NULL,
-  Descripcion        VARCHAR(255) NULL,
-  Activa             TINYINT(1)   NOT NULL DEFAULT 1,
-  Fecha_Creacion     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Fecha_Actualizacion DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_inv_categoria_nombre (Nombre)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-
--- Verificaciones rápidas
 SELECT DATABASE();
 SHOW TABLES LIKE 'fin_invoices';
-
-Select * from Usuario
+SELECT * FROM Usuario;

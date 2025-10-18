@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recepción – Estancia sin reserva (Walk-in) | Hotel Villa Grace</title>
+  <meta name="description" content="Crear estancia sin reserva con selección de habitación y pago opcional.">
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .soft{color:#6c757d}
+    .room-card{border:1px solid #e9ecef;border-radius:12px;padding:12px}
+    .room-card.selected{border-color:#198754;background:#f0fff4}
+    .price{font-weight:700}
+  </style>
+</head>
+<body class="inner-page">
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="ops-dashboard.html">Operaciones</a></li>
+        <li><a href="ops-checkin.html">Check-in</a></li>
+        <li><a href="ops-checkout.html">Check-out</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="ops-dashboard.html">Volver al tablero</a>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title dark-background" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="container position-relative"><h1>Estancia sin reserva (Walk-in)</h1><p>Selecciona habitación según filtros y (opcional) registra pago.</p></div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div id="msg" class="alert d-none"></div>
+
+      <!-- Datos del huésped -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white border-0"><h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>Datos del huésped</h5></div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Documento (cédula/pasaporte) <span class="text-danger">*</span></label>
+              <input id="doc" type="text" class="form-control" placeholder="Ej. 1-2345-6789 / A1234567" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Nombre del huésped</label>
+              <input id="name" type="text" class="form-control" placeholder="Nombre y Apellido">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Correo (opcional)</label>
+              <input id="email" type="email" class="form-control" placeholder="correo@ejemplo.com">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros de búsqueda -->
+      <div class="card shadow-sm border-0 mt-3">
+        <div class="card-header bg-white border-0"><h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Buscar habitaciones disponibles</h5></div>
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Check-in <span class="text-danger">*</span></label>
+              <input id="ci" type="date" class="form-control">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Check-out <span class="text-danger">*</span></label>
+              <input id="co" type="date" class="form-control">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Huéspedes</label>
+              <input id="pax" type="number" min="1" value="1" class="form-control">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Tipo</label>
+              <input id="tipo" type="text" class="form-control" placeholder="Ej. Doble / Suite">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Capacidad mínima</label>
+              <input id="cap" type="number" min="1" class="form-control" placeholder="Ej. 2">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Precio máx. por noche</label>
+              <input id="pmax" type="number" min="0" step="0.01" class="form-control" placeholder="₡">
+            </div>
+            <div class="col-md-2">
+              <button id="btnSearch" class="btn btn-primary w-100"><i class="bi bi-search"></i> Buscar</button>
+            </div>
+          </div>
+          <div id="rooms" class="mt-3"></div>
+        </div>
+      </div>
+
+      <!-- Resumen & pago -->
+      <div class="card shadow-sm border-0 mt-3 d-none" id="boxConfirm">
+        <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Confirmar estancia</h5>
+          <small class="soft" id="selInfo"></small>
+        </div>
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Noches</label>
+              <input id="nights" type="text" class="form-control" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Tarifa por noche</label>
+              <input id="rate" type="text" class="form-control" readonly>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Total</label>
+              <input id="total" type="text" class="form-control" readonly>
+            </div>
+          </div>
+
+          <div class="row g-3 align-items-end mt-2">
+            <div class="col-md-3">
+              <label class="form-label">Pago (opcional)</label>
+              <input id="payAmount" type="number" min="0" step="0.01" class="form-control" placeholder="₡">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Método</label>
+              <select id="payMethod" class="form-select"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option></select>
+            </div>
+            <div class="col-md-6 d-grid d-md-flex gap-2">
+              <button id="btnCreate" class="btn btn-success"><i class="bi bi-plus-circle"></i> Crear estancia</button>
+              <a href="ops-checkin.html" class="btn btn-outline-secondary"><i class="bi bi-arrow-right"></i> Ir a Check-in</a>
+            </div>
+          </div>
+
+          <div class="alert alert-success mt-3 d-none" id="okMsg"></div>
+          <div class="alert alert-danger mt-3 d-none" id="errMsg"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script>
+const fmtCRC = n => new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(Number(n||0));
+const $ = s => document.querySelector(s);
+
+let selected = null; // {id, numero, tipo, precio, numero_hab}
+let searchState = { ci:null, co:null, nights:1 };
+
+function showMsg(text, type='info'){
+  const m = $('#msg');
+  m.className = `alert alert-${type}`;
+  m.textContent = text;
+  m.classList.remove('d-none');
+}
+
+function clearMsg(){ $('#msg').classList.add('d-none'); }
+
+$('#btnSearch').addEventListener('click', async ()=>{
+  clearMsg();
+  selected = null;
+  $('#boxConfirm').classList.add('d-none');
+  const doc = $('#doc').value.trim();
+  const ci = $('#ci').value; const co = $('#co').value;
+  if(!doc || !ci || !co){ showMsg('Documento, check-in y check-out son obligatorios.', 'warning'); return; }
+
+  const tipo = $('#tipo').value.trim();
+  const cap  = $('#cap').value ? Number($('#cap').value) : '';
+  const pmax = $('#pmax').value ? Number($('#pmax').value) : '';
+
+  const params = new URLSearchParams({ci, co});
+  if(tipo) params.set('tipo', tipo);
+  if(cap!=='') params.set('capacidad_min', cap);
+  if(pmax!=='') params.set('precio_max', pmax);
+
+  try{
+    const r = await fetch(`/api/ops/walkin/rooms?${params.toString()}`);
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Error');
+    const box = $('#rooms');
+    if(!j.items || !j.items.length){
+      box.innerHTML = '<div class="alert alert-info">No hay habitaciones disponibles que cumplan con los filtros.</div>';
+      return;
+    }
+    const nights = j.nights || 1;
+    searchState = { ci, co, nights };
+
+    box.innerHTML = j.items.map(it => `
+      <div class="room-card mb-2" data-id="${it.id}" data-precio="${it.precio||0}">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="fw-bold">Hab. ${it.numero} — ${it.tipo || '-'}</div>
+            <div class="soft small">Capacidad: ${it.capacidad ?? '-'} · Estado: ${it.estado}</div>
+          </div>
+          <div class="text-end">
+            <div class="price">${fmtCRC(it.precio||0)} <span class="soft small">/ noche</span></div>
+            <button class="btn btn-outline-primary btn-sm mt-1">Seleccionar</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    box.querySelectorAll('.room-card .btn').forEach(btn=>{
+      btn.addEventListener('click', (ev)=>{
+        const wrap = ev.target.closest('.room-card');
+        box.querySelectorAll('.room-card').forEach(x=> x.classList.remove('selected'));
+        wrap.classList.add('selected');
+        const id = Number(wrap.dataset.id);
+        const precio = Number(wrap.dataset.precio||0);
+        const numero = wrap.querySelector('.fw-bold').textContent.match(/Hab\. ([^\s]+)/)?.[1] || '';
+        const tipo   = wrap.querySelector('.fw-bold').textContent.split('—')[1]?.trim() || '';
+        selected = {id, numero, tipo, precio};
+
+        $('#selInfo').textContent = `Hab. ${numero} · ${tipo}`;
+        $('#nights').value = nights;
+        $('#rate').value = fmtCRC(precio);
+        $('#total').value = fmtCRC(precio * nights);
+        $('#boxConfirm').classList.remove('d-none');
+      });
+    });
+
+  }catch(e){
+    console.warn(e);
+    showMsg('No se pudo consultar habitaciones. Revisa /api/ops/walkin/rooms.', 'danger');
+  }
+});
+
+$('#btnCreate').addEventListener('click', async ()=>{
+  clearMsg();
+  $('#okMsg').classList.add('d-none'); $('#errMsg').classList.add('d-none');
+
+  if(!selected){ showMsg('Selecciona una habitación.', 'warning'); return; }
+  const doc = $('#doc').value.trim();
+  const name = $('#name').value.trim();
+  const email = $('#email').value.trim();
+  const ci = $('#ci').value; const co = $('#co').value;
+  const pax = Number($('#pax').value||1);
+  const pay = Number($('#payAmount').value||0);
+  const method = $('#payMethod').value;
+
+  try{
+    const r = await fetch('/api/ops/walkin/create', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        documento: doc, nombre: name||null, email: email||null,
+        checkin: ci, checkout: co, habitacion_id: selected.id, huespedes: pax,
+        pago_monto: pay>0?pay:0, pago_metodo: method
+      })
+    });
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'Error');
+    $('#okMsg').textContent = `Estancia creada (Reserva #${j.reserva_id}${j.numero? ' · '+j.numero:''}). ${j.receipt ? 'Pago registrado ['+j.receipt.numero+'].' : ''}`;
+    $('#okMsg').classList.remove('d-none');
+
+    if(j.receipt && j.receipt.id){
+      try{ window.open(`/api/fin/receipts/${j.receipt.id}/pdf`,'_blank'); }catch(_){}
+    }
+  }catch(e){
+    $('#errMsg').textContent = 'No se pudo crear la estancia. ' + (e.message||'');
+    $('#errMsg').classList.remove('d-none');
+  }
+});
+</script>
+</body>
+</html>

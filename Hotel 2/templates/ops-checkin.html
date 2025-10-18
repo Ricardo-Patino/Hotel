@@ -45,6 +45,7 @@
           <li><a href="ops-arrivals-departures.html">Llegadas/Salidas</a></li>
           <li><a href="ops-rooms-status.html">Estado Hab.</a></li>
           <li><a href="ops-housekeeping.html">Limpieza</a></li>
+          <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
         </ul>
         <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
       </nav>
@@ -115,38 +116,6 @@
                   <!-- filas dinámicas -->
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Walk-in (crear estancia sin reserva) -->
-        <div class="card shadow-sm border-0" id="card-walkin">
-          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="bi bi-person-plus me-2"></i>Crear estancia sin reserva (Walk-in)</h5>
-            <span class="soft small">Úsalo cuando no exista una reserva para el documento indicado.</span>
-          </div>
-          <div class="card-body">
-            <div class="row g-3">
-              <div class="col-md-4">
-                <label class="form-label">Documento (usado arriba)</label>
-                <input type="text" readonly class="form-control-plaintext" id="walkin-doc" value="">
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">Nombre del huésped</label>
-                <input type="text" class="form-control" id="walkin-name" placeholder="Nombre y Apellido">
-              </div>
-              <div class="col-md-2">
-                <label class="form-label">Check-in</label>
-                <input type="date" class="form-control" id="walkin-ci">
-              </div>
-              <div class="col-md-2">
-                <label class="form-label">Check-out</label>
-                <input type="date" class="form-control" id="walkin-co">
-              </div>
-              <div class="col-12 d-flex gap-2">
-                <button class="btn btn-outline-secondary" id="btn-walkin"><i class="bi bi-plus-circle me-1"></i> Crear y asignar</button>
-                <span class="hint align-self-center">Se intentará auto-asignar habitación disponible según GRR-01-003.</span>
-              </div>
             </div>
           </div>
         </div>
@@ -239,7 +208,6 @@
 
     // -------- Firma (opcional) --------
     let isDrawing=false, last={x:0,y:0};
-    const canvas = document.createElement('canvas');
     function setupSignPad(){
       const pad = $('#sign-pad');
       if(!pad) return;
@@ -351,11 +319,7 @@
         return;
       }
 
-      $('#walkin-doc').value = doc;
-
       try{
-        // Endpoint esperado en backend:
-        // GET /api/ops/checkin/search?doc=XXXXX&when=YYYY-MM-DD
         const url = `/api/ops/checkin/search?doc=${encodeURIComponent(doc)}${when?`&when=${encodeURIComponent(when)}`:''}`;
         const r = await fetch(url, {headers:{Accept:'application/json'}});
         if(!r.ok){ throw new Error('Respuesta no OK'); }
@@ -386,7 +350,7 @@
         return;
       }
       if(!selectedReserva){
-        setAlert('Debes seleccionar una reserva encontrada o crear una estancia de walk-in.', 'warning');
+        setAlert('Debes seleccionar una reserva encontrada.', 'warning');
         return;
       }
 
@@ -394,29 +358,15 @@
       const payload = {
         reserva_id: selectedReserva.id,
         documento: doc,
-        guardar_firma: $('#toggle-sign').checked ? (sessionStorage.getItem('ops.sign') || null) : null,
-        adjunto_doc: null, // se mandará por FormData si corresponde
+        guardar_firma: $('#toggle-sign').checked ? (sessionStorage.getItem('ops.sign') || null) : null
       };
 
       try{
-        // Si hay doc adjunto y el switch está activo, usamos FormData
-        const docFileInput = $('#docimg');
-        const useDocImg = $('#toggle-docimg').checked && docFileInput && docFileInput.files && docFileInput.files[0];
-        let resp;
-        if(useDocImg){
-          const fd = new FormData();
-          fd.append('reserva_id', String(payload.reserva_id));
-          fd.append('documento', payload.documento);
-          if(payload.guardar_firma){ fd.append('firma_base64', payload.guardar_firma); }
-          fd.append('docfile', docFileInput.files[0]); // backend: guardar en guest_docs
-          resp = await fetch('/api/ops/checkin/complete', { method:'POST', body: fd });
-        }else{
-          resp = await fetch('/api/ops/checkin/complete', {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify(payload)
-          });
-        }
+        const resp = await fetch('/api/ops/checkin/complete', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
 
         if(!resp.ok){ throw new Error('Respuesta no OK'); }
         const j = await resp.json();
@@ -425,11 +375,9 @@
           return;
         }
 
-        // Éxito
         setAlert('Check-in realizado correctamente.', 'success');
         enableCheckin(false);
 
-        // Opcional: abrir comprobante si backend lo devuelve
         if(j.comprobante_reserva_id){
           try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){}
         }
@@ -439,65 +387,23 @@
       }
     }
 
-    // -------- Walk-in --------
-    async function doWalkin(){
-      const doc = $('#walkin-doc').value.trim();
-      const name = $('#walkin-name').value.trim();
-      const ci = $('#walkin-ci').value;
-      const co = $('#walkin-co').value;
-
-      if(!doc){
-        setAlert('Para un walk-in, indica al menos el documento.', 'warning');
-        return;
-      }
-      if(!ci || !co){
-        setAlert('Para un walk-in, debes indicar fechas de entrada y salida.', 'warning');
-        return;
-      }
-
-      try{
-        const r = await fetch('/api/ops/walkin', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ documento: doc, nombre: name || null, checkin: ci, checkout: co })
-        });
-        if(!r.ok) throw new Error('Respuesta no OK');
-        const j = await r.json();
-        if(!j || !j.ok){ setAlert(j.message || 'No se pudo crear la estancia de walk-in.', 'danger'); return; }
-
-        // Seleccionar automáticamente la nueva "reserva/estancia"
-        selectedReserva = { id: j.reserva_id, numero: j.numero, huesped: name || 'Walk-in', checkin: ci, checkout: co, habitacion: j.habitacion || '—', estado:'Confirmada' };
-        renderResults([selectedReserva]);
-        enableCheckin(true);
-        setAlert('Walk-in creado y habitación auto-asignada (si disponible).', 'success');
-      }catch(e){
-        console.warn('walkin error', e);
-        setAlert('No se pudo crear la estancia de walk-in. Verifica el endpoint /api/ops/walkin.', 'danger');
-      }
-    }
-
     // -------- Bind & init --------
     function prefillFromQuery(){
-      const q = readQuery('q');
+      const u = new URL(window.location.href);
+      const q = u.searchParams.get('q');
       if(q){ $('#doc').value = q; }
     }
 
     document.addEventListener('DOMContentLoaded', ()=>{
-      // toggles opcionales
       bindToggles();
       setupSignPad();
       setupDocImg();
 
-      // acciones
       $('#frm-search').addEventListener('submit', (e)=>{ e.preventDefault(); doSearch(); });
       $('#btn-search').addEventListener('click', (e)=>{ e.preventDefault(); doSearch(); });
       $('#btn-checkin').addEventListener('click', (e)=>{ e.preventDefault(); doCheckin(); });
-      $('#btn-walkin').addEventListener('click', (e)=>{ e.preventDefault(); doWalkin(); });
 
-      // prefill
       prefillFromQuery();
-
-      // si viene ?q=DOC, dispara búsqueda
       if($('#doc').value.trim()){ doSearch(); }
     });
   </script>

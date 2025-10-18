@@ -12,7 +12,7 @@ from datetime import datetime, date
 from pathlib import Path
 from typing import Optional
 from werkzeug.utils import secure_filename
-import reportlab
+import reportlab  # noqa
 
 from sqlalchemy import text, func, inspect
 from sqlalchemy.exc import IntegrityError
@@ -47,7 +47,7 @@ except Exception:
     pass
 
 # Imports del proyecto
-from services.grr.assignment import auto_assign_for_reserva, reassign_reserva, split_reserva, merge_reserva
+from services.grr.assignment import auto_assign_for_reserva, reassign_reserva, split_reserva, merge_reserva  # noqa
 from config import Config
 from extensions import db, migrate
 from models_sql import Usuario, Rol, Habitacion
@@ -768,7 +768,6 @@ def create_app() -> Flask:
     from blueprints.fin_periods import fin_periods_bp
     app.register_blueprint(fin_periods_bp)
 
-
     # Blueprint de FAC-07-005 (reportes contables)
     from blueprints.fin_reports import fin_reports_bp
     app.register_blueprint(fin_reports_bp)
@@ -783,8 +782,6 @@ def create_app() -> Flask:
 
     from blueprints.inv import inv_bp
     app.register_blueprint(inv_bp, url_prefix="/inv")
-
-
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:
@@ -842,6 +839,40 @@ def create_app() -> Flask:
                 {"t": nombre}
             ).scalar()
             return bool(exists)
+        
+    def _col_exists(table: str, column: str) -> bool:
+        """
+        True si existe la columna `column` en la tabla `table` del esquema actual.
+        """
+        try:
+            exists = db.session.execute(
+                text("""
+                    SELECT 1
+                      FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME = :t
+                       AND COLUMN_NAME = :c
+                     LIMIT 1
+                """),
+                {"t": table, "c": column},
+            ).first()
+            return bool(exists)
+        except Exception:
+            return False
+
+    # --- Helpers seguros para castear valores de dict/JSON ---
+    def _to_int(v, default=None):
+        try:
+            return int(v)
+        except Exception:
+            return default
+
+    def _to_float(v, default=None):
+        try:
+            return float(v)
+        except Exception:
+            return default
+
 
     def _asegurar_auto_asignacion(reserva_id: int):
         """
@@ -1055,6 +1086,13 @@ def create_app() -> Flask:
     @role_required("Administrador", "Recepcionista")
     def admin_calendario_html():
         return render_template("admin-calendario.html")
+    
+    
+    @app.route("/ops-walkin.html")
+    @role_required("Administrador", "Recepcionista")
+    def ops_walkin_html():
+        return render_template("ops-walkin.html")
+
 
     # ---------------------- API Disponibilidad --------------------------
     @app.get("/api/availability")
@@ -1113,7 +1151,7 @@ def create_app() -> Flask:
                 "id": h.Codigo_Habitacion,
                 "numero": h.Numero_Habitacion,
                 "tipo": h.Tipo,
-                "estado": h.Estado,  # Disponible, Ocupada, Limpieza, Mantenimiento
+                "estado": h.Estado,  # Disponible, Ocupada, Mantenimiento
                 "precio": float(h.Precio_Noche) if h.Precio_Noche is not None else None,
             } for h in rows]
             return jsonify({"ok": True, "items": data})
@@ -1724,7 +1762,7 @@ def create_app() -> Flask:
             identifier = (request.form.get("email") or "").strip().lower()
             password = (request.form.get("password") or "").strip()
 
-        # Find by email, otherwise try by document
+            # Find by email, otherwise try by document
             user = None
             if identifier:
                 user = Usuario.query.filter(func.lower(Usuario.Correo) == identifier).first()
@@ -1804,7 +1842,6 @@ def create_app() -> Flask:
         flash("Sesión cerrada correctamente.", "info")
         return redirect(url_for("index_html"))
 
-    # ---------------------- REGISTRO ----------------------
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
@@ -1890,8 +1927,8 @@ def create_app() -> Flask:
         doc_number = db.Column(db.String(64), index=True, nullable=False)
         doc_image_path = db.Column(db.String(255))
         signature_path = db.Column(db.String(255))
-        key_activated = db.Column(db.Boolean, default=False)
-        created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+        key_activated = db.Column(db.Boolean, nullable=False, server_default=text("0"))
+        created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
         meta = db.Column(db.JSON)
 
     class KeyActivation(db.Model):
@@ -1900,8 +1937,8 @@ def create_app() -> Flask:
         reserva_id = db.Column(db.Integer, nullable=False, index=True)
         habitacion_id = db.Column(db.Integer, index=True)
         cliente_id = db.Column(db.Integer, index=True)
-        activated_at = db.Column(db.DateTime, default=datetime.utcnow)
-        status = db.Column(db.Enum("activated", "failed"), default="activated")
+        activated_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        status = db.Column(db.Enum("activated", "failed", name="key_activation_status"), server_default="activated")
         meta = db.Column(db.JSON)
 
     def allowed_guest_file(filename: str) -> bool:
@@ -1910,18 +1947,24 @@ def create_app() -> Flask:
     def _normalize_docnum(v: str) -> str:
         return (v or "").strip()
 
+    # Opción B: si la tabla key_activation aún no existe, no intentamos escribir y no fallamos.
     def _activate_e_key(habitacion_id: Optional[int], reserva_id: int, cliente_id: Optional[int]) -> None:
         """
-        Stub de activación de llave electrónica
+        Stub de activación de llave electrónica (opción B):
+        - Si la tabla no existe, se omite silenciosamente.
+        - Usa timestamps del servidor (server_default NOW()) para evitar warnings UTC.
         """
         try:
+            if not _tabla_existe("key_activation"):
+                current_app.logger.info("[KEY] Tabla key_activation no existe; omitiendo registro de activación.")
+                return
+
             ka = KeyActivation(
                 reserva_id=reserva_id,
                 habitacion_id=int(habitacion_id) if habitacion_id else None,
                 cliente_id=int(cliente_id) if cliente_id else None,
-                activated_at=datetime.utcnow(),
                 status="activated",
-                meta={"provider": "stub", "note": "Simulación de activación"}
+                meta={"provider": "stub", "note": "Simulación de activación"},
             )
             db.session.add(ka)
             db.session.flush()
@@ -1932,7 +1975,7 @@ def create_app() -> Flask:
             )
             db.session.commit()
         except Exception as e:
-            current_app.logger.warning(f"[KEY] No se pudo registrar activación: {e}")
+            current_app.logger.info(f"[KEY] Activación omitida/failed: {e}")
             db.session.rollback()
 
     def _reservas_by_doc_when(doc_number: str, when_iso: Optional[str] = None):
@@ -1963,7 +2006,7 @@ def create_app() -> Flask:
             LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
             WHERE DATE(R.Fecha_Entrada) <= DATE(:w)
               AND DATE(:w) <= DATE(R.Fecha_Salida)
-              AND R.Estado IN ('Confirmada', 'Pendiente', 'En Casa')
+              AND R.Estado IN ('Confirmada', 'Pendiente')
               AND ( C.Cedula = :doc OR U.Cedula_Pasaporte = :doc )
             ORDER BY R.Fecha_Entrada ASC, R.Codigo_Reserva ASC
         """), {"doc": doc, "w": when}).mappings().all()
@@ -2042,9 +2085,11 @@ def create_app() -> Flask:
         r = db.session.execute(text("""
             SELECT R.Codigo_Reserva, R.Codigo_Cliente, R.Estado,
                    C.Cedula AS CedulaCliente, C.Nombre, C.Apellido,
-                   R.Codigo_Habitacion
+                   R.Codigo_Habitacion, R.Numero_Comprobante,
+                   R.Fecha_Entrada, R.Fecha_Salida, R.Monto_Total, H.Tipo
               FROM Reserva R
               JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
+              LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
              WHERE R.Codigo_Reserva = :rid
              LIMIT 1
         """), {"rid": reserva_id}).mappings().first()
@@ -2069,6 +2114,8 @@ def create_app() -> Flask:
 
         # Guardar firma (opcional, base64)
         saved_files = []
+        sign_path = None
+        docimg_path = None
         if firma_b64:
             try:
                 import base64
@@ -2077,6 +2124,7 @@ def create_app() -> Flask:
                 fpath = GUEST_DOCS_DIR / f"firma-R{reserva_id}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.png"
                 with open(fpath, "wb") as f:
                     f.write(data)
+                sign_path = f"/storage/guest_docs/{fpath.name}"
                 saved_files.append(("GuestSignature", fpath))
             except Exception as e:
                 current_app.logger.warning(f"[CHECKIN] No se pudo guardar firma: {e}")
@@ -2087,6 +2135,7 @@ def create_app() -> Flask:
                 fn = secure_filename(docfile.filename or f"doc-R{reserva_id}.bin")
                 fpath = GUEST_DOCS_DIR / f"{datetime.utcnow():%Y%m%d%H%M%S}-{fn}"
                 docfile.save(str(fpath))
+                docimg_path = f"/storage/guest_docs/{fpath.name}"
                 saved_files.append(("GuestDoc", fpath))
             except Exception as e:
                 current_app.logger.warning(f"[CHECKIN] No se pudo guardar doc: {e}")
@@ -2110,97 +2159,326 @@ def create_app() -> Flask:
                 db.session.rollback()
                 current_app.logger.warning(f"[CHECKIN] No se pudo asociar documento: {e}")
 
-        # Marcar la reserva como 'En Casa' (o el estado que uses para check-in)
+        # Marcar habitación como Ocupada al hacer check-in (si aplica)
+        try:
+            hab_id = r.get("Codigo_Habitacion")
+            if hab_id:
+                db.session.execute(
+                    text("UPDATE Habitacion SET Estado='Ocupada' WHERE Codigo_Habitacion=:h"),
+                    {"h": hab_id}
+                )
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        # Activación de llave (opcional, Opción B)
+        try:
+            _activate_e_key(r.get("Codigo_Habitacion"), reserva_id, r.get("Codigo_Cliente"))
+            key_activated = True
+        except Exception:
+            key_activated = False
+
+        # Registrar evento GuestCheckin (para trazabilidad)
+        try:
+            doc_type = "pasaporte" if not documento.isdigit() else "cedula"
+            gc = GuestCheckin(
+                reserva_id=reserva_id,
+                cliente_id=r.get("Codigo_Cliente"),
+                recep_user_id=session.get("user_id"),
+                doc_type=doc_type,
+                doc_number=documento,
+                doc_image_path=docimg_path,
+                signature_path=sign_path,
+                key_activated=bool(key_activated),
+                meta={"ui": "ops-checkin", "numero": r.get("Numero_Comprobante")},
+            )
+            db.session.add(gc)
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.info(f"[CHECKIN] GuestCheckin log omitido: {e}")
+            db.session.rollback()
+
+        # Auditoría
+        _audit_log(_current_user_email(), "checkin.completed",
+                   {"reserva_id": reserva_id, "documento": documento}, entidad_id=str(reserva_id))
+
+        # (opcional) asegurar comprobante disponible
+        try:
+            _create_comprobante_pdf({
+                "Codigo_Reserva": r["Codigo_Reserva"],
+                "Numero": r["Numero_Comprobante"] or _make_unique_number(reserva_id, str(r.get("Fecha_Entrada") or "")),
+                "Usuario": _current_user_email(),
+                "Fecha_Entrada": r.get("Fecha_Entrada"),
+                "Fecha_Salida": r.get("Fecha_Salida"),
+                "Monto_Total": r.get("Monto_Total"),
+                "Tipo": r.get("Tipo") or "Habitación",
+            })
+        except Exception:
+            pass
+
+        return jsonify({"ok": True, "reserva_id": reserva_id, "comprobante_reserva_id": reserva_id})
+    
+    @app.get("/api/ops/walkin/rooms")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_walkin_rooms():
+        """
+        Lista habitaciones disponibles entre ci/co con filtros opcionales:
+          - tipo (exacto)
+          - capacidad_min
+          - precio_max
+        Devuelve además 'nights' para el rango.
+        """
+        ci = (request.args.get("ci") or "").strip()
+        co = (request.args.get("co") or "").strip()
+        if not ci or not co:
+            return jsonify({"ok": False, "error": "dates_required"}), 400
+
+        tipo = (request.args.get("tipo") or "").strip()
+        cap_min = request.args.get("capacidad_min", type=int)
+        pmax = request.args.get("precio_max", type=float)
+
+        has_cap = _col_exists("Habitacion", "Capacidad")
+        has_precio = _col_exists("Habitacion", "Precio_Noche")
+        has_tipo = _col_exists("Habitacion", "Tipo")
+
+        conditions = ["h.Estado = 'Disponible'"]
+        params = {"ci": ci, "co": co}
+
+        if tipo and has_tipo:
+            conditions.append("h.Tipo = :tipo")
+            params["tipo"] = tipo
+        if cap_min is not None and has_cap:
+            conditions.append("h.Capacidad >= :cap")
+            params["cap"] = int(cap_min)
+        if pmax is not None and has_precio:
+            conditions.append("h.Precio_Noche <= :pmax")
+            params["pmax"] = float(pmax)
+
+        # no solapamiento con reservas existentes
+        conditions.append("""
+            NOT EXISTS (
+                SELECT 1 FROM Reserva r
+                 WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
+                   AND r.Estado IN ('Confirmada','Pendiente')
+                   AND DATE(r.Fecha_Entrada) < DATE(:co)
+                   AND DATE(r.Fecha_Salida)  > DATE(:ci)
+            )
+        """)
+
+        where = " AND ".join(conditions)
+        rows = db.session.execute(
+            text(f"""
+                SELECT
+                  h.Codigo_Habitacion AS id,
+                  h.Numero_Habitacion AS numero,
+                  {'h.Capacidad AS capacidad,' if has_cap else 'NULL AS capacidad,'}
+                  {'h.Precio_Noche AS precio,' if has_precio else '0 AS precio,'}
+                  {'h.Tipo AS tipo' if has_tipo else "NULL AS tipo"},
+                  h.Estado AS estado
+                FROM Habitacion h
+                WHERE {where}
+                ORDER BY h.Numero_Habitacion
+            """),
+            params
+        ).mappings().all()
+
+        # noches
+        try:
+            from datetime import datetime as _dt
+            nights = max((_dt.strptime(co, "%Y-%m-%d") - _dt.strptime(ci, "%Y-%m-%d")).days, 1)
+        except Exception:
+            nights = 1
+
+        return jsonify({"ok": True, "nights": nights, "items": [dict(r) for r in rows]})
+
+    @app.post("/api/ops/walkin/create")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_walkin_create():
+        """
+        Crea una reserva Walk-in SOLO si se indica una habitación disponible.
+        Evita insertar Codigo_Habitacion = NULL (previene IntegrityError 1048).
+        Permite pago inmediato opcional.
+        """
+        p = request.get_json(silent=True) or {}
+        doc = (p.get("documento") or "").strip()
+        name = (p.get("nombre") or "").strip() or "Walk-in"
+        email = (p.get("email") or "").strip().lower() or None
+        ci = (p.get("checkin") or "").strip()
+        co = (p.get("checkout") or "").strip()
+        habitacion_id = _to_int(p.get("habitacion_id")) if hasattr(p, "get") else None
+        pax = _to_int(p.get("huespedes"), 1)
+
+
+        if not doc or not ci or not co or not habitacion_id:
+            return jsonify({"ok": False, "error": "missing_params"}), 400
+
+        # validar no solape para esa habitación
+        overlap = db.session.execute(
+            text("""
+                SELECT 1
+                  FROM Reserva r
+                 WHERE r.Codigo_Habitacion = :h
+                   AND r.Estado IN ('Confirmada','Pendiente')
+                   AND DATE(r.Fecha_Entrada) < DATE(:co)
+                   AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                 LIMIT 1
+            """),
+            {"h": int(habitacion_id), "ci": ci, "co": co}
+        ).first()
+        if overlap:
+            return jsonify({"ok": False, "error": "room_unavailable",
+                            "message": "La habitación ya está ocupada en ese rango."}), 409
+
+        # precio / datos de la habitación
+        row_h = db.session.execute(
+            text("SELECT Precio_Noche, Tipo, Numero_Habitacion FROM Habitacion WHERE Codigo_Habitacion=:h LIMIT 1"),
+            {"h": int(habitacion_id)}
+        ).mappings().first()
+        if not row_h:
+            return jsonify({"ok": False, "error": "room_not_found"}), 404
+
+        precio_noche = float(row_h.get("Precio_Noche") or 0.0)
+        from datetime import datetime as _dt
+        try:
+            nights = max((_dt.strptime(co, "%Y-%m-%d") - _dt.strptime(ci, "%Y-%m-%d")).days, 1)
+        except Exception:
+            nights = 1
+        monto_total = round(precio_noche * nights, 2)
+
+        # asegurar Cliente por documento
+        cli = db.session.execute(
+            text("SELECT Codigo_Cliente, Correo, Nombre, Apellido FROM Cliente WHERE CAST(Cedula AS CHAR) = :d LIMIT 1"),
+            {"d": doc}
+        ).mappings().first()
+        if not cli:
+            nom, ape = (name.split(" ",1)+[""])[:2]
+            res_cli = db.session.execute(
+                text("""
+                    INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
+                    VALUES (:ced,:n,:a,'',:e,'1990-01-01')
+                """),
+                {"ced": doc, "n": nom[:50], "a": ape[:50], "e": email}
+            )
+            db.session.commit()
+            cliente_id = int(res_cli.lastrowid)
+        else:
+            cliente_id = int(cli["Codigo_Cliente"])
+
+        # crear reserva con la habitación indicada (NUNCA NULL)
+        # funcionario que crea el walk-in (NOT NULL en la tabla)
+        func_id = _to_int(session.get("user_id"), 0)
+        res_ins = db.session.execute(
+            text("""
+                INSERT INTO Reserva (Codigo_Cliente, Codigo_Habitacion, Fecha_Entrada, Fecha_Salida,
+                                     Estado, Canal, Monto_Total, Huespedes, Observaciones, Fecha_Registro, Monto_Pagado,
+                                     Codigo_Funcionario)
+                VALUES (:c, :h, :ci, :co, 'Pendiente', 'FrontDesk', :mt, :pax, 'Walk-in (sin auto-asignación)', NOW(), 0,
+                        :f)
+            """),
+            {"c": cliente_id, "h": int(habitacion_id), "ci": ci, "co": co, "mt": monto_total, "pax": pax, "f": func_id}
+        )
+
+        db.session.commit()
+        reserva_id = int(res_ins.lastrowid)
+
+        # asignar número único
+        numero = _make_unique_number(reserva_id, ci)
         try:
             db.session.execute(
-                text("UPDATE Reserva SET Estado = 'En Casa' WHERE Codigo_Reserva = :r"),
-                {"r": reserva_id}
+                text("UPDATE Reserva SET Numero_Comprobante=:n WHERE Codigo_Reserva=:r"),
+                {"n": numero, "r": reserva_id}
             )
             db.session.commit()
         except Exception:
             db.session.rollback()
 
-        # Activación de llave (opcional)
+        # pago inmediato (opcional)
+                # pago inmediato (opcional)
+        receipt = None
+        pago_monto = _to_float(p.get("pago_monto"), 0.0)
+        pago_metodo = (p.get("pago_metodo") or "Efectivo")[:30]
+
+
+        if pago_monto > 0.0:
+            try:
+                rec = FinReceipt(
+                    numero="PENDING",
+                    reserva_id=reserva_id,
+                    invoice_id=None,
+                    tx_id=None,
+                    metodo=pago_metodo,
+                    currency="CRC",
+                    monto=pago_monto,
+                    emitido_por=session["user_id"],
+                )
+                db.session.add(rec)
+                db.session.flush()
+                rec.numero = _make_seq("RC", rec.id_receipt)
+
+                db.session.execute(
+                    text("""
+                        UPDATE Reserva
+                           SET Monto_Pagado = COALESCE(Monto_Pagado,0) + :p,
+                               Fecha_Ultimo_Pago = NOW(),
+                               Estado = CASE WHEN (COALESCE(Monto_Pagado,0) + :p) >= Monto_Total
+                                             THEN 'Confirmada' ELSE Estado END
+                         WHERE Codigo_Reserva = :r
+                    """),
+                    {"p": pago_monto, "r": reserva_id}
+                )
+                db.session.commit()
+                _create_receipt_pdf(rec)
+                receipt = {"id": rec.id_receipt, "numero": rec.numero}
+            except Exception as e:
+                current_app.logger.warning(f"[WALKIN] Pago inmediato falló: {e}")
+                db.session.rollback()
+
+        # auditoría + KPIs
         try:
-            _activate_e_key(r.get("Codigo_Habitacion"), reserva_id, r.get("Codigo_Cliente"))
+            _update_kpis(monto_total, ci)
+        except Exception:
+            pass
+        try:
+            _audit_log(_current_user_email(), "walkin.created",
+                       {"reserva_id": reserva_id, "documento": doc, "habitacion_id": int(habitacion_id),
+                        "monto_total": float(monto_total)}, entidad_id=str(reserva_id))
         except Exception:
             pass
 
-        _audit_log(_current_user_email(), "checkin.completed",
-                   {"reserva_id": reserva_id, "documento": documento}, entidad_id=str(reserva_id))
+        return jsonify({
+            "ok": True,
+            "reserva_id": reserva_id,
+            "numero": numero,
+            "habitacion": row_h.get("Numero_Habitacion"),
+            "receipt": receipt
+        })
 
-        return jsonify({"ok": True, "reserva_id": reserva_id})
 
     @app.post("/api/ops/walkin")
     @role_required("Administrador", "Recepcionista")
     def api_ops_walkin():
         """
-        Crea una estancia sin reserva previa para un documento dado y fechas.
-        Intenta auto-asignar habitación.
+        Alias legacy para compatibilidad.
+        Requiere 'habitacion_id' y redirige a /api/ops/walkin/create.
+        Evita crear reservas con Codigo_Habitacion = NULL.
         """
-        p = request.get_json(silent=True) or {}
-        doc = (p.get("documento") or "").strip()
-        name = (p.get("nombre") or "").strip() or "Walk-in"
-        ci = (p.get("checkin") or "").strip()
-        co = (p.get("checkout") or "").strip()
-        if not doc or not ci or not co:
-            return jsonify({"ok": False, "error": "missing_params"}), 400
-
-        # Asegurar/obtener Cliente por documento
-        cli = db.session.execute(text("""
-            SELECT Codigo_Cliente, Correo, Nombre, Apellido FROM Cliente
-             WHERE CAST(Cedula AS CHAR) = :d
-             LIMIT 1
-        """), {"d": doc}).mappings().first()
-        if not cli:
-            # crear cliente mínimo
-            nom, ape = (name.split(" ",1)+[""])[:2]
-            res = db.session.execute(text("""
-                INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
-                VALUES (:ced,:n,:a,'',NULL,'1990-01-01')
-            """), {"ced": doc, "n": nom[:50], "a": ape[:50]})
-            db.session.commit()
-            cid = res.lastrowid
+        # Acepta JSON o form-data
+        if request.content_type and request.content_type.startswith("application/x-www-form-urlencoded"):
+            p = request.form.to_dict(flat=True)
+            for k in ("huespedes", "habitacion_id"):
+                if k in p:
+                    try: p[k] = int(p[k])
+                    except Exception: pass
         else:
-            cid = int(cli["Codigo_Cliente"])
+            p = request.get_json(silent=True) or {}
 
-        # Crear reserva mínima
-        rres = db.session.execute(text("""
-            INSERT INTO Reserva (Codigo_Cliente, Codigo_Habitacion, Fecha_Entrada, Fecha_Salida,
-                                 Estado, Canal, Monto_Total, Huespedes, Observaciones, Fecha_Registro)
-            VALUES (:c, NULL, :ci, :co, 'Pendiente', 'FrontDesk', 0, '1', 'Walk-in creado en recepción', NOW())
-        """), {"c": cid, "ci": ci, "co": co})
-        db.session.commit()
-        rid = int(rres.lastrowid)
+        if not p.get("habitacion_id"):
+            return jsonify({"ok": False, "error": "habitacion_required",
+                            "message": "Debes seleccionar una habitación disponible antes de crear el walk-in."}), 400
 
-        # Crear número/comprobante si aplica
-        numero = _make_unique_number(rid, ci)
-        try:
-            db.session.execute(text("UPDATE Reserva SET Numero_Comprobante=:n WHERE Codigo_Reserva=:r"),
-                               {"n": numero, "r": rid})
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+        with current_app.test_request_context("/api/ops/walkin/create", method="POST", json=p):
+            return api_ops_walkin_create()
 
-        # Auto-asignar
-        try:
-            auto_assign_for_reserva(rid, preferir_tipo=True, allow_split=False)
-        except Exception as e:
-            current_app.logger.warning(f"[WALKIN] auto-assign fallo: {e}")
-
-        info = db.session.execute(text("""
-            SELECT R.Codigo_Reserva, R.Numero_Comprobante AS Numero,
-                   H.Numero_Habitacion
-              FROM Reserva R
-              LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
-             WHERE R.Codigo_Reserva = :r
-             LIMIT 1
-        """), {"r": rid}).mappings().first()
-
-        _audit_log(_current_user_email(), "walkin.created", {"reserva_id": rid, "documento": doc}, entidad_id=str(rid))
-
-        return jsonify({"ok": True, "reserva_id": rid, "numero": info.get("Numero") if info else numero,
-                        "habitacion": (info.get("Numero_Habitacion") if info else None)})
 
     # --------- Endpoints anteriores mantenidos (compatibilidad) ---------
 
@@ -2226,12 +2504,6 @@ def create_app() -> Flask:
         """
         # Adaptar nombres y redirigir internamente
         if request.content_type and request.content_type.startswith("multipart/form-data"):
-            form = request.form.copy()
-            # map: doc_number -> documento
-            if form.get("doc_number") and not form.get("documento"):
-                form = form.to_dict(flat=True)
-                form["documento"] = form.pop("doc_number")
-            # enviar a función objetivo
             with app.test_request_context(
                 "/api/ops/checkin/complete",
                 method="POST",
@@ -2249,38 +2521,88 @@ def create_app() -> Flask:
 
     # ========= GRR-01-005 — Check-out (helpers + endpoints) =========
 
-    def _reservas_checkout_hoy_por_documento(doc_number: str):
-        """Reservas que salen HOY por documento (Cliente o Usuario enlazado).
-           Estados válidos para check-out: 'En Casa', 'Confirmada', 'Pendiente'."""
-        doc = _normalize_docnum(doc_number)
-        rows = (
+    def _crear_orden_limpieza(habitacion_id: int, notas: str):
+        """Crea orden en LimpiezaOrden y tarea en HousekeepingTask (compatibilidad)."""
+        if not habitacion_id:
+            return
+        # LimpiezaOrden (tabla nueva)
+        try:
             db.session.execute(
                 text("""
-                    SELECT
-                        R.Codigo_Reserva           AS reserva_id,
-                        R.Codigo_Cliente           AS cliente_id,
-                        R.Codigo_Habitacion        AS habitacion_id,
-                        R.Estado                   AS estado,
-                        R.Fecha_Entrada            AS checkin,
-                        R.Fecha_Salida             AS checkout,
-                        R.Monto_Total              AS monto_total,
-                        C.Cedula                   AS cliente_doc,
-                        C.Correo                   AS cliente_email
-                    FROM Reserva R
-                    JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
-                    LEFT JOIN Usuario U ON U.Codigo_Cliente = C.Codigo_Cliente
-                    WHERE DATE(R.Fecha_Salida) = CURDATE()
-                      AND R.Estado IN ('En Casa', 'Confirmada', 'Pendiente')
-                      AND (
-                           C.Cedula = :doc
-                           OR U.Cedula_Pasaporte = :doc
-                      )
-                    ORDER BY R.Fecha_Salida ASC
+                    INSERT INTO LimpiezaOrden (Codigo_Habitacion, Estado, Notas, Fecha_Creacion)
+                    VALUES (:h, 'Pendiente', :n, NOW())
                 """),
-                {"doc": doc},
-            ).mappings().all()
-        )
-        return [dict(r) for r in rows]
+                {"h": habitacion_id, "n": (notas or "")[:255]}
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[LIMPIEZA] No se pudo crear LimpiezaOrden: {e}")
+            db.session.rollback()
+        # HousekeepingTask (existente)
+        try:
+            db.session.execute(
+                text("""
+                    INSERT INTO HousekeepingTask (Habitacion_Id, Estado, Observaciones, Fecha_Creacion)
+                    VALUES (:h, 'Pendiente', :n, NOW())
+                """),
+                {"h": habitacion_id, "n": (notas or "")[:255]}
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[HK] No se pudo crear HousekeepingTask: {e}")
+            db.session.rollback()
+
+    def _liberar_habitacion_y_lanzar_limpieza(habitacion_id: Optional[int], reserva_id: int):
+        """Deja la habitación Disponible y lanza orden de limpieza."""
+        if not habitacion_id:
+            return
+        try:
+            db.session.execute(
+                text("UPDATE Habitacion SET Estado='Disponible' WHERE Codigo_Habitacion=:h"),
+                {"h": int(habitacion_id)}
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[ROOM] No se pudo poner Disponible: {e}")
+            db.session.rollback()
+        _crear_orden_limpieza(int(habitacion_id), f"Limpieza por check-out de la reserva {reserva_id}")
+
+    def _estancias_salen_hoy_por_documento(doc: str) -> list[dict]:
+        """Estancias que finalizan HOY y pertenecen al documento indicado."""
+        if not doc:
+            return []
+        rows = db.session.execute(text("""
+            SELECT
+                re.Id_Estancia        AS estancia_id,
+                re.Codigo_Reserva     AS reserva_id,
+                re.Habitacion_Id      AS habitacion_id,
+                re.Fecha_Desde        AS desde,
+                re.Fecha_Hasta        AS hasta,
+                r.Numero_Comprobante  AS numero,
+                r.Monto_Total         AS monto_total,
+                h.Numero_Habitacion   AS hab_num,
+                c.Correo              AS cliente_email
+            FROM ReservaEstancia re
+            JOIN Reserva r   ON r.Codigo_Reserva = re.Codigo_Reserva
+            JOIN Habitacion h ON h.Codigo_Habitacion = re.Habitacion_Id
+            JOIN Cliente c    ON c.Codigo_Cliente = r.Codigo_Cliente
+            LEFT JOIN Usuario u ON u.Codigo_Cliente = c.Codigo_Cliente
+            WHERE DATE(re.Fecha_Hasta) = CURDATE()
+              AND (c.Cedula = :doc OR u.Cedula_Pasaporte = :doc)
+              AND re.Estado IN ('Pendiente','Asignada')
+            ORDER BY re.Fecha_Hasta ASC, re.Id_Estancia ASC
+        """), {"doc": doc}).mappings().all()
+        return [{
+            "estancia_id": int(r["estancia_id"]),
+            "reserva_id": int(r["reserva_id"]),
+            "habitacion_id": int(r["habitacion_id"]),
+            "habitacion": r["hab_num"],
+            "desde": str(r["desde"]),
+            "hasta": str(r["hasta"]),
+            "numero": r["numero"],
+            "monto_total_reserva": float(r["monto_total"] or 0.0),
+            "cliente": r["cliente_email"],
+        } for r in rows]
 
     def _sum_pos_consumos(reserva_id: int) -> float:
         """Suma neta de consumos desde el libro mayor POS.
@@ -2303,17 +2625,43 @@ def create_app() -> Flask:
         except Exception:
             return 0.0
 
-    def _checkout_breakdown(reserva_id: int) -> Optional[dict]:
-        """Retorna el desglose para check-out sin modificar estado."""
+    def _checkout_breakdown(reserva_id: int, estancia_id: Optional[int] = None) -> Optional[dict]:
+        """Retorna el desglose para check-out. Si se da estancia_id, prorratea por noches."""
         r = _get_reserva_by_id(reserva_id)
         if not r:
             return None
 
-        room_total = float(r.get("Monto_Total") or 0.0)
+        # Totales de la reserva
+        fecha_entrada = r.get("Fecha_Entrada")
+        fecha_salida = r.get("Fecha_Salida")
+        try:
+            nights_res = max((fecha_salida - fecha_entrada).days, 1) if (fecha_entrada and fecha_salida) else 1
+        except Exception:
+            nights_res = 1
+        monto_res = float(r.get("Monto_Total") or 0.0)
+
+        room_total = monto_res
+        habitacion_id = r.get("Codigo_Habitacion")
+
+        # Prorrateo por estancia (opcional)
+        if estancia_id:
+            est = db.session.execute(text("""
+                SELECT Habitacion_Id, Fecha_Desde, Fecha_Hasta
+                  FROM ReservaEstancia
+                 WHERE Id_Estancia=:e AND Codigo_Reserva=:r
+                 LIMIT 1
+            """), {"e": int(estancia_id), "r": int(reserva_id)}).mappings().first()
+            if est:
+                try:
+                    nights_est = max((est["Fecha_Hasta"] - est["Fecha_Desde"]).days, 1)
+                except Exception:
+                    nights_est = 1
+                room_total = round(monto_res * (nights_est / nights_res), 2)
+                habitacion_id = est["Habitacion_Id"]
+
         consumos = _sum_pos_consumos(reserva_id)
         iva_rate = float(current_app.config.get("IVA_RATE", DEFAULT_IVA))
 
-        # Impuestos: por defecto aplicamos IVA sobre consumos; asumimos que room_total ya incluye impuestos.
         imp_consumos = round(consumos * iva_rate, 2) if APPLY_TAX_ON_CONSUMOS else 0.0
         imp_room = 0.0 if ROOM_TOTAL_INCLUDES_TAX else round(room_total * iva_rate, 2)
 
@@ -2333,6 +2681,7 @@ def create_app() -> Flask:
 
         return {
             "reserva_id": reserva_id,
+            "estancia_id": estancia_id,
             "room_total": round(room_total, 2),
             "consumos": round(consumos, 2),
             "impuestos": round(impuestos, 2),
@@ -2342,290 +2691,55 @@ def create_app() -> Flask:
             "checkin": _normalize_date_like(r.get("Fecha_Entrada")),
             "checkout": _normalize_date_like(r.get("Fecha_Salida")),
             "estado": r.get("Estado"),
-            "habitacion_id": r.get("Codigo_Habitacion"),
+            "habitacion_id": habitacion_id,
             "cliente_id": r.get("Codigo_Cliente"),
             "usuario": r.get("Usuario"),
         }
-
-    def _crear_tarea_limpieza(habitacion_id: int, reserva_id: int):
-        """Crea tarea de housekeeping 'Pendiente' por check-out. No rompe si la tabla no existe."""
-        try:
-            db.session.execute(
-                text("""
-                    INSERT INTO HousekeepingTask (Habitacion_Id, Estado, Fecha_Creacion, Observaciones)
-                    VALUES (:hid, 'Pendiente', NOW(), :obs)
-                """),
-                {"hid": habitacion_id, "obs": f"Limpieza por check-out de la reserva {reserva_id}"}
-            )
-            db.session.commit()
-        except Exception as e:
-            current_app.logger.warning(f"[HK] No se pudo crear tarea de limpieza: {e}")
-            db.session.rollback()
-
-    def _marcar_hab_limpieza(habitacion_id: Optional[int]):
-        if not habitacion_id:
-            return
-        try:
-            db.session.execute(
-                text("UPDATE Habitacion SET Estado='Limpieza' WHERE Codigo_Habitacion=:h"),
-                {"h": int(habitacion_id)}
-            )
-            db.session.commit()
-        except Exception as e:
-            current_app.logger.warning(f"[ROOM] No se pudo marcar limpieza: {e}")
-            db.session.rollback()
 
     # ================== GRR-01-005 — Check-out ==================
 
     @app.get("/api/ops/checkout/search")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkout_search():
-        """Buscar reservas que salen HOY por documento (cédula/pasaporte)."""
+        """Buscar estancias que salen HOY por documento (cédula/pasaporte)."""
         doc = _normalize_docnum(request.args.get("doc"))
         if not doc:
             return jsonify({"ok": False, "error": "doc_required"}), 400
-
-        items = _reservas_checkout_hoy_por_documento(doc)
+        items = _estancias_salen_hoy_por_documento(doc)
         return jsonify({"ok": True, "items": items})
 
     @app.get("/api/ops/checkout/preview")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkout_preview():
-        """Previa de cargos de una reserva antes de confirmar el check-out."""
-        try:
-            rid = int(request.args.get("reserva_id", "0") or "0")
-        except Exception:
-            rid = 0
-        if not rid:
-            return jsonify({"ok": False, "error": "reserva_id_required"}), 400
+        """Previa de cargos de una estancia/reserva antes de confirmar el check-out."""
+        estancia_id = request.args.get("estancia_id", type=int)
+        reserva_id = request.args.get("reserva_id", type=int)
 
-        bd = _checkout_breakdown(rid)
+        if not reserva_id and estancia_id:
+            reserva_id = db.session.execute(
+                text("SELECT Codigo_Reserva FROM ReservaEstancia WHERE Id_Estancia=:e"),
+                {"e": estancia_id}
+            ).scalar()
+
+        if not reserva_id:
+            return jsonify({"ok": False, "error": "reserva_or_estancia_required"}), 400
+
+        bd = _checkout_breakdown(int(reserva_id), estancia_id=estancia_id)
         if not bd:
             return jsonify({"ok": False, "error": "not_found"}), 404
         return jsonify({"ok": True, "breakdown": bd})
-
-    @app.post("/api/ops/checkout")
-    @role_required("Administrador", "Recepcionista")
-    def api_ops_checkout_confirm():
-        """
-        Confirma el check-out:
-          - Opcionalmente registra un pago final (si se envía monto/metodo) como Recibo.
-          - Actualiza estado de Reserva a 'Check-out' (o 'Finalizada').
-          - Marca habitación en 'Limpieza' y crea tarea de housekeeping.
-        Payload JSON/form:
-          - reserva_id   (int, requerido)
-          - pago_monto   (float, opcional)
-          - pago_metodo  (str, opcional; p.ej. 'Efectivo', 'Tarjeta')
-        """
-        p = request.get_json(silent=True) or request.form or {}
-        try:
-            reserva_id = int(p.get("reserva_id") or 0)
-        except Exception:
-            reserva_id = 0
-        if not reserva_id:
-            return jsonify({"ok": False, "error": "reserva_id_required"}), 400
-
-        bd = _checkout_breakdown(reserva_id)
-        if not bd:
-            return jsonify({"ok": False, "error": "not_found"}), 404
-
-        # (1) Pago final opcional
-        pago_monto = float(p.get("pago_monto") or 0.0)
-        pago_metodo = (p.get("pago_metodo") or "").strip() or "Efectivo"
-        receipt = None
-        if pago_monto > 0.0:
-            try:
-                # Insert directo vía modelo para evitar roundtrip HTTP:
-                rec_obj = FinReceipt(
-                    numero="PENDING",
-                    reserva_id=reserva_id,
-                    invoice_id=None,
-                    tx_id=None,
-                    metodo=pago_metodo[:30],
-                    currency="CRC",
-                    monto=pago_monto,
-                    emitido_por=session["user_id"],
-                )
-                db.session.add(rec_obj)
-                db.session.flush()
-                rec_obj.numero = _make_seq("RC", rec_obj.id_receipt)
-
-                # Actualizar pagado en reserva
-                db.session.execute(
-                    text("""
-                        UPDATE Reserva
-                           SET Monto_Pagado = COALESCE(Monto_Pagado,0) + :p,
-                               Fecha_Ultimo_Pago = NOW()
-                         WHERE Codigo_Reserva = :r
-                    """),
-                    {"p": pago_monto, "r": reserva_id}
-                )
-                db.session.commit()
-                _create_receipt_pdf(rec_obj)
-                receipt = {"id": rec_obj.id_receipt, "numero": rec_obj.numero}
-            except Exception as e:
-                current_app.logger.warning(f"[CHECKOUT] No se pudo registrar recibo: {e}")
-                db.session.rollback()
-
-        # (2) Cerrar la estancia: estado de reserva
-        try:
-            db.session.execute(
-                text("""
-                    UPDATE Reserva
-                       SET Estado = CASE
-                                      WHEN Estado IN ('En Casa','Confirmada','Pendiente') THEN 'Check-out'
-                                      ELSE Estado
-                                    END
-                     WHERE Codigo_Reserva = :r
-                """),
-                {"r": reserva_id}
-            )
-            db.session.commit()
-        except Exception as e:
-            current_app.logger.warning(f"[CHECKOUT] No se pudo actualizar estado de la reserva: {e}")
-            db.session.rollback()
-
-        # (3) Marcar habitación y disparar housekeeping
-        _marcar_hab_limpieza(bd.get("habitacion_id"))
-        _crear_tarea_limpieza(bd.get("habitacion_id"), reserva_id)
-
-        # Auditoría
-        try:
-            _audit_log(
-                _current_user_email(),
-                "checkout.completed",
-                {
-                    "reserva_id": reserva_id,
-                    "habitacion_id": bd.get("habitacion_id"),
-                    "saldo_previo": bd.get("saldo"),
-                    "pago_registrado": float(pago_monto or 0.0),
-                    "metodo": pago_metodo,
-                },
-                entidad_id=str(reserva_id)
-            )
-        except Exception:
-            pass
-
-        # Recalcular para devolver saldo final actualizado
-        final_bd = _checkout_breakdown(reserva_id) or bd
-        return jsonify({
-            "ok": True,
-            "reserva_id": reserva_id,
-            "receipt": receipt,
-            "breakdown": final_bd
-        })
-
-    # ========= FIN-INV-01 — Gestión de Facturas =========
-    def allowed_file(filename):
-        return "." in filename and filename.rsplit(".", 1)[1].lower() in {"png", "jpg", "jpeg", "pdf"}
-
-    class FinInvoice(db.Model):
-        __tablename__ = "fin_invoices"
-        id_factura = db.Column(db.Integer, primary_key=True)
-        numero = db.Column(db.String(50), unique=True, nullable=False)  # Ej: VG-20251011-0001
-        cliente_nombre = db.Column(db.String(120))
-        cliente_email = db.Column(db.String(120), index=True)
-        moneda = db.Column(db.String(10), default="CRC")
-        monto_total = db.Column(db.Numeric(12, 2), nullable=False)
-        descripcion = db.Column(db.Text)
-        archivo_path = db.Column(db.String(255))  # PDF subido (opcional)
-        id_reserva = db.Column(db.Integer)  # vínculo opcional con reserva
-        id_usuario = db.Column(db.Integer, nullable=False)  # quien la emitió
-        fecha_emision = db.Column(db.DateTime, default=datetime.utcnow)
-        estado = db.Column(db.Enum("Borrador", "Emitida", "Pagada", "Anulada"), default="Emitida")
-
-    INVOICE_UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads", "invoices")
-    os.makedirs(INVOICE_UPLOAD_FOLDER, exist_ok=True)
-
-    @app.route("/fin-invoices.html", methods=["GET"])
-    @login_required
-    @role_required("Administrador", "Recepcionista")
-    def fin_invoices_html():
-        facturas = FinInvoice.query.order_by(FinInvoice.fecha_emision.desc()).limit(200).all()
-        return render_template("fin-invoices.html", facturas=facturas)
-
-    @app.route("/fin/invoices/nuevo", methods=["POST"])
-    @login_required
-    @role_required("Administrador", "Recepcionista")
-    def fin_invoice_nuevo():
-        numero = (request.form.get("numero") or "").strip()
-        cliente_nombre = (request.form.get("cliente_nombre") or "").strip()
-        cliente_email = (request.form.get("cliente_email") or "").strip().lower()
-        moneda = (request.form.get("moneda") or "CRC").strip()[:10]
-        monto_total = request.form.get("monto_total")
-        descripcion = (request.form.get("descripcion") or "").strip()
-        id_reserva = request.form.get("id_reserva")
-
-        if not numero or not monto_total:
-            flash("Debe indicar número de factura y monto.", "warning")
-            return redirect(url_for("fin_invoices_html"))
-
-        if FinInvoice.query.filter_by(numero=numero).first():
-            flash("El número de factura ya existe.", "danger")
-            return redirect(url_for("fin_invoices_html"))
-
-        archivo = request.files.get("archivo")
-        filename = None
-        if archivo and allowed_file(archivo.filename):
-            filename = secure_filename(archivo.filename)
-            save_path = os.path.join(INVOICE_UPLOAD_FOLDER, filename)
-            archivo.save(save_path)
-
-        factura = FinInvoice(
-            numero=numero,
-            cliente_nombre=cliente_nombre or None,
-            cliente_email=cliente_email or None,
-            moneda=moneda or "CRC",
-            monto_total=monto_total,
-            descripcion=descripcion or None,
-            archivo_path=filename,
-            id_reserva=int(id_reserva) if id_reserva else None,
-            id_usuario=session["user_id"],
-            estado="Emitida",
-        )
-        db.session.add(factura)
-        db.session.commit()
-
-        flash("Factura registrada correctamente.", "success")
-        return redirect(url_for("fin_invoices_html"))
-
-    @app.route("/fin/invoices/<int:id>/pagar", methods=["POST"])
-    @login_required
-    @role_required("Administrador", "Recepcionista")
-    def fin_invoice_pagar(id):
-        factura = FinInvoice.query.get_or_404(id)
-        if factura.estado not in ("Emitida", "Borrador"):
-            flash("Solo se pueden marcar como pagadas las facturas emitidas o en borrador.", "warning")
-            return redirect(url_for("fin_invoices_html"))
-        factura.estado = "Pagada"
-        db.session.commit()
-        flash("Factura marcada como Pagada.", "success")
-        return redirect(url_for("fin_invoices_html"))
-
-    @app.route("/fin/invoices/<int:id>/anular", methods=["POST"])
-    @login_required
-    @role_required("Administrador")
-    def fin_invoice_anular(id):
-        factura = FinInvoice.query.get_or_404(id)
-        if factura.estado == "Anulada":
-            flash("La factura ya está anulada.", "info")
-            return redirect(url_for("fin_invoices_html"))
-        factura.estado = "Anulada"
-        db.session.commit()
-        flash("Factura anulada.", "info")
-        return redirect(url_for("fin_invoices_html"))
 
     # ====== FAC-07-002: Libro Mayor / POS ======
     class FinLedgerTx(db.Model):
         __tablename__ = "fin_ledger_tx"
         id_tx = db.Column(db.Integer, primary_key=True)
         external_id = db.Column(db.String(64), unique=True, nullable=False)
-        source = db.Column(db.Enum("POS", "BACKOFFICE"), default="POS", nullable=False)
+        source = db.Column(db.Enum("POS", "BACKOFFICE", name="fin_ledger_source"), default="POS", nullable=False)
         reserva_id = db.Column(db.Integer)
         currency = db.Column(db.String(10), default="CRC", nullable=False)
         total = db.Column(db.Numeric(14, 2), default=0, nullable=False)
-        status = db.Column(db.Enum("posted", "voided"), default="posted", nullable=False)
-        created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+        status = db.Column(db.Enum("posted", "voided", name="fin_ledger_status"), default="posted", nullable=False)
+        created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
         meta = db.Column(db.JSON)
         lines = db.relationship("FinLedgerLine", backref="tx", cascade="all, delete-orphan")
 
@@ -2799,22 +2913,22 @@ def create_app() -> Flask:
         currency = db.Column(db.String(10), default="CRC", nullable=False)
         monto = db.Column(db.Numeric(14, 2), nullable=False)
         emitido_por = db.Column(db.Integer, nullable=False)
-        creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-        estado = db.Column(db.Enum("Emitido", "Anulado"), default="Emitido", nullable=False)
+        creado_en = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        estado = db.Column(db.Enum("Emitido", "Anulado", name="fin_receipt_status"), default="Emitido", nullable=False)
 
     class FinNote(db.Model):
         __tablename__ = "fin_notes"
         id_note = db.Column(db.Integer, primary_key=True)
         numero = db.Column(db.String(40), unique=True, nullable=False)
-        tipo = db.Column(db.Enum("Credito", "Debito"), nullable=False)
+        tipo = db.Column(db.Enum("Credito", "Debito", name="fin_note_type"), nullable=False)
         ref_invoice = db.Column(db.Integer)
         ref_reserva = db.Column(db.Integer)
         currency = db.Column(db.String(10), default="CRC", nullable=False)
         monto_abs = db.Column(db.Numeric(14, 2), nullable=False)
         motivo = db.Column(db.String(255))
         emitido_por = db.Column(db.Integer, nullable=False)
-        creado_en = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-        estado = db.Column(db.Enum("Emitida", "Anulada"), default="Emitida", nullable=False)
+        creado_en = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        estado = db.Column(db.Enum("Emitida", "Anulada", name="fin_note_status"), default="Emitida", nullable=False)
 
     def _make_seq(prefix: str, nid: int) -> str:
         return f"{prefix}-{datetime.utcnow():%Y%m%d}-{nid:04d}"
@@ -3123,6 +3237,128 @@ def create_app() -> Flask:
         if not path.exists():
             _create_note_pdf(note)
         return send_file(str(path), as_attachment=True, download_name=f"{note.numero}.pdf")
+
+    # ================== Confirmación de Check-out ==================
+    @app.post("/api/ops/checkout")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_checkout_confirm():
+        """
+        Confirma el check-out:
+          - Opcionalmente registra un pago final (fin_receipts).
+          - Marca la/las estancias como 'Liberada'.
+          - Deja la habitación en 'Disponible' y crea LimpiezaOrden/HousekeepingTask.
+        Payload JSON/form:
+          - estancia_id   (int, opcional)  -> cierra solo esa estancia
+          - reserva_id    (int, opcional)  -> cierra todas las estancias abiertas de la reserva
+          - pago_monto    (float, opcional)
+          - pago_metodo   (str, opcional; default 'Efectivo')
+        """
+        p = request.get_json(silent=True) or request.form or {}
+        estancia_id = _to_int(p.get("estancia_id") if hasattr(p, "get") else None)
+        reserva_id  = _to_int(p.get("reserva_id")  if hasattr(p, "get") else None)
+
+
+        if not reserva_id and estancia_id:
+            reserva_id = db.session.execute(
+                text("SELECT Codigo_Reserva FROM ReservaEstancia WHERE Id_Estancia=:e"),
+                {"e": estancia_id}
+            ).scalar()
+
+        if not reserva_id:
+            return jsonify({"ok": False, "error": "reserva_or_estancia_required"}), 400
+
+        bd_before = _checkout_breakdown(int(reserva_id), estancia_id=estancia_id)
+        if not bd_before:
+            return jsonify({"ok": False, "error": "not_found"}), 404
+
+        # Pago final (opcional)
+                # Pago final (opcional)
+        pago_monto = _to_float(p.get("pago_monto") if hasattr(p, "get") else None, 0.0)
+        pago_metodo = (p.get("pago_metodo") or "Efectivo")[:30] if hasattr(p, "get") else "Efectivo"
+
+
+        receipt = None
+        if pago_monto > 0.0:
+            try:
+                rec = FinReceipt(
+                    numero="PENDING",
+                    reserva_id=int(reserva_id),
+                    invoice_id=None,
+                    tx_id=None,
+                    metodo=pago_metodo,
+                    currency="CRC",
+                    monto=pago_monto,
+                    emitido_por=session["user_id"],
+                )
+                db.session.add(rec)
+                db.session.flush()
+                rec.numero = _make_seq("RC", rec.id_receipt)
+
+                db.session.execute(
+                    text("""
+                        UPDATE Reserva
+                           SET Monto_Pagado = COALESCE(Monto_Pagado,0) + :p,
+                               Fecha_Ultimo_Pago = NOW()
+                         WHERE Codigo_Reserva = :r
+                    """),
+                    {"p": pago_monto, "r": int(reserva_id)}
+                )
+                db.session.commit()
+                _create_receipt_pdf(rec)
+                receipt = {"id": rec.id_receipt, "numero": rec.numero}
+            except Exception as e:
+                current_app.logger.warning(f"[CHECKOUT] No se pudo registrar pago final: {e}")
+                db.session.rollback()
+
+        # Cerrar estancias y liberar habitación(es)
+        if estancia_id:
+            estancias = db.session.execute(
+                text("SELECT Id_Estancia, Habitacion_Id FROM ReservaEstancia WHERE Id_Estancia=:e"),
+                {"e": estancia_id}
+            ).mappings().all()
+        else:
+            estancias = db.session.execute(
+                text("""
+                    SELECT Id_Estancia, Habitacion_Id
+                      FROM ReservaEstancia
+                     WHERE Codigo_Reserva=:r
+                       AND Estado IN ('Pendiente','Asignada')
+                """),
+                {"r": int(reserva_id)}
+            ).mappings().all()
+
+        cerradas = []
+        for e in estancias:
+            try:
+                db.session.execute(
+                    text("UPDATE ReservaEstancia SET Estado='Liberada' WHERE Id_Estancia=:id"),
+                    {"id": int(e["Id_Estancia"])}
+                )
+                db.session.commit()
+                _liberar_habitacion_y_lanzar_limpieza(int(e["Habitacion_Id"]), int(reserva_id))
+                cerradas.append(int(e["Id_Estancia"]))
+            except Exception as ex:
+                db.session.rollback()
+                current_app.logger.warning(f"[CHECKOUT] No se pudo cerrar estancia {e['Id_Estancia']}: {ex}")
+
+        # Auditoría
+        try:
+            _audit_log(
+                _current_user_email(),
+                "checkout.completed",
+                {
+                    "reserva_id": int(reserva_id),
+                    "estancias_cerradas": cerradas,
+                    "pago_final": float(pago_monto or 0.0),
+                    "metodo": pago_metodo,
+                },
+                entidad_id=str(reserva_id),
+            )
+        except Exception:
+            pass
+
+        bd_after = _checkout_breakdown(int(reserva_id), estancia_id=estancia_id) or bd_before
+        return jsonify({"ok": True, "reserva_id": int(reserva_id), "receipt": receipt, "breakdown": bd_after})
 
     return app
 

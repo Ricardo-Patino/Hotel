@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recepción – Tablero | Hotel Villa Grace</title>
-  <meta name="description" content="Tablero operativo para Recepción: check-in, salidas, estado de habitaciones y tareas.">
+  <meta name="description" content="Tablero operativo para Recepción: KPIs, llegadas/salidas, estado de habitaciones y accesos.">
 
   <!-- Favicons -->
   <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
@@ -27,7 +27,7 @@
     .kpi-card .icon { font-size: 1.75rem; opacity:.9 }
     .kpi-card .value { font-size: 1.5rem; font-weight: 700 }
     .soft { color:#6c757d }
-    .quick-actions .btn { min-width: 180px }
+    .menu-card .btn { min-width: 220px }
     .section-title h1 { font-size: 1.6rem; margin:0 }
     .table thead th { white-space: nowrap }
     .badge-pill { border-radius: 50rem }
@@ -47,7 +47,9 @@
           <li class="dropdown"><a href="#" class="active"><span>Recepción</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
             <ul>
               <li><a href="ops-dashboard.html" class="active">Tablero</a></li>
-              <li><a href="ops-checkin.html">Check-in / Check-out</a></li>
+              <li><a href="ops-checkin.html">Check-in</a></li>
+              <li><a href="ops-checkout.html">Check-out</a></li>
+              <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
               <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
               <li><a href="ops-rooms-status.html">Estado de habitaciones</a></li>
               <li><a href="ops-housekeeping.html">Limpieza</a></li>
@@ -71,10 +73,11 @@
         <div class="d-flex align-items-center justify-content-between">
           <div class="section-title text-white">
             <h1>Tablero de Recepción</h1>
-            <p class="mb-0">Acciones rápidas, llegadas/salidas y estado del hotel.</p>
+            <p class="mb-0">KPIs y accesos a módulos.</p>
           </div>
-          <div>
-            <a href="ops-checkin.html" class="btn btn-success btn-lg"><i class="bi bi-person-badge me-1"></i> Check-in / Check-out</a>
+          <div class="d-flex gap-2">
+            <a href="ops-checkin.html" class="btn btn-success"><i class="bi bi-person-badge me-1"></i> Check-in</a>
+            <a href="ops-walkin.html" class="btn btn-outline-light"><i class="bi bi-person-plus me-1"></i> Estancia sin reserva</a>
           </div>
         </div>
         <nav class="breadcrumbs mt-2"><ol><li><a href="index.html">Inicio</a></li><li class="current">Recepción</li></ol></nav>
@@ -139,38 +142,20 @@
             </div>
           </div>
 
-          <!-- Acciones rápidas / Enlace a ops-checkin.html -->
+          <!-- Menú de accesos -->
           <div class="col-12">
-            <div class="card shadow-sm border-0 quick-actions">
-              <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
-                <h5 class="mb-0"><i class="bi bi-lightning-charge me-2"></i>Acciones rápidas</h5>
-                <a href="ops-checkin.html" class="btn btn-success btn-sm"><i class="bi bi-person-badge me-1"></i> Abrir módulo de Check-in</a>
+            <div class="card shadow-sm border-0 menu-card">
+              <div class="card-header bg-white border-0">
+                <h5 class="mb-0"><i class="bi bi-menu-button-wide me-2"></i>Menú de operaciones</h5>
               </div>
               <div class="card-body">
-                <div class="row g-3 align-items-end">
-                  <div class="col-md-5">
-                    <label class="form-label soft">Buscar por Nº de reserva o documento</label>
-                    <input id="q-checkin" type="text" class="form-control" placeholder="Ej: VG-20250112-0007 o 012345678">
-                  </div>
-                  <div class="col-md-3">
-                    <button id="btn-go-checkin" class="btn btn-primary w-100">
-                      <i class="bi bi-search me-1"></i> Ir a Check-in
-                    </button>
-                  </div>
-                  <div class="col-md-4 d-grid d-md-flex gap-2">
-                    <a class="btn btn-outline-secondary" href="ops-checkin.html#walkin">
-                      <i class="bi bi-person-plus me-1"></i> Crear estancia sin reserva
-                    </a>
-                    <a class="btn btn-outline-secondary" href="ops-arrivals-departures.html">
-                      <i class="bi bi-box-arrow-in-right me-1"></i> Llegadas/Salidas de hoy
-                    </a>
-                    <a class="btn btn-outline-secondary" href="ops-rooms-status.html">
-                      <i class="bi bi-door-closed me-1"></i> Estado de habitaciones
-                    </a>
-                  </div>
-                </div>
-                <div class="small soft mt-2">
-                  Tip: escribe el número de comprobante o el pasaporte/cédula del huésped y presiona “Ir a Check-in”.
+                <div class="d-flex flex-wrap gap-2">
+                  <a class="btn btn-outline-primary" href="ops-checkin.html"><i class="bi bi-person-badge me-1"></i> Check-in</a>
+                  <a class="btn btn-outline-primary" href="ops-checkout.html"><i class="bi bi-box-arrow-right me-1"></i> Check-out</a>
+                  <a class="btn btn-outline-primary" href="ops-walkin.html"><i class="bi bi-person-plus me-1"></i> Estancia sin reserva</a>
+                  <a class="btn btn-outline-secondary" href="ops-arrivals-departures.html"><i class="bi bi-box-arrow-in-right me-1"></i> Llegadas/Salidas</a>
+                  <a class="btn btn-outline-secondary" href="ops-rooms-status.html"><i class="bi bi-door-closed me-1"></i> Estado de habitaciones</a>
+                  <a class="btn btn-outline-secondary" href="ops-housekeeping.html"><i class="bi bi-bucket me-1"></i> Limpieza</a>
                 </div>
               </div>
             </div>
@@ -192,8 +177,6 @@
                       </tr>
                     </thead>
                     <tbody id="tbl-adr">
-                      <!-- Si agregas un endpoint de agenda (p.ej. /api/ops/agenda?date=YYYY-MM-DD),
-                           puedes poblar esta tabla dinámicamente. Por ahora muestra placeholders. -->
                       <tr><td>11:00</td><td>—</td><td><span class="badge text-bg-light">Check-out</span></td><td>—</td><td><span class="badge text-bg-secondary">Pendiente</span></td></tr>
                       <tr><td>15:00</td><td>—</td><td><span class="badge text-bg-light">Check-in</span></td><td>—</td><td><span class="badge text-bg-secondary">Pendiente</span></td></tr>
                     </tbody>
@@ -211,12 +194,12 @@
                 <ul class="list-group list-group-flush" id="shift-log">
                   <li class="list-group-item px-0">—</li>
                 </ul>
-                <div class="soft small mt-2">Conecta aquí tu fuente de notas si creas un endpoint (p.ej. /api/ops/shift-log).</div>
+                <div class="soft small mt-2">Conecta aquí tu endpoint si creas /api/ops/shift-log.</div>
               </div>
             </div>
           </div>
 
-          <!-- Columna derecha: Habitaciones y Mantenimiento -->
+          <!-- Estado de habitaciones -->
           <div class="col-lg-5">
             <div class="card shadow-sm border-0 mb-4">
               <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
@@ -290,39 +273,31 @@
   <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
   <script>
-    // --- Utilidades ---
     function moneyCRC(n){
-      try {
-        return new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(Number(n||0));
-      } catch(_) { return '₡ ' + (Number(n||0)).toFixed(2); }
+      try { return new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(Number(n||0)); }
+      catch(_) { return '₡ ' + (Number(n||0)).toFixed(2); }
     }
 
-    // --- KPIs desde /api/kpi/summary ---
     async function loadKpis(){
       try{
         const r = await fetch('/api/kpi/summary', {headers:{Accept:'application/json'}});
         const j = await r.json();
         if(!j || !j.ok) return;
-
-        const day = j.day||{}, week=j.week||{}, month=j.month||{};
-        document.getElementById('kpi-day-res').textContent = day.reservas ?? '0';
-        document.getElementById('kpi-day-amt').textContent = moneyCRC(day.monto ?? 0);
-
-        document.getElementById('kpi-week-res').textContent = week.reservas ?? '0';
-        document.getElementById('kpi-week-amt').textContent = moneyCRC(week.monto ?? 0);
-
-        document.getElementById('kpi-month-res').textContent = month.reservas ?? '0';
-        document.getElementById('kpi-month-amt').textContent = moneyCRC(month.monto ?? 0);
+        const d=j.day||{}, w=j.week||{}, m=j.month||{};
+        document.getElementById('kpi-day-res').textContent = d.reservas ?? '0';
+        document.getElementById('kpi-day-amt').textContent = moneyCRC(d.monto ?? 0);
+        document.getElementById('kpi-week-res').textContent = w.reservas ?? '0';
+        document.getElementById('kpi-week-amt').textContent = moneyCRC(w.monto ?? 0);
+        document.getElementById('kpi-month-res').textContent = m.reservas ?? '0';
+        document.getElementById('kpi-month-amt').textContent = moneyCRC(m.monto ?? 0);
       }catch(e){ console.warn('kpi error', e); }
     }
 
-    // --- Estado habitaciones desde /api/rooms/status ---
     async function loadRooms(){
       try{
         const r = await fetch('/api/rooms/status', {headers:{Accept:'application/json'}});
         const j = await r.json();
         if(!j || !j.ok) return;
-
         const items = j.items || [];
         let free=0, occ=0, hk=0, mt=0;
         for(const it of items){
@@ -338,7 +313,6 @@
         document.getElementById('rooms-hk').textContent  = hk;
         document.getElementById('rooms-mt').textContent  = mt;
 
-        // Ocupación simple = ocupadas / total
         const total = items.length || 0;
         const occPct = total ? Math.round((occ / total) * 100) : 0;
         document.getElementById('kpi-occ').textContent = total ? (occPct + '%') : '—';
@@ -346,25 +320,8 @@
       }catch(e){ console.warn('rooms error', e); }
     }
 
-    // --- Redirección al módulo de check-in ---
-    function bindCheckinSearch(){
-      const input = document.getElementById('q-checkin');
-      const btn   = document.getElementById('btn-go-checkin');
-      const go = () => {
-        const q = (input.value||'').trim();
-        const url = q ? `ops-checkin.html?q=${encodeURIComponent(q)}` : 'ops-checkin.html';
-        window.location.href = url;
-      };
-      btn.addEventListener('click', go);
-      input.addEventListener('keydown', (ev) => {
-        if(ev.key === 'Enter'){ ev.preventDefault(); go(); }
-      });
-    }
-
-    // Init
     loadKpis();
     loadRooms();
-    bindCheckinSearch();
   </script>
 </body>
 </html>
