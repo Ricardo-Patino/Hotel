@@ -17,6 +17,7 @@ USE Hotel_VillaGrace;
 -- Limpieza
 SET FOREIGN_KEY_CHECKS = 0;
 
+-- Limpieza total
 DROP VIEW IF EXISTS v_reservas_ext;
 DROP VIEW IF EXISTS v_reserva_pagos_pos;
 DROP VIEW IF EXISTS v_fin_caja_resumen;
@@ -32,12 +33,12 @@ DROP TABLE IF EXISTS fin_receipts;
 DROP TABLE IF EXISTS fin_ledger_line;
 DROP TABLE IF EXISTS fin_ledger_tx;
 DROP TABLE IF EXISTS fin_invoices;
-
+DROP TABLE IF EXISTS fin_monthly_close;
+DROP TABLE IF EXISTS fin_period_lock;
 DROP TABLE IF EXISTS AsignacionDecision;
 DROP TABLE IF EXISTS ReglaAsignacion;
 DROP TABLE IF EXISTS PreferenciaHuesped;
 DROP TABLE IF EXISTS ReservaEstancia;
-
 DROP TABLE IF EXISTS MaintenanceRequest;
 DROP TABLE IF EXISTS HousekeepingTask;
 DROP TABLE IF EXISTS Villa;
@@ -50,15 +51,55 @@ DROP TABLE IF EXISTS Rol;
 DROP TABLE IF EXISTS Cliente;
 DROP TABLE IF EXISTS Funcionario;
 DROP TABLE IF EXISTS Habitacion;
-
 DROP TABLE IF EXISTS KPI_Stats;
 DROP TABLE IF EXISTS Audit_Log;
 DROP TABLE IF EXISTS Auditoria_Log;
+DROP TABLE IF EXISTS fin_cash_movement;
+DROP TABLE IF EXISTS fin_cash_session;
+DROP TABLE IF EXISTS fin_notes;
+DROP TABLE IF EXISTS fin_receipts;
+DROP TABLE IF EXISTS fin_ledger_line;
+DROP TABLE IF EXISTS fin_ledger_tx;
+DROP TABLE IF EXISTS fin_invoices;
+DROP TABLE IF EXISTS fin_monthly_close;
+DROP TABLE IF EXISTS fin_period_lock;
+
+DROP TABLE IF EXISTS MantenimientoNotificacion;
+DROP TABLE IF EXISTS MantenimientoPreventivo;
+DROP TABLE IF EXISTS MantenimientoCambioEstado;
+DROP TABLE IF EXISTS MantenimientoSolicitud;
+
+DROP TABLE IF EXISTS InvMovimiento;
+DROP TABLE IF EXISTS InvInsumo;
+DROP TABLE IF EXISTS InvCategoria;
+
+DROP TABLE IF EXISTS AsignacionDecision;
+DROP TABLE IF EXISTS ReglaAsignacion;
+DROP TABLE IF EXISTS PreferenciaHuesped;
+DROP TABLE IF EXISTS ReservaEstancia;
+
+DROP TABLE IF EXISTS ReservaDocumento;
+DROP TABLE IF EXISTS Documento;
+DROP TABLE IF EXISTS Reserva;
+DROP TABLE IF EXISTS Usuario;
+DROP TABLE IF EXISTS Rol;
+DROP TABLE IF EXISTS Cliente;
+DROP TABLE IF EXISTS Funcionario;
+DROP TABLE IF EXISTS Habitacion;
+DROP TABLE IF EXISTS KPI_Stats;
+DROP TABLE IF EXISTS Audit_Log;
+DROP TABLE IF EXISTS Auditoria_Log;
+DROP TABLE IF EXISTS Villa;
+
 
 SET FOREIGN_KEY_CHECKS = 1;
 
+
+
 /* ------------------------------------------------------------------------- */
-/* Tablas base                                                               */
+/* Tablas base																*/
+/*comprobar que n hayan tablas existentes:															*/
+/*show tables;                                                               */
 /* ------------------------------------------------------------------------- */
 CREATE TABLE Habitacion (
   Codigo_Habitacion   INT NOT NULL AUTO_INCREMENT,
@@ -611,7 +652,8 @@ SELECT
   s.opening_cash,
   IFNULL(r.ingresos_efectivo, 0.00) AS ingresos_efectivo,
   IFNULL(m.egresos_efectivo, 0.00)  AS egresos_efectivo,
-  IFNULL(m.ajustes_mas, 0.00)       AS ajustes_mas,
+  IFNULL(m.ajustes_mas, 0.00)       AS 
+  ajustes_mas,
   IFNULL(m.ajustes_menos, 0.00)     AS ajustes_menos,
   (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
     + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0)) AS efectivo_esperado,
@@ -635,9 +677,175 @@ LEFT JOIN (
   GROUP BY DATE(created_at)
 ) m ON m.fecha = s.fecha;
 
+
+
+-- Cierres mensuales e historial
+CREATE TABLE IF NOT EXISTS fin_period_lock (
+  id_lock        INT AUTO_INCREMENT PRIMARY KEY,
+  period_key     CHAR(7) NOT NULL,              -- 'YYYY-MM'
+  period_start   DATE     NOT NULL,             -- primer día del mes
+  period_end     DATE     NOT NULL,             -- último día del mes
+  status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
+  note           VARCHAR(255) NULL,
+  closed_by      INT NULL,
+  closed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reopened_by    INT NULL,
+  reopened_at    DATETIME NULL,
+  UNIQUE KEY uq_fin_period_lock (period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Snapshot de totales del mes (para auditoría/consulta)
+CREATE TABLE IF NOT EXISTS fin_monthly_close (
+  id_close       INT AUTO_INCREMENT PRIMARY KEY,
+  period_key     CHAR(7) NOT NULL,
+  totals_json    JSON NOT NULL,                 -- resumen por cuentas/métodos/efectivo
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by     INT NULL,
+  hash_sum       CHAR(64) NULL,                 -- opcional: hash de integridad
+  UNIQUE KEY uq_fin_monthly_close (period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* ------------------------------------------------------------------------- */
+/*  Inventario (INV) — Categorías, Insumos y Movimientos (ajustes/historial) */
+/* ------------------------------------------------------------------------- */
+
+
+-- Tu tabla InvMovimiento (tal cual la compartiste):
+CREATE TABLE InvMovimiento (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Insumo_Id        INT NOT NULL,
+  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION',
+                          'ENTRADA_COMPRA','ENTRADA_DEVOLUCION') NOT NULL,
+  Campo            VARCHAR(60)  NULL,
+  Valor_Antes      VARCHAR(120) NULL,
+  Valor_Despues    VARCHAR(120) NULL,
+  Delta            DECIMAL(14,3) NULL,
+  Motivo           VARCHAR(255) NOT NULL,
+  Doc_Tipo         VARCHAR(30)  NULL,
+  Doc_Numero       VARCHAR(60)  NULL,
+  Proveedor        VARCHAR(120) NULL,
+  Fecha_Mov        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Usuario_Id       INT NULL,
+  Usuario_Nombre   VARCHAR(120) NULL,
+  Usuario_Email    VARCHAR(120) NULL,
+  CONSTRAINT PK_InvMovimiento PRIMARY KEY (Id),
+  CONSTRAINT FK_InvMovimiento_Insumo
+    FOREIGN KEY (Insumo_Id) REFERENCES InvInsumo(Id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  KEY IX_InvMovimiento_Insumo (Insumo_Id),
+  KEY IX_InvMovimiento_Tipo   (Tipo),
+  KEY IX_InvMovimiento_Fecha  (Fecha_Mov)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Datos de prueba
+
+INSERT INTO InvCategoria (Nombre, Descripcion, Activa)
+VALUES ('General', 'Categoría por defecto para insumos generales', 1);
+
+INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad)
+VALUES (1, 'Cloro piscina', 'lt');
+
+
+
+
+
+INSERT INTO InvMovimiento (Insumo_Id, Tipo, Motivo, Delta)
+VALUES (1, 'AJUSTE', 'Carga inicial', 50.000);
+
+-- ==============================
+--  MantenimientoSolicitud
+-- ==============================
+CREATE TABLE IF NOT EXISTS MantenimientoSolicitud (
+  Id                INT NOT NULL AUTO_INCREMENT,
+  Codigo_Habitacion INT NOT NULL,
+  Titulo            VARCHAR(120) NOT NULL,
+  Descripcion       VARCHAR(500),
+  Prioridad         VARCHAR(10)  NOT NULL DEFAULT 'Media',
+  Estado            VARCHAR(12)  NOT NULL DEFAULT 'Abierta',
+  Fecha_Creacion    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_MantenimientoSolicitud PRIMARY KEY (Id),
+  CONSTRAINT FK_MantenimientoSolicitud_Habitacion
+    FOREIGN KEY (Codigo_Habitacion) REFERENCES Habitacion(Codigo_Habitacion)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  KEY IX_MantenimientoSolicitud_Habitacion (Codigo_Habitacion),
+  KEY IX_MantenimientoSolicitud_Estado (Estado),
+  KEY IX_MantenimientoSolicitud_Fecha (Fecha_Creacion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================
+--  MantenimientoCambioEstado
+-- ==============================
+CREATE TABLE IF NOT EXISTS MantenimientoCambioEstado (
+  Id              INT NOT NULL AUTO_INCREMENT,
+  Solicitud_Id    INT NOT NULL,
+  Estado_Antes    VARCHAR(12),
+  Estado_Despues  VARCHAR(12) NOT NULL,
+  Motivo          VARCHAR(255),
+  Usuario_Id      INT,
+  Usuario_Nombre  VARCHAR(120),
+  Fecha           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_MantenimientoCambioEstado PRIMARY KEY (Id),
+  CONSTRAINT FK_MantenimientoCambioEstado_Solicitud
+    FOREIGN KEY (Solicitud_Id) REFERENCES MantenimientoSolicitud(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  KEY IX_MantenimientoCambioEstado_Solicitud (Solicitud_Id),
+  KEY IX_MantenimientoCambioEstado_Fecha (Fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================
+--  MantenimientoPreventivo
+-- ==============================
+CREATE TABLE IF NOT EXISTS MantenimientoPreventivo (
+  Id              INT NOT NULL AUTO_INCREMENT,
+  Equipo          VARCHAR(120) NOT NULL,
+  Ubicacion       VARCHAR(120),
+  Descripcion     VARCHAR(255),
+  Frecuencia_Dias INT NOT NULL,
+  Proxima_Fecha   DATE NOT NULL,
+  Activo          TINYINT(1) NOT NULL DEFAULT 1,
+  CONSTRAINT PK_MantenimientoPreventivo PRIMARY KEY (Id),
+  KEY IX_MantenimientoPreventivo_Activo (Activo),
+  KEY IX_MantenimientoPreventivo_ProximaFecha (Proxima_Fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================
+--  MantenimientoNotificacion
+-- ==============================
+CREATE TABLE IF NOT EXISTS MantenimientoNotificacion (
+  Id             INT NOT NULL AUTO_INCREMENT,
+  Solicitud_Id   INT,
+  Para_Email     VARCHAR(150),
+  Para_Nombre    VARCHAR(120),
+  Asunto         VARCHAR(150),
+  Cuerpo         TEXT,
+  Enviada        TINYINT(1) NOT NULL DEFAULT 0,
+  Fecha_Creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Envio    DATETIME NULL,
+  CONSTRAINT PK_MantenimientoNotificacion PRIMARY KEY (Id),
+  CONSTRAINT FK_MantenimientoNotificacion_Solicitud
+    FOREIGN KEY (Solicitud_Id) REFERENCES MantenimientoSolicitud(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  KEY IX_MantenimientoNotificacion_Solicitud (Solicitud_Id),
+  KEY IX_MantenimientoNotificacion_Enviada (Enviada),
+  KEY IX_MantenimientoNotificacion_Fecha (Fecha_Creacion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Dato de prueba
+
+SELECT * FROM Habitacion;
+SELECT Codigo_Habitacion FROM Habitacion;
 /* ------------------------------------------------------------------------- */
 /* Seeds                                                                     */
 /* ------------------------------------------------------------------------- */
+
+INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado)
+VALUES ('101', 'Sencilla', 15000.00, 'Disponible');
+
+INSERT INTO MantenimientoSolicitud
+(Codigo_Habitacion, Titulo, Descripcion, Prioridad, Estado)
+VALUES (1, 'A/C con ruido', 'Vibración fuerte por la noche', 'Alta', 'Abierta');
+
 
 INSERT INTO InvCategoria (Nombre, Descripcion, Activa)
 VALUES ('Limpieza', 'Insumos de limpieza y desinfección', 1)
@@ -752,62 +960,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM Usuario WHERE LOWER(Correo) = LOWER('recepcion@hotel.test')
 );
 
--- Cierres mensuales e historial
-CREATE TABLE IF NOT EXISTS fin_period_lock (
-  id_lock        INT AUTO_INCREMENT PRIMARY KEY,
-  period_key     CHAR(7) NOT NULL,              -- 'YYYY-MM'
-  period_start   DATE     NOT NULL,             -- primer día del mes
-  period_end     DATE     NOT NULL,             -- último día del mes
-  status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
-  note           VARCHAR(255) NULL,
-  closed_by      INT NULL,
-  closed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  reopened_by    INT NULL,
-  reopened_at    DATETIME NULL,
-  UNIQUE KEY uq_fin_period_lock (period_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Snapshot de totales del mes (para auditoría/consulta)
-CREATE TABLE IF NOT EXISTS fin_monthly_close (
-  id_close       INT AUTO_INCREMENT PRIMARY KEY,
-  period_key     CHAR(7) NOT NULL,
-  totals_json    JSON NOT NULL,                 -- resumen por cuentas/métodos/efectivo
-  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_by     INT NULL,
-  hash_sum       CHAR(64) NULL,                 -- opcional: hash de integridad
-  UNIQUE KEY uq_fin_monthly_close (period_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* ------------------------------------------------------------------------- */
-/*  Inventario (INV) — Categorías, Insumos y Movimientos (ajustes/historial) */
-/* ------------------------------------------------------------------------- */
-
-CREATE TABLE InvMovimiento (
-  Id               INT NOT NULL AUTO_INCREMENT,
-  Insumo_Id        INT NOT NULL,
-  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION',
-                        'ENTRADA_COMPRA','ENTRADA_DEVOLUCION') NOT NULL,
-  Campo            VARCHAR(60)  NULL,              -- para cambios de metadatos
-  Valor_Antes      VARCHAR(120) NULL,
-  Valor_Despues    VARCHAR(120) NULL,
-  Delta            DECIMAL(14,3) NULL,             -- para variación de stock (+/-)
-  Motivo           VARCHAR(255) NOT NULL,
-  Doc_Tipo         VARCHAR(30)  NULL,              -- opcional: 'FACTURA','NC','DEV'
-  Doc_Numero       VARCHAR(60)  NULL,
-  Proveedor        VARCHAR(120) NULL,              -- opcional
-  Fecha_Mov        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  Usuario_Id       INT NULL,
-  Usuario_Nombre   VARCHAR(120) NULL,
-  Usuario_Email    VARCHAR(120) NULL,
-
-  CONSTRAINT PK_InvMovimiento PRIMARY KEY (Id),
-  CONSTRAINT FK_InvMovimiento_Insumo FOREIGN KEY (Insumo_Id)
-      REFERENCES InvInsumo(Id) ON UPDATE CASCADE ON DELETE RESTRICT,
-  KEY IX_InvMovimiento_Insumo (Insumo_Id),
-  KEY IX_InvMovimiento_Tipo (Tipo),
-  KEY IX_InvMovimiento_Fecha (Fecha_Mov)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 
@@ -816,10 +969,12 @@ CREATE TABLE InvMovimiento (
 SELECT DATABASE();
 SHOW TABLES LIKE 'fin_invoices';
 
+select * from Habitacion;
 Select * from Usuario;
 Select * from InvCategoria;
 Select * from InvInsumo;
 Select * from InvMovimiento;
 SELECT 'General', 1
 WHERE NOT EXISTS (SELECT 1 FROM InvCategoria WHERE Nombre='General');
+
 
