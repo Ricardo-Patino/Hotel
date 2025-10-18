@@ -18,6 +18,7 @@ from sqlalchemy import text, func, inspect
 from sqlalchemy.exc import IntegrityError
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
+
 from flask import (
     Flask,
     render_template,
@@ -753,6 +754,7 @@ def create_app() -> Flask:
         template_folder=str(BASE_DIR / "templates"),
         static_folder=str(BASE_DIR / "static"),
     )
+    
     app.config.from_object(Config)
 
     db.init_app(app)
@@ -780,8 +782,11 @@ def create_app() -> Flask:
     from blueprints.grr.routes import grr_bp
     app.register_blueprint(grr_bp, url_prefix="/grr")
 
+
+        # Blueprint de Inventario (INV-07)
     from blueprints.inv import inv_bp
-    app.register_blueprint(inv_bp, url_prefix="/inv")
+    app.register_blueprint(inv_bp)
+
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:

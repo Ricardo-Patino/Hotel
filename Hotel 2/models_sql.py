@@ -263,3 +263,29 @@ class MantenimientoSolicitud(db.Model):
                                   server_onupdate=func.current_timestamp())
     Habitacion        = db.relationship('Habitacion', lazy='joined')
 
+
+class InvCategoria(db.Model):
+    __tablename__ = "InvCategoria"
+    Id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Nombre          = db.Column(db.String(80), nullable=False, unique=True)
+    Descripcion     = db.Column(db.String(255))
+    Activa          = db.Column(db.Boolean, default=True, index=True)
+    Fecha_Creacion  = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    Fecha_Actualiza = db.Column(db.DateTime, nullable=False,
+                                server_default=func.current_timestamp(),
+                                server_onupdate=func.current_timestamp())
+
+class InvInsumo(db.Model):
+    __tablename__ = "InvInsumo"
+    Id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Categoria_Id    = db.Column(db.Integer, db.ForeignKey("InvCategoria.Id"), nullable=False, index=True)
+    Nombre          = db.Column(db.String(120), nullable=False)
+    Unidad          = db.Column(db.String(20), nullable=False)
+    Stock_Actual    = db.Column(db.Numeric(12, 3), nullable=False, default=0)
+    Stock_Minimo    = db.Column(db.Numeric(12, 3), nullable=False, default=0)
+    Activo          = db.Column(db.Boolean, default=True, index=True)
+    Fecha_Creacion  = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    Fecha_Actualiza = db.Column(db.DateTime, nullable=False,
+                                server_default=func.current_timestamp(),
+                                server_onupdate=func.current_timestamp())
+

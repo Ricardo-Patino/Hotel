@@ -89,9 +89,16 @@
             <!-- Operaciones (Admin o Recepcionista) -->
             {% if session.get('user_role') in ['Administrador', 'Recepcionista'] %}
               <li><a href="{{ url_for('ops_dashboard_html') }}">Operaciones</a></li>
-            {% endif %}
+              {% endif %}
 
-            <!-- Administración (solo Admin) -->
+              <!-- Inventario de insumos -->
+              {% if session.get('user_role') in ['Administrador', 'Recepcionista'] %}
+              <li><a href="{{ url_for('inv.insumos_list') }}">Inventario – Insumos</a></li>
+              <li><a href="{{ url_for('inv.insumo_new') }}">Inventario – Nuevo insumo</a></li>
+              {% endif %}
+              
+              
+              <!-- Administración (solo Admin) -->
             {% if session.get('user_role') == 'Administrador' %}
               <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
 
