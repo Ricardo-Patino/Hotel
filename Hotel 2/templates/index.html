@@ -207,46 +207,6 @@
                 {% endif %}
                 <!-- =================================== -->
 
-                <!-- ======= Mantenimiento (Admin) ======= -->
-                <li class="dropdown">
-                  <a href="#">
-                    <span>Mantenimiento (Admin)</span>
-                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                  </a>
-                  <ul>
-                    <li>
-                      <a href="{{ url_for('mnt.solicitudes_list') }}">
-                        <i
-                          class="bi bi-wrench-adjustable me-1"
-                          aria-hidden="true"
-                        ></i>
-                        Mantenimiento – Solicitudes
-                      </a>
-                    </li>
-                    <li>
-                      <a href="{{ url_for('mnt.solicitud_new') }}">
-                        <i
-                          class="bi bi-plus-square me-1"
-                          aria-hidden="true"
-                        ></i>
-                        Mantenimiento – Nueva solicitud
-                      </a>
-                    </li>
-                    <li>
-                      <a href="{{ url_for('mnt.preventivo') }}">
-                        <i
-                          class="bi bi-calendar-check me-1"
-                          aria-hidden="true"
-                        ></i>
-                        Mantenimiento – Preventivo
-                      </a>
-                    </li>
-                  </ul>
-                </li>
-                <!-- ======= /Mantenimiento (Admin) ======= -->
-
-                <!-- =================================== -->
-
                 <!-- Alertas Inventario (Admin + Recepcionista) -->
                 {% if session.get('user_id') and session.get('user_role') in
                 ['Administrador','Recepcionista'] %}
