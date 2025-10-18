@@ -1,11 +1,10 @@
 from decimal import Decimal, InvalidOperation
-from flask import render_template, request, redirect, url_for, flash
+from flask import render_template, request, redirect, url_for, flash, session
 from sqlalchemy import func
 from sqlalchemy import text
 from extensions import db
-from models import InvCategoria
 from . import inv_bp
-from models_sql import InvCategoria, InvInsumo
+from models_sql import InvCategoria, InvInsumo, InvMovimiento   
 from utils.auth import role_required
 
 
@@ -174,3 +173,184 @@ def insumo_new():
 
     # GET
     return render_template("inv/insumos_form.html", categorias=categorias, unidades=UNIDADES)
+
+# Usa los mismos roles que el sistema
+def role_required(*roles):
+    roles_norm = {r.lower() for r in roles if r}
+    def decorator(fn):
+        from functools import wraps
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not session.get("user_id"):
+                flash("Inicia sesión para continuar.", "warning")
+                return redirect(url_for("login_html", next=request.path))
+            current = (session.get("user_role") or "").lower()
+            if current not in roles_norm:
+                flash("No tienes permiso para acceder a esta sección.", "danger")
+                return redirect(url_for("index_html"))
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+UNIDADES = ["un", "kg", "g", "lt", "ml", "paq", "caja", "rollo", "bolsa", "pz"]
+
+def _actor():
+    return {
+        "id": session.get("user_id"),
+        "name": session.get("user_name"),
+        "email": session.get("user_email") or session.get("email"),
+    }
+
+
+# ---------------------------
+# EDITAR / INACTIVAR (INV-07-003)
+# ---------------------------
+@inv_bp.route("/insumos/<int:insumo_id>/editar", methods=["GET", "POST"])
+@role_required("administrador")
+def insumo_edit(insumo_id: int):
+    i: InvInsumo | None = InvInsumo.query.filter_by(Id=insumo_id).first()
+    if not i:
+        flash("Insumo no encontrado.", "warning")
+        return redirect(url_for("inv.insumos_list"))
+
+    categorias = InvCategoria.query.filter_by(Activa=True).order_by(InvCategoria.Nombre.asc()).all()
+
+    if request.method == "POST":
+        motivo = (request.form.get("motivo") or "").strip()
+        if not motivo:
+            flash("Debes indicar un motivo del ajuste/edición.", "danger")
+            return render_template("inv/insumos_edit.html", insumo=i, categorias=categorias, unidades=UNIDADES)
+
+        nuevo_nombre   = (request.form.get("nombre") or "").strip()
+        nueva_unidad   = (request.form.get("unidad") or "").strip().lower()
+        nueva_cat_id_s = (request.form.get("categoria_id") or "").strip()
+        nuevo_min_s    = (request.form.get("stock_minimo") or "").strip()
+        nuevo_activo   = True if request.form.get("activo") == "on" else False
+
+        # Normalizaciones
+        try:
+            nueva_cat_id = int(nueva_cat_id_s)
+        except Exception:
+            nueva_cat_id = i.Categoria_Id
+
+        try:
+            nuevo_min = Decimal(nuevo_min_s or "0")
+            if nuevo_min < 0:
+                raise InvalidOperation()
+        except InvalidOperation:
+            flash("Stock mínimo inválido.", "danger")
+            return render_template("inv/insumos_edit.html", insumo=i, categorias=categorias, unidades=UNIDADES)
+
+        # Registro de cambios
+        changes: list[InvMovimiento] = []
+        actor = _actor()
+
+        def log_change(campo, antes, despues, tipo="EDICION"):
+            mov = InvMovimiento(
+                Insumo_Id=i.Id,
+                Tipo=tipo,
+                Campo=campo,
+                Valor_Antes=str(antes) if antes is not None else None,
+                Valor_Despues=str(despues) if despues is not None else None,
+                Delta=None,
+                Motivo=motivo,
+                Usuario_Id=actor["id"],
+                Usuario_Nombre=actor["name"],
+                Usuario_Email=actor["email"],
+            )
+            changes.append(mov)
+
+        # Comparaciones (Nombre, Unidad, Categoria_Id, Stock_Minimo, Activo)
+        if nuevo_nombre and nuevo_nombre != i.Nombre:
+            log_change("Nombre", i.Nombre, nuevo_nombre)
+            i.Nombre = nuevo_nombre
+
+        if nueva_unidad and nueva_unidad != i.Unidad:
+            if nueva_unidad not in UNIDADES:
+                flash("Unidad inválida.", "danger")
+                return render_template("inv/insumos_edit.html", insumo=i, categorias=categorias, unidades=UNIDADES)
+            log_change("Unidad", i.Unidad, nueva_unidad)
+            i.Unidad = nueva_unidad
+
+        if nueva_cat_id != i.Categoria_Id:
+            old_cat = InvCategoria.query.get(i.Categoria_Id)
+            new_cat = InvCategoria.query.get(nueva_cat_id)
+            log_change("Categoria_Id", old_cat.Nombre if old_cat else i.Categoria_Id, new_cat.Nombre if new_cat else nueva_cat_id)
+            i.Categoria_Id = nueva_cat_id
+
+        if nuevo_min != (i.Stock_Minimo or Decimal("0")):
+            log_change("Stock_Minimo", i.Stock_Minimo, nuevo_min)
+            i.Stock_Minimo = nuevo_min
+
+        if nuevo_activo != bool(i.Activo):
+            tipo = "INACTIVACION" if (bool(i.Activo) and not nuevo_activo) else "REACTIVACION"
+            log_change("Activo", int(i.Activo), int(nuevo_activo), tipo=tipo)
+            i.Activo = nuevo_activo
+
+        if not changes:
+            flash("No hay cambios para guardar.", "info")
+            return redirect(url_for("inv.insumo_edit", insumo_id=i.Id))
+
+        for m in changes:
+            db.session.add(m)
+        db.session.commit()
+
+        flash("Insumo actualizado y cambios registrados en historial.", "success")
+        return redirect(url_for("inv.insumos_list"))
+
+    # GET
+    return render_template("inv/insumos_edit.html", insumo=i, categorias=categorias, unidades=UNIDADES)
+
+# ---------------------------
+# AJUSTE DE STOCK (INV-07-003)
+# ---------------------------
+@inv_bp.route("/insumos/<int:insumo_id>/ajuste", methods=["GET", "POST"])
+@role_required("administrador")
+def insumo_adjust(insumo_id: int):
+    i: InvInsumo | None = InvInsumo.query.filter_by(Id=insumo_id).first()
+    if not i:
+        flash("Insumo no encontrado.", "warning")
+        return redirect(url_for("inv.insumos_list"))
+
+    if request.method == "POST":
+        delta_s = (request.form.get("delta") or "").strip()
+        motivo  = (request.form.get("motivo") or "").strip()
+
+        try:
+            delta = Decimal(delta_s)
+        except Exception:
+            flash("Cantidad de ajuste inválida.", "danger")
+            return render_template("inv/ajustes_form.html", insumo=i)
+
+        if not motivo:
+            flash("Debes indicar un motivo del ajuste.", "danger")
+            return render_template("inv/ajustes_form.html", insumo=i)
+
+        nuevo_stock = (i.Stock_Actual or Decimal("0")) + delta
+        if nuevo_stock < 0:
+            flash("El ajuste dejaría el stock negativo. Corrige la cantidad.", "danger")
+            return render_template("inv/ajustes_form.html", insumo=i)
+
+        actor = _actor()
+        mov = InvMovimiento(
+            Insumo_Id=i.Id,
+            Tipo="AJUSTE",
+            Campo="Stock_Actual",
+            Valor_Antes=str(i.Stock_Actual),
+            Valor_Despues=str(nuevo_stock),
+            Delta=delta,
+            Motivo=motivo,
+            Usuario_Id=actor["id"],
+            Usuario_Nombre=actor["name"],
+            Usuario_Email=actor["email"],
+        )
+        i.Stock_Actual = nuevo_stock
+
+        db.session.add(mov)
+        db.session.commit()
+
+        flash("Ajuste aplicado y registrado en historial.", "success")
+        return redirect(url_for("inv.insumos_list"))
+
+    # GET
+    return render_template("inv/ajustes_form.html", insumo=i)

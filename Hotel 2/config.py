@@ -14,18 +14,18 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
     MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", "587")) # 587 TLS, 465 SSL
-    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "hotelvillagrace@gmail.com")
-    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "lnad ndxy nhyw knro")
+    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "fabarcsa@gmail.com")
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "otyd wvfu fbuh cctj")
     MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "1") == "1"
     MAIL_USE_SSL = os.getenv("MAIL_USE_SSL", "0") == "1"
-    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "hotelvillagrace@gmail.com")
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "fabarcsa@gmail.com")
     
     
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 
    
     DB_USER_RAW = os.environ.get("DB_USER", "root")
-    DB_PASSWORD_RAW = os.environ.get("DB_PASSWORD", "TempP@ssw0rd_2025")
+    DB_PASSWORD_RAW = os.environ.get("DB_PASSWORD", "1234")
     DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
     DB_PORT = os.environ.get("DB_PORT", "3306")
     DB_NAME = os.environ.get("DB_NAME", "Hotel_VillaGrace")
@@ -42,8 +42,6 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    POS_API_KEY = os.environ.get("POS_API_KEY", "dev-pos-key")
-
     print(
     "DB ->",
     os.environ.get("DB_USER", "root"),
@@ -54,6 +52,3 @@ class Config:
     "/",
     os.environ.get("DB_NAME", "Hotel_VillaGrace"),
 )
-
-
-    
