@@ -1,96 +1,170 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ajuste de inventario | Hotel Villa Grace</title>
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-</head>
-<body class="index-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container d-flex align-items-center justify-content-between">
-    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
-        <li class="dropdown">
-          <a href="#"><span>Páginas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ajuste de inventario | Hotel Villa Grace</title>
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="index-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div class="container d-flex align-items-center justify-content-between">
+        <a
+          href="{{ url_for('index_html') }}"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+        >
+          <h1 class="sitename">Hotel Villa Grace</h1>
+        </a>
+        <nav id="navmenu" class="navmenu">
           <ul>
-            {% if session.get('user_role') in ['Administrador','Recepcionista'] %}
-              <li><a href="{{ url_for('inv.insumos_list') }}">Inventario – Insumos</a></li>
-            {% endif %}
+            <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+            <li class="dropdown">
+              <a href="#"
+                ><span>Páginas</span>
+                <i class="bi bi-chevron-down toggle-dropdown"></i
+              ></a>
+              <ul>
+                {% if session.get('user_role') in
+                ['Administrador','Recepcionista'] %}
+                <li>
+                  <a href="{{ url_for('inv.insumos_list') }}"
+                    >Inventario – Insumos</a
+                  >
+                </li>
+                {% endif %}
+              </ul>
+            </li>
           </ul>
-        </li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-  </div>
-</header>
+          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+        </nav>
+      </div>
+    </header>
 
-<main class="main" style="padding-top: 100px">
-  <div class="container" data-aos="fade-up" data-aos-delay="100">
-    <div class="row justify-content-center">
-      <div class="col-lg-7">
-        <div class="card shadow-sm">
-          <div class="card-body">
-            <h3 class="mb-3"><i class="bi bi-arrow-left-right me-2"></i>Ajuste de stock</h3>
-
-            <div class="mb-3">
-              <span class="badge bg-secondary me-2">{{ insumo.Unidad|upper }}</span>
-              <strong>{{ insumo.Nombre }}</strong>
-              <div class="text-muted small">Stock actual: {{ '%.3f'|format(insumo.Stock_Actual or 0) }}</div>
-            </div>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for cat, msg in messages %}
-                  <div class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show" role="alert">
-                    {{ msg }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <main class="main" style="padding-top: 100px">
+      <div class="container" data-aos="fade-up" data-aos-delay="100">
+        <div class="row justify-content-center">
+          <div class="col-lg-7">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                {# --- Alerta de bajo stock (servidor) --- #} {% if insumo and
+                (insumo.Stock_Actual or 0) < (insumo.Stock_Minimo or 0) %}
+                <div
+                  class="alert alert-warning d-flex align-items-center mb-3"
+                  role="alert"
+                >
+                  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                  <div>
+                    Este insumo está por debajo del mínimo.
+                    <strong>Actual:</strong> {{
+                    '%.3f'|format(insumo.Stock_Actual or 0) }},
+                    <strong>Mín.:</strong> {{ '%.3f'|format(insumo.Stock_Minimo
+                    or 0) }}.
                   </div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
-
-            <form method="post" novalidate>
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label">Cantidad (puede ser negativa)</label>
-                  <input name="delta" type="number" step="0.001" class="form-control" placeholder="+10 / -2.5" required>
                 </div>
-                <div class="col-12">
-                  <label class="form-label">Motivo del ajuste</label>
-                  <textarea name="motivo" class="form-control" rows="3" placeholder="Ej.: Pérdida, merma, conteo físico, corrección" required></textarea>
+                {% endif %}
+
+                <h3 class="mb-3">
+                  <i class="bi bi-arrow-left-right me-2"></i>Ajuste de stock
+                </h3>
+
+                <div class="mb-3">
+                  <span class="badge bg-secondary me-2"
+                    >{{ insumo.Unidad|upper }}</span
+                  >
+                  <strong>{{ insumo.Nombre }}</strong>
+                  <div class="text-muted small">
+                    Stock actual: {{ '%.3f'|format(insumo.Stock_Actual or 0) }}
+                  </div>
                 </div>
-              </div>
 
-              <div class="d-flex gap-2 mt-4">
-                <button class="btn btn-primary" type="submit">
-                  <i class="bi bi-check2-circle me-1"></i> Aplicar ajuste
-                </button>
-                <a class="btn btn-outline-secondary" href="{{ url_for('inv.insumos_list') }}">
-                  <i class="bi bi-arrow-left"></i> Volver
-                </a>
-              </div>
-            </form>
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %} {% for cat, msg in messages %}
+                <div
+                  class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show"
+                  role="alert"
+                >
+                  {{ msg }}
+                  <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                  ></button>
+                </div>
+                {% endfor %} {% endif %} {% endwith %}
 
+                <form method="post" novalidate>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label"
+                        >Cantidad (puede ser negativa)</label
+                      >
+                      <input
+                        name="delta"
+                        type="number"
+                        step="0.001"
+                        class="form-control"
+                        placeholder="+10 / -2.5"
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Motivo del ajuste</label>
+                      <textarea
+                        name="motivo"
+                        class="form-control"
+                        rows="3"
+                        placeholder="Ej.: Pérdida, merma, conteo físico, corrección"
+                        required
+                      ></textarea>
+                    </div>
+                  </div>
+
+                  <div class="d-flex gap-2 mt-4">
+                    <button class="btn btn-primary" type="submit">
+                      <i class="bi bi-check2-circle me-1"></i> Aplicar ajuste
+                    </button>
+                    <a
+                      class="btn btn-outline-secondary"
+                      href="{{ url_for('inv.insumos_list') }}"
+                    >
+                      <i class="bi bi-arrow-left"></i> Volver
+                    </a>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-</main>
+    </main>
 
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  </body>
 </html>

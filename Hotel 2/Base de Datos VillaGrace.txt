@@ -823,7 +823,3 @@ Select * from InvMovimiento;
 SELECT 'General', 1
 WHERE NOT EXISTS (SELECT 1 FROM InvCategoria WHERE Nombre='General');
 
-INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad, Stock_Actual, Stock_Minimo, Activo)
-SELECT (SELECT Id FROM InvCategoria WHERE Nombre='General' LIMIT 1),
-       'Toallas', 'unidad', 50, 10, 1
-WHERE NOT EXISTS (SELECT 1 FROM InvInsumo WHERE Nombre='Toallas');

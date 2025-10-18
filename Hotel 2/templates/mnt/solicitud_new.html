@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Nueva solicitud | Mantenimiento | Hotel Villa Grace</title>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"/>
+</head>
+<body class="index-page">
+  {% include 'partials/header.html' ignore missing %}
+  <main class="main" style="padding-top: 100px">
+    <div class="container" data-aos="fade-up" data-aos-delay="100">
+      <h2 class="mb-3"><i class="bi bi-plus-square me-2"></i>Nueva solicitud de mantenimiento</h2>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show" role="alert">
+              {{ msg }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="post" class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Habitación</label>
+              <select class="form-select" name="Codigo_Habitacion" required>
+                <option value="">Selecciona...</option>
+                {% for h in habitaciones %}
+                  <option value="{{ h.Codigo_Habitacion }}">{{ h.Numero_Habitacion }} — {{ h.Tipo }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Prioridad</label>
+              <select class="form-select" name="Prioridad">
+                <option>Media</option>
+                <option>Baja</option>
+                <option>Alta</option>
+                <option>Crítica</option>
+              </select>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Título</label>
+              <input type="text" name="Titulo" class="form-control" placeholder="Ej: Fuga en grifo del baño" required>
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Descripción</label>
+              <textarea name="Descripcion" class="form-control" rows="4" placeholder="Detalles del problema, acceso, riesgos, etc."></textarea>
+            </div>
+            <div class="col-md-12 d-flex gap-2">
+              <button class="btn btn-primary"><i class="bi bi-save me-1"></i>Guardar</button>
+              <a class="btn btn-outline-secondary" href="{{ url_for('mnt.solicitudes_list') }}">Cancelar</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+</body>
+</html>

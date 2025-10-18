@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Solicitudes | Mantenimiento | Hotel Villa Grace</title>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"/>
+  <style>
+    .status-badge{font-weight:600}
+    .status-Abierta{background:#e7f1ff;color:#0b5ed7}
+    .status-En\ Progreso{background:#fff3cd;color:#b68900}
+    .status-En\ Espera{background:#e2e3e5;color:#343a40}
+    .status-Cerrada{background:#d1e7dd;color:#0f5132}
+    .status-Cancelada{background:#f8d7da;color:#842029}
+  </style>
+
+  <!-- MNT: token CSRF para fetch -->
+{% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
+
+</head>
+
+<script>
+  async function chg(id, estado){
+    if(!confirm(`¿Cambiar solicitud #${id} a "${estado}"?`)) return;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const url = `{{ url_for('mnt.solicitudes_cambiar_estado', sol_id='__ID__') }}`.replace('__ID__', id);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'X-CSRFToken': csrf},
+      body: JSON.stringify({estado})
+    });
+    if(res.ok){ location.reload(); } else { alert('Error al actualizar estado'); }
+  }
+</script>
+</body>
+
+
+<body class="index-page">
+  {% include 'partials/header.html' ignore missing %}
+  <main class="main" style="padding-top: 100px">
+    <div class="container" data-aos="fade-up" data-aos-delay="100">
+      <div class="d-flex justify-content-between align-items-center">
+        <h2 class="mb-3"><i class="bi bi-wrench-adjustable me-2"></i>Solicitudes de mantenimiento</h2>
+        <a class="btn btn-primary" href="{{ url_for('mnt.solicitud_new') }}"><i class="bi bi-plus-lg me-1"></i>Nueva</a>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show" role="alert">
+              {{ msg }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form class="row g-2 mb-3" method="get">
+            <div class="col-md-3">
+              <label class="form-label">Estado</label>
+              <select name="estado" class="form-select" onchange="this.form.submit()">
+                <option value="">Todos</option>
+                {% for e in ['Abierta','En Progreso','En Espera','Cerrada','Cancelada'] %}
+                  <option value="{{e}}" {{ 'selected' if request.args.get('estado')==e else '' }}>{{e}}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Prioridad</label>
+              <select name="prioridad" class="form-select" onchange="this.form.submit()">
+                <option value="">Todas</option>
+                {% for p in ['Baja','Media','Alta','Crítica'] %}
+                  <option value="{{p}}" {{ 'selected' if request.args.get('prioridad')==p else '' }}>{{p}}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </form>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Fecha</th>
+                  <th>Habitación</th>
+                  <th>Título</th>
+                  <th>Prioridad</th>
+                  <th>Estado</th>
+                  <th style="width:220px">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in items %}
+                <tr>
+                  <td>{{ s.Id }}</td>
+                  <td>{{ (s.Fecha_Creacion or s.Fecha_Actualiza).strftime('%Y-%m-%d %H:%M') if s.Fecha_Creacion else '' }}</td>
+                  <td>{{ s.Codigo_Habitacion }}</td>
+                  <td>{{ s.Titulo }}</td>
+                  <td>
+                    <span class="badge {{ 'bg-danger' if s.Prioridad in ['Alta','Crítica'] else 'bg-secondary' }}">{{ s.Prioridad }}</span>
+                  </td>
+                  <td>
+                    <span class="badge status-badge status-{{ s.Estado }}">{{ s.Estado }}</span>
+                  </td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-1">
+                    <form method="post" action="{{ url_for('mnt.solicitudes_cambiar_estado', sol_id=s.Id) }}" class="d-inline">
+                    {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="estado" value="En Progreso">
+                    <button class="btn btn-outline-secondary btn-sm" title="Marcar En Progreso">En Progreso</button>
+                    </form>
+
+                    <form method="post" action="{{ url_for('mnt.solicitudes_cambiar_estado', sol_id=s.Id) }}" class="d-inline">
+                    {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="estado" value="Cerrada">
+                    <button class="btn btn-outline-success btn-sm" title="Cerrar solicitud">Cerrar</button>
+                    </form>
+
+                    <form method="post" action="{{ url_for('mnt.solicitudes_cambiar_estado', sol_id=s.Id) }}" class="d-inline">
+                    {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="estado" value="En Espera">
+                    <button class="btn btn-outline-warning btn-sm" title="Poner en espera">Espera</button>
+                    </form>
+
+                    <form method="post" action="{{ url_for('mnt.solicitudes_cambiar_estado', sol_id=s.Id) }}" class="d-inline">
+                    {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                    <input type="hidden" name="estado" value="Cancelada">
+                    <button class="btn btn-outline-danger btn-sm" title="Cancelar solicitud">Cancelar</button>
+                    </form>
+                    </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-muted">Sin solicitudes</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    async function chg(id, estado){
+      if(!confirm(`¿Cambiar solicitud #${id} a "${estado}"?`)) return;
+      const res = await fetch(`{{ url_for('mnt.solicitudes_cambiar_estado', sol_id=0) }}`.replace('0', id), {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({estado})
+      });
+      if(res.ok){ location.reload(); }
+      else { alert('Error al actualizar estado'); }
+    }
+
+//     {% block scripts %}
+//   {{ super() }}
+//   <script>
+//     async function chg(id, estado){
+//       if(!confirm(`¿Cambiar solicitud #${id} a "${estado}"?`)) return;
+//       const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+//       const url = `{{ url_for('mnt.solicitudes_cambiar_estado', sol_id='__ID__') }}`.replace('__ID__', id);
+//       const res = await fetch(url, {
+//         method: 'POST',
+//         headers: {'Content-Type':'application/json', 'X-CSRFToken': csrf},
+//         body: JSON.stringify({estado})
+//       });
+//       if(res.ok){ location.reload(); } else { alert('Error al actualizar estado'); }
+//     }
+//   </script>
+
+// {% endblock %}
+
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  
+</body>
+</html>

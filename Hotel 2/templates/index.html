@@ -1,1437 +1,2185 @@
 <!DOCTYPE html>
 <html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>
+      Hotel Villa Grace | Cóbano, Puntarenas – Piscina, Restaurante y Parqueo
+      Gratis
+    </title>
 
-<head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Hotel Villa Grace | Cóbano, Puntarenas – Piscina, Restaurante y Parqueo Gratis</title>
+    <!-- Meta SEO correctos -->
+    <meta
+      name="description"
+      content="Hotel Villa Grace en Cóbano, Puntarenas. Piscina para adultos y niños, restaurante y bar, Wi-Fi y parqueo gratis. A 7 km de Montezuma y 14 km de Santa Teresa. Tel: +506 2642 0225"
+    />
+    <meta
+      name="keywords"
+      content="Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa, hotel con piscina, restaurante, hospedaje Costa Rica"
+    />
 
-  <!-- Meta SEO correctos -->
-  <meta name="description" content="Hotel Villa Grace en Cóbano, Puntarenas. Piscina para adultos y niños, restaurante y bar, Wi-Fi y parqueo gratis. A 7 km de Montezuma y 14 km de Santa Teresa. Tel: +506 2642 0225">
-  <meta name="keywords" content="Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa, hotel con piscina, restaurante, hospedaje Costa Rica">
+    <!-- Favicons -->
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
+      rel="apple-touch-icon"
+    />
 
-  <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+      rel="stylesheet"
+    />
 
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <!-- Vendor CSS -->
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}"
+      rel="stylesheet"
+    />
 
-  <!-- Vendor CSS -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
+    <!-- Main CSS -->
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
 
-  <!-- Main CSS -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-
-  <!--
+    <!--
   * Template Name: LuxuryHotel
   * Template URL: https://bootstrapmade.com/luxury-hotel-bootstrap-template/
   * Updated: Jun 30 2025 with Bootstrap v5.3.7
   * Author: BootstrapMade.com
   * License: https://bootstrapmade.com/license/
-  -->
-</head>
+  --></head>
 
+  <body class="index-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div
+        class="container position-relative d-flex align-items-center justify-content-between"
+      >
+        <!-- Logo -->
+        <a
+          href="{{ url_for('index_html') }}"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+          aria-label="Hotel Villa Grace - Inicio"
+        >
+          <svg
+            viewBox="0 0 32 32"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <g>
+              <path
+                d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z"
+                style="fill: #f2ebe2"
+              ></path>
+              <path
+                d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897Z"
+                style="fill: #917a5a"
+              ></path>
+            </g>
+          </svg>
+          <h1 class="sitename">Hotel Villa Grace</h1>
+        </a>
 
-<body class="index-page">
-
-  <header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-
-    <!-- Logo enlazado con url_for -->
-    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0" aria-label="Hotel Villa Grace - Inicio">
-      <!-- <img src="{{ url_for('static', filename='assets/img/logo.webp') }}" alt="Hotel Villa Grace"> -->
-      <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="#000000" aria-hidden="true">
-        <g id="SVGRepo_iconCarrier">
-          <g id="b">
-            <path d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z" style="fill:#f2ebe2;"></path>
-            <path d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897Z" style="fill:#917a5a;"></path>
-          </g>
-        </g>
-      </svg>
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <!-- Principales con url_for -->
-        <li><a href="{{ url_for('index_html') }}" class="active">Inicio</a></li>
-        <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
-        <li><a href="{{ url_for('rooms_html') }}">Habitaciones</a></li>
-        <li><a href="amenities.html">Servicios</a></li>
-        <li><a href="location.html">Ubicación</a></li>
-
-        <!-- DESPLEGABLE PÁGINAS -->
-        <li class="dropdown">
-          <a href="#"><span>Páginas</span> <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+        <!-- NAV -->
+        <nav id="navmenu" class="navmenu">
           <ul>
-            <!-- Sitio público -->
-            <li><a href="room-details.html">Detalle de habitación</a></li>
-            <li><a href="restaurant.html">Restaurante</a></li>
-            <li><a href="offers.html">Ofertas</a></li>
-            <li><a href="events.html">Eventos</a></li>
-            <li><a href="gallery.html">Galería</a></li>
-            <!-- Reservas (front) -->
-            <li><a href="{{ url_for('booking_search') }}">Reservas – Buscar</a></li>
+            <!-- Principales -->
+            <li>
+              <a href="{{ url_for('index_html') }}" class="active">Inicio</a>
+            </li>
+            <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
+            <li><a href="{{ url_for('rooms_html') }}">Habitaciones</a></li>
+            <li><a href="amenities.html">Servicios</a></li>
+            <li><a href="location.html">Ubicación</a></li>
 
-            <!-- Portal del huésped (solo Cliente) -->
-            {% if session.get('user_role') == 'Cliente' %}
-              <li><a href="{{ url_for('portal_dashboard_html') }}">Portal del huésped</a></li>
-            {% endif %}
+            <!-- Dropdown Páginas -->
+            <li class="dropdown">
+              <a href="#">
+                <span>Páginas</span>
+                <i
+                  class="bi bi-chevron-down toggle-dropdown"
+                  aria-hidden="true"
+                ></i>
+              </a>
+              <ul>
+                <!-- Sitio público -->
+                <li><a href="room-details.html">Detalle de habitación</a></li>
+                <li><a href="restaurant.html">Restaurante</a></li>
+                <li><a href="offers.html">Ofertas</a></li>
+                <li><a href="events.html">Eventos</a></li>
+                <li><a href="gallery.html">Galería</a></li>
 
-            <!-- Operaciones (Admin o Recepcionista) -->
-            {% if session.get('user_role') in ['Administrador', 'Recepcionista'] %}
-            <li><a href="{{ url_for('ops_dashboard_html') }}">Operaciones</a></li>
-            {% endif %}
-            
-            <!-- Operaciones (Admin o Recepcionista) -->
-            {% if session.get('user_role') in ['Administrador', 'Recepcionista'] %}
-            <li><a href="{{ url_for('ops_dashboard_html') }}">Operaciones</a></li>
-            {% endif %}
-            
+                <!-- Reservas (front) -->
+                <li>
+                  <a href="{{ url_for('booking_search') }}"
+                    >Reservas – Buscar</a
+                  >
+                </li>
 
-              <!-- Inventario de insumos -->
-              {% if session.get('user_role') in ['Administrador', 'Recepcionista'] %}
-              <li><a href="{{ url_for('inv.insumos_list') }}">Inventario – Insumos</a></li>
-              <li><a href="{{ url_for('inv.insumo_new') }}">Inventario – Nuevo insumo</a></li>
-              {% endif %}
-              
-              
-              <!-- Administración (solo Admin) -->
-            {% if session.get('user_role') == 'Administrador' %}
-              <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+                <!-- Portal huésped -->
+                {% if session.get('user_role') == 'Cliente' %}
+                <li>
+                  <a href="{{ url_for('portal_dashboard_html') }}"
+                    >Portal del huésped</a
+                  >
+                </li>
+                {% endif %}
 
-              <!-- ========================= -->
-              <!-- Inventario (solo Admin)   -->
-              <!-- ========================= -->
-              <li class="dropdown">
-                <a href="#"><span>Inventario</span> <i class="bi bi-chevron-right" aria-hidden="true"></i></a>
-                <ul>
-                  <li>
-                    <a href="{{ url_for('inv.categorias_list') }}">
-                      <i class="bi bi-tags me-1" aria-hidden="true"></i> Categorías de insumos
-                    </a>
-                  </li>
-                  <li>
-                    <a href="{{ url_for('inv.categorias_new') }}">
-                      <i class="bi bi-plus-square me-1" aria-hidden="true"></i> Nueva categoría
-                    </a>
-                  </li>
-                </ul>
-              </li>
-            {% endif %}
+                <!-- Operaciones -->
+                {% if session.get('user_role') in
+                ['Administrador','Recepcionista'] %}
+                <li>
+                  <a href="{{ url_for('ops_dashboard_html') }}">Operaciones</a>
+                </li>
+                {% endif %}
 
-            <!-- Legales / varios -->
-            <li><a href="terms.html">Términos</a></li>
-            <li><a href="privacy.html">Privacidad</a></li>
-            <li><a href="404.html">404</a></li>
-            <li><a href="starter-page.html">Página base</a></li>
-          </ul>
-        </li>
+                <!-- Inventario (Admin + Recepcionista) -->
+                {% if session.get('user_role') in
+                ['Administrador','Recepcionista'] %}
+                <li>
+                  <a href="{{ url_for('inv.insumos_list') }}"
+                    >Inventario – Insumos</a
+                  >
+                </li>
+                <li>
+                  <a href="{{ url_for('inv.insumo_new') }}"
+                    >Inventario – Nuevo insumo</a
+                  >
+                </li>
+                {% endif %}
 
-        <li><a href="{{ url_for('contact_html') }}">Contacto</a></li>
+                <!-- ============ SOLO ADMIN ============ -->
+                {% if session.get('user_role') == 'Administrador' %}
+                <li>
+                  <a href="{{ url_for('admin.dashboard') }}"
+                    ><strong>Administración</strong></a
+                  >
+                </li>
+                <li class="dropdown">
+                  <a href="#"
+                    ><span>Inventario (Admin)</span>
+                    <i class="bi bi-chevron-right" aria-hidden="true"></i
+                  ></a>
+                  <ul>
+                    <li>
+                      <a href="{{ url_for('inv.categorias_list') }}">
+                        <i class="bi bi-tags me-1" aria-hidden="true"></i>
+                        Categorías de insumos
+                      </a>
+                    </li>
+                    <li>
+                      <a href="{{ url_for('inv.categorias_new') }}">
+                        <i
+                          class="bi bi-plus-square me-1"
+                          aria-hidden="true"
+                        ></i>
+                        Nueva categoría
+                      </a>
+                    </li>
+                  </ul>
+                </li>
+                {% endif %}
+                <!-- =================================== -->
 
-        <!-- Selector de idioma -->
-        <li class="dropdown">
-          <a href="#es" aria-label="Cambiar idioma">
-            <svg class="icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M4 0H6V2H10V4H8.86807C8.57073 5.66996 7.78574 7.17117 6.6656 8.35112C7.46567 8.73941 8.35737 8.96842 9.29948 8.99697L10.2735 6H12.7265L15.9765 16H13.8735L13.2235 14H9.77647L9.12647 16H7.0235L8.66176 10.9592C7.32639 10.8285 6.08165 10.3888 4.99999 9.71246C3.69496 10.5284 2.15255 11 0.5 11H0V9H0.5C1.5161 9 2.47775 8.76685 3.33437 8.35112C2.68381 7.66582 2.14629 6.87215 1.75171 6H4.02179C4.30023 6.43491 4.62904 6.83446 4.99999 7.19044C5.88743 6.33881 6.53369 5.23777 6.82607 4H0V2H4V0ZM12.5735 12L11.5 8.69688L10.4265 12H12.5735Z" fill="currentColor"></path>
-            </svg>
-            <span>Español</span>
-            <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
-          </a>
-          <ul>
-            <li><a href="#en">English</a></li>
-            <li><a href="#fr">Français</a></li>
-          </ul>
-        </li>
+                <!-- ======= Mantenimiento (Admin) ======= -->
+                <li class="dropdown">
+                  <a href="#">
+                    <span>Mantenimiento (Admin)</span>
+                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                  </a>
+                  <ul>
+                    <li>
+                      <a href="{{ url_for('mnt.solicitudes_list') }}">
+                        <i
+                          class="bi bi-wrench-adjustable me-1"
+                          aria-hidden="true"
+                        ></i>
+                        Mantenimiento – Solicitudes
+                      </a>
+                    </li>
+                    <li>
+                      <a href="{{ url_for('mnt.solicitud_new') }}">
+                        <i
+                          class="bi bi-plus-square me-1"
+                          aria-hidden="true"
+                        ></i>
+                        Mantenimiento – Nueva solicitud
+                      </a>
+                    </li>
+                    <li>
+                      <a href="{{ url_for('mnt.preventivo') }}">
+                        <i
+                          class="bi bi-calendar-check me-1"
+                          aria-hidden="true"
+                        ></i>
+                        Mantenimiento – Preventivo
+                      </a>
+                    </li>
+                  </ul>
+                </li>
+                <!-- ======= /Mantenimiento (Admin) ======= -->
 
-        <!-- PERFIL / LOGIN condicional -->
-        {% if session.get('user_id') %}
-          <li class="dropdown">
-            <a href="{{ url_for('portal_perfil_html') }}" aria-label="Perfil">
-              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-              <span>{{ session.get('user_name', 'Perfil') }}</span>
-              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
-            </a>
-            <ul>
-              <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
-              <li><a href="{{ url_for('portal_reservas_html') }}">Mis reservas</a></li>
-              <li><a href="{{ url_for('portal_perfil_html') }}">Perfil</a></li>
-              <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
-            </ul>
-          </li>
-        {% else %}
-          <li class="dropdown">
-            <a href="#" aria-label="Cuenta">
-              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-              <span>Cuenta</span>
-              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
-            </a>
-            <ul>
-              <li><a href="{{ url_for('login_html') }}">Iniciar sesión</a></li>
-              <li><a href="{{ url_for('register') }}">Crear cuenta</a></li>
-              <li><a href="{{ url_for('forgot_password') }}">¿Olvidaste tu contraseña?</a></li>
-            </ul>
-          </li>
-        {% endif %}
+                <!-- =================================== -->
 
-      </ul>
-
-      <i class="mobile-nav-toggle d-xl-none bi bi-list" aria-label="Abrir menú"></i>
-    </nav>
-
-    <!-- Botón Reservar -->
-    <a class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4" href="{{ url_for('booking_search') }}">Reservar</a>
-
-  </div>
-</header>
-
-
-
-
-
-
-  <main class="main">
-
-    <!-- Hotel Hero Section -->
-    <section id="hotel-hero" class="hotel-hero section dark-background">
-
-      <div class="hero-content">
-        <div class="hero-background">
-          <video autoplay muted loop loading="lazy" aria-label="Video Hotel Villa Grace">
-            <source src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Video-5.mp4') }}" type="video/mp4">
-          </video>
-          <div class="hero-overlay"></div>
-        </div>
-
-        <div class="container">
-          <div class="row justify-content-center">
-            <div class="col-lg-10">
-              <div class="hero-text text-center" data-aos="fade-up" data-aos-delay="100">
-                <h1>Tu hotel en Cóbano con piscina y restaurante</h1>
-                <p class="hero-subtitle">Descansa en Hotel Villa Grace: piscina para adultos y niños, Wi-Fi y parqueo
-                  gratis, restaurante y bar. A 7 km de Montezuma y 14 km de Santa Teresa.</p>
-
-                <div class="hero-features" data-aos="fade-up" data-aos-delay="200">
-                  <div class="feature-item">
-                    <i class="bi bi-water"></i>
-                    <span>Piscina familiar</span>
-                  </div>
-                  <div class="feature-item">
-                    <i class="bi bi-wifi"></i>
-                    <span>Wi-Fi gratis</span>
-                  </div>
-                  <div class="feature-item">
-                    <i class="bi bi-car-front"></i>
-                    <span>Parqueo gratuito</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="booking-card" data-aos="fade-up" data-aos-delay="300">
-                <div class="card">
-                  <div class="card-body">
-                    <form action="" method="post" aria-label="Formulario de búsqueda de disponibilidad">
-                      <div class="row g-3">
-                        <div class="col-xl-3">
-                          <label for="checkin" class="form-label">Llegada</label>
-                          <input type="date" class="form-control" id="checkin" name="checkin" required>
-                        </div>
-                        <div class="col-xl-3">
-                          <label for="checkout" class="form-label">Salida</label>
-                          <input type="date" class="form-control" id="checkout" name="checkout" required>
-                        </div>
-                        <div class="col-xl-2">
-                          <label for="guests" class="form-label">Huéspedes</label>
-                          <select class="form-select" id="guests" name="guests" required>
-                            <option value="">Selecciona</option>
-                            <option value="1">1 persona</option>
-                            <option value="2">2 personas</option>
-                            <option value="3">3 personas</option>
-                            <option value="4">4+ personas</option>
-                          </select>
-                        </div>
-                        <div class="col-xl-2">
-                          <label for="rooms" class="form-label">Habitaciones</label>
-                          <select class="form-select" id="rooms" name="rooms" required>
-                            <option value="">Selecciona</option>
-                            <option value="1">1 habitación</option>
-                            <option value="2">2 habitaciones</option>
-                            <option value="3">3+ habitaciones</option>
-                          </select>
-                        </div>
-                        <div class="col-xl-2">
-                          <label class="form-label d-block">&nbsp;</label>
-                          <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-search"></i>
-                            Buscar
-                          </button>
-                        </div>
+                <!-- Alertas Inventario (Admin + Recepcionista) -->
+                {% if session.get('user_id') and session.get('user_role') in
+                ['Administrador','Recepcionista'] %}
+                <li class="dropdown">
+                  <a href="#" aria-label="Alertas de inventario">
+                    <i class="bi bi-bell me-1" aria-hidden="true"></i>
+                    <span>Alertas</span>
+                    <span
+                      id="inv-alert-badge"
+                      class="badge bg-danger ms-1 d-none"
+                      >0</span
+                    >
+                    <i
+                      class="bi bi-chevron-down toggle-dropdown"
+                      aria-hidden="true"
+                    ></i>
+                  </a>
+                  <ul style="min-width: 320px">
+                    <li class="px-3 py-2">
+                      <div id="inv-alert-list" class="small text-muted">
+                        Cargando alertas...
                       </div>
-                      <p class="small text-white mt-2 mb-0">
-                        Para reservar ahora mismo también puedes llamarnos al <a href="Tel: +50626420225">2642-0225</a> o escribir
-                        a <a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a>.
-                      </p>
-                    </form>
+                      <div class="mt-2">
+                        <a
+                          class="btn btn-sm btn-outline-primary w-100"
+                          href="{{ url_for('inv.insumos_list') }}"
+                        >
+                          Ver inventario
+                        </a>
+                      </div>
+                    </li>
+                  </ul>
+                </li>
+                {% endif %}
+
+                <!-- Legales -->
+                <li><a href="terms.html">Términos</a></li>
+                <li><a href="privacy.html">Privacidad</a></li>
+                <li><a href="404.html">404</a></li>
+                <li><a href="starter-page.html">Página base</a></li>
+              </ul>
+            </li>
+
+            <li><a href="{{ url_for('contact_html') }}">Contacto</a></li>
+
+            <!-- Idioma -->
+            <li class="dropdown">
+              <a href="#es" aria-label="Cambiar idioma">
+                <svg
+                  class="icon"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M4 0H6V2H10V4H8.86807C8.57073 5.66996 7.78574 7.17117 6.6656 8.35112C7.46567 8.73941 8.35737 8.96842 9.29948 8.99697L10.2735 6H12.7265L15.9765 16H13.8735L13.2235 14H9.77647L9.12647 16H7.0235L8.66176 10.9592C7.32639 10.8285 6.08165 10.3888 4.99999 9.71246C3.69496 10.5284 2.15255 11 0.5 11H0V9H0.5C1.5161 9 2.47775 8.76685 3.33437 8.35112C2.68381 7.66582 2.14629 6.87215 1.75171 6H4.02179C4.30023 6.43491 4.62904 6.83446 4.99999 7.19044C5.88743 6.33881 6.53369 5.23777 6.82607 4H0V2H4V0ZM12.5735 12L11.5 8.69688L10.4265 12H12.5735Z"
+                    fill="currentColor"
+                  ></path>
+                </svg>
+                <span>Español</span>
+                <i
+                  class="bi bi-chevron-down toggle-dropdown"
+                  aria-hidden="true"
+                ></i>
+              </a>
+              <ul>
+                <li><a href="#en">English</a></li>
+                <li><a href="#fr">Français</a></li>
+              </ul>
+            </li>
+
+            <!-- Perfil / Cuenta -->
+            {% if session.get('user_id') %}
+            <li class="dropdown">
+              <a href="{{ url_for('portal_perfil_html') }}" aria-label="Perfil">
+                <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+                <span>{{ session.get('user_name', 'Perfil') }}</span>
+                <i
+                  class="bi bi-chevron-down toggle-dropdown"
+                  aria-hidden="true"
+                ></i>
+              </a>
+              <ul>
+                <li>
+                  <a href="{{ url_for('portal_dashboard_html') }}">Portal</a>
+                </li>
+                <li>
+                  <a href="{{ url_for('portal_reservas_html') }}"
+                    >Mis reservas</a
+                  >
+                </li>
+                <li>
+                  <a href="{{ url_for('portal_perfil_html') }}">Perfil</a>
+                </li>
+                <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
+              </ul>
+            </li>
+            {% else %}
+            <li class="dropdown">
+              <a href="#" aria-label="Cuenta">
+                <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+                <span>Cuenta</span>
+                <i
+                  class="bi bi-chevron-down toggle-dropdown"
+                  aria-hidden="true"
+                ></i>
+              </a>
+              <ul>
+                <li>
+                  <a href="{{ url_for('login_html') }}">Iniciar sesión</a>
+                </li>
+                <li><a href="{{ url_for('register') }}">Crear cuenta</a></li>
+                <li>
+                  <a href="{{ url_for('forgot_password') }}"
+                    >¿Olvidaste tu contraseña?</a
+                  >
+                </li>
+              </ul>
+            </li>
+            {% endif %}
+          </ul>
+
+          <i
+            class="mobile-nav-toggle d-xl-none bi bi-list"
+            aria-label="Abrir menú"
+          ></i>
+        </nav>
+
+        <!-- Botón Reservar -->
+        <a
+          class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4"
+          href="{{ url_for('booking_search') }}"
+        >
+          Reservar
+        </a>
+      </div>
+
+      <!-- JS de alertas de inventario (si tienes el endpoint inv.alertas_stock) -->
+      <script>
+        (function () {
+          const badge = document.getElementById("inv-alert-badge");
+          const list = document.getElementById("inv-alert-list");
+          if (!badge || !list) return;
+
+          async function refreshAlerts() {
+            try {
+              const res = await fetch('{{ url_for("inv.alertas_stock") }}');
+              if (!res.ok) throw new Error("HTTP " + res.status);
+              const data = await res.json();
+              const n = data.count || 0;
+
+              if (n > 0) {
+                badge.textContent = n;
+                badge.classList.remove("d-none");
+              } else {
+                badge.classList.add("d-none");
+              }
+
+              if (n === 0) {
+                list.innerHTML =
+                  '<span class="text-success">Sin alertas de stock.</span>';
+              } else {
+                list.innerHTML = (data.items || [])
+                  .map(
+                    (x) => `
+              <div class="d-flex align-items-center py-1">
+                <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                <div class="flex-grow-1">
+                  <div><strong>${
+                    x.Nombre
+                  }</strong> <small class="text-muted">(${
+                      x.Unidad || ""
+                    })</small></div>
+                  <div class="small">Actual: ${
+                    x.Stock_Actual
+                  } &nbsp; • &nbsp; Mín.: ${x.Stock_Minimo}</div>
+                </div>
+              </div>`
+                  )
+                  .join("");
+              }
+            } catch (err) {
+              list.innerHTML =
+                '<span class="text-danger">No se pudieron obtener las alertas.</span>';
+            }
+          }
+
+          refreshAlerts();
+          setInterval(refreshAlerts, 60000);
+        })();
+      </script>
+    </header>
+
+    <main class="main">
+      <!-- Hotel Hero Section -->
+      <section id="hotel-hero" class="hotel-hero section dark-background">
+        <div class="hero-content">
+          <div class="hero-background">
+            <video
+              autoplay
+              muted
+              loop
+              loading="lazy"
+              aria-label="Video Hotel Villa Grace"
+            >
+              <source
+                src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Video-5.mp4') }}"
+                type="video/mp4"
+              />
+            </video>
+            <div class="hero-overlay"></div>
+          </div>
+
+          <div class="container">
+            <div class="row justify-content-center">
+              <div class="col-lg-10">
+                <div
+                  class="hero-text text-center"
+                  data-aos="fade-up"
+                  data-aos-delay="100"
+                >
+                  <h1>Tu hotel en Cóbano con piscina y restaurante</h1>
+                  <p class="hero-subtitle">
+                    Descansa en Hotel Villa Grace: piscina para adultos y niños,
+                    Wi-Fi y parqueo gratis, restaurante y bar. A 7 km de
+                    Montezuma y 14 km de Santa Teresa.
+                  </p>
+
+                  <div
+                    class="hero-features"
+                    data-aos="fade-up"
+                    data-aos-delay="200"
+                  >
+                    <div class="feature-item">
+                      <i class="bi bi-water"></i>
+                      <span>Piscina familiar</span>
+                    </div>
+                    <div class="feature-item">
+                      <i class="bi bi-wifi"></i>
+                      <span>Wi-Fi gratis</span>
+                    </div>
+                    <div class="feature-item">
+                      <i class="bi bi-car-front"></i>
+                      <span>Parqueo gratuito</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="booking-card"
+                  data-aos="fade-up"
+                  data-aos-delay="300"
+                >
+                  <div class="card">
+                    <div class="card-body">
+                      <form
+                        action=""
+                        method="post"
+                        aria-label="Formulario de búsqueda de disponibilidad"
+                      >
+                        <div class="row g-3">
+                          <div class="col-xl-3">
+                            <label for="checkin" class="form-label"
+                              >Llegada</label
+                            >
+                            <input
+                              type="date"
+                              class="form-control"
+                              id="checkin"
+                              name="checkin"
+                              required
+                            />
+                          </div>
+                          <div class="col-xl-3">
+                            <label for="checkout" class="form-label"
+                              >Salida</label
+                            >
+                            <input
+                              type="date"
+                              class="form-control"
+                              id="checkout"
+                              name="checkout"
+                              required
+                            />
+                          </div>
+                          <div class="col-xl-2">
+                            <label for="guests" class="form-label"
+                              >Huéspedes</label
+                            >
+                            <select
+                              class="form-select"
+                              id="guests"
+                              name="guests"
+                              required
+                            >
+                              <option value="">Selecciona</option>
+                              <option value="1">1 persona</option>
+                              <option value="2">2 personas</option>
+                              <option value="3">3 personas</option>
+                              <option value="4">4+ personas</option>
+                            </select>
+                          </div>
+                          <div class="col-xl-2">
+                            <label for="rooms" class="form-label"
+                              >Habitaciones</label
+                            >
+                            <select
+                              class="form-select"
+                              id="rooms"
+                              name="rooms"
+                              required
+                            >
+                              <option value="">Selecciona</option>
+                              <option value="1">1 habitación</option>
+                              <option value="2">2 habitaciones</option>
+                              <option value="3">3+ habitaciones</option>
+                            </select>
+                          </div>
+                          <div class="col-xl-2">
+                            <label class="form-label d-block">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                              <i class="bi bi-search"></i>
+                              Buscar
+                            </button>
+                          </div>
+                        </div>
+                        <p class="small text-white mt-2 mb-0">
+                          Para reservar ahora mismo también puedes llamarnos al
+                          <a href="Tel: +50626420225">2642-0225</a> o escribir a
+                          <a href="mailto:hotelvillagrace@gmail.com"
+                            >hotelvillagrace@gmail.com</a
+                          >.
+                        </p>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="hero-actions"
+                  data-aos="fade-up"
+                  data-aos-delay="400"
+                >
+                  <a href="rooms.html" class="btn btn-light btn-lg">
+                    <i class="bi bi-house-door"></i>
+                    Ver habitaciones
+                  </a>
+                  <a
+                    href="amenities.html"
+                    class="btn btn-outline-light btn-lg text-white"
+                  >
+                    <i class="bi bi-star"></i>
+                    Ver servicios
+                  </a>
+                </div>
+
+                <div
+                  class="hero-stats text-white"
+                  data-aos="fade-up"
+                  data-aos-delay="500"
+                  aria-label="Estadísticas del hotel"
+                >
+                  <div class="stat-item">
+                    <div class="stat-number">
+                      <span
+                        data-purecounter-start="0"
+                        data-purecounter-end="42"
+                        data-purecounter-duration="2"
+                        class="purecounter"
+                      ></span>
+                    </div>
+                    <div class="stat-label">Habitaciones</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-number">
+                      7 <span class="small">km</span>
+                    </div>
+                    <div class="stat-label">de Montezuma</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-number">
+                      14 <span class="small">km</span>
+                    </div>
+                    <div class="stat-label">de Santa Teresa</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Recepción</div>
                   </div>
                 </div>
               </div>
-
-              <div class="hero-actions" data-aos="fade-up" data-aos-delay="400">
-                <a href="rooms.html" class="btn btn-light btn-lg">
-                  <i class="bi bi-house-door"></i>
-                  Ver habitaciones
-                </a>
-                <a href="amenities.html" class="btn btn-outline-light btn-lg text-white">
-                  <i class="bi bi-star"></i>
-                  Ver servicios
-                </a>
-              </div>
-
-              <div class="hero-stats text-white" data-aos="fade-up" data-aos-delay="500"
-                aria-label="Estadísticas del hotel">
-                <div class="stat-item">
-                  <div class="stat-number">
-                    <span data-purecounter-start="0" data-purecounter-end="42" data-purecounter-duration="2"
-                      class="purecounter"></span>
-                  </div>
-                  <div class="stat-label">Habitaciones</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-number">
-                    7 <span class="small">km</span>
-                  </div>
-                  <div class="stat-label">de Montezuma</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-number">
-                    14 <span class="small">km</span>
-                  </div>
-                  <div class="stat-label">de Santa Teresa</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-number">
-                    24/7
-                  </div>
-                  <div class="stat-label">Recepción</div>
-                </div>
-              </div>
-
             </div>
           </div>
         </div>
+      </section>
+      <!-- /Hotel Hero Section -->
 
-      </div>
-
-    </section><!-- /Hotel Hero Section -->
-
-    <!-- About Home Section -->
-    <section id="about-home" class="about-home section">
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="row align-items-center">
-
-          <div class="col-lg-5" data-aos="fade-up" data-aos-delay="200">
-            <div class="about-images">
-              <div class="image-stack">
-                <div class="image-main">
-                  <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/482055929_1158853392605531_2143408678999726761_n.jpg') }}" alt="Fachada y áreas verdes del Hotel Villa Grace"
-                    class="img-fluid">
+      <!-- About Home Section -->
+      <section id="about-home" class="about-home section">
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="row align-items-center">
+            <div class="col-lg-5" data-aos="fade-up" data-aos-delay="200">
+              <div class="about-images">
+                <div class="image-stack">
+                  <div class="image-main">
+                    <img
+                      src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/482055929_1158853392605531_2143408678999726761_n.jpg') }}"
+                      alt="Fachada y áreas verdes del Hotel Villa Grace"
+                      class="img-fluid"
+                    />
+                  </div>
+                  <div class="image-overlay">
+                    <img
+                      src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}"
+                      alt="Habitación cómoda con aire acondicionado"
+                      class="img-fluid"
+                    />
+                  </div>
                 </div>
-                <div class="image-overlay">
-                  <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}" alt="Habitación cómoda con aire acondicionado"
-                    class="img-fluid">
-                </div>
-              </div>
-              <div class="floating-badge">
-                <div class="badge-icon">
-                  <i class="bi bi-award"></i>
-                </div>
-                <div class="badge-info">
-                  <span class="badge-title">Confort</span>
-                  <span class="badge-subtitle">y hospitalidad</span>
+                <div class="floating-badge">
+                  <div class="badge-icon">
+                    <i class="bi bi-award"></i>
+                  </div>
+                  <div class="badge-info">
+                    <span class="badge-title">Confort</span>
+                    <span class="badge-subtitle">y hospitalidad</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div><!-- End About Images -->
+            <!-- End About Images -->
 
-          <div class="col-lg-7" data-aos="fade-up" data-aos-delay="300">
-            <div class="about-content">
-              <div class="section-header">
-                <span class="subtitle">Cóbano, Península de Nicoya</span>
-                <h2>Tu hogar lejos de casa</h2>
+            <div class="col-lg-7" data-aos="fade-up" data-aos-delay="300">
+              <div class="about-content">
+                <div class="section-header">
+                  <span class="subtitle">Cóbano, Península de Nicoya</span>
+                  <h2>Tu hogar lejos de casa</h2>
+                </div>
+
+                <p>
+                  En Hotel Villa Grace combinamos la calidez de un hotel
+                  familiar con servicios pensados para tu descanso: piscina para
+                  adultos y niños, restaurante y bar, Wi-Fi y parqueo gratis,
+                  habitaciones con aire acondicionado y jardines.
+                </p>
+
+                <p>
+                  Nuestra ubicación es ideal para explorar la zona: estamos a
+                  solo 7 km de las playas de Montezuma y a 14 km de Santa
+                  Teresa, cerca de supermercados, bancos y el centro de Cóbano.
+                </p>
+
+                <div class="features-grid">
+                  <div class="feature-item">
+                    <div class="feature-icon">
+                      <i class="bi bi-building"></i>
+                    </div>
+                    <div class="feature-content">
+                      <h4>Habitaciones cómodas</h4>
+                      <p>Televisión, A/C, baño privado y vista al jardín</p>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <div class="feature-icon">
+                      <i class="bi bi-people"></i>
+                    </div>
+                    <div class="feature-content">
+                      <h4>Espacios para eventos</h4>
+                      <p>Reuniones, cumpleaños y actividades sociales</p>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <div class="feature-icon">
+                      <i class="bi bi-geo-alt"></i>
+                    </div>
+                    <div class="feature-content">
+                      <h4>Ubicación práctica</h4>
+                      <p>A 100 m del Banco Nacional de Cóbano</p>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <div class="feature-icon">
+                      <i class="bi bi-cup-hot"></i>
+                    </div>
+                    <div class="feature-content">
+                      <h4>Restaurante &amp; bar</h4>
+                      <p>Abierto todos los días con opciones para todos</p>
+                    </div>
+                  </div>
+                </div>
+                <!-- End Features Grid -->
+
+                <div class="about-actions">
+                  <a href="about.html" class="btn-discover">
+                    <span>Conoce nuestra historia</span>
+                    <i class="bi bi-arrow-right"></i>
+                  </a>
+                </div>
               </div>
+            </div>
+            <!-- End About Content -->
+          </div>
+        </div>
+      </section>
+      <!-- /About Home Section -->
 
-              <p>En Hotel Villa Grace combinamos la calidez de un hotel familiar con servicios pensados para tu
-                descanso: piscina para adultos y niños, restaurante y bar, Wi-Fi y parqueo gratis, habitaciones con aire
-                acondicionado y jardines.</p>
+      <!-- Rooms Showcase Section -->
+      <section id="rooms-showcase" class="rooms-showcase section">
+        <!-- Section Title -->
+        <div class="container section-title" data-aos="fade-up">
+          <h2>Habitaciones</h2>
+          <p>
+            Opciones para parejas, familias y grupos — 42 habitaciones con A/C y
+            baño privado
+          </p>
+        </div>
+        <!-- End Section Title -->
 
-              <p>Nuestra ubicación es ideal para explorar la zona: estamos a solo 7 km de las playas de Montezuma y a 14
-                km de Santa Teresa, cerca de supermercados, bancos y el centro de Cóbano.</p>
-
-              <div class="features-grid">
-                <div class="feature-item">
-                  <div class="feature-icon">
-                    <i class="bi bi-building"></i>
-                  </div>
-                  <div class="feature-content">
-                    <h4>Habitaciones cómodas</h4>
-                    <p>Televisión, A/C, baño privado y vista al jardín</p>
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="row">
+            <div
+              class="col-lg-6 col-md-6 mb-4"
+              data-aos="zoom-in"
+              data-aos-delay="200"
+            >
+              <div class="room-showcase-card featured">
+                <div class="room-hero-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}"
+                    alt="Habitación Familiar"
+                    class="img-fluid"
+                  />
+                  <div class="room-badge">Ideal para familias</div>
+                  <div class="room-icons">
+                    <span class="icon-item"
+                      ><i class="bi bi-people"></i> 4</span
+                    >
+                    <span class="icon-item"
+                      ><i class="bi bi-house"></i> Doble/Triple</span
+                    >
+                    <span class="icon-item"
+                      ><i class="bi bi-snow"></i> A/C</span
+                    >
                   </div>
                 </div>
-                <div class="feature-item">
-                  <div class="feature-icon">
-                    <i class="bi bi-people"></i>
+                <div class="room-info">
+                  <div class="room-header">
+                    <h3>Habitación Familiar</h3>
+                    <div class="rating">
+                      <i class="bi bi-star-fill"></i>
+                      <i class="bi bi-star-fill"></i>
+                      <i class="bi bi-star-fill"></i>
+                      <i class="bi bi-star-fill"></i>
+                      <i class="bi bi-star-fill"></i>
+                    </div>
                   </div>
-                  <div class="feature-content">
-                    <h4>Espacios para eventos</h4>
-                    <p>Reuniones, cumpleaños y actividades sociales</p>
+                  <p class="room-excerpt">
+                    Camas cómodas, baño privado, aire acondicionado, TV y área
+                    de descanso exterior con vista al jardín.
+                  </p>
+                  <div class="room-amenities">
+                    <i class="bi bi-wifi" title="Wi-Fi"></i>
+                    <i class="bi bi-tv" title="TV"></i>
+                    <i class="bi bi-cup-hot" title="Restaurante cercano"></i>
+                    <i class="bi bi-snow" title="Aire Acondicionado"></i>
+                    <i class="bi bi-telephone" title="Recepción 24/7"></i>
+                    <i class="bi bi-safe" title="Parqueo en propiedad"></i>
+                  </div>
+                  <div class="room-bottom">
+                    <div class="pricing-info">
+                      <span class="price-tag">₡15,000</span>
+                      <span class="price-label">por persona/noche *</span>
+                    </div>
+                    <a href="room-details.html" class="explore-btn"
+                      >Ver detalles</a
+                    >
+                  </div>
+                  <p class="small text-muted mt-2 mb-0">
+                    * Mayores de 10 años ₡15,000; menores de 10 años ₡7,500 por
+                    noche (+IVA).
+                  </p>
+                </div>
+              </div>
+            </div>
+            <!-- End Featured Room Card -->
+
+            <div class="col-lg-6">
+              <div class="row">
+                <div
+                  class="col-12 mb-4"
+                  data-aos="slide-left"
+                  data-aos-delay="250"
+                >
+                  <div class="room-showcase-card compact">
+                    <div class="compact-image">
+                      <img
+                        src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/486180854_1169316518225885_479484847626275475_n.jpg') }}"
+                        alt="Habitación Doble"
+                        class="img-fluid"
+                      />
+                      <div class="quick-view">
+                        <i class="bi bi-eye"></i>
+                      </div>
+                    </div>
+                    <div class="compact-content">
+                      <h4>Habitación Doble</h4>
+                      <p>
+                        Perfecta para dos personas con A/C, TV y baño privado.
+                      </p>
+                      <div class="compact-features">
+                        <span><i class="bi bi-snow"></i> Aire Acond.</span>
+                        <span><i class="bi bi-tree"></i> Vista jardín</span>
+                      </div>
+                      <div class="compact-bottom">
+                        <span class="compact-price"
+                          >Desde ₡15,000<small>/persona</small></span
+                        >
+                        <a href="room-details.html" class="quick-book"
+                          >Reservar</a
+                        >
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="feature-item">
-                  <div class="feature-icon">
-                    <i class="bi bi-geo-alt"></i>
-                  </div>
-                  <div class="feature-content">
-                    <h4>Ubicación práctica</h4>
-                    <p>A 100 m del Banco Nacional de Cóbano</p>
+                <!-- End Compact Room Card -->
+
+                <div
+                  class="col-12 mb-4"
+                  data-aos="slide-left"
+                  data-aos-delay="300"
+                >
+                  <div class="room-showcase-card compact">
+                    <div class="compact-image">
+                      <img
+                        src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485757412_1169316591559211_2641667825645153970_n.jpg') }}"
+                        alt="Habitación Triple"
+                        class="img-fluid"
+                      />
+                      <div class="quick-view">
+                        <i class="bi bi-eye"></i>
+                      </div>
+                    </div>
+                    <div class="compact-content">
+                      <h4>Habitación Triple</h4>
+                      <p>
+                        Espaciosa y fresca, ideal para amigos o familias
+                        pequeñas.
+                      </p>
+                      <div class="compact-features">
+                        <span><i class="bi bi-people"></i> 3 huéspedes</span>
+                        <span
+                          ><i class="bi bi-car-front"></i> Parqueo gratis</span
+                        >
+                      </div>
+                      <div class="compact-bottom">
+                        <span class="compact-price"
+                          >Consulta<small>/tarifas</small></span
+                        >
+                        <a href="room-details.html" class="quick-book"
+                          >Reservar</a
+                        >
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div class="feature-item">
-                  <div class="feature-icon">
+                <!-- End Compact Room Card -->
+
+                <div
+                  class="col-12 mb-4"
+                  data-aos="slide-left"
+                  data-aos-delay="350"
+                >
+                  <div class="room-showcase-card compact">
+                    <div class="compact-image">
+                      <img
+                        src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481332737_1158853602605510_7442821055590771650_n.jpg') }}"
+                        alt="Habitación Económica"
+                        class="img-fluid"
+                      />
+                      <div class="quick-view">
+                        <i class="bi bi-eye"></i>
+                      </div>
+                    </div>
+                    <div class="compact-content">
+                      <h4>Habitación Económica</h4>
+                      <p>
+                        La opción más conveniente para explorar la península con
+                        presupuesto.
+                      </p>
+                      <div class="compact-features">
+                        <span><i class="bi bi-wifi"></i> Wi-Fi</span>
+                        <span><i class="bi bi-snow"></i> A/C</span>
+                      </div>
+                      <div class="compact-bottom">
+                        <span class="compact-price"
+                          >Tarifa local<small> disponible</small></span
+                        >
+                        <a href="room-details.html" class="quick-book"
+                          >Reservar</a
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- End Compact Room Card -->
+              </div>
+            </div>
+          </div>
+
+          <div class="row mt-5">
+            <div
+              class="col-lg-3 col-md-6 mb-4"
+              data-aos="fade-up"
+              data-aos-delay="400"
+            >
+              <div class="room-showcase-card mini">
+                <div class="mini-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/482023126_1158853279272209_2860408706580062427_n.jpg') }}"
+                    alt="Doble estándar"
+                    class="img-fluid"
+                  />
+                  <div class="mini-overlay">
+                    <a href="room-details.html"
+                      ><i class="bi bi-arrow-right"></i
+                    ></a>
+                  </div>
+                </div>
+                <div class="mini-content">
+                  <h5>Doble estándar</h5>
+                  <div class="mini-price">₡15,000<span>/persona</span></div>
+                  <div class="mini-amenities">
+                    <i class="bi bi-wifi"></i>
+                    <i class="bi bi-tv"></i>
+                    <i class="bi bi-snow"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Mini Room Card -->
+
+            <div
+              class="col-lg-3 col-md-6 mb-4"
+              data-aos="fade-up"
+              data-aos-delay="450"
+            >
+              <div class="room-showcase-card mini">
+                <div class="mini-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485350977_1169316531559217_1975155610514000117_n.jpg') }}"
+                    alt="King deluxe"
+                    class="img-fluid"
+                  />
+                  <div class="mini-overlay">
+                    <a href="room-details.html"
+                      ><i class="bi bi-arrow-right"></i
+                    ></a>
+                  </div>
+                </div>
+                <div class="mini-content">
+                  <h5>King deluxe</h5>
+                  <div class="mini-price">Consulta<span>/tarifa</span></div>
+                  <div class="mini-amenities">
+                    <i class="bi bi-wifi"></i>
+                    <i class="bi bi-cup-hot"></i>
+                    <i class="bi bi-snow"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Mini Room Card -->
+
+            <div
+              class="col-lg-3 col-md-6 mb-4"
+              data-aos="fade-up"
+              data-aos-delay="500"
+            >
+              <div class="room-showcase-card mini">
+                <div class="mini-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485629177_1169316841559186_16666146202751381_n.jpg') }}"
+                    alt="Vista jardín"
+                    class="img-fluid"
+                  />
+                  <div class="mini-overlay">
+                    <a href="room-details.html"
+                      ><i class="bi bi-arrow-right"></i
+                    ></a>
+                  </div>
+                </div>
+                <div class="mini-content">
+                  <h5>Vista jardín</h5>
+                  <div class="mini-price">Consulta<span>/tarifa</span></div>
+                  <div class="mini-amenities">
+                    <i class="bi bi-tree"></i>
+                    <i class="bi bi-tv"></i>
+                    <i class="bi bi-wifi"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Mini Room Card -->
+
+            <div
+              class="col-lg-3 col-md-6 mb-4"
+              data-aos="fade-up"
+              data-aos-delay="550"
+            >
+              <div class="room-showcase-card mini">
+                <div class="mini-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}"
+                    alt="Suite familiar"
+                    class="img-fluid"
+                  />
+                  <div class="mini-overlay">
+                    <a href="room-details.html"
+                      ><i class="bi bi-arrow-right"></i
+                    ></a>
+                  </div>
+                </div>
+                <div class="mini-content">
+                  <h5>Suite familiar</h5>
+                  <div class="mini-price">Consulta<span>/tarifa</span></div>
+                  <div class="mini-amenities">
+                    <i class="bi bi-award"></i>
+                    <i class="bi bi-house"></i>
+                    <i class="bi bi-star"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Mini Room Card -->
+          </div>
+
+          <div class="text-center mt-5" data-aos="fade-up" data-aos-delay="600">
+            <a href="rooms.html" class="discover-all-btn"
+              >Ver todas las habitaciones</a
+            >
+          </div>
+        </div>
+      </section>
+      <!-- /Rooms Showcase Section -->
+
+      <!-- Amenities Cards Section -->
+      <section id="amenities-cards" class="amenities-cards section">
+        <!-- Section Title -->
+        <div class="container section-title" data-aos="fade-up">
+          <h2>Servicios</h2>
+          <p>Todo lo que necesitas para una estancia cómoda en Cóbano</p>
+        </div>
+        <!-- End Section Title -->
+
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="row gy-5">
+            <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="200">
+              <div class="amenity-card">
+                <div class="card-header">
+                  <div class="amenity-icon">
+                    <i class="bi bi-water"></i>
+                  </div>
+                  <h4>Piscina y terraza</h4>
+                </div>
+                <div class="amenity-content">
+                  <p>
+                    Piscina para adultos y niños con áreas de descanso y duchas.
+                    Ideal para refrescarse después de la playa.
+                  </p>
+                  <div class="amenity-features">
+                    <span class="feature-tag">Toallas disponibles</span>
+                    <span class="feature-tag">Zona infantil</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Amenity Item -->
+
+            <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="300">
+              <div class="amenity-card">
+                <div class="card-header">
+                  <div class="amenity-icon">
                     <i class="bi bi-cup-hot"></i>
                   </div>
-                  <div class="feature-content">
-                    <h4>Restaurante &amp; bar</h4>
-                    <p>Abierto todos los días con opciones para todos</p>
+                  <h4>Restaurante &amp; bar</h4>
+                </div>
+                <div class="amenity-content">
+                  <p>
+                    Abierto todos los días con platillos caseros y cocteles.
+                    También ofrecemos opciones para eventos.
+                  </p>
+                  <div class="amenity-features">
+                    <span class="feature-tag">Desayunos</span>
+                    <span class="feature-tag">Coctelería</span>
                   </div>
                 </div>
-              </div><!-- End Features Grid -->
-
-              <div class="about-actions">
-                <a href="about.html" class="btn-discover">
-                  <span>Conoce nuestra historia</span>
-                  <i class="bi bi-arrow-right"></i>
-                </a>
               </div>
-
             </div>
-          </div><!-- End About Content -->
+            <!-- End Amenity Item -->
 
+            <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="400">
+              <div class="amenity-card">
+                <div class="card-header">
+                  <div class="amenity-icon">
+                    <i class="bi bi-wifi"></i>
+                  </div>
+                  <h4>Conectividad</h4>
+                </div>
+                <div class="amenity-content">
+                  <p>
+                    Wi-Fi gratuito en todas las áreas y recepción 24/7 para
+                    ayudarte en lo que necesites.
+                  </p>
+                  <div class="amenity-features">
+                    <span class="feature-tag">Recepción 24/7</span>
+                    <span class="feature-tag">Asistencia turística</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Amenity Item -->
+
+            <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="500">
+              <div class="amenity-card">
+                <div class="card-header">
+                  <div class="amenity-icon">
+                    <i class="bi bi-car-front"></i>
+                  </div>
+                  <h4>Comodidades</h4>
+                </div>
+                <div class="amenity-content">
+                  <p>
+                    Parqueo gratuito, habitaciones con aire acondicionado y
+                    jardines ideales para descansar.
+                  </p>
+                  <div class="amenity-features">
+                    <span class="feature-tag">A/C en habitaciones</span>
+                    <span class="feature-tag">Jardín</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Amenity Item -->
+          </div>
+
+          <div
+            class="amenities-cta text-center mt-5"
+            data-aos="fade-up"
+            data-aos-delay="600"
+          >
+            <div class="cta-content">
+              <h5>¿Planeas un evento?</h5>
+              <p class="mb-4">
+                Consultanos por paquetes para cumpleaños, reuniones y
+                actividades sociales.
+              </p>
+              <a href="amenities.html" class="btn-explore">Ver más servicios</a>
+            </div>
+          </div>
         </div>
+      </section>
+      <!-- /Amenities Cards Section -->
 
-      </div>
+      <!-- Testimonials Section -->
+      <section id="testimonials" class="testimonials section">
+        <!-- Section Title -->
+        <div class="container section-title" data-aos="fade-up">
+          <h2>Opiniones</h2>
+          <p>Lo que dicen nuestros huéspedes</p>
+        </div>
+        <!-- End Section Title -->
 
-    </section><!-- /About Home Section -->
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="testimonial-slider swiper init-swiper">
+            <script type="application/json" class="swiper-config">
+              {
+                "loop": true,
+                "speed": 600,
+                "autoplay": {
+                  "delay": 4000
+                },
+                "slidesPerView": 1,
+                "spaceBetween": 30,
+                "navigation": {
+                  "nextEl": ".swiper-button-next",
+                  "prevEl": ".swiper-button-prev"
+                },
+                "breakpoints": {
+                  "768": { "slidesPerView": 2 },
+                  "1200": { "slidesPerView": 3 }
+                }
+              }
+            </script>
 
-    <!-- Rooms Showcase Section -->
-    <section id="rooms-showcase" class="rooms-showcase section">
-
-      <!-- Section Title -->
-      <div class="container section-title" data-aos="fade-up">
-        <h2>Habitaciones</h2>
-        <p>Opciones para parejas, familias y grupos — 42 habitaciones con A/C y baño privado</p>
-      </div><!-- End Section Title -->
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="row">
-          <div class="col-lg-6 col-md-6 mb-4" data-aos="zoom-in" data-aos-delay="200">
-            <div class="room-showcase-card featured">
-              <div class="room-hero-image">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}" alt="Habitación Familiar" class="img-fluid">
-                <div class="room-badge">Ideal para familias</div>
-                <div class="room-icons">
-                  <span class="icon-item"><i class="bi bi-people"></i> 4</span>
-                  <span class="icon-item"><i class="bi bi-house"></i> Doble/Triple</span>
-                  <span class="icon-item"><i class="bi bi-snow"></i> A/C</span>
+            <div class="swiper-wrapper">
+              <div class="swiper-slide">
+                <div
+                  class="testimonial-item"
+                  data-aos="zoom-in"
+                  data-aos-delay="200"
+                >
+                  <div class="testimonial-header">
+                    <img
+                      src="{{ url_for('static', filename='assets/img/person/person-f-12.webp') }}"
+                      alt="Huésped"
+                      class="img-fluid"
+                      loading="lazy"
+                    />
+                    <div class="rating">
+                      <i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i>
+                    </div>
+                  </div>
+                  <div class="testimonial-body">
+                    <p>
+                      Excelente atención y la piscina es perfecta para niños.
+                      Muy cerca de todo en Cóbano.
+                    </p>
+                  </div>
+                  <div class="testimonial-footer">
+                    <h5>Jessica M.</h5>
+                    <span>Familia</span>
+                    <div class="quote-icon">
+                      <i class="bi bi-chat-quote-fill"></i>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="room-info">
-                <div class="room-header">
-                  <h3>Habitación Familiar</h3>
-                  <div class="rating">
-                    <i class="bi bi-star-fill"></i>
-                    <i class="bi bi-star-fill"></i>
-                    <i class="bi bi-star-fill"></i>
-                    <i class="bi bi-star-fill"></i>
-                    <i class="bi bi-star-fill"></i>
+
+              <div class="swiper-slide">
+                <div
+                  class="testimonial-item"
+                  data-aos="zoom-in"
+                  data-aos-delay="300"
+                >
+                  <div class="testimonial-header">
+                    <img
+                      src="{{ url_for('static', filename='assets/img/person/person-m-8.webp') }}"
+                      alt="Huésped"
+                      class="img-fluid"
+                      loading="lazy"
+                    />
+                    <div class="rating">
+                      <i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i>
+                    </div>
+                  </div>
+                  <div class="testimonial-body">
+                    <p>
+                      Habitaciones cómodas y parqueo amplio. Buen punto base
+                      para ir a Montezuma y Santa Teresa.
+                    </p>
+                  </div>
+                  <div class="testimonial-footer">
+                    <h5>David R.</h5>
+                    <span>Turista</span>
+                    <div class="quote-icon">
+                      <i class="bi bi-chat-quote-fill"></i>
+                    </div>
                   </div>
                 </div>
-                <p class="room-excerpt">Camas cómodas, baño privado, aire acondicionado, TV y área de descanso exterior
-                  con vista al jardín.</p>
-                <div class="room-amenities">
-                  <i class="bi bi-wifi" title="Wi-Fi"></i>
-                  <i class="bi bi-tv" title="TV"></i>
-                  <i class="bi bi-cup-hot" title="Restaurante cercano"></i>
-                  <i class="bi bi-snow" title="Aire Acondicionado"></i>
-                  <i class="bi bi-telephone" title="Recepción 24/7"></i>
-                  <i class="bi bi-safe" title="Parqueo en propiedad"></i>
-                </div>
-                <div class="room-bottom">
-                  <div class="pricing-info">
-                    <span class="price-tag">₡15,000</span>
-                    <span class="price-label">por persona/noche *</span>
+              </div>
+
+              <div class="swiper-slide">
+                <div
+                  class="testimonial-item"
+                  data-aos="zoom-in"
+                  data-aos-delay="400"
+                >
+                  <div class="testimonial-header">
+                    <img
+                      src="{{ url_for('static', filename='assets/img/person/person-f-6.webp') }}"
+                      alt="Huésped"
+                      class="img-fluid"
+                      loading="lazy"
+                    />
+                    <div class="rating">
+                      <i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i>
+                    </div>
                   </div>
-                  <a href="room-details.html" class="explore-btn">Ver detalles</a>
+                  <div class="testimonial-body">
+                    <p>
+                      El restaurante nos encantó y el personal fue muy amable.
+                      ¡Volveremos!
+                    </p>
+                  </div>
+                  <div class="testimonial-footer">
+                    <h5>Amanda W.</h5>
+                    <span>Pareja</span>
+                    <div class="quote-icon">
+                      <i class="bi bi-chat-quote-fill"></i>
+                    </div>
+                  </div>
                 </div>
-                <p class="small text-muted mt-2 mb-0">* Mayores de 10 años ₡15,000; menores de 10 años ₡7,500 por noche
-                  (+IVA).</p>
+              </div>
+
+              <div class="swiper-slide">
+                <div
+                  class="testimonial-item"
+                  data-aos="zoom-in"
+                  data-aos-delay="500"
+                >
+                  <div class="testimonial-header">
+                    <img
+                      src="{{ url_for('static', filename='assets/img/person/person-m-12.webp') }}"
+                      alt="Huésped"
+                      class="img-fluid"
+                      loading="lazy"
+                    />
+                    <div class="rating">
+                      <i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i
+                      ><i class="bi bi-star-fill"></i>
+                    </div>
+                  </div>
+                  <div class="testimonial-body">
+                    <p>
+                      Buena relación calidad-precio y ubicación céntrica en
+                      Cóbano.
+                    </p>
+                  </div>
+                  <div class="testimonial-footer">
+                    <h5>Ryan T.</h5>
+                    <span>Trabajo</span>
+                    <div class="quote-icon">
+                      <i class="bi bi-chat-quote-fill"></i>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div><!-- End Featured Room Card -->
 
-          <div class="col-lg-6">
-            <div class="row">
-              <div class="col-12 mb-4" data-aos="slide-left" data-aos-delay="250">
-                <div class="room-showcase-card compact">
-                  <div class="compact-image">
-                    <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/486180854_1169316518225885_479484847626275475_n.jpg') }}" alt="Habitación Doble" class="img-fluid">
-                    <div class="quick-view">
-                      <i class="bi bi-eye"></i>
-                    </div>
-                  </div>
-                  <div class="compact-content">
-                    <h4>Habitación Doble</h4>
-                    <p>Perfecta para dos personas con A/C, TV y baño privado.</p>
-                    <div class="compact-features">
-                      <span><i class="bi bi-snow"></i> Aire Acond.</span>
-                      <span><i class="bi bi-tree"></i> Vista jardín</span>
-                    </div>
-                    <div class="compact-bottom">
-                      <span class="compact-price">Desde ₡15,000<small>/persona</small></span>
-                      <a href="room-details.html" class="quick-book">Reservar</a>
-                    </div>
-                  </div>
+            <div class="swiper-navigation">
+              <div class="swiper-button-prev" aria-label="Anterior"></div>
+              <div class="swiper-button-next" aria-label="Siguiente"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- /Testimonials Section -->
+
+      <!-- Offer Cards Section -->
+      <section id="offer-cards" class="offer-cards section">
+        <!-- Section Title -->
+        <div class="container section-title" data-aos="fade-up">
+          <h2>Ofertas</h2>
+          <p>Tarifas simples y convenientes — precios por persona por noche</p>
+        </div>
+        <!-- End Section Title -->
+
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="row g-4">
+            <div class="col-lg-4 col-md-6">
+              <div class="offer-card" data-aos="zoom-in" data-aos-delay="200">
+                <div class="offer-badge">
+                  <span class="discount">NIÑOS</span>
                 </div>
-              </div><!-- End Compact Room Card -->
-
-              <div class="col-12 mb-4" data-aos="slide-left" data-aos-delay="300">
-                <div class="room-showcase-card compact">
-                  <div class="compact-image">
-                    <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485757412_1169316591559211_2641667825645153970_n.jpg') }}" alt="Habitación Triple" class="img-fluid">
-                    <div class="quick-view">
-                      <i class="bi bi-eye"></i>
-                    </div>
-                  </div>
-                  <div class="compact-content">
-                    <h4>Habitación Triple</h4>
-                    <p>Espaciosa y fresca, ideal para amigos o familias pequeñas.</p>
-                    <div class="compact-features">
-                      <span><i class="bi bi-people"></i> 3 huéspedes</span>
-                      <span><i class="bi bi-car-front"></i> Parqueo gratis</span>
-                    </div>
-                    <div class="compact-bottom">
-                      <span class="compact-price">Consulta<small>/tarifas</small></span>
-                      <a href="room-details.html" class="quick-book">Reservar</a>
-                    </div>
-                  </div>
+                <div class="offer-image">
+                  <img
+                    src="https://cdn-icons-png.flaticon.com/128/85/85909.png"
+                    style="width: 300px; height: 300px"
+                    alt="Tarifa niños"
+                    class="img-fluid"
+                  />
                 </div>
-              </div><!-- End Compact Room Card -->
-
-              <div class="col-12 mb-4" data-aos="slide-left" data-aos-delay="350">
-                <div class="room-showcase-card compact">
-                  <div class="compact-image">
-                    <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481332737_1158853602605510_7442821055590771650_n.jpg') }}" alt="Habitación Económica" class="img-fluid">
-                    <div class="quick-view">
-                      <i class="bi bi-eye"></i>
+                <div class="offer-content">
+                  <h3>Menores de 10 años</h3>
+                  <p>
+                    Tarifa especial por noche para menores acompañados de
+                    adulto.
+                  </p>
+                  <div class="offer-details">
+                    <div class="price-info">
+                      <span class="offer-price">₡7,500</span>
+                      <span class="per-night">/noche</span>
+                    </div>
+                    <div class="validity">
+                      <i class="bi bi-calendar-check"></i>
+                      <span>Sujeto a disponibilidad</span>
                     </div>
                   </div>
-                  <div class="compact-content">
-                    <h4>Habitación Económica</h4>
-                    <p>La opción más conveniente para explorar la península con presupuesto.</p>
-                    <div class="compact-features">
-                      <span><i class="bi bi-wifi"></i> Wi-Fi</span>
-                      <span><i class="bi bi-snow"></i> A/C</span>
-                    </div>
-                    <div class="compact-bottom">
-                      <span class="compact-price">Tarifa local<small> disponible</small></span>
-                      <a href="room-details.html" class="quick-book">Reservar</a>
-                    </div>
-                  </div>
+                  <a href="#" class="btn-book">Consultar</a>
                 </div>
-              </div><!-- End Compact Room Card -->
+              </div>
+            </div>
 
+            <div class="col-lg-4 col-md-6">
+              <div
+                class="offer-card featured"
+                data-aos="zoom-in"
+                data-aos-delay="300"
+              >
+                <div class="offer-badge">
+                  <span class="discount">ADULTOS</span>
+                </div>
+                <div class="offer-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Adultos.png') }}"
+                    style="width: 300px; height: 300px"
+                    alt="Tarifa adultos"
+                    class="img-fluid"
+                  />
+                </div>
+                <div class="offer-content">
+                  <h3>Mayores de 10 años</h3>
+                  <p>
+                    La mejor tarifa de la península para descansar con
+                    comodidad.
+                  </p>
+                  <div class="offer-details">
+                    <div class="price-info">
+                      <span class="offer-price">₡15,000</span>
+                      <span class="per-night">/noche</span>
+                    </div>
+                    <div class="validity">
+                      <i class="bi bi-receipt-cutoff"></i>
+                      <span>+ IVA según ley</span>
+                    </div>
+                  </div>
+                  <a href="#" class="btn-book">Reservar</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-4 col-md-6">
+              <div class="offer-card" data-aos="zoom-in" data-aos-delay="400">
+                <div class="offer-badge">
+                  <span class="discount">GRUPOS</span>
+                </div>
+                <div class="offer-image">
+                  <img
+                    src="https://img.freepik.com/fotos-premium/grupo-amigos-comiendo-barbacoa-al-aire-libre-terraza-conversacion-reunion-evento-social-verano-gente-barbacoa-almuerzo-patio-comida-hablando-celebrando-vinculos-bebidas_590464-391980.jpg"
+                    alt="Grupos y eventos"
+                    class="img-fluid"
+                  />
+                </div>
+                <div class="offer-content">
+                  <h3>Grupos &amp; eventos</h3>
+                  <p>
+                    Salones y áreas al aire libre para actividades sociales con
+                    opciones de comida y bebida.
+                  </p>
+                  <div class="offer-details">
+                    <div class="price-info">
+                      <span class="offer-price">Cotiza</span>
+                      <span class="per-night">según tamaño</span>
+                    </div>
+                    <div class="validity">
+                      <i class="bi bi-telephone"></i>
+                      <span>Llámanos: </span
+                      ><a href="Tel: +50626420225">+506 2642 0225</a>
+                    </div>
+                  </div>
+                  <a href="#" class="btn-book">Solicitar cotización</a>
+                </div>
+              </div>
             </div>
           </div>
 
+          <div class="row mt-5">
+            <div class="col-12">
+              <div class="offer-banner" data-aos="fade-up" data-aos-delay="500">
+                <div class="row align-items-center">
+                  <div class="col-lg-8">
+                    <div class="banner-content">
+                      <h2>Reserva directa y ahorra</h2>
+                      <p>
+                        Contáctanos por teléfono o correo y asegura la mejor
+                        tarifa disponible para tus fechas.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="col-lg-4 text-lg-end">
+                    <div class="banner-action">
+                      <div
+                        class="countdown"
+                        data-count="2025/12/15"
+                        aria-hidden="true"
+                      >
+                        <div>
+                          <span class="count-days"></span>
+                          <label>Días</label>
+                        </div>
+                        <div>
+                          <span class="count-hours"></span>
+                          <label>Horas</label>
+                        </div>
+                        <div>
+                          <span class="count-minutes"></span>
+                          <label>Minutos</label>
+                        </div>
+                      </div>
+                      <a href="booking.html" class="btn-cta">Reservar ahora</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </section>
+      <!-- /Offer Cards Section -->
 
-        <div class="row mt-5">
-          <div class="col-lg-3 col-md-6 mb-4" data-aos="fade-up" data-aos-delay="400">
-            <div class="room-showcase-card mini">
-              <div class="mini-image">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/482023126_1158853279272209_2860408706580062427_n.jpg') }}" alt="Doble estándar" class="img-fluid">
-                <div class="mini-overlay">
-                  <a href="room-details.html"><i class="bi bi-arrow-right"></i></a>
-                </div>
-              </div>
-              <div class="mini-content">
-                <h5>Doble estándar</h5>
-                <div class="mini-price">₡15,000<span>/persona</span></div>
-                <div class="mini-amenities">
-                  <i class="bi bi-wifi"></i>
-                  <i class="bi bi-tv"></i>
-                  <i class="bi bi-snow"></i>
+      <!-- Call To Action Section -->
+      <section
+        id="call-to-action"
+        class="call-to-action section light-background"
+      >
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="row justify-content-center">
+            <div class="col-lg-10">
+              <div class="cta-content text-center">
+                <div class="row align-items-center">
+                  <div class="col-lg-8">
+                    <div class="text-content">
+                      <h2>¿Listo para tu viaje a la península?</h2>
+                      <p class="lead mb-0">
+                        Asegura tu espacio en Hotel Villa Grace. Atención
+                        cercana, ubicación práctica y precios justos.
+                      </p>
+                    </div>
+                  </div>
+                  <div class="col-lg-4">
+                    <div
+                      class="cta-action"
+                      data-aos="zoom-in"
+                      data-aos-delay="200"
+                    >
+                      <a href="booking.html" class="btn btn-cta">
+                        <i class="bi bi-calendar-check me-2"></i>
+                        Reservar
+                      </a>
+                      <div
+                        class="offer-badge"
+                        data-aos="fade-up"
+                        data-aos-delay="300"
+                      >
+                        <span>Mejor tarifa directa</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div><!-- End Mini Room Card -->
+          </div>
 
-          <div class="col-lg-3 col-md-6 mb-4" data-aos="fade-up" data-aos-delay="450">
-            <div class="room-showcase-card mini">
-              <div class="mini-image">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485350977_1169316531559217_1975155610514000117_n.jpg') }}" alt="King deluxe" class="img-fluid">
-                <div class="mini-overlay">
-                  <a href="room-details.html"><i class="bi bi-arrow-right"></i></a>
+          <div class="row mt-5" data-aos="fade-up" data-aos-delay="200">
+            <div class="col-lg-3 col-md-6 mb-4">
+              <div class="feature-item text-center">
+                <div class="icon-wrapper">
+                  <i class="bi bi-shield-check"></i>
                 </div>
-              </div>
-              <div class="mini-content">
-                <h5>King deluxe</h5>
-                <div class="mini-price">Consulta<span>/tarifa</span></div>
-                <div class="mini-amenities">
-                  <i class="bi bi-wifi"></i>
-                  <i class="bi bi-cup-hot"></i>
-                  <i class="bi bi-snow"></i>
-                </div>
+                <h5>Cancelación flexible</h5>
+                <p>Consulta condiciones según temporada</p>
               </div>
             </div>
-          </div><!-- End Mini Room Card -->
-
-          <div class="col-lg-3 col-md-6 mb-4" data-aos="fade-up" data-aos-delay="500">
-            <div class="room-showcase-card mini">
-              <div class="mini-image">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485629177_1169316841559186_16666146202751381_n.jpg') }}" alt="Vista jardín" class="img-fluid">
-                <div class="mini-overlay">
-                  <a href="room-details.html"><i class="bi bi-arrow-right"></i></a>
-                </div>
-              </div>
-              <div class="mini-content">
-                <h5>Vista jardín</h5>
-                <div class="mini-price">Consulta<span>/tarifa</span></div>
-                <div class="mini-amenities">
-                  <i class="bi bi-tree"></i>
-                  <i class="bi bi-tv"></i>
-                  <i class="bi bi-wifi"></i>
-                </div>
-              </div>
-            </div>
-          </div><!-- End Mini Room Card -->
-
-          <div class="col-lg-3 col-md-6 mb-4" data-aos="fade-up" data-aos-delay="550">
-            <div class="room-showcase-card mini">
-              <div class="mini-image">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}" alt="Suite familiar" class="img-fluid">
-                <div class="mini-overlay">
-                  <a href="room-details.html"><i class="bi bi-arrow-right"></i></a>
-                </div>
-              </div>
-              <div class="mini-content">
-                <h5>Suite familiar</h5>
-                <div class="mini-price">Consulta<span>/tarifa</span></div>
-                <div class="mini-amenities">
+            <div class="col-lg-3 col-md-6 mb-4">
+              <div class="feature-item text-center">
+                <div class="icon-wrapper">
                   <i class="bi bi-award"></i>
-                  <i class="bi bi-house"></i>
-                  <i class="bi bi-star"></i>
                 </div>
+                <h5>Tarifa local</h5>
+                <p>Precios especiales para residentes</p>
               </div>
             </div>
-          </div><!-- End Mini Room Card -->
-
-        </div>
-
-        <div class="text-center mt-5" data-aos="fade-up" data-aos-delay="600">
-          <a href="rooms.html" class="discover-all-btn">Ver todas las habitaciones</a>
-        </div>
-
-      </div>
-
-    </section><!-- /Rooms Showcase Section -->
-
-    <!-- Amenities Cards Section -->
-    <section id="amenities-cards" class="amenities-cards section">
-
-      <!-- Section Title -->
-      <div class="container section-title" data-aos="fade-up">
-        <h2>Servicios</h2>
-        <p>Todo lo que necesitas para una estancia cómoda en Cóbano</p>
-      </div><!-- End Section Title -->
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="row gy-5">
-
-          <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="200">
-            <div class="amenity-card">
-              <div class="card-header">
-                <div class="amenity-icon">
-                  <i class="bi bi-water"></i>
+            <div class="col-lg-3 col-md-6 mb-4">
+              <div class="feature-item text-center">
+                <div class="icon-wrapper">
+                  <i class="bi bi-headset"></i>
                 </div>
-                <h4>Piscina y terraza</h4>
-              </div>
-              <div class="amenity-content">
-                <p>Piscina para adultos y niños con áreas de descanso y duchas. Ideal para refrescarse después de la
-                  playa.</p>
-                <div class="amenity-features">
-                  <span class="feature-tag">Toallas disponibles</span>
-                  <span class="feature-tag">Zona infantil</span>
-                </div>
+                <h5>Soporte 24/7</h5>
+                <p>Siempre disponibles para ayudarte</p>
               </div>
             </div>
-          </div><!-- End Amenity Item -->
-
-          <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="300">
-            <div class="amenity-card">
-              <div class="card-header">
-                <div class="amenity-icon">
-                  <i class="bi bi-cup-hot"></i>
+            <div class="col-lg-3 col-md-6 mb-4">
+              <div class="feature-item text-center">
+                <div class="icon-wrapper">
+                  <i class="bi bi-lock"></i>
                 </div>
-                <h4>Restaurante &amp; bar</h4>
-              </div>
-              <div class="amenity-content">
-                <p>Abierto todos los días con platillos caseros y cocteles. También ofrecemos opciones para eventos.</p>
-                <div class="amenity-features">
-                  <span class="feature-tag">Desayunos</span>
-                  <span class="feature-tag">Coctelería</span>
-                </div>
+                <h5>Reserva segura</h5>
+                <p>Tus datos están protegidos</p>
               </div>
             </div>
-          </div><!-- End Amenity Item -->
-
-          <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="400">
-            <div class="amenity-card">
-              <div class="card-header">
-                <div class="amenity-icon">
-                  <i class="bi bi-wifi"></i>
-                </div>
-                <h4>Conectividad</h4>
-              </div>
-              <div class="amenity-content">
-                <p>Wi-Fi gratuito en todas las áreas y recepción 24/7 para ayudarte en lo que necesites.</p>
-                <div class="amenity-features">
-                  <span class="feature-tag">Recepción 24/7</span>
-                  <span class="feature-tag">Asistencia turística</span>
-                </div>
-              </div>
-            </div>
-          </div><!-- End Amenity Item -->
-
-          <div class="col-lg-6" data-aos="zoom-in" data-aos-delay="500">
-            <div class="amenity-card">
-              <div class="card-header">
-                <div class="amenity-icon">
-                  <i class="bi bi-car-front"></i>
-                </div>
-                <h4>Comodidades</h4>
-              </div>
-              <div class="amenity-content">
-                <p>Parqueo gratuito, habitaciones con aire acondicionado y jardines ideales para descansar.</p>
-                <div class="amenity-features">
-                  <span class="feature-tag">A/C en habitaciones</span>
-                  <span class="feature-tag">Jardín</span>
-                </div>
-              </div>
-            </div>
-          </div><!-- End Amenity Item -->
-
-        </div>
-
-        <div class="amenities-cta text-center mt-5" data-aos="fade-up" data-aos-delay="600">
-          <div class="cta-content">
-            <h5>¿Planeas un evento?</h5>
-            <p class="mb-4">Consultanos por paquetes para cumpleaños, reuniones y actividades sociales.</p>
-            <a href="amenities.html" class="btn-explore">Ver más servicios</a>
           </div>
         </div>
+      </section>
+      <!-- /Call To Action Section -->
 
-      </div>
+      <!-- Events Cards Section -->
+      <section id="events-cards" class="events-cards section">
+        <!-- Section Title -->
+        <div class="container section-title" data-aos="fade-up">
+          <h2>Eventos</h2>
+          <p>Áreas para celebraciones, reuniones y actividades sociales</p>
+        </div>
+        <!-- End Section Title -->
 
-    </section><!-- /Amenities Cards Section -->
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="row g-4">
+            <div class="col-lg-4 col-md-6">
+              <div class="event-card" data-aos="zoom-in" data-aos-delay="100">
+                <div class="event-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/hotel/event-6.webp') }}"
+                    alt="Bodas y celebraciones"
+                    class="img-fluid"
+                  />
+                  <div class="event-overlay">
+                    <h4>Bodas y celebraciones</h4>
+                    <p>Ambientes acogedores y menú personalizado</p>
+                    <a href="events.html" class="event-btn"
+                      ><i class="bi bi-arrow-right"></i
+                    ></a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Event Card -->
 
-    <!-- Testimonials Section -->
-    <section id="testimonials" class="testimonials section">
+            <div class="col-lg-4 col-md-6">
+              <div class="event-card" data-aos="zoom-in" data-aos-delay="200">
+                <div class="event-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/hotel/event-3.webp') }}"
+                    alt="Reuniones y talleres"
+                    class="img-fluid"
+                  />
+                  <div class="event-overlay">
+                    <h4>Reuniones &amp; talleres</h4>
+                    <p>Espacios funcionales con apoyo del staff</p>
+                    <a href="events.html" class="event-btn"
+                      ><i class="bi bi-arrow-right"></i
+                    ></a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Event Card -->
 
-      <!-- Section Title -->
-      <div class="container section-title" data-aos="fade-up">
-        <h2>Opiniones</h2>
-        <p>Lo que dicen nuestros huéspedes</p>
-      </div><!-- End Section Title -->
+            <div class="col-lg-4 col-md-6">
+              <div class="event-card" data-aos="zoom-in" data-aos-delay="300">
+                <div class="event-image">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/hotel/event-7.webp') }}"
+                    alt="Cumpleaños y sociales"
+                    class="img-fluid"
+                  />
+                  <div class="event-overlay">
+                    <h4>Cumpleaños &amp; sociales</h4>
+                    <p>Arma tu paquete con piscina, comida y música</p>
+                    <a href="events.html" class="event-btn"
+                      ><i class="bi bi-arrow-right"></i
+                    ></a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- End Event Card -->
+          </div>
+        </div>
+      </section>
+      <!-- /Events Cards Section -->
 
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
+      <!-- Location Cards Section -->
+      <section id="location-cards" class="location-cards section">
+        <!-- Section Title -->
+        <div class="container section-title" data-aos="fade-up">
+          <h2>Ubicación &amp; Actividades</h2>
+          <p>Explora la Península de Nicoya desde Cóbano</p>
+        </div>
+        <!-- End Section Title -->
 
-        <div class="testimonial-slider swiper init-swiper">
-          <script type="application/json" class="swiper-config">
-            {
-              "loop": true,
-              "speed": 600,
-              "autoplay": {
-                "delay": 4000
-              },
-              "slidesPerView": 1,
-              "spaceBetween": 30,
-              "navigation": {
-                "nextEl": ".swiper-button-next",
-                "prevEl": ".swiper-button-prev"
-              },
-              "breakpoints": {
-                "768": { "slidesPerView": 2 },
-                "1200": { "slidesPerView": 3 }
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div class="row gy-4">
+            <div
+              class="col-lg-4 col-md-6"
+              data-aos="fade-up"
+              data-aos-delay="200"
+            >
+              <div class="location-card">
+                <img
+                  src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/PlayaMontezuma.jpg') }}"
+                  alt="Montezuma"
+                  class="img-fluid location-image"
+                />
+                <div class="location-content">
+                  <div class="location-icon">
+                    <i class="bi bi-geo-alt"></i>
+                  </div>
+                  <h4>Playas de Montezuma</h4>
+                  <p>
+                    Artes, cascadas y playas a solo 7 km del hotel. Perfecto
+                    para un día de aventura.
+                  </p>
+                  <ul class="nearby-places">
+                    <li><i class="bi bi-dot"></i> Cascadas de Montezuma</li>
+                    <li><i class="bi bi-dot"></i> Centro de artes</li>
+                    <li><i class="bi bi-dot"></i> Playa Montezuma</li>
+                  </ul>
+                  <a href="location.html" class="explore-btn">Cómo llegar</a>
+                </div>
+              </div>
+            </div>
+            <!-- End Location Card -->
+
+            <div
+              class="col-lg-4 col-md-6"
+              data-aos="fade-up"
+              data-aos-delay="300"
+            >
+              <div class="location-card">
+                <img
+                  src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/SantaTere.jpg') }}"
+                  alt="Santa Teresa"
+                  class="img-fluid location-image"
+                />
+                <div class="location-content">
+                  <div class="location-icon">
+                    <i class="bi bi-geo-alt"></i>
+                  </div>
+                  <h4>Santa Teresa</h4>
+                  <p>
+                    Capital del surf y atardeceres increíbles a 14 km.
+                    Gastronomía internacional.
+                  </p>
+                  <ul class="nearby-places">
+                    <li><i class="bi bi-dot"></i> Playas de surf</li>
+                    <li><i class="bi bi-dot"></i> Restaurantes</li>
+                    <li><i class="bi bi-dot"></i> Vida nocturna</li>
+                  </ul>
+                  <a href="location.html" class="explore-btn">Descubrir</a>
+                </div>
+              </div>
+            </div>
+            <!-- End Location Card -->
+
+            <div
+              class="col-lg-4 col-md-6"
+              data-aos="fade-up"
+              data-aos-delay="400"
+            >
+              <div class="location-card">
+                <img
+                  src="https://i.ytimg.com/vi/Xnw7kBs-IFQ/maxresdefault.jpg"
+                  alt="Cóbano centro"
+                  class="img-fluid location-image"
+                />
+                <div class="location-content">
+                  <div class="location-icon">
+                    <i class="bi bi-geo-alt"></i>
+                  </div>
+                  <h4>Cóbano Centro</h4>
+                  <p>
+                    Estamos a 100 m del Banco Nacional: supermercados, cajeros y
+                    servicios a pie.
+                  </p>
+                  <ul class="nearby-places">
+                    <li><i class="bi bi-dot"></i> Banco Nacional (100 m)</li>
+                    <li><i class="bi bi-dot"></i> Paradas de bus</li>
+                    <li><i class="bi bi-dot"></i> Comercios y ferias</li>
+                  </ul>
+                  <a href="location.html" class="explore-btn">Ver mapas</a>
+                </div>
+              </div>
+            </div>
+            <!-- End Location Card -->
+          </div>
+        </div>
+      </section>
+      <!-- /Location Cards Section -->
+
+      <!-- Gallery Showcase Section -->
+      <section id="gallery-showcase" class="gallery-showcase section">
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <div
+            class="gallery-carousel swiper init-swiper"
+            data-aos="fade-up"
+            data-aos-delay="200"
+          >
+            <script type="application/json" class="swiper-config">
+              {
+                "loop": true,
+                "speed": 600,
+                "autoplay": { "delay": 3000 },
+                "slidesPerView": 1,
+                "spaceBetween": 20,
+                "centeredSlides": true,
+                "breakpoints": {
+                  "576": { "slidesPerView": 2, "centeredSlides": false },
+                  "768": { "slidesPerView": 3, "centeredSlides": false },
+                  "992": { "slidesPerView": 4, "centeredSlides": false },
+                  "1200": { "slidesPerView": 5, "centeredSlides": false }
+                }
               }
-            }
-          </script>
-
-          <div class="swiper-wrapper">
-
-            <div class="swiper-slide">
-              <div class="testimonial-item" data-aos="zoom-in" data-aos-delay="200">
-                <div class="testimonial-header">
-                  <img src="{{ url_for('static', filename='assets/img/person/person-f-12.webp') }}" alt="Huésped" class="img-fluid" loading="lazy">
-                  <div class="rating">
-                    <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
-                      class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-                  </div>
-                </div>
-                <div class="testimonial-body">
-                  <p>Excelente atención y la piscina es perfecta para niños. Muy cerca de todo en Cóbano.</p>
-                </div>
-                <div class="testimonial-footer">
-                  <h5>Jessica M.</h5>
-                  <span>Familia</span>
-                  <div class="quote-icon"><i class="bi bi-chat-quote-fill"></i></div>
+            </script>
+            <div class="swiper-wrapper">
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}"
+                    alt="Logo"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver Logo"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
               </div>
-            </div>
-
-            <div class="swiper-slide">
-              <div class="testimonial-item" data-aos="zoom-in" data-aos-delay="300">
-                <div class="testimonial-header">
-                  <img src="{{ url_for('static', filename='assets/img/person/person-m-8.webp') }}" alt="Huésped" class="img-fluid" loading="lazy">
-                  <div class="rating">
-                    <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
-                      class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-                  </div>
-                </div>
-                <div class="testimonial-body">
-                  <p>Habitaciones cómodas y parqueo amplio. Buen punto base para ir a Montezuma y Santa Teresa.</p>
-                </div>
-                <div class="testimonial-footer">
-                  <h5>David R.</h5>
-                  <span>Turista</span>
-                  <div class="quote-icon"><i class="bi bi-chat-quote-fill"></i></div>
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485647074_1169316448225892_6051398396741335453_n.jpg') }}"
+                    alt="Lobby y áreas comunes"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485749757_1169316801559190_7789749542882896097_n4.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver imagen lobby"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
               </div>
-            </div>
-
-            <div class="swiper-slide">
-              <div class="testimonial-item" data-aos="zoom-in" data-aos-delay="400">
-                <div class="testimonial-header">
-                  <img src="{{ url_for('static', filename='assets/img/person/person-f-6.webp') }}" alt="Huésped" class="img-fluid" loading="lazy">
-                  <div class="rating">
-                    <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
-                      class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-                  </div>
-                </div>
-                <div class="testimonial-body">
-                  <p>El restaurante nos encantó y el personal fue muy amable. ¡Volveremos!</p>
-                </div>
-                <div class="testimonial-footer">
-                  <h5>Amanda W.</h5>
-                  <span>Pareja</span>
-                  <div class="quote-icon"><i class="bi bi-chat-quote-fill"></i></div>
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/197210742_4044968992261969_66124490301987805_n.jpg') }}"
+                    alt="Restaurante"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/197210742_4044968992261969_66124490301987805_n.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver imagen restaurante"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
               </div>
-            </div>
-
-            <div class="swiper-slide">
-              <div class="testimonial-item" data-aos="zoom-in" data-aos-delay="500">
-                <div class="testimonial-header">
-                  <img src="{{ url_for('static', filename='assets/img/person/person-m-12.webp') }}" alt="Huésped" class="img-fluid" loading="lazy">
-                  <div class="rating">
-                    <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i
-                      class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-                  </div>
-                </div>
-                <div class="testimonial-body">
-                  <p>Buena relación calidad-precio y ubicación céntrica en Cóbano.</p>
-                </div>
-                <div class="testimonial-footer">
-                  <h5>Ryan T.</h5>
-                  <span>Trabajo</span>
-                  <div class="quote-icon"><i class="bi bi-chat-quote-fill"></i></div>
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Rest 3.jpg') }}"
+                    alt="Área para eventos"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Rest 3.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver imagen eventos"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
               </div>
-            </div>
-
-          </div>
-
-          <div class="swiper-navigation">
-            <div class="swiper-button-prev" aria-label="Anterior"></div>
-            <div class="swiper-button-next" aria-label="Siguiente"></div>
-          </div>
-
-        </div>
-
-      </div>
-
-    </section><!-- /Testimonials Section -->
-
-    <!-- Offer Cards Section -->
-    <section id="offer-cards" class="offer-cards section">
-
-      <!-- Section Title -->
-      <div class="container section-title" data-aos="fade-up">
-        <h2>Ofertas</h2>
-        <p>Tarifas simples y convenientes — precios por persona por noche</p>
-      </div><!-- End Section Title -->
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="row g-4">
-
-          <div class="col-lg-4 col-md-6">
-            <div class="offer-card" data-aos="zoom-in" data-aos-delay="200">
-              <div class="offer-badge">
-                <span class="discount">NIÑOS</span>
-              </div>
-              <div class="offer-image">
-                <img src="https://cdn-icons-png.flaticon.com/128/85/85909.png" style="width:300px;height:300px;"alt="Tarifa niños" class="img-fluid">
-              </div>
-              <div class="offer-content">
-                <h3>Menores de 10 años</h3>
-                <p>Tarifa especial por noche para menores acompañados de adulto.</p>
-                <div class="offer-details">
-                  <div class="price-info">
-                    <span class="offer-price">₡7,500</span>
-                    <span class="per-night">/noche</span>
-                  </div>
-                  <div class="validity">
-                    <i class="bi bi-calendar-check"></i>
-                    <span>Sujeto a disponibilidad</span>
-                  </div>
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485986750_1169316678225869_5469593008717010963_n.jpg') }}"
+                    alt="Zona de descanso"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485986750_1169316678225869_5469593008717010963_n.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver imagen descanso"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
-                <a href="#" class="btn-book">Consultar</a>
               </div>
-            </div>
-          </div>
-
-          <div class="col-lg-4 col-md-6">
-            <div class="offer-card featured" data-aos="zoom-in" data-aos-delay="300">
-              <div class="offer-badge">
-                <span class="discount">ADULTOS</span>
-              </div>
-              <div class="offer-image">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Adultos.png') }}" style="width:300px;height:300px;" alt="Tarifa adultos" class="img-fluid">
-              </div>
-              <div class="offer-content">
-                <h3>Mayores de 10 años</h3>
-                <p>La mejor tarifa de la península para descansar con comodidad.</p>
-                <div class="offer-details">
-                  <div class="price-info">
-                    <span class="offer-price">₡15,000</span>
-                    <span class="per-night">/noche</span>
-                  </div>
-                  <div class="validity">
-                    <i class="bi bi-receipt-cutoff"></i>
-                    <span>+ IVA según ley</span>
-                  </div>
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/486034426_1169316748225862_8745471476490193834_n.jpg') }}"
+                    alt="Habitación con A/C"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/486034426_1169316748225862_8745471476490193834_n.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver imagen habitación"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
-                <a href="#" class="btn-book">Reservar</a>
               </div>
-            </div>
-          </div>
-
-          <div class="col-lg-4 col-md-6">
-            <div class="offer-card" data-aos="zoom-in" data-aos-delay="400">
-              <div class="offer-badge">
-                <span class="discount">GRUPOS</span>
-              </div>
-              <div class="offer-image">
-                <img src="https://img.freepik.com/fotos-premium/grupo-amigos-comiendo-barbacoa-al-aire-libre-terraza-conversacion-reunion-evento-social-verano-gente-barbacoa-almuerzo-patio-comida-hablando-celebrando-vinculos-bebidas_590464-391980.jpg" alt="Grupos y eventos" class="img-fluid">
-              </div>
-              <div class="offer-content">
-                <h3>Grupos &amp; eventos</h3>
-                <p>Salones y áreas al aire libre para actividades sociales con opciones de comida y bebida.</p>
-                <div class="offer-details">
-                  <div class="price-info">
-                    <span class="offer-price">Cotiza</span>
-                    <span class="per-night">según tamaño</span>
-                  </div>
-                  <div class="validity">
-                    <i class="bi bi-telephone"></i>
-                    <span>Llámanos: </span><a href="Tel: +50626420225">+506 2642 0225</a>
-                  </div>
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485890209_1169316844892519_3952174886959137293_n.jpg') }}"
+                    alt="Áreas verdes"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485890209_1169316844892519_3952174886959137293_n.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver imagen áreas verdes"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
-                <a href="#" class="btn-book">Solicitar cotización</a>
               </div>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="row mt-5">
-          <div class="col-12">
-            <div class="offer-banner" data-aos="fade-up" data-aos-delay="500">
-              <div class="row align-items-center">
-                <div class="col-lg-8">
-                  <div class="banner-content">
-                    <h2>Reserva directa y ahorra</h2>
-                    <p>Contáctanos por teléfono o correo y asegura la mejor tarifa disponible para tus fechas.</p>
-                  </div>
-                </div>
-                <div class="col-lg-4 text-lg-end">
-                  <div class="banner-action">
-                    <div class="countdown" data-count="2025/12/15" aria-hidden="true">
-                      <div>
-                        <span class="count-days"></span>
-                        <label>Días</label>
-                      </div>
-                      <div>
-                        <span class="count-hours"></span>
-                        <label>Horas</label>
-                      </div>
-                      <div>
-                        <span class="count-minutes"></span>
-                        <label>Minutos</label>
-                      </div>
-                    </div>
-                    <a href="booking.html" class="btn-cta">Reservar ahora</a>
-                  </div>
+              <div class="swiper-slide">
+                <div class="gallery-item">
+                  <img
+                    src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485866380_1169316498225887_741408465558813654_n.jpg') }}"
+                    alt="Salón multiuso"
+                    class="img-fluid"
+                    loading="lazy"
+                  />
+                  <a
+                    href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485866380_1169316498225887_741408465558813654_n.jpg') }}"
+                    class="gallery-overlay glightbox"
+                    aria-label="Ver imagen salón"
+                  >
+                    <i class="bi bi-eye"></i>
+                  </a>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-      </div>
-
-    </section><!-- /Offer Cards Section -->
-
-    <!-- Call To Action Section -->
-    <section id="call-to-action" class="call-to-action section light-background">
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="row justify-content-center">
-          <div class="col-lg-10">
-            <div class="cta-content text-center">
-              <div class="row align-items-center">
-                <div class="col-lg-8">
-                  <div class="text-content">
-                    <h2>¿Listo para tu viaje a la península?</h2>
-                    <p class="lead mb-0">Asegura tu espacio en Hotel Villa Grace. Atención cercana, ubicación práctica y
-                      precios justos.</p>
-                  </div>
-                </div>
-                <div class="col-lg-4">
-                  <div class="cta-action" data-aos="zoom-in" data-aos-delay="200">
-                    <a href="booking.html" class="btn btn-cta">
-                      <i class="bi bi-calendar-check me-2"></i>
-                      Reservar
-                    </a>
-                    <div class="offer-badge" data-aos="fade-up" data-aos-delay="300">
-                      <span>Mejor tarifa directa</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row mt-5" data-aos="fade-up" data-aos-delay="200">
-          <div class="col-lg-3 col-md-6 mb-4">
-            <div class="feature-item text-center">
-              <div class="icon-wrapper">
-                <i class="bi bi-shield-check"></i>
-              </div>
-              <h5>Cancelación flexible</h5>
-              <p>Consulta condiciones según temporada</p>
-            </div>
-          </div>
-          <div class="col-lg-3 col-md-6 mb-4">
-            <div class="feature-item text-center">
-              <div class="icon-wrapper">
-                <i class="bi bi-award"></i>
-              </div>
-              <h5>Tarifa local</h5>
-              <p>Precios especiales para residentes</p>
-            </div>
-          </div>
-          <div class="col-lg-3 col-md-6 mb-4">
-            <div class="feature-item text-center">
-              <div class="icon-wrapper">
-                <i class="bi bi-headset"></i>
-              </div>
-              <h5>Soporte 24/7</h5>
-              <p>Siempre disponibles para ayudarte</p>
-            </div>
-          </div>
-          <div class="col-lg-3 col-md-6 mb-4">
-            <div class="feature-item text-center">
-              <div class="icon-wrapper">
-                <i class="bi bi-lock"></i>
-              </div>
-              <h5>Reserva segura</h5>
-              <p>Tus datos están protegidos</p>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-    </section><!-- /Call To Action Section -->
-
-    <!-- Events Cards Section -->
-    <section id="events-cards" class="events-cards section">
-
-      <!-- Section Title -->
-      <div class="container section-title" data-aos="fade-up">
-        <h2>Eventos</h2>
-        <p>Áreas para celebraciones, reuniones y actividades sociales</p>
-      </div><!-- End Section Title -->
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="row g-4">
-
-          <div class="col-lg-4 col-md-6">
-            <div class="event-card" data-aos="zoom-in" data-aos-delay="100">
-              <div class="event-image">
-                <img src="{{ url_for('static', filename='assets/img/hotel/event-6.webp') }}" alt="Bodas y celebraciones" class="img-fluid">
-                <div class="event-overlay">
-                  <h4>Bodas y celebraciones</h4>
-                  <p>Ambientes acogedores y menú personalizado</p>
-                  <a href="events.html" class="event-btn"><i class="bi bi-arrow-right"></i></a>
-                </div>
-              </div>
-            </div>
-          </div><!-- End Event Card -->
-
-          <div class="col-lg-4 col-md-6">
-            <div class="event-card" data-aos="zoom-in" data-aos-delay="200">
-              <div class="event-image">
-                <img src="{{ url_for('static', filename='assets/img/hotel/event-3.webp') }}" alt="Reuniones y talleres" class="img-fluid">
-                <div class="event-overlay">
-                  <h4>Reuniones &amp; talleres</h4>
-                  <p>Espacios funcionales con apoyo del staff</p>
-                  <a href="events.html" class="event-btn"><i class="bi bi-arrow-right"></i></a>
-                </div>
-              </div>
-            </div>
-          </div><!-- End Event Card -->
-
-          <div class="col-lg-4 col-md-6">
-            <div class="event-card" data-aos="zoom-in" data-aos-delay="300">
-              <div class="event-image">
-                <img src="{{ url_for('static', filename='assets/img/hotel/event-7.webp') }}" alt="Cumpleaños y sociales" class="img-fluid">
-                <div class="event-overlay">
-                  <h4>Cumpleaños &amp; sociales</h4>
-                  <p>Arma tu paquete con piscina, comida y música</p>
-                  <a href="events.html" class="event-btn"><i class="bi bi-arrow-right"></i></a>
-                </div>
-              </div>
-            </div>
-          </div><!-- End Event Card -->
-
-        </div>
-
-      </div>
-
-    </section><!-- /Events Cards Section -->
-
-    <!-- Location Cards Section -->
-    <section id="location-cards" class="location-cards section">
-
-      <!-- Section Title -->
-      <div class="container section-title" data-aos="fade-up">
-        <h2>Ubicación &amp; Actividades</h2>
-        <p>Explora la Península de Nicoya desde Cóbano</p>
-      </div><!-- End Section Title -->
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="row gy-4">
-          <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="200">
-            <div class="location-card">
-              <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/PlayaMontezuma.jpg') }}" alt="Montezuma" class="img-fluid location-image">
-              <div class="location-content">
-                <div class="location-icon">
-                  <i class="bi bi-geo-alt"></i>
-                </div>
-                <h4>Playas de Montezuma</h4>
-                <p>Artes, cascadas y playas a solo 7 km del hotel. Perfecto para un día de aventura.</p>
-                <ul class="nearby-places">
-                  <li><i class="bi bi-dot"></i> Cascadas de Montezuma</li>
-                  <li><i class="bi bi-dot"></i> Centro de artes</li>
-                  <li><i class="bi bi-dot"></i> Playa Montezuma</li>
-                </ul>
-                <a href="location.html" class="explore-btn">Cómo llegar</a>
-              </div>
-            </div>
-          </div><!-- End Location Card -->
-
-          <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="300">
-            <div class="location-card">
-              <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/SantaTere.jpg') }}" alt="Santa Teresa" class="img-fluid location-image">
-              <div class="location-content">
-                <div class="location-icon">
-                  <i class="bi bi-geo-alt"></i>
-                </div>
-                <h4>Santa Teresa</h4>
-                <p>Capital del surf y atardeceres increíbles a 14 km. Gastronomía internacional.</p>
-                <ul class="nearby-places">
-                  <li><i class="bi bi-dot"></i> Playas de surf</li>
-                  <li><i class="bi bi-dot"></i> Restaurantes</li>
-                  <li><i class="bi bi-dot"></i> Vida nocturna</li>
-                </ul>
-                <a href="location.html" class="explore-btn">Descubrir</a>
-              </div>
-            </div>
-          </div><!-- End Location Card -->
-
-          <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="400">
-            <div class="location-card">
-              <img src="https://i.ytimg.com/vi/Xnw7kBs-IFQ/maxresdefault.jpg" alt="Cóbano centro" class="img-fluid location-image">
-              <div class="location-content">
-                <div class="location-icon">
-                  <i class="bi bi-geo-alt"></i>
-                </div>
-                <h4>Cóbano Centro</h4>
-                <p>Estamos a 100 m del Banco Nacional: supermercados, cajeros y servicios a pie.</p>
-                <ul class="nearby-places">
-                  <li><i class="bi bi-dot"></i> Banco Nacional (100 m)</li>
-                  <li><i class="bi bi-dot"></i> Paradas de bus</li>
-                  <li><i class="bi bi-dot"></i> Comercios y ferias</li>
-                </ul>
-                <a href="location.html" class="explore-btn">Ver mapas</a>
-              </div>
-            </div>
-          </div><!-- End Location Card -->
-
-        </div>
-
-      </div>
-
-    </section><!-- /Location Cards Section -->
-
-    <!-- Gallery Showcase Section -->
-    <section id="gallery-showcase" class="gallery-showcase section">
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <div class="gallery-carousel swiper init-swiper" data-aos="fade-up" data-aos-delay="200">
-          <script type="application/json" class="swiper-config">
-            {
-              "loop": true,
-              "speed": 600,
-              "autoplay": { "delay": 3000 },
-              "slidesPerView": 1,
-              "spaceBetween": 20,
-              "centeredSlides": true,
-              "breakpoints": {
-                "576": { "slidesPerView": 2, "centeredSlides": false },
-                "768": { "slidesPerView": 3, "centeredSlides": false },
-                "992": { "slidesPerView": 4, "centeredSlides": false },
-                "1200": { "slidesPerView": 5, "centeredSlides": false }
-              }
-            }
-          </script>
-          <div class="swiper-wrapper">
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}" alt="Logo" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver Logo">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485647074_1169316448225892_6051398396741335453_n.jpg') }}" alt="Lobby y áreas comunes" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485749757_1169316801559190_7789749542882896097_n4.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver imagen lobby">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/197210742_4044968992261969_66124490301987805_n.jpg') }}" alt="Restaurante" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/197210742_4044968992261969_66124490301987805_n.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver imagen restaurante">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Rest 3.jpg') }}" alt="Área para eventos" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/Rest 3.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver imagen eventos">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485986750_1169316678225869_5469593008717010963_n.jpg') }}" alt="Zona de descanso" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485986750_1169316678225869_5469593008717010963_n.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver imagen descanso">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/486034426_1169316748225862_8745471476490193834_n.jpg') }}" alt="Habitación con A/C" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/486034426_1169316748225862_8745471476490193834_n.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver imagen habitación">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485890209_1169316844892519_3952174886959137293_n.jpg') }}" alt="Áreas verdes" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485890209_1169316844892519_3952174886959137293_n.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver imagen áreas verdes">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-            <div class="swiper-slide">
-              <div class="gallery-item">
-                <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485866380_1169316498225887_741408465558813654_n.jpg') }}" alt="Salón multiuso" class="img-fluid" loading="lazy">
-                <a href="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485866380_1169316498225887_741408465558813654_n.jpg') }}" class="gallery-overlay glightbox"
-                  aria-label="Ver imagen salón">
-                  <i class="bi bi-eye"></i>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="text-center mt-5" data-aos="fade-up" data-aos-delay="300">
-          <a href="gallery.html" class="btn btn-gallery">
-            <i class="bi bi-collection me-2"></i>Ver galería completa
-          </a>
-        </div>
-
-      </div>
-
-    </section><!-- /Gallery Showcase Section -->
-
-  </main>
-
-  <footer id="footer" class="footer position-relative dark-background">
-
-    <div class="footer-top">
-      <div class="container">
-        <div class="row gy-4">
-          <div class="col-lg-4 col-md-6 footer-about">
-            <a href="index.html" class="logo d-flex align-items-center">
-              <span class="sitename">Hotel Villa Grace</span>
+          <div class="text-center mt-5" data-aos="fade-up" data-aos-delay="300">
+            <a href="gallery.html" class="btn btn-gallery">
+              <i class="bi bi-collection me-2"></i>Ver galería completa
             </a>
-            <div class="footer-contact pt-3">
-              <p>Cóbano, 100 m del Banco Nacional</p>
-              <p>Puntarenas, Costa Rica · 60111</p>
-              <p class="mt-3"><strong>Teléfono:</strong> <a href="Tel: +50626420225">2642-0225</a></p>
-              <p><strong>Email:</strong> <span><a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a></span></p>
+          </div>
+        </div>
+      </section>
+      <!-- /Gallery Showcase Section -->
+    </main>
+
+    <footer id="footer" class="footer position-relative dark-background">
+      <div class="footer-top">
+        <div class="container">
+          <div class="row gy-4">
+            <div class="col-lg-4 col-md-6 footer-about">
+              <a href="index.html" class="logo d-flex align-items-center">
+                <span class="sitename">Hotel Villa Grace</span>
+              </a>
+              <div class="footer-contact pt-3">
+                <p>Cóbano, 100 m del Banco Nacional</p>
+                <p>Puntarenas, Costa Rica · 60111</p>
+                <p class="mt-3">
+                  <strong>Teléfono:</strong>
+                  <a href="Tel: +50626420225">2642-0225</a>
+                </p>
+                <p>
+                  <strong>Email:</strong>
+                  <span
+                    ><a href="mailto:hotelvillagrace@gmail.com"
+                      >hotelvillagrace@gmail.com</a
+                    ></span
+                  >
+                </p>
+              </div>
+            </div>
+
+            <div class="col-lg-2 col-md-3 footer-links">
+              <h4>Enlaces</h4>
+              <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="about.html">Nosotros</a></li>
+                <li><a href="amenities.html">Servicios</a></li>
+                <li><a href="terms.html">Términos</a></li>
+                <li><a href="privacy.html">Privacidad</a></li>
+              </ul>
+            </div>
+
+            <div class="col-lg-2 col-md-3 footer-links">
+              <h4>Servicios</h4>
+              <ul>
+                <li><a href="rooms.html">Hospedaje</a></li>
+                <li><a href="restaurant.html">Restaurante &amp; bar</a></li>
+                <li><a href="events.html">Eventos</a></li>
+                <li><a href="location.html">Cómo llegar</a></li>
+                <li><a href="booking.html">Reservas</a></li>
+              </ul>
+            </div>
+
+            <div class="col-lg-2 col-md-3 footer-links">
+              <h4>Horarios</h4>
+              <ul>
+                <li><a href="#">Check-in: 1:00 pm</a></li>
+                <li><a href="#">Check-out: 11:00 am</a></li>
+                <li><a href="#">Recepción 24/7</a></li>
+                <li><a href="#">Restaurante diario</a></li>
+                <li><a href="#">Parqueo gratis</a></li>
+              </ul>
+            </div>
+
+            <div class="col-lg-2 col-md-3 footer-links">
+              <h4>Síguenos</h4>
+              <ul>
+                <li>
+                  <a
+                    href="https://www.facebook.com/HotelVillaGrace"
+                    target="_blank"
+                    rel="noopener"
+                    >Facebook</a
+                  >
+                </li>
+                <li><a href="contact.html">Contacto rápido</a></li>
+                <li><a href="location.html">Mapa</a></li>
+              </ul>
             </div>
           </div>
-
-          <div class="col-lg-2 col-md-3 footer-links">
-            <h4>Enlaces</h4>
-            <ul>
-              <li><a href="index.html">Inicio</a></li>
-              <li><a href="about.html">Nosotros</a></li>
-              <li><a href="amenities.html">Servicios</a></li>
-              <li><a href="terms.html">Términos</a></li>
-              <li><a href="privacy.html">Privacidad</a></li>
-            </ul>
-          </div>
-
-          <div class="col-lg-2 col-md-3 footer-links">
-            <h4>Servicios</h4>
-            <ul>
-              <li><a href="rooms.html">Hospedaje</a></li>
-              <li><a href="restaurant.html">Restaurante &amp; bar</a></li>
-              <li><a href="events.html">Eventos</a></li>
-              <li><a href="location.html">Cómo llegar</a></li>
-              <li><a href="booking.html">Reservas</a></li>
-            </ul>
-          </div>
-
-          <div class="col-lg-2 col-md-3 footer-links">
-            <h4>Horarios</h4>
-            <ul>
-              <li><a href="#">Check-in: 1:00 pm</a></li>
-              <li><a href="#">Check-out: 11:00 am</a></li>
-              <li><a href="#">Recepción 24/7</a></li>
-              <li><a href="#">Restaurante diario</a></li>
-              <li><a href="#">Parqueo gratis</a></li>
-            </ul>
-          </div>
-
-          <div class="col-lg-2 col-md-3 footer-links">
-            <h4>Síguenos</h4>
-            <ul>
-              <li><a href="https://www.facebook.com/HotelVillaGrace" target="_blank" rel="noopener">Facebook</a></li>
-              <li><a href="contact.html">Contacto rápido</a></li>
-              <li><a href="location.html">Mapa</a></li>
-            </ul>
-          </div>
-
         </div>
       </div>
-    </div>
 
-    <div class="copyright text-center">
-      <div
-        class="container d-flex flex-column flex-lg-row justify-content-center justify-content-lg-between align-items-center">
-
-        <div class="d-flex flex-column align-items-center align-items-lg-start">
-          <div>
-            © <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados
+      <div class="copyright text-center">
+        <div
+          class="container d-flex flex-column flex-lg-row justify-content-center justify-content-lg-between align-items-center"
+        >
+          <div
+            class="d-flex flex-column align-items-center align-items-lg-start"
+          >
+            <div>
+              © <strong><span>Hotel Villa Grace</span></strong
+              >. Todos los derechos reservados
+            </div>
           </div>
         </div>
-
       </div>
-    </div>
+    </footer>
 
-  </footer>
+    <!-- Scroll Top -->
+    <a
+      href="#"
+      id="scroll-top"
+      class="scroll-top d-flex align-items-center justify-content-center"
+      aria-label="Volver arriba"
+      ><i class="bi bi-arrow-up-short"></i
+    ></a>
 
-  <!-- Scroll Top -->
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"
-    aria-label="Volver arriba"><i class="bi bi-arrow-up-short"></i></a>
+    <!-- Preloader -->
+    <div id="preloader" aria-hidden="true"></div>
 
-  <!-- Preloader -->
-  <div id="preloader" aria-hidden="true"></div>
+    <!-- Vendor JS Files -->
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/php-email-form/validate.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
 
-  <!-- Vendor JS Files -->
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/php-email-form/validate.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+    <!-- Main JS File -->
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+    <script>
+      (function () {
+        const badge = document.getElementById("inv-alert-badge");
+        const list = document.getElementById("inv-alert-list");
+        if (!badge || !list) return;
 
-  <!-- Main JS File -->
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+        async function refreshAlerts() {
+          try {
+            const res = await fetch('{{ url_for("inv.alertas_stock") }}');
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+            const n = data.count || 0;
 
-</body>
+            // Badge
+            if (n > 0) {
+              badge.textContent = n;
+              badge.classList.remove("d-none");
+            } else {
+              badge.classList.add("d-none");
+            }
 
+            // Lista
+            if (n === 0) {
+              list.innerHTML =
+                '<span class="text-success">Sin alertas de stock.</span>';
+            } else {
+              const items = (data.items || [])
+                .map((x) => {
+                  return `
+            <div class="d-flex align-items-center py-1">
+              <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+              <div class="flex-grow-1">
+                <div><strong>${x.Nombre}</strong> <small class="text-muted">(${
+                    x.Unidad || ""
+                  })</small></div>
+                <div class="small">Actual: ${
+                  x.Stock_Actual
+                } &nbsp; • &nbsp; Mín.: ${x.Stock_Minimo}</div>
+              </div>
+            </div>
+          `;
+                })
+                .join("");
+              list.innerHTML = items;
+            }
+          } catch (err) {
+            list.innerHTML =
+              '<span class="text-danger">No se pudieron obtener las alertas.</span>';
+          }
+        }
+
+        // Primera carga y polling cada 60s
+        refreshAlerts();
+        setInterval(refreshAlerts, 60000);
+      })();
+    </script>
+  </body>
 </html>

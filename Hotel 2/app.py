@@ -785,8 +785,16 @@ def create_app() -> Flask:
 
         # Blueprint de Inventario (INV-07)
     from blueprints.inv import inv_bp
-    app.register_blueprint(inv_bp)
+    app.register_blueprint(inv_bp, url_prefix="/inv")
 
+    # Blueprint de Operaciones
+    from blueprints.admin import admin_bp 
+    app.register_blueprint(admin_bp)
+
+    from blueprints.mnt import mnt_bp  # <-- IMPORTA
+    app.register_blueprint(mnt_bp)     # <-- REGISTRA (después de inv_bp / admin_bp)
+
+    
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:

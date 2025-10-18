@@ -1,15 +1,30 @@
+# -*- coding: utf-8 -*-
 from decimal import Decimal, InvalidOperation
 from flask import render_template, request, redirect, url_for, flash, session
 from sqlalchemy import func
-from sqlalchemy import text
 from extensions import db
 from . import inv_bp
-from models_sql import InvCategoria, InvInsumo, InvMovimiento   
+from models_sql import InvCategoria, InvInsumo, InvMovimiento
 from utils.auth import role_required
 
+# Catálogo de unidades (una sola definición)
+UNIDADES = ["un", "kg", "g", "lt", "ml", "paq", "caja", "rollo", "bolsa", "pz"]
 
-# ---------- Listado ----------
+def _actor():
+    """Información del usuario autenticado para auditoría."""
+    return {
+        "id": session.get("user_id"),
+        "name": session.get("user_name"),
+        "email": session.get("user_email") or session.get("email"),
+    }
+
+# =========================================================
+# CATEGORÍAS (INV-07-001)
+# =========================================================
+
+# Listado de categorías
 @inv_bp.route("/categorias", methods=["GET"])
+@role_required("Administrador")  # o amplía a otros roles si corresponde
 def categorias_list():
     q = request.args.get("q", "").strip()
     solo_activas = request.args.get("solo_activas", "1") == "1"
@@ -17,15 +32,28 @@ def categorias_list():
     query = InvCategoria.query
     if q:
         like = f"%{q}%"
-        query = query.filter((InvCategoria.Nombre.ilike(like)) | (InvCategoria.Descripcion.ilike(like)))
+        query = query.filter(
+            (InvCategoria.Nombre.ilike(like)) |
+            (InvCategoria.Descripcion.ilike(like))
+        )
     if solo_activas:
         query = query.filter(InvCategoria.Activa.is_(True))
 
-    categorias = query.order_by(InvCategoria.Activa.desc(), InvCategoria.Nombre.asc()).all()
-    return render_template("inv/categorias_list.html", categorias=categorias, q=q, solo_activas=solo_activas)
+    categorias = query.order_by(
+        InvCategoria.Activa.desc(),
+        InvCategoria.Nombre.asc()
+    ).all()
 
-# ---------- Crear ----------
+    return render_template(
+        "inv/categorias_list.html",
+        categorias=categorias,
+        q=q,
+        solo_activas=solo_activas
+    )
+
+# Crear categoría
 @inv_bp.route("/categorias/nueva", methods=["GET", "POST"])
+@role_required("Administrador")
 def categorias_new():
     if request.method == "POST":
         nombre = (request.form.get("Nombre") or "").strip()
@@ -35,8 +63,10 @@ def categorias_new():
             flash("El nombre es obligatorio.", "danger")
             return redirect(url_for("inv.categorias_new"))
 
-        # Validación de duplicado
-        existe = InvCategoria.query.filter(db.func.lower(InvCategoria.Nombre) == nombre.lower()).first()
+        # Duplicado por nombre (case-insensitive)
+        existe = InvCategoria.query.filter(
+            db.func.lower(InvCategoria.Nombre) == nombre.lower()
+        ).first()
         if existe:
             flash("Ya existe una categoría con ese nombre.", "warning")
             return redirect(url_for("inv.categorias_new"))
@@ -49,8 +79,9 @@ def categorias_new():
 
     return render_template("inv/categorias_form.html", modo="new")
 
-# ---------- Editar ----------
+# Editar categoría
 @inv_bp.route("/categorias/<int:cat_id>/editar", methods=["GET", "POST"])
+@role_required("Administrador")
 def categorias_edit(cat_id: int):
     cat = InvCategoria.query.get_or_404(cat_id)
 
@@ -62,7 +93,7 @@ def categorias_edit(cat_id: int):
             flash("El nombre es obligatorio.", "danger")
             return redirect(url_for("inv.categorias_edit", cat_id=cat_id))
 
-        # Validación de duplicado (excluyendo la misma Id)
+        # Duplicado excluyendo la misma Id
         existe = InvCategoria.query.filter(
             db.func.lower(InvCategoria.Nombre) == nombre.lower(),
             InvCategoria.Id != cat.Id
@@ -79,24 +110,22 @@ def categorias_edit(cat_id: int):
 
     return render_template("inv/categorias_form.html", modo="edit", cat=cat)
 
-# ---------- Activar/Inactivar (soft delete) ----------
+# Activar/Inactivar categoría
 @inv_bp.route("/categorias/<int:cat_id>/toggle", methods=["POST"])
+@role_required("Administrador")
 def categorias_toggle(cat_id: int):
     cat = InvCategoria.query.get_or_404(cat_id)
     cat.Activa = not cat.Activa
     db.session.commit()
-    flash(("Categoría activada." if cat.Activa else "Categoría inactivada.") , "info")
+    flash(("Categoría activada." if cat.Activa else "Categoría inactivada."), "info")
     return redirect(url_for("inv.categorias_list"))
 
+# =========================================================
+# INSUMOS
+# =========================================================
 
-
-# catálogo simple para la UI (puedes mover a tabla propia si es necesario)
-UNIDADES = ["un", "kg", "g", "lt", "ml", "paq", "caja", "rollo", "bolsa", "pz"]
-
-# ---------------------------
-# LISTA DE INSUMOS
-# ---------------------------
-@inv_bp.route("/insumos", methods=["GET"])
+# LISTA DE INSUMOS (endpoint único)
+@inv_bp.route("/insumos", methods=["GET"], endpoint="insumos_list")
 @role_required("Administrador", "Recepcionista")
 def insumos_list():
     q = (
@@ -104,25 +133,19 @@ def insumos_list():
         .join(InvCategoria, InvInsumo.Categoria_Id == InvCategoria.Id)
         .order_by(InvInsumo.Activo.desc(), InvCategoria.Nombre.asc(), InvInsumo.Nombre.asc())
     )
-    data = [{"insumo": i, "categoria": c} for (i, c) in q.all()]
-    return render_template("inv/insumos_list.html", items=data)
+    rows = q.all()
+    data = [{"insumo": i, "categoria": c} for (i, c) in rows]
 
-@inv_bp.get("/insumos")
-def insumos_list():
-    if not session.get("user_id"):
-        flash("Inicia sesión para continuar.", "warning")
-        return redirect(url_for("login_html", next=request.path))
-    if not _require_role("Administrador", "Recepcionista"):
-        flash("No tienes permiso para Inventario.", "danger")
-        return redirect(url_for("index_html"))
+    # Conteo de alertas (stock < mínimo)
+    low_count = sum(1 for (i, _) in rows if (i.Stock_Actual or 0) < (i.Stock_Minimo or 0))
 
-    q = db.session.query(InvInsumo, InvCategoria).join(InvCategoria, InvInsumo.Categoria_Id == InvCategoria.Id)
-    data = [{"insumo": i, "categoria": c} for (i, c) in q.all()]
-    return render_template("inv/insumos_list.html", data=data)
+    # items y data para compatibilidad con vistas previas
+    return render_template("inv/insumos_list.html", items=data, data=data, low_count=low_count)
 
-# ---------------------------
+
+
+
 # NUEVO INSUMO (INV-07-002)
-# ---------------------------
 @inv_bp.route("/insumos/nuevo", methods=["GET", "POST"])
 @role_required("Administrador", "Recepcionista")
 def insumo_new():
@@ -187,41 +210,11 @@ def insumo_new():
     # GET
     return render_template("inv/insumos_form.html", categorias=categorias, unidades=UNIDADES)
 
-# Usa los mismos roles que el sistema
-def role_required(*roles):
-    roles_norm = {r.lower() for r in roles if r}
-    def decorator(fn):
-        from functools import wraps
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            if not session.get("user_id"):
-                flash("Inicia sesión para continuar.", "warning")
-                return redirect(url_for("login_html", next=request.path))
-            current = (session.get("user_role") or "").lower()
-            if current not in roles_norm:
-                flash("No tienes permiso para acceder a esta sección.", "danger")
-                return redirect(url_for("index_html"))
-            return fn(*args, **kwargs)
-        return wrapper
-    return decorator
-
-UNIDADES = ["un", "kg", "g", "lt", "ml", "paq", "caja", "rollo", "bolsa", "pz"]
-
-def _actor():
-    return {
-        "id": session.get("user_id"),
-        "name": session.get("user_name"),
-        "email": session.get("user_email") or session.get("email"),
-    }
-
-
-# ---------------------------
 # EDITAR / INACTIVAR (INV-07-003)
-# ---------------------------
 @inv_bp.route("/insumos/<int:insumo_id>/editar", methods=["GET", "POST"])
-@role_required("administrador")
+@role_required("Administrador")
 def insumo_edit(insumo_id: int):
-    i: InvInsumo | None = InvInsumo.query.filter_by(Id=insumo_id).first()
+    i = InvInsumo.query.filter_by(Id=insumo_id).first()
     if not i:
         flash("Insumo no encontrado.", "warning")
         return redirect(url_for("inv.insumos_list"))
@@ -255,7 +248,7 @@ def insumo_edit(insumo_id: int):
             return render_template("inv/insumos_edit.html", insumo=i, categorias=categorias, unidades=UNIDADES)
 
         # Registro de cambios
-        changes: list[InvMovimiento] = []
+        changes = []
         actor = _actor()
 
         def log_change(campo, antes, despues, tipo="EDICION"):
@@ -288,7 +281,9 @@ def insumo_edit(insumo_id: int):
         if nueva_cat_id != i.Categoria_Id:
             old_cat = InvCategoria.query.get(i.Categoria_Id)
             new_cat = InvCategoria.query.get(nueva_cat_id)
-            log_change("Categoria_Id", old_cat.Nombre if old_cat else i.Categoria_Id, new_cat.Nombre if new_cat else nueva_cat_id)
+            log_change("Categoria_Id",
+                       old_cat.Nombre if old_cat else i.Categoria_Id,
+                       new_cat.Nombre if new_cat else nueva_cat_id)
             i.Categoria_Id = nueva_cat_id
 
         if nuevo_min != (i.Stock_Minimo or Decimal("0")):
@@ -314,13 +309,11 @@ def insumo_edit(insumo_id: int):
     # GET
     return render_template("inv/insumos_edit.html", insumo=i, categorias=categorias, unidades=UNIDADES)
 
-# ---------------------------
 # AJUSTE DE STOCK (INV-07-003)
-# ---------------------------
 @inv_bp.route("/insumos/<int:insumo_id>/ajuste", methods=["GET", "POST"])
-@role_required("administrador")
+@role_required("Administrador")
 def insumo_adjust(insumo_id: int):
-    i: InvInsumo | None = InvInsumo.query.filter_by(Id=insumo_id).first()
+    i = InvInsumo.query.filter_by(Id=insumo_id).first()
     if not i:
         flash("Insumo no encontrado.", "warning")
         return redirect(url_for("inv.insumos_list"))
@@ -368,20 +361,13 @@ def insumo_adjust(insumo_id: int):
     # GET
     return render_template("inv/ajustes_form.html", insumo=i)
 
-
-# ==============================================
+# =========================================================
 # INV-07-004: ENTRADA por COMPRA o DEVOLUCIÓN
-# ==============================================
+# =========================================================
 @inv_bp.route("/entradas/nueva", methods=["GET", "POST"])
+@role_required("Administrador", "Recepcionista")
 def entradas_new():
-    if not session.get("user_id"):
-        flash("Inicia sesión para continuar.", "warning")
-        return redirect(url_for("login_html", next=request.path))
-    if not _require_role("Administrador", "Recepcionista"):
-        flash("No tienes permiso para Inventario.", "danger")
-        return redirect(url_for("index_html"))
-
-    # combos
+    # Combos
     insumos = InvInsumo.query.filter_by(Activo=True).order_by(InvInsumo.Nombre.asc()).all()
     categorias = InvCategoria.query.filter_by(Activa=True).order_by(InvCategoria.Nombre.asc()).all()
 
@@ -390,9 +376,9 @@ def entradas_new():
         tipo = request.form.get("tipo")  # 'COMPRA' | 'DEVOLUCION'
         cantidad = request.form.get("cantidad")
         motivo = request.form.get("motivo", "").strip()
-        doc_tipo = request.form.get("doc_tipo", "").strip() or None
-        doc_numero = request.form.get("doc_numero", "").strip() or None
-        proveedor = request.form.get("proveedor", "").strip() or None
+        doc_tipo = (request.form.get("doc_tipo", "") or None)
+        doc_numero = (request.form.get("doc_numero", "") or None)
+        proveedor = (request.form.get("proveedor", "") or None)
 
         # Validaciones
         if not insumo_id or not tipo or not cantidad or not motivo:
@@ -444,5 +430,40 @@ def entradas_new():
         flash("Entrada registrada y stock actualizado.", "success")
         return redirect(url_for("inv.insumos_list"))
 
+    # GET
     return render_template("inv/entradas_form.html",
                            insumos=insumos, categorias=categorias, modo="new")
+
+# =========================================================
+# INV-07-005 – Alertas de stock 
+# =========================================================
+@inv_bp.get("/alertas/stock")
+@role_required("Administrador", "Recepcionista")
+def alertas_stock():
+    low_q = (
+        InvInsumo.query
+        .filter(InvInsumo.Activo.is_(True))
+        .filter((InvInsumo.Stock_Actual or 0) < (InvInsumo.Stock_Minimo or 0))
+    )
+    # En SQLAlchemy, la comparación con None/Decimal requiere cuidado; usa una sub-expresión segura:
+    items = []
+    for ins in InvInsumo.query.filter_by(Activo=True).all():
+        try:
+            a = Decimal(ins.Stock_Actual or 0)
+            m = Decimal(ins.Stock_Minimo or 0)
+        except Exception:
+            a, m = Decimal(0), Decimal(0)
+        if a < m:
+            items.append({
+                "Id": ins.Id,
+                "Nombre": ins.Nombre,
+                "Stock_Actual": float(a),
+                "Stock_Minimo": float(m),
+                "Unidad": ins.Unidad,
+            })
+
+    return {
+        "count": len(items),
+        "items": sorted(items, key=lambda x: x["Nombre"])[:10]  # máximo 10 para la UI
+    }
+# =========================================================

@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy import func
 from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
-
+from decimal import Decimal
 
 
 
@@ -159,6 +159,8 @@ class Usuario(db.Model):
     @property
     def rol_nombre(self) -> str | None:
         return self.rol.Nombre if self.rol else None
+    
+
 
 
 # ---------------------------
@@ -263,7 +265,28 @@ class MantenimientoSolicitud(db.Model):
                                   server_onupdate=func.current_timestamp())
     Habitacion        = db.relationship('Habitacion', lazy='joined')
 
+# ---------------------------
+# Tabla: MantenimientoPreventivo
+# --------------------------- 
+class MantenimientoPreventivo(db.Model):
+    __tablename__ = 'MantenimientoPreventivo'
+    Id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Equipo          = db.Column(db.String(120), nullable=False)
+    Ubicacion       = db.Column(db.String(120), nullable=False)  # texto libre: "Cuarto bombas", "Hab 203", etc.
+    Frecuencia      = db.Column(db.Enum('Mensual', 'Trimestral', 'Semestral', 'Anual', 'Semanas'), nullable=False, default='Mensual')
+    Cada_Dias       = db.Column(db.Integer)   # usado si Frecuencia='Semanas' (ej. 14 días)
+    Proxima_Fecha   = db.Column(db.Date, nullable=False)
+    Responsable     = db.Column(db.String(120))
+    Notas           = db.Column(db.String(500))
+    Activo          = db.Column(db.Boolean, default=True, index=True)
+    Fecha_Creacion  = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    Fecha_Actualiza = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp(), server_onupdate=func.current_timestamp())
 
+    def __repr__(self) -> str:
+        return f"<MantenimientoPreventivo {self.Id} {self.Equipo} {self.Ubicacion} prox={self.Proxima_Fecha}>"
+
+# ---------------------------
+# Inventario: Categorías e Insumos
 class InvCategoria(db.Model):
     __tablename__ = "InvCategoria"
     Id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -275,7 +298,7 @@ class InvCategoria(db.Model):
                                 server_default=func.current_timestamp(),
                                 server_onupdate=func.current_timestamp())
     
-def __repr__(self) -> str:
+    def __repr__(self) -> str:
         return f"<InvCategoria {self.Id} {self.Nombre}>"
 
 
@@ -289,22 +312,28 @@ class InvInsumo(db.Model):
     Stock_Minimo    = db.Column(db.Numeric(12, 3), nullable=False, default=0)
     Activo          = db.Column(db.Boolean, default=True, index=True)
     Fecha_Creacion  = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
-    Fecha_Actualiza = db.Column(db.DateTime, nullable=False,
-                                server_default=func.current_timestamp(),
-                                server_onupdate=func.current_timestamp())
+    Fecha_Actualiza = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp(),server_onupdate=func.current_timestamp())
     
-    Categoria = db.relationship('InvCategoria', lazy='joined')
+    categoria = db.relationship(
+        "InvCategoria",
+        backref=db.backref("insumos", lazy=True),
+        foreign_keys=[Categoria_Id],
+    )
+
+    @property
+    def bajo_minimo(self) -> bool:
+        """Devuelve True si el stock actual está por debajo del mínimo."""
+        actual = self.Stock_Actual or Decimal("0")
+        minimo = self.Stock_Minimo or Decimal("0")
+        return actual < minimo
 
     def __repr__(self) -> str:
         return f"<InvInsumo {self.Id} {self.Nombre} - Stock: {self.Stock_Actual} {self.Unidad}>"
-    
+
 
 # ---------------------------
 # Inventario: Categorías, Insumos y Movimientos (historial)
 # ---------------------------
-from sqlalchemy import func
-from extensions import db
-
 
 class InvMovimiento(db.Model):
     __tablename__ = 'InvMovimiento'
