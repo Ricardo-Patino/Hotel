@@ -107,6 +107,19 @@ def insumos_list():
     data = [{"insumo": i, "categoria": c} for (i, c) in q.all()]
     return render_template("inv/insumos_list.html", items=data)
 
+@inv_bp.get("/insumos")
+def insumos_list():
+    if not session.get("user_id"):
+        flash("Inicia sesión para continuar.", "warning")
+        return redirect(url_for("login_html", next=request.path))
+    if not _require_role("Administrador", "Recepcionista"):
+        flash("No tienes permiso para Inventario.", "danger")
+        return redirect(url_for("index_html"))
+
+    q = db.session.query(InvInsumo, InvCategoria).join(InvCategoria, InvInsumo.Categoria_Id == InvCategoria.Id)
+    data = [{"insumo": i, "categoria": c} for (i, c) in q.all()]
+    return render_template("inv/insumos_list.html", data=data)
+
 # ---------------------------
 # NUEVO INSUMO (INV-07-002)
 # ---------------------------
@@ -354,3 +367,82 @@ def insumo_adjust(insumo_id: int):
 
     # GET
     return render_template("inv/ajustes_form.html", insumo=i)
+
+
+# ==============================================
+# INV-07-004: ENTRADA por COMPRA o DEVOLUCIÓN
+# ==============================================
+@inv_bp.route("/entradas/nueva", methods=["GET", "POST"])
+def entradas_new():
+    if not session.get("user_id"):
+        flash("Inicia sesión para continuar.", "warning")
+        return redirect(url_for("login_html", next=request.path))
+    if not _require_role("Administrador", "Recepcionista"):
+        flash("No tienes permiso para Inventario.", "danger")
+        return redirect(url_for("index_html"))
+
+    # combos
+    insumos = InvInsumo.query.filter_by(Activo=True).order_by(InvInsumo.Nombre.asc()).all()
+    categorias = InvCategoria.query.filter_by(Activa=True).order_by(InvCategoria.Nombre.asc()).all()
+
+    if request.method == "POST":
+        insumo_id = request.form.get("insumo_id", type=int)
+        tipo = request.form.get("tipo")  # 'COMPRA' | 'DEVOLUCION'
+        cantidad = request.form.get("cantidad")
+        motivo = request.form.get("motivo", "").strip()
+        doc_tipo = request.form.get("doc_tipo", "").strip() or None
+        doc_numero = request.form.get("doc_numero", "").strip() or None
+        proveedor = request.form.get("proveedor", "").strip() or None
+
+        # Validaciones
+        if not insumo_id or not tipo or not cantidad or not motivo:
+            flash("Completa insumo, tipo, cantidad y motivo.", "warning")
+            return render_template("inv/entradas_form.html",
+                                   insumos=insumos, categorias=categorias, modo="new")
+
+        try:
+            cantidad = Decimal(str(cantidad))
+        except Exception:
+            flash("Cantidad inválida.", "warning")
+            return render_template("inv/entradas_form.html",
+                                   insumos=insumos, categorias=categorias, modo="new")
+
+        if cantidad <= 0:
+            flash("Cantidad debe ser mayor a cero.", "warning")
+            return render_template("inv/entradas_form.html",
+                                   insumos=insumos, categorias=categorias, modo="new")
+
+        ins = InvInsumo.query.get(insumo_id)
+        if not ins or not ins.Activo:
+            flash("Insumo no válido o inactivo.", "danger")
+            return redirect(url_for("inv.insumos_list"))
+
+        # Transacción
+        stock_antes = Decimal(ins.Stock_Actual or 0)
+        stock_despues = stock_antes + cantidad  # entradas suman
+
+        ins.Stock_Actual = stock_despues
+
+        mov = InvMovimiento(
+            Insumo_Id=ins.Id,
+            Tipo=("ENTRADA_COMPRA" if tipo == "COMPRA" else "ENTRADA_DEVOLUCION"),
+            Campo="Stock_Actual",
+            Valor_Antes=str(stock_antes),
+            Valor_Despues=str(stock_despues),
+            Delta=cantidad,
+            Motivo=motivo,
+            Doc_Tipo=doc_tipo,
+            Doc_Numero=doc_numero,
+            Proveedor=proveedor,
+            Usuario_Id=session.get("user_id"),
+            Usuario_Nombre=session.get("user_name"),
+            Usuario_Email=session.get("user_email"),
+        )
+        db.session.add(mov)
+        db.session.commit()
+
+        flash("Entrada registrada y stock actualizado.", "success")
+        return redirect(url_for("inv.insumos_list"))
+
+    return render_template("inv/entradas_form.html",
+                           insumos=insumos, categorias=categorias, modo="new")

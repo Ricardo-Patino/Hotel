@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Inventario · Registrar entrada</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+</head>
+
+<body class="index-page">
+  {% include 'partials/header_simple.html' ignore missing %}
+
+  <main class="main">
+    <section class="section container" data-aos="fade-up" data-aos-delay="100">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <h2 class="mb-4">Registro de entrada (compra / devolución)</h2>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ 'warning' if category=='message' else category }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <div class="card">
+            <div class="card-body">
+              <form method="post" autocomplete="off">
+                <div class="row g-3">
+                  <div class="col-md-8">
+                    <label class="form-label">Insumo</label>
+                    <select name="insumo_id" class="form-select" required>
+                      <option value="">Selecciona...</option>
+                      {% for i in insumos %}
+                        <option value="{{ i.Id }}">{{ i.Nombre }} — Stock: {{ i.Stock_Actual|round(3) }} {{ i.Unidad }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Tipo de entrada</label>
+                    <select name="tipo" class="form-select" required>
+                      <option value="COMPRA">Compra</option>
+                      <option value="DEVOLUCION">Devolución</option>
+                    </select>
+                  </div>
+
+                  <div class="col-md-4">
+                    <label class="form-label">Cantidad</label>
+                    <input type="number" step="0.001" min="0.001" name="cantidad" class="form-control" required>
+                  </div>
+
+                  <div class="col-md-8">
+                    <label class="form-label">Motivo</label>
+                    <input type="text" name="motivo" maxlength="255" class="form-control" placeholder="Ej: Compra mensual, devolución por cliente, etc." required>
+                  </div>
+
+                  <div class="col-md-4">
+                    <label class="form-label">Documento (tipo)</label>
+                    <input type="text" name="doc_tipo" class="form-control" placeholder="FACTURA / NC / DEV">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Documento (número)</label>
+                    <input type="text" name="doc_numero" class="form-control" placeholder="Ej: FAC-00125">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Proveedor (opcional)</label>
+                    <input type="text" name="proveedor" class="form-control" placeholder="Nombre proveedor">
+                  </div>
+
+                  <div class="col-12 text-end">
+                    <a href="{{ url_for('inv.insumos_list') }}" class="btn btn-outline-secondary me-2">
+                      <i class="bi bi-arrow-left"></i> Volver
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                      <i class="bi bi-check2-circle"></i> Registrar entrada
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <p class="text-muted small mt-3">
+            Al guardar, el sistema crea un movimiento tipo <code>ENTRADA_COMPRA</code> o <code>ENTRADA_DEVOLUCION</code> y actualiza el stock.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+</body>
+</html>

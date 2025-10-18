@@ -274,6 +274,10 @@ class InvCategoria(db.Model):
     Fecha_Actualiza = db.Column(db.DateTime, nullable=False,
                                 server_default=func.current_timestamp(),
                                 server_onupdate=func.current_timestamp())
+    
+def __repr__(self) -> str:
+        return f"<InvCategoria {self.Id} {self.Nombre}>"
+
 
 class InvInsumo(db.Model):
     __tablename__ = "InvInsumo"
@@ -289,6 +293,11 @@ class InvInsumo(db.Model):
                                 server_default=func.current_timestamp(),
                                 server_onupdate=func.current_timestamp())
     
+    Categoria = db.relationship('InvCategoria', lazy='joined')
+
+    def __repr__(self) -> str:
+        return f"<InvInsumo {self.Id} {self.Nombre} - Stock: {self.Stock_Actual} {self.Unidad}>"
+    
 
 # ---------------------------
 # Inventario: Categorías, Insumos y Movimientos (historial)
@@ -298,21 +307,28 @@ from extensions import db
 
 
 class InvMovimiento(db.Model):
-    __tablename__ = "InvMovimiento"
-    Id              = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    Insumo_Id       = db.Column(db.Integer, db.ForeignKey("InvInsumo.Id"), nullable=False, index=True)
-    Tipo            = db.Column(db.Enum("AJUSTE","EDICION","INACTIVACION","REACTIVACION"),
-                                nullable=False, default="EDICION", index=True)
-    Campo           = db.Column(db.String(60))
-    Valor_Antes     = db.Column(db.String(120))
-    Valor_Despues   = db.Column(db.String(120))
-    Delta           = db.Column(db.Numeric(12, 3))
-    Motivo          = db.Column(db.String(255), nullable=False)
-    Usuario_Id      = db.Column(db.Integer)
-    Usuario_Nombre  = db.Column(db.String(120))
-    Usuario_Email   = db.Column(db.String(120))
-    Fecha_Creacion  = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    __tablename__ = 'InvMovimiento'
+    Id             = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Insumo_Id      = db.Column(db.Integer, db.ForeignKey('InvInsumo.Id'), nullable=False, index=True)
+    Tipo           = db.Column(db.Enum('AJUSTE','EDICION','INACTIVACION','REACTIVACION',
+                                       'ENTRADA_COMPRA','ENTRADA_DEVOLUCION'), nullable=False)
+    Campo          = db.Column(db.String(60))
+    Valor_Antes    = db.Column(db.String(120))
+    Valor_Despues  = db.Column(db.String(120))
+    Delta          = db.Column(db.Numeric(14,3))
+    Motivo         = db.Column(db.String(255), nullable=False)
+    Doc_Tipo       = db.Column(db.String(30))
+    Doc_Numero     = db.Column(db.String(60))
+    Proveedor      = db.Column(db.String(120))
+    Fecha_Mov      = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
-    Insumo = db.relationship("InvInsumo", lazy="joined")
+    Usuario_Id     = db.Column(db.Integer)
+    Usuario_Nombre = db.Column(db.String(120))
+    Usuario_Email  = db.Column(db.String(120))
+
+    Insumo = db.relationship('InvInsumo', lazy='joined')
+
+    def __repr__(self) -> str:
+        return f"<InvMovimiento {self.Id} Insumo={self.Insumo_Id} {self.Tipo} Δ={self.Delta}>"
 
 

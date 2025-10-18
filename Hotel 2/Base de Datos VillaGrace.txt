@@ -646,6 +646,15 @@ VALUES ('Limpieza', 'Insumos de limpieza y desinfección', 1)
      ,('Recepción','Papelería y suministros de front desk', 1)
 ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion);
 
+INSERT INTO InvCategoria (Nombre, Activa)
+SELECT 'General', 1
+WHERE NOT EXISTS (SELECT 1 FROM InvCategoria WHERE Nombre='General');
+
+INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad, Stock_Actual, Stock_Minimo, Activo)
+SELECT (SELECT Id FROM InvCategoria WHERE Nombre='General' LIMIT 1),
+       'Toallas', 'unidad', 50, 10, 1
+WHERE NOT EXISTS (SELECT 1 FROM InvInsumo WHERE Nombre='Toallas');
+
 INSERT INTO Rol (Nombre, Descripcion, Estado) VALUES
  ('Administrador','Rol Administrador','Activo'),
  ('Recepcionista','Rol Recepción','Activo'),
@@ -773,31 +782,33 @@ CREATE TABLE IF NOT EXISTS fin_monthly_close (
 /*  Inventario (INV) — Categorías, Insumos y Movimientos (ajustes/historial) */
 /* ------------------------------------------------------------------------- */
 
-
--- Historial de movimientos para ajustes manuales, ediciones e inactivaciones
-
-DROP TABLE IF EXISTS InvMovimiento;
-
 CREATE TABLE InvMovimiento (
   Id               INT NOT NULL AUTO_INCREMENT,
   Insumo_Id        INT NOT NULL,
-  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION') NOT NULL DEFAULT 'EDICION',
-  Campo            VARCHAR(60)  NULL,      -- p.ej. 'Stock_Actual','Nombre','Unidad','Activo'
+  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION',
+                        'ENTRADA_COMPRA','ENTRADA_DEVOLUCION') NOT NULL,
+  Campo            VARCHAR(60)  NULL,              -- para cambios de metadatos
   Valor_Antes      VARCHAR(120) NULL,
   Valor_Despues    VARCHAR(120) NULL,
-  Delta            DECIMAL(12,3) NULL,     -- para ajustes de stock (+/-)
-  Motivo           VARCHAR(255) NOT NULL,  -- requerido por historia INV-07-003
+  Delta            DECIMAL(14,3) NULL,             -- para variación de stock (+/-)
+  Motivo           VARCHAR(255) NOT NULL,
+  Doc_Tipo         VARCHAR(30)  NULL,              -- opcional: 'FACTURA','NC','DEV'
+  Doc_Numero       VARCHAR(60)  NULL,
+  Proveedor        VARCHAR(120) NULL,              -- opcional
+  Fecha_Mov        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
   Usuario_Id       INT NULL,
   Usuario_Nombre   VARCHAR(120) NULL,
   Usuario_Email    VARCHAR(120) NULL,
-  Fecha_Creacion   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
   CONSTRAINT PK_InvMovimiento PRIMARY KEY (Id),
   CONSTRAINT FK_InvMovimiento_Insumo FOREIGN KEY (Insumo_Id)
-      REFERENCES InvInsumo(Id)
-      ON UPDATE CASCADE ON DELETE RESTRICT,
+      REFERENCES InvInsumo(Id) ON UPDATE CASCADE ON DELETE RESTRICT,
   KEY IX_InvMovimiento_Insumo (Insumo_Id),
-  KEY IX_InvMovimiento_Tipo (Tipo)
+  KEY IX_InvMovimiento_Tipo (Tipo),
+  KEY IX_InvMovimiento_Fecha (Fecha_Mov)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 
 
@@ -808,3 +819,11 @@ SHOW TABLES LIKE 'fin_invoices';
 Select * from Usuario;
 Select * from InvCategoria;
 Select * from InvInsumo;
+Select * from InvMovimiento;
+SELECT 'General', 1
+WHERE NOT EXISTS (SELECT 1 FROM InvCategoria WHERE Nombre='General');
+
+INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad, Stock_Actual, Stock_Minimo, Activo)
+SELECT (SELECT Id FROM InvCategoria WHERE Nombre='General' LIMIT 1),
+       'Toallas', 'unidad', 50, 10, 1
+WHERE NOT EXISTS (SELECT 1 FROM InvInsumo WHERE Nombre='Toallas');
