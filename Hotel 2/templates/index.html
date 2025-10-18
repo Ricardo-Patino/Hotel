@@ -159,7 +159,7 @@
                 </li>
                 {% endif %}
 
-                <!-- Inventario (Admin + Recepcionista) -->
+                <!-- Inventario (Admin + Recepcionista)
                 {% if session.get('user_role') in
                 ['Administrador','Recepcionista'] %}
                 <li>
@@ -173,13 +173,12 @@
                   >
                 </li>
                 {% endif %}
+                 -->
 
                 <!-- ============ SOLO ADMIN ============ -->
                 {% if session.get('user_role') == 'Administrador' %}
                 <li>
-                  <a href="{{ url_for('admin.dashboard') }}"
-                    ><strong>Administración</strong></a
-                  >
+                  <a href="{{ url_for('admin_dashboard_html') }}">Administración</a>
                 </li>
                 <li class="dropdown">
                   <a href="#"
