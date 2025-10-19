@@ -1,222 +1,371 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Mis reservas | Hotel Villa Grace</title>
-  <meta name="description" content="Consulta y gestiona tus reservas en Hotel Villa Grace.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <meta charset="utf-8">
+  <title>Mis reservas — Hotel Villa Grace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Iconos opcionales -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
   <style>
-    .res-card .badge{vertical-align:middle}
-    .res-empty{opacity:.9}
+    :root{
+      --vg-primary:#145a40;
+      --vg-primary-2:#0e3f2c;
+      --vg-accent:#1f8a5b;
+    }
+    body{ background-color:#f7f8f9; }
+    .navbar{ background:linear-gradient(90deg,var(--vg-primary),var(--vg-primary-2)); }
+    .navbar-brand, .navbar-nav .nav-link{ color:#fff!important; }
+    .page-title{
+      font-weight:700; color:#17212b;
+    }
+    .filter-card{
+      border:0; border-radius:16px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.06);
+    }
+    .filter-card .card-header{
+      border-bottom:0; background:transparent; font-weight:600;
+    }
+    .reservation-card{
+      border:0; border-radius:16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.07);
+      transition:.2s ease;
+    }
+    .reservation-card:hover{ transform: translateY(-2px); }
+    .badge-status{ font-weight:600; letter-spacing:.2px; }
+    .badge-status.Confirmada{ background:#d1f7e3; color:#096d46; }
+    .badge-status.Pendiente{ background:#fff4d6; color:#8a5b00; }
+    .badge-status.Cancelada{ background:#ffe0e0; color:#9c1e1e; }
+    .money{ font-weight:700; color:var(--vg-primary); }
+    .empty-state{
+      border:2px dashed #dfe5ea; border-radius:16px; padding:36px; text-align:center; color:#6b7a89;
+      background:#fff;
+    }
+    .btn-vg{
+      background:var(--vg-primary); border-color:var(--vg-primary);
+    }
+    .btn-vg:hover{ background:var(--vg-primary-2); border-color:var(--vg-primary-2); }
+    .btn-outline-vg{ color:var(--vg-primary); border-color:var(--vg-primary); }
+    .btn-outline-vg:hover{ color:#fff; background:var(--vg-primary); }
+    .spinner-wrap{ display:none; }
+    .list-divider{ height:1px; background:#eef2f6; margin:24px 0; }
+    .form-hint{ font-size:.875rem; color:#6b7a89; }
   </style>
 </head>
-<body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="portal-dashboard.html">Portal</a></li>
-        <li><a href="portal-reservas.html" class="active">Mis reservas</a></li>
-        <li><a href="portal-perfil.html">Perfil</a></li>
-        <li><a href="portal-soporte.html">Soporte</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="booking-search.html">Nueva reserva</a>
-  </div>
-</header>
-
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Mis reservas</h1>
-      <p>Consulta, modifica o cancela tus estancias futuras.</p>
-      <nav class="breadcrumbs"><ol><li><a href="portal-dashboard.html">Portal</a></li><li class="current">Reservas</li></ol></nav>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/portal-dashboard.html">
+        Hotel Villa Grace — Portal
+      </a>
+      <div class="ms-auto">
+        <a class="nav-link d-inline-block text-white-50" href="/logout">Cerrar sesión</a>
+      </div>
     </div>
-  </div>
+  </nav>
 
-  <section class="section pt-3">
-    <div class="container" data-aos="fade-up">
-      <ul class="nav nav-pills flex-wrap gap-2 mb-4">
-        <li class="nav-item"><a class="nav-link" href="portal-dashboard.html">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link active" href="portal-reservas.html">Mis reservas</a></li>
-        <li class="nav-item"><a class="nav-link" href="portal-preferencias.html">Preferencias</a></li>
-        <li class="nav-item"><a class="nav-link" href="portal-facturas.html">Facturas</a></li>
-      </ul>
+  <main class="container py-4 py-md-5">
 
-      <!-- Filtros -->
-      <div class="row g-3 align-items-end mb-3">
-        <div class="col-md-4">
-          <label class="form-label">Estado</label>
-          <select id="flt-estado" class="form-select">
-            <option value="">Todas</option>
-            <option value="Confirmada">Confirmada</option>
-            <option value="Cancelada">Cancelada</option>
-            <option value="Completada">Completada</option>
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">Rango de fechas</label>
-          <div class="d-flex gap-2">
-            <input id="flt-fini" type="date" class="form-control">
-            <input id="flt-ffin" type="date" class="form-control">
+    <div class="d-flex align-items-end justify-content-between flex-wrap gap-3 mb-3">
+      <div>
+        <h1 class="page-title mb-1">Mis reservas</h1>
+        <div class="form-hint">Consulta, edita o exporta tus reservas.</div>
+      </div>
+      <div class="d-flex gap-2">
+        <button id="btn-export-hist" class="btn btn-outline-vg">
+          Exportar historial
+        </button>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card filter-card mb-4">
+      <div class="card-header">Filtros</div>
+      <div class="card-body">
+        <form id="filterForm" class="row gy-3 gx-3 align-items-end">
+          <div class="col-12 col-sm-6 col-lg-3">
+            <label class="form-label">Desde</label>
+            <input type="date" class="form-control" id="fini">
           </div>
-        </div>
-        <div class="col-md-4 d-grid d-md-flex gap-2">
-          <a class="btn btn-primary" href="booking-search.html"><i class="bi bi-plus-lg me-1"></i>Nueva reserva</a>
-          <button id="btn-aplicar" class="btn btn-outline"><i class="bi bi-funnel me-1"></i>Aplicar</button>
-        </div>
+          <div class="col-12 col-sm-6 col-lg-3">
+            <label class="form-label">Hasta</label>
+            <input type="date" class="form-control" id="ffin">
+          </div>
+          <div class="col-12 col-sm-6 col-lg-3">
+            <label class="form-label">Estado</label>
+            <select class="form-select" id="estado">
+              <option value="">Todos</option>
+              <option value="Confirmada">Confirmada</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="Cancelada">Cancelada</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-6 col-lg-3 d-flex gap-2">
+            <button class="btn btn-vg flex-fill" type="submit">Buscar</button>
+            <button class="btn btn-outline-secondary flex-fill" type="button" id="btnClear">Limpiar</button>
+          </div>
+        </form>
       </div>
-
-      <!-- Lista dinámica -->
-      <div id="res-list"></div>
-
-      <p class="text-muted small mt-3">¿Necesitas ayuda? <a href="portal-soporte.html">Abre un ticket de soporte</a>.</p>
     </div>
-  </section>
-</main>
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="footer-top"><div class="container">
-    <div class="row gy-4">
-      <div class="col-lg-4 col-md-6 footer-about">
-        <a href="index.html" class="logo d-flex align-items-center"><span class="sitename">Hotel Villa Grace</span></a>
-        <div class="footer-contact pt-3"><p>Cóbano, Puntarenas</p><p><strong>Email:</strong> info@hotelvillagrace.com</p></div>
-      </div>
-      <div class="col-lg-8 col-md-6 footer-links">
-        <h4>Portal</h4>
-        <ul class="d-flex flex-wrap gap-3">
-          <li><a href="portal-dashboard.html">Dashboard</a></li>
-          <li><a href="portal-reservas.html">Reservas</a></li>
-          <li><a href="portal-perfil.html">Perfil</a></li>
-          <li><a href="portal-preferencias.html">Preferencias</a></li>
-          <li><a href="portal-soporte.html">Soporte</a></li>
-        </ul>
-      </div>
-    </div></div></div>
-  <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados</div></div>
-</footer>
+    <!-- Resultados -->
+    <div id="alerts"></div>
+    <div class="spinner-wrap text-center my-4" id="spinner">
+      <div class="spinner-border text-success" role="status"></div>
+      <div class="small text-muted mt-2">Cargando…</div>
+    </div>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+    <div id="reservasList" class="vstack gap-3"></div>
 
-<script>
-(function(){
-  const $ = (s)=>document.querySelector(s);
-  const list = $("#res-list");
-  const estado = $("#flt-estado");
-  const fini = $("#flt-fini");
-  const ffin = $("#flt-ffin");
+    <div id="emptyBlock" class="empty-state mt-4" style="display:none;">
+      No hay reservas para los filtros seleccionados.
+    </div>
 
-  function fmtDate(iso){
-    if(!iso) return "—";
-    const d = new Date(iso+"T00:00:00");
-    return new Intl.DateTimeFormat("es-CR",{day:"2-digit",month:"short",year:"numeric"}).format(d).replace(".","");
-  }
-  function nights(a,b){
-    if(!a||!b) return 1;
-    const d1 = new Date(a+"T00:00:00"); const d2 = new Date(b+"T00:00:00");
-    return Math.max(1, Math.round((d2-d1)/86400000));
-  }
-  function badgeClass(e){
-    if(e==="Cancelada") return "bg-danger";
-    if(e==="Completada") return "bg-secondary";
-    return "bg-success";
-  }
-  function card(r){
-    const ns = nights(r.checkin, r.checkout);
-    const plan = r.plan || "Tarifa Flexible";
-    const gtxt = r.huespedes ? `${r.huespedes} huésped(es)` : "—";
-    const fechas = `${fmtDate(r.checkin)} – ${fmtDate(r.checkout)}`;
-    return `
-    <div class="card shadow-sm border-0 mb-3 res-card">
-      <div class="card-body d-md-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="mb-1">#${r.numero || ("VG-" + r.id)} · ${r.tipo || "Habitación"}</h5>
-          <div class="text-muted small">${fechas} · ${gtxt} · ${plan}</div>
-          <span class="badge ${badgeClass(r.estado)} mt-2">${r.estado||"—"}</span>
+  </main>
+
+  <!-- Modal: Exportar una reserva -->
+  <div class="modal fade" id="modalExportReserva" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Exportar reserva</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
-        <div class="mt-3 mt-md-0 d-grid gap-2 d-md-flex">
-          ${r.estado==="Cancelada" ? "" : `<button class="btn btn-outline btn-sm" data-act="edit" data-id="${r.id}"><i class="bi bi-pencil-square me-1"></i>Editar</button>`}
-          ${r.estado==="Cancelada" ? "" : `<button class="btn btn-outline btn-sm" data-act="cancel" data-id="${r.id}"><i class="bi bi-x-circle me-1"></i>Cancelar</button>`}
-          <button class="btn btn-outline btn-sm" data-act="export" data-id="${r.id}"><i class="bi bi-download me-1"></i>Exportar</button>
+        <div class="modal-body">
+          ¿En qué formato deseas exportar esta reserva?
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" id="btn-exp-pdf" class="btn btn-primary">PDF</button>
+          <button type="button" id="btn-exp-xls" class="btn btn-success">Excel</button>
         </div>
       </div>
-    </div>`;
-  }
-  function emptyState(){
-    list.innerHTML = `
-      <div class="alert alert-info res-empty">
-        Aún no encontramos reservas con los filtros actuales.
-        <a href="booking-search.html" class="alert-link">Crea una nueva</a>.
-      </div>`;
-  }
-  async function fetchItems(){
-    const p = new URLSearchParams();
-    if(estado.value) p.set("estado", estado.value);
-    if(fini.value)   p.set("fini", fini.value);
-    if(ffin.value)   p.set("ffin", ffin.value);
-    const res = await fetch("/api/portal/reservas?"+p.toString(), {headers:{"Accept":"application/json"}});
-    if(!res.ok) throw new Error("HTTP "+res.status);
-    const json = await res.json();
-    return json.items || [];
-  }
-  async function render(){
-    list.innerHTML = `<div class="text-muted">Cargando…</div>`;
-    try{
-      const items = await fetchItems();
-      if(!items.length){ emptyState(); return; }
-      list.innerHTML = items.map(card).join("");
-      list.querySelectorAll("button[data-act]").forEach(btn=>{
-        btn.addEventListener("click", async (ev)=>{
-          const id = ev.currentTarget.getAttribute("data-id");
-          const act= ev.currentTarget.getAttribute("data-act");
-          if(act==="cancel"){
-            if(!confirm("¿Confirmas cancelar esta reserva?")) return;
-            const r = await fetch(`/api/portal/reservas/${id}`, {method:"DELETE", headers:{"Accept":"application/json"}});
-            const j = await r.json().catch(()=>({}));
-            if(!r.ok || !j.ok){ alert(j.message||"No se pudo cancelar."); return; }
-            render();
-          }else if(act==="export"){
-            const r = await fetch(`/api/portal/reservas/${id}/export`, {headers:{"Accept":"application/json"}});
-            const j = await r.json().catch(()=>({}));
-            if(!r.ok || !j.ok){ alert(j.message||"No se pudo exportar."); return; }
-            const blob = new Blob([JSON.stringify(j.comprobante,null,2)], {type:"application/json"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url; a.download = `comprobante-${j.comprobante?.numero||id}.json`;
-            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-          }else if(act==="edit"){
-            location.href = `portal-reserva-detalle.html?id=${encodeURIComponent(id)}`;
-          }
+    </div>
+  </div>
+
+  <!-- Modal: Exportar historial -->
+  <div class="modal fade" id="modalExportHist" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Exportar historial</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          Elige el formato para exportar el historial (aplica los filtros actuales).
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" id="btn-hist-pdf" class="btn btn-primary">PDF</button>
+          <button type="button" id="btn-hist-xls" class="btn btn-success">Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS (Bundle) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    (function(){
+      const listEl = document.getElementById('reservasList');
+      const spinner = document.getElementById('spinner');
+      const emptyBlock = document.getElementById('emptyBlock');
+      const alerts = document.getElementById('alerts');
+
+      const fini = document.getElementById('fini');
+      const ffin = document.getElementById('ffin');
+      const estado = document.getElementById('estado');
+
+      let currentReservaId = null;
+      const modalReserva = new bootstrap.Modal(document.getElementById('modalExportReserva'));
+      const modalHist = new bootstrap.Modal(document.getElementById('modalExportHist'));
+
+      function showSpinner(show){ spinner.style.display = show ? 'block' : 'none'; }
+      function showEmpty(show){ emptyBlock.style.display = show ? 'block' : 'none'; }
+
+      function alertMsg(type, msg){
+        const el = document.createElement('div');
+        el.className = `alert alert-${type}`;
+        el.textContent = msg;
+        alerts.innerHTML = '';
+        alerts.appendChild(el);
+        setTimeout(()=>{ el.remove(); }, 4000);
+      }
+
+      function fmtDate(s){
+        if(!s) return '-';
+        return String(s).slice(0,10);
+      }
+
+      function badge(status){
+        const b = document.createElement('span');
+        b.className = `badge badge-status ${status}`;
+        b.textContent = status || '—';
+        return b;
+      }
+
+      function renderList(items){
+        listEl.innerHTML = '';
+        if(!items || !items.length){
+          showEmpty(true);
+          return;
+        }
+        showEmpty(false);
+
+        items.forEach(r=>{
+          const card = document.createElement('div');
+          card.className = 'card reservation-card';
+          const numero = r.numero || `VG-${r.id}`;
+          const header = document.createElement('div');
+          header.className = 'card-header d-flex justify-content-between align-items-center';
+          header.innerHTML = `
+            <div class="fw-semibold">Reserva <span class="text-muted">#</span>${numero}</div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="small text-muted">${fmtDate(r.created_at)}</span>
+            </div>
+          `;
+          header.querySelector('.d-flex').prepend(badge(r.estado || 'Confirmada'));
+
+          const body = document.createElement('div');
+          body.className = 'card-body';
+          body.innerHTML = `
+            <div class="row g-3 align-items-center">
+              <div class="col-12 col-md-3">
+                <div class="text-muted small">Check-in</div>
+                <div class="fw-semibold">${fmtDate(r.checkin)}</div>
+              </div>
+              <div class="col-12 col-md-3">
+                <div class="text-muted small">Check-out</div>
+                <div class="fw-semibold">${fmtDate(r.checkout)}</div>
+              </div>
+              <div class="col-6 col-md-2">
+                <div class="text-muted small">Huéspedes</div>
+                <div class="fw-semibold">${r.huespedes || '-'}</div>
+              </div>
+              <div class="col-6 col-md-2">
+                <div class="text-muted small">Canal</div>
+                <div class="fw-semibold">${r.canal || '-'}</div>
+              </div>
+              <div class="col-12 col-md-2 text-md-end">
+                <div class="text-muted small">Total</div>
+                <div class="money">₡ ${Number(r.monto||0).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+              </div>
+            </div>
+
+            <div class="list-divider"></div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <a class="btn btn-outline-secondary" href="/portal-reserva-detalle.html?id=${encodeURIComponent(r.id)}">Editar</a>
+              <button class="btn btn-outline-danger btn-cancel" data-id="${r.id}">Cancelar</button>
+              <button class="btn btn-outline-vg btn-export-reserva" data-id="${r.id}">Exportar</button>
+            </div>
+          `;
+
+          card.appendChild(header);
+          card.appendChild(body);
+          listEl.appendChild(card);
         });
+      }
+
+      async function fetchList(){
+        try{
+          showSpinner(true);
+          const params = new URLSearchParams();
+          if(fini.value) params.set('fini', fini.value);
+          if(ffin.value) params.set('ffin', ffin.value);
+          if(estado.value) params.set('estado', estado.value);
+          const res = await fetch(`/api/portal/reservas?${params.toString()}`, {credentials:'same-origin'});
+          const data = await res.json();
+          if(!data.ok){ throw new Error('No se pudo cargar las reservas.'); }
+          renderList(data.items||[]);
+        }catch(err){
+          console.error(err);
+          alertMsg('danger', err.message || 'Error al listar reservas');
+          renderList([]);
+        }finally{
+          showSpinner(false);
+        }
+      }
+
+      // Eventos
+      document.getElementById('filterForm').addEventListener('submit', (e)=>{
+        e.preventDefault();
+        fetchList();
       });
-    }catch(err){
-      list.innerHTML = `<div class="alert alert-danger">No se pudieron cargar tus reservas.</div>`;
-      console.error(err);
-    }
-  }
-  document.getElementById("btn-aplicar").addEventListener("click", render);
-  render();
-})();
-</script>
+
+      document.getElementById('btnClear').addEventListener('click', ()=>{
+        fini.value = ''; ffin.value = ''; estado.value = '';
+        fetchList();
+      });
+
+      document.addEventListener('click', async (ev)=>{
+        const exp = ev.target.closest('.btn-export-reserva');
+        if(exp){
+          currentReservaId = exp.getAttribute('data-id');
+          modalReserva.show();
+          return;
+        }
+
+        const del = ev.target.closest('.btn-cancel');
+        if(del){
+          const id = del.getAttribute('data-id');
+          if(!confirm('¿Seguro que deseas cancelar esta reserva?')){
+            return;
+          }
+          try{
+            const resp = await fetch(`/api/portal/reservas/${id}`, {method:'DELETE', credentials:'same-origin'});
+            const data = await resp.json();
+            if(!data.ok){ throw new Error('No se pudo cancelar la reserva.'); }
+            alertMsg('success', 'Reserva cancelada.');
+            fetchList();
+          }catch(err){
+            alertMsg('danger', err.message || 'Error al cancelar.');
+          }
+        }
+      });
+
+      // Export individual
+      document.getElementById('btn-exp-pdf').addEventListener('click', ()=>{
+        if(!currentReservaId) return;
+        window.location.href = `/api/portal/reservas/${currentReservaId}/export?format=pdf`;
+        modalReserva.hide();
+      });
+      document.getElementById('btn-exp-xls').addEventListener('click', ()=>{
+        if(!currentReservaId) return;
+        window.location.href = `/api/portal/reservas/${currentReservaId}/export?format=xlsx`;
+        modalReserva.hide();
+      });
+
+      // Export historial (con filtros actuales)
+      document.getElementById('btn-export-hist').addEventListener('click', ()=>{
+        modalHist.show();
+      });
+      document.getElementById('btn-hist-pdf').addEventListener('click', ()=>{
+        const params = new URLSearchParams({format:'pdf'});
+        if(fini.value) params.set('fini',fini.value);
+        if(ffin.value) params.set('ffin',ffin.value);
+        if(estado.value) params.set('estado',estado.value);
+        window.location.href = `/api/portal/reservas/export?${params.toString()}`;
+        modalHist.hide();
+      });
+      document.getElementById('btn-hist-xls').addEventListener('click', ()=>{
+        const params = new URLSearchParams({format:'xlsx'});
+        if(fini.value) params.set('fini',fini.value);
+        if(ffin.value) params.set('ffin',ffin.value);
+        if(estado.value) params.set('estado',estado.value);
+        window.location.href = `/api/portal/reservas/export?${params.toString()}`;
+        modalHist.hide();
+      });
+
+      // Inicial
+      fetchList();
+    })();
+  </script>
 </body>
 </html>

@@ -1,319 +1,312 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Detalle de reserva | Hotel Villa Grace</title>
-  <meta name="description" content="Información completa de tu reserva con políticas y extras.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <meta charset="utf-8">
+  <title>Detalle de reserva — Hotel Villa Grace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
   <style>
-    .badge.align{vertical-align:middle}
-    .muted{color:#6c757d}
+    :root{
+      --vg-primary:#145a40;
+      --vg-primary-2:#0e3f2c;
+    }
+    body{ background:#f7f8f9; }
+    .navbar{ background:linear-gradient(90deg,var(--vg-primary),var(--vg-primary-2)); }
+    .navbar-brand, .navbar-nav .nav-link{ color:#fff!important; }
+    .page-title{ font-weight:700; color:#17212b; }
+    .info-card{
+      border:0; border-radius:16px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.08);
+    }
+    .label{ font-size:.85rem; color:#6b7a89; }
+    .value{ font-weight:600; }
+    .badge-status{ font-weight:600; letter-spacing:.2px; }
+    .badge-status.Confirmada{ background:#d1f7e3; color:#096d46; }
+    .badge-status.Pendiente{ background:#fff4d6; color:#8a5b00; }
+    .badge-status.Cancelada{ background:#ffe0e0; color:#9c1e1e; }
+    .btn-vg{ background:var(--vg-primary); border-color:var(--vg-primary); }
+    .btn-vg:hover{ background:var(--vg-primary-2); border-color:var(--vg-primary-2); }
+    .spinner-wrap{ display:none; }
+    .money{ font-weight:700; color:var(--vg-primary); }
+    .section-title{
+      font-size:1.05rem; font-weight:700; color:#17212b;
+    }
+    .form-hint{ font-size:.875rem; color:#6b7a89; }
   </style>
 </head>
-<body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="portal-dashboard.html">Portal</a></li>
-        <li><a href="portal-reservas.html" class="active">Mis reservas</a></li>
-        <li><a href="portal-perfil.html">Perfil</a></li>
-      </ul><i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a id="btn-mod" class="btn-getstarted d-none d-sm-block" href="#">Modificar</a>
-  </div>
-</header>
-
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1 id="hdr-title">Reserva</h1>
-      <p id="hdr-sub" class="muted">—</p>
-      <nav class="breadcrumbs"><ol><li><a href="portal-reservas.html">Mis reservas</a></li><li class="current">Detalle</li></ol></nav>
+<body>
+  <nav class="navbar navbar-expand-lg">
+    <div class="container">
+      <a class="navbar-brand fw-semibold" href="/portal-reservas.html">
+        ← Mis reservas
+      </a>
+      <div class="ms-auto">
+        <a class="nav-link d-inline-block text-white-50" href="/logout">Cerrar sesión</a>
+      </div>
     </div>
-  </div>
+  </nav>
 
-  <section class="section pt-3">
-    <div class="container" data-aos="fade-up">
-      <div id="alert-box"></div>
-      <div class="row g-4">
-        <div class="col-lg-8">
-          <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body" id="sum-card">
-              <h5 class="card-title">Resumen</h5>
-              <div class="row">
-                <div class="col-md-6">
-                  <p class="mb-1"><strong>Check-in:</strong> —</p>
-                  <p class="mb-1"><strong>Check-out:</strong> —</p>
-                  <p class="mb-1"><strong>Noches:</strong> —</p>
-                </div>
-                <div class="col-md-6">
-                  <p class="mb-1"><strong>Huéspedes:</strong> —</p>
-                  <p class="mb-1"><strong>Plan:</strong> —</p>
-                  <p class="mb-1"><strong>Estado:</strong> <span class="badge bg-secondary align">—</span></p>
-                </div>
+  <main class="container py-4 py-md-5">
+    <div class="d-flex align-items-end justify-content-between flex-wrap gap-3 mb-3">
+      <div>
+        <h1 class="page-title mb-1" id="title">Detalle de la reserva</h1>
+        <div class="form-hint">Edita fechas u observaciones, descarga el comprobante o cancela la reserva.</div>
+      </div>
+      <div class="d-flex gap-2">
+        <a id="btnComprobante" class="btn btn-outline-success" href="#" target="_blank" rel="noopener">
+          Exportar comprobante (PDF)
+        </a>
+      </div>
+    </div>
+
+    <div id="alerts"></div>
+
+    <div id="spinner" class="spinner-wrap text-center my-4">
+      <div class="spinner-border text-success" role="status"></div>
+      <div class="small text-muted mt-2">Cargando…</div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Resumen -->
+      <div class="col-12 col-lg-6">
+        <div class="card info-card">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="section-title">Resumen</div>
+              <span id="badgeEstado" class="badge badge-status">—</span>
+            </div>
+
+            <div class="row g-3 mt-2">
+              <div class="col-6">
+                <div class="label">Número</div>
+                <div class="value" id="valNumero">—</div>
+              </div>
+              <div class="col-6 text-end">
+                <div class="label">Total</div>
+                <div class="value money" id="valTotal">—</div>
+              </div>
+
+              <div class="col-6">
+                <div class="label">Check-in</div>
+                <div class="value" id="valCI">—</div>
+              </div>
+              <div class="col-6">
+                <div class="label">Check-out</div>
+                <div class="value" id="valCO">—</div>
+              </div>
+
+              <div class="col-6">
+                <div class="label">Huéspedes</div>
+                <div class="value" id="valPax">—</div>
+              </div>
+              <div class="col-6">
+                <div class="label">Canal</div>
+                <div class="value" id="valCanal">—</div>
+              </div>
+
+              <div class="col-12">
+                <div class="label">Tipo habitación</div>
+                <div class="value" id="valTipo">—</div>
               </div>
             </div>
-          </div>
 
-          <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Editar reserva</h5>
-              <form id="edit-form" class="row g-3">
-                <div class="col-md-4">
-                  <label class="form-label">Check-in</label>
-                  <input type="date" id="ci" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Check-out</label>
-                  <input type="date" id="co" class="form-control" required>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">Huéspedes</label>
-                  <input type="number" id="guests" min="1" class="form-control">
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Observaciones</label>
-                  <textarea id="obs" rows="2" class="form-control" placeholder="Ej. llegada tarde, alergias…"></textarea>
-                </div>
-                <div class="col-12 d-grid d-md-flex gap-2">
-                  <button id="btn-save" type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-save me-1"></i>Guardar cambios
-                  </button>
-                  <button id="btn-cancel" type="button" class="btn btn-outline btn-sm">
-                    <i class="bi bi-x-circle me-1"></i>Cancelar reserva
-                  </button>
-                  <button id="btn-export" type="button" class="btn btn-outline btn-sm">
-                    <i class="bi bi-download me-1"></i>Exportar comprobante
-                  </button>
-                </div>
-              </form>
-              <small class="text-muted d-block mt-2"><i class="bi bi-shield-check me-1"></i>La edición valida disponibilidad en tiempo real.</small>
-            </div>
-          </div>
+            <hr class="my-4">
 
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h5 class="card-title">Políticas</h5>
-              <p class="mb-2"><strong>Cancelación:</strong> Gratis hasta 48 horas antes del check-in (excepto tarifas no reembolsables).</p>
-              <p class="mb-0"><strong>No show:</strong> Cargo de 1 noche.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-lg-4">
-          <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Total</h5>
-              <div class="d-flex justify-content-between"><span>Tarifa</span><span id="sum-tarifa">—</span></div>
-              <div class="d-flex justify-content-between"><span>Impuestos estimados</span><span id="sum-tax">—</span></div>
-              <hr>
-              <div class="d-flex justify-content-between fw-semibold"><span>Gran total</span><span id="sum-total">—</span></div>
-              <div class="mt-3 d-grid gap-2">
-                <!-- Eliminado: botón "Pagar ahora" -->
-                <a class="btn btn-outline btn-sm" href="portal-facturas.html"><i class="bi bi-receipt me-1"></i>Ver factura</a>
+            <div>
+              <div class="section-title mb-2">Exportar</div>
+              <div class="d-flex flex-wrap gap-2">
+                <a id="btnExportPdf" class="btn btn-outline-primary" href="#" target="_blank">PDF</a>
+                <a id="btnExportXls" class="btn btn-outline-success" href="#" target="_blank">Excel</a>
               </div>
+              <div class="form-hint mt-2">El PDF usa el comprobante oficial. El Excel descarga un CSV compatible.</div>
             </div>
           </div>
-
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h5 class="card-title">Acciones</h5>
-              <div class="d-grid gap-2">
-                <a id="link-edit" class="btn btn-outline btn-sm" href="#"><i class="bi bi-pencil-square me-1"></i>Modificar</a>
-                <button id="link-cancel" class="btn btn-outline btn-sm" type="button"><i class="bi bi-x-circle me-1"></i>Solicitar cancelación</button>
-                <a class="btn btn-outline btn-sm" href="portal-soporte.html"><i class="bi bi-chat-text me-1"></i>Contactar</a>
-              </div>
-            </div>
-          </div>
-
         </div>
       </div>
 
+      <!-- Edición -->
+      <div class="col-12 col-lg-6">
+        <div class="card info-card">
+          <div class="card-body">
+            <div class="section-title">Editar</div>
+            <form id="editForm" class="row gy-3 mt-1">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Check-in</label>
+                <input type="date" id="inCheckin" class="form-control">
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Check-out</label>
+                <input type="date" id="inCheckout" class="form-control">
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Huéspedes</label>
+                <input type="number" min="1" id="inPax" class="form-control" placeholder="1">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Observaciones</label>
+                <textarea id="inObs" class="form-control" rows="3" placeholder="Notas u observaciones"></textarea>
+              </div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-vg" type="submit">Guardar cambios</button>
+                <button id="btnCancel" class="btn btn-outline-danger" type="button">Cancelar reserva</button>
+                <a class="btn btn-outline-secondary ms-auto" href="/portal-reservas.html">Volver</a>
+              </div>
+            </form>
+            <div class="form-hint mt-2">Los cambios de fechas validan disponibilidad antes de guardarse.</div>
+          </div>
+        </div>
+      </div>
     </div>
-  </section>
-</main>
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados</div></div>
-</footer>
+  </main>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-<script>
-(function(){
-  const $ = (s)=>document.querySelector(s);
-  const params = new URLSearchParams(location.search);
-  const id = params.get("id");
-  const TAX = 0.13;
+  <script>
+    (function(){
+      const q = new URLSearchParams(location.search);
+      const reservaId = q.get('id');
 
-  const hdrTitle = $("#hdr-title");
-  const hdrSub   = $("#hdr-sub");
-  const sumCard  = $("#sum-card");
-  const ci = $("#ci"); const co = $("#co"); const guests = $("#guests"); const obs = $("#obs");
-  const btnSave = $("#btn-save"); const btnCancel = $("#btn-cancel"); const btnExport = $("#btn-export");
-  const linkEdit = $("#link-edit"); const linkCancel = $("#link-cancel"); const btnMod = $("#btn-mod");
+      const alerts = document.getElementById('alerts');
+      const spinner = document.getElementById('spinner');
 
-  const sTarifa = $("#sum-tarifa"); const sTax = $("#sum-tax"); const sTotal = $("#sum-total");
-  const alertBox = $("#alert-box");
+      const badgeEstado = document.getElementById('badgeEstado');
+      const valNumero = document.getElementById('valNumero');
+      const valTotal = document.getElementById('valTotal');
+      const valCI = document.getElementById('valCI');
+      const valCO = document.getElementById('valCO');
+      const valPax = document.getElementById('valPax');
+      const valCanal = document.getElementById('valCanal');
+      const valTipo = document.getElementById('valTipo');
 
-  function money(n){ n = Number(n||0); return "USD " + n.toFixed(2); }
-  function nights(a,b){
-    if(!a||!b) return 1;
-    const d1 = new Date(a+"T00:00:00"), d2 = new Date(b+"T00:00:00");
-    return Math.max(1, Math.round((d2-d1)/86400000));
-  }
-  function badgeClass(e){
-    if(e==="Cancelada") return "bg-danger";
-    if(e==="Completada") return "bg-secondary";
-    return "bg-success";
-  }
-  function flash(kind, msg){
-    alertBox.innerHTML = `<div class="alert alert-${kind}">${msg}</div>`;
-    setTimeout(()=>alertBox.innerHTML="", 2500);
-  }
+      const inCI = document.getElementById('inCheckin');
+      const inCO = document.getElementById('inCheckout');
+      const inPax = document.getElementById('inPax');
+      const inObs = document.getElementById('inObs');
 
-  async function load(){
-    if(!id){ hdrSub.textContent = "Reserva no especificada."; return; }
-    try{
-      const res = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}`, {headers:{"Accept":"application/json"}});
-      const j = await res.json();
-      if(!res.ok || !j.ok) throw new Error(j.error||"not found");
-      const r = j.item;
+      const btnComprobante = document.getElementById('btnComprobante');
+      const btnExportPdf = document.getElementById('btnExportPdf');
+      const btnExportXls = document.getElementById('btnExportXls');
 
-      hdrTitle.textContent = `Reserva #${r.numero || ("VG-" + r.id)}`;
-      hdrSub.textContent = `${r.tipo || "Habitación"} · ${r.checkin} – ${r.checkout}`;
-
-      const n = nights(r.checkin, r.checkout);
-      sumCard.innerHTML = `
-        <h5 class="card-title">Resumen</h5>
-        <div class="row">
-          <div class="col-md-6">
-            <p class="mb-1"><strong>Check-in:</strong> ${r.checkin}</p>
-            <p class="mb-1"><strong>Check-out:</strong> ${r.checkout}</p>
-            <p class="mb-1"><strong>Noches:</strong> ${n}</p>
-          </div>
-          <div class="col-md-6">
-            <p class="mb-1"><strong>Huéspedes:</strong> ${r.huespedes||"—"}</p>
-            <p class="mb-1"><strong>Plan:</strong> ${r.plan||"Tarifa Flexible"}</p>
-            <p class="mb-1"><strong>Estado:</strong> <span class="badge ${badgeClass(r.estado)} align">${r.estado}</span></p>
-          </div>
-        </div>`;
-
-      // Rellena form edición
-      ci.value = r.checkin || "";
-      co.value = r.checkout || "";
-      guests.value = (r.huespedes && String(r.huespedes).match(/\d+/)) ? String(r.huespedes).match(/\d+/)[0] : "";
-      obs.value = r.observaciones || "";
-
-      // Totales estimados
-      const priceNight = Number(r.precio_noche || 0);
-      const subtotal = priceNight * n;
-      const tax = subtotal * TAX;
-      const total = (r.monto && r.monto>0) ? r.monto : subtotal + tax;
-      sTarifa.textContent = money(subtotal);
-      sTax.textContent = money(tax);
-      sTotal.textContent = money(total);
-
-      // Acciones
-      linkEdit.href = `#edit`;
-      linkCancel.addEventListener("click", ()=>btnCancel.click());
-      btnMod.href = `#edit`;
-
-      // Si está cancelada, deshabilita edición
-      if(r.estado === "Cancelada"){
-        [ci, co, guests, obs, btnSave].forEach(el=>el.disabled = true);
+      function alertMsg(type, msg){
+        const el = document.createElement('div');
+        el.className = `alert alert-${type}`;
+        el.textContent = msg;
+        alerts.innerHTML = '';
+        alerts.appendChild(el);
+        setTimeout(()=>{ el.remove(); }, 5000);
       }
-    }catch(e){
-      hdrSub.textContent = "No pudimos cargar la reserva.";
-      console.error(e);
-    }
-  }
 
-  // Guardar (PUT)
-  document.getElementById("edit-form").addEventListener("submit", async (ev)=>{
-    ev.preventDefault();
-    btnSave.disabled = true;
-    try{
-      const payload = {
-        checkin: ci.value || undefined,
-        checkout: co.value || undefined,
-        huespedes: guests.value ? String(guests.value) : undefined,
-        observaciones: obs.value || ""
-      };
-      const r = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}`, {
-        method:"PUT",
-        headers:{"Content-Type":"application/json","Accept":"application/json"},
-        body: JSON.stringify(payload)
-      });
-      const j = await r.json().catch(()=>({}));
-      if(!r.ok || !j.ok){
-        if(j.error==="availability"){
-          flash("warning", j.message || "No hay disponibilidad para el nuevo rango.");
-        }else{
-          flash("danger", j.message || "No se pudo guardar.");
+      function fmtDate(s){ return s ? String(s).slice(0,10) : ''; }
+
+      function setEstadoBadge(estado){
+        badgeEstado.textContent = estado || '—';
+        badgeEstado.className = `badge badge-status ${estado||''}`;
+      }
+
+      if(!reservaId){
+        alertMsg('warning', 'Falta el parámetro ?id en la URL.');
+        document.querySelector('main').style.opacity = '.6';
+        throw new Error('missing id');
+      }
+
+      async function load(){
+        try{
+          spinner.style.display = 'block';
+          const res = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}`, {credentials:'same-origin'});
+          const data = await res.json();
+          if(!data.ok){ throw new Error('No se encontró la reserva.'); }
+          const r = data.item || {};
+
+          // Título / Estado / Básicos
+          document.getElementById('title').textContent = `Reserva ${r.numero || ('VG-'+r.id)}`;
+          setEstadoBadge(r.estado);
+          valNumero.textContent = r.numero || ('VG-'+r.id);
+          valTotal.textContent = '₡ ' + Number(r.monto||0).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
+          valCI.textContent = fmtDate(r.checkin);
+          valCO.textContent = fmtDate(r.checkout);
+          valPax.textContent = r.huespedes || '—';
+          valCanal.textContent = r.canal || '—';
+          valTipo.textContent = r.tipo || '—';
+
+          // Form edición
+          inCI.value = fmtDate(r.checkin);
+          inCO.value = fmtDate(r.checkout);
+          inPax.value = (r.huespedes||'').replace(/\D/g,'') || '';
+          inObs.value = r.observaciones || '';
+
+          // Enlaces de exportación
+          btnComprobante.href = `/api/reservas/${encodeURIComponent(r.id)}/comprobante`;
+          btnExportPdf.href = `/api/portal/reservas/${encodeURIComponent(r.id)}/export?format=pdf`;
+          btnExportXls.href = `/api/portal/reservas/${encodeURIComponent(r.id)}/export?format=xlsx`;
+
+        }catch(err){
+          console.error(err);
+          alertMsg('danger', err.message || 'Error al cargar la reserva.');
+        }finally{
+          spinner.style.display = 'none';
         }
-        return;
       }
-      flash("success","Cambios guardados.");
-      await load();
-    }catch(e){
-      console.error(e); flash("danger","Error inesperado.");
-    }finally{
-      btnSave.disabled = false;
-    }
-  });
 
-  // Cancelar (DELETE)
-  btnCancel.addEventListener("click", async ()=>{
-    if(!confirm("¿Confirmas cancelar esta reserva?")) return;
-    btnCancel.disabled = true;
-    try{
-      const r = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}`, {method:"DELETE", headers:{"Accept":"application/json"}});
-      const j = await r.json().catch(()=>({}));
-      if(!r.ok || !j.ok){ flash("danger", j.message||"No se pudo cancelar."); return; }
-      flash("success","Reserva cancelada.");
-      await load();
-    }catch(e){
-      console.error(e); flash("danger","Error inesperado.");
-    }finally{
-      btnCancel.disabled = false;
-    }
-  });
+      // Guardar cambios
+      document.getElementById('editForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        try{
+          const payload = {
+            checkin: inCI.value || null,
+            checkout: inCO.value || null,
+            huespedes: inPax.value ? String(inPax.value) : null,
+            observaciones: inObs.value || null
+          };
+          const res = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}`, {
+            method:'PUT',
+            headers:{'Content-Type':'application/json'},
+            credentials:'same-origin',
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if(!data.ok){
+            if(data.error === 'availability'){
+              throw new Error(data.message || 'No hay disponibilidad para las fechas seleccionadas.');
+            }
+            throw new Error('No se pudo guardar la reserva.');
+          }
+          alertMsg('success','Cambios guardados.');
+          // refrescar resumen
+          const r = data.item;
+          setEstadoBadge(r.estado);
+          document.getElementById('title').textContent = `Reserva ${r.numero || ('VG-'+r.id)}`;
+          valNumero.textContent = r.numero || ('VG-'+r.id);
+          valCI.textContent = fmtDate(r.checkin);
+          valCO.textContent = fmtDate(r.checkout);
+          valPax.textContent = r.huespedes || '—';
+        }catch(err){
+          alertMsg('danger', err.message || 'Error al guardar.');
+        }
+      });
 
-  // Exportar comprobante
-  btnExport.addEventListener("click", async ()=>{
-    try{
-      const r = await fetch(`/api/portal/reservas/${encodeURIComponent(id)}/export`, {headers:{"Accept":"application/json"}});
-      const j = await r.json().catch(()=>({}));
-      if(!r.ok || !j.ok){ flash("danger", j.message||"No se pudo exportar."); return; }
-      const blob = new Blob([JSON.stringify(j.comprobante,null,2)], {type:"application/json"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `comprobante-${j.comprobante?.numero||id}.json`;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }catch(e){
-      console.error(e); flash("danger","Error al exportar.");
-    }
-  });
+      // Cancelar
+      document.getElementById('btnCancel').addEventListener('click', async ()=>{
+        if(!confirm('¿Estás seguro de cancelar esta reserva?')) return;
+        try{
+          const resp = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}`, {
+            method:'DELETE', credentials:'same-origin'
+          });
+          const data = await resp.json();
+          if(!data.ok) throw new Error('No se pudo cancelar la reserva.');
+          alertMsg('success','Reserva cancelada.');
+          setEstadoBadge('Cancelada');
+        }catch(err){
+          alertMsg('danger', err.message || 'Error al cancelar.');
+        }
+      });
 
-  load();
-})();
-</script>
+      load();
+    })();
+  </script>
 </body>
 </html>

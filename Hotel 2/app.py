@@ -6,6 +6,7 @@ import sys
 import smtplib
 import ssl
 import json
+import csv
 from functools import wraps
 from email.message import EmailMessage
 from datetime import datetime, date
@@ -64,6 +65,11 @@ except Exception:
 STORAGE_DIR = BASE_DIR / "storage"
 COMPROBANTES_DIR = STORAGE_DIR / "comprobantes"
 COMPROBANTES_DIR.mkdir(parents=True, exist_ok=True)
+
+# Exportaciones (historial PDF/Excel)
+EXPORTS_DIR = STORAGE_DIR / "exports"
+EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+
 
 RECIBOS_DIR = STORAGE_DIR / "recibos"
 NOTAS_DIR = STORAGE_DIR / "notas"
@@ -743,6 +749,53 @@ def _create_comprobante_pdf(reserva: dict) -> Path:
         db.session.rollback()
 
     return out_path
+
+
+def _reserva_basic_row(r: dict) -> dict:
+    """Normaliza una reserva a columnas comunes para exportar."""
+    d = _reserva_to_dict(r)
+    return {
+        "numero": d.get("numero") or f"VG-{d.get('id')}",
+        "checkin": d.get("checkin"),
+        "checkout": d.get("checkout"),
+        "estado": d.get("estado"),
+        "tipo": d.get("tipo") or "-",
+        "plan": d.get("plan") or "-",
+        "canal": d.get("canal") or "-",
+        "huespedes": d.get("huespedes") or "0",
+        "monto": f"{float(d.get('monto') or 0.0):.2f}",
+    }
+
+def _create_reservas_pdf(items: list[dict], title: str, filename: str) -> Path:
+    """Genera un PDF simple con el listado de reservas del usuario."""
+    out_path = EXPORTS_DIR / filename
+    lines = []
+    header = "Núm.;Check-in;Check-out;Estado;Tipo;Plan;Canal;Huésp.;Total"
+    lines.append(header)
+    for r in items:
+        row = _reserva_basic_row(r)
+        lines.append(
+            f"{row['numero']};{row['checkin']};{row['checkout']};{row['estado']};"
+            f"{row['tipo']};{row['plan']};{row['canal']};{row['huespedes']};₡ {row['monto']}"
+        )
+    _write_minimal_pdf(out_path, title, lines)
+    return out_path
+
+def _create_reservas_csv(items: list[dict], filename: str) -> Path:
+    """
+    Genera un CSV (compatible con Excel) con el listado de reservas.
+    Usamos CSV para evitar dependencias adicionales (.xlsx). Excel lo abre sin problema.
+    """
+    out_path = EXPORTS_DIR / filename
+    cols = ["numero", "checkin", "checkout", "estado", "tipo", "plan", "canal", "huespedes", "monto"]
+    with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f, delimiter=",")
+        w.writerow(["Numero", "Check-in", "Check-out", "Estado", "Tipo", "Plan", "Canal", "Huespedes", "Total_CRC"])
+        for it in items:
+            row = _reserva_basic_row(it)
+            w.writerow([row[c] for c in cols])
+    return out_path
+
 
 
 # =========================
@@ -1484,6 +1537,44 @@ def create_app() -> Flask:
                 "[PORTAL] Error listando reservas para %s: %s", email, e
             )
             return jsonify({"ok": True, "items": [], "warning": "no_data"}), 200
+        
+        
+    @app.route("/api/portal/reservas/export", methods=["GET"])
+    @role_required("Cliente")
+    def api_portal_reservas_export():
+        """
+        Exporta el HISTORIAL del cliente:
+          - ?format=pdf  -> PDF listado
+          - ?format=excel|xls|xlsx -> CSV compatible con Excel
+        Respeta los mismos filtros que /api/portal/reservas: estado, fini, ffin.
+        """
+        if not session.get("user_id"):
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+
+        email = _current_user_email()
+        if not email:
+            return jsonify({"ok": True, "warning": "no_email"}), 200
+
+        estado = request.args.get("estado") or None
+        fini = request.args.get("fini") or None
+        ffin = request.args.get("ffin") or None
+        fmt = (request.args.get("format") or "pdf").lower()
+
+        items = _query_user_reservas(email, estado, fini, ffin) or []
+        ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+
+        if fmt == "pdf":
+            fname = f"reservas-{ts}.pdf"
+            path = _create_reservas_pdf(items, "Historial de reservas — Hotel Villa Grace", fname)
+            return send_file(str(path), as_attachment=True, download_name=fname, mimetype="application/pdf")
+
+        if fmt in ("excel", "xls", "xlsx"):
+            fname = f"reservas-{ts}.csv"
+            path = _create_reservas_csv(items, fname)
+            return send_file(str(path), as_attachment=True, download_name=fname, mimetype="text/csv")
+
+        return jsonify({"ok": True, "items": items})
+
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["GET"])
     @role_required("Cliente")
@@ -1560,10 +1651,17 @@ def create_app() -> Flask:
         )
         db.session.commit()
         return jsonify({"ok": True})
+    
+    
 
     @app.route("/api/portal/reservas/<int:reserva_id>/export", methods=["GET"])
     @role_required("Cliente")
     def api_portal_reserva_export(reserva_id: int):
+        """
+        Exporta UNA reserva:
+          - ?format=pdf  -> PDF de comprobante (por defecto)
+          - ?format=excel|xls|xlsx -> CSV compatible con Excel, con campos de la reserva
+        """
         if not session.get("user_id"):
             return jsonify({"ok": False, "error": "auth_required"}), 401
         email = _current_user_email()
@@ -1574,19 +1672,31 @@ def create_app() -> Flask:
         if not r:
             return jsonify({"ok": False, "error": "not_found"}), 404
 
-        data = _reserva_to_dict(r)
-        return jsonify(
-            {
-                "ok": True,
-                "comprobante": {
-                    "numero": data.get("numero") or f"VG-{data.get('id')}",
-                    "fecha": datetime.utcnow().isoformat() + "Z",
-                    "cliente": email,
-                    "reserva": data,
-                    "emisor": {"hotel": "Hotel Villa Grace", "canal": data.get("canal", "Web")},
-                },
-            }
-        )
+        fmt = (request.args.get("format") or "pdf").lower()
+
+        # PDF de comprobante (existente)
+        if fmt == "pdf":
+            numero = r.get("Numero") or _make_unique_number(
+                reserva_id, _normalize_date_like(r.get("Fecha_Entrada")) or ""
+            )
+            pdf_path = COMPROBANTES_DIR / f"{numero}.pdf"
+            if not pdf_path.exists():
+                _create_comprobante_pdf(dict(r))
+            if not pdf_path.exists():
+                return jsonify({"ok": False, "error": "not_available"}), 404
+            return send_file(str(pdf_path), as_attachment=True, download_name=f"{numero}.pdf")
+
+        # Excel (CSV compatible) de UNA reserva
+        if fmt in ("excel", "xls", "xlsx"):
+            data = [_reserva_to_dict(r)]
+            num = data[0].get("numero") or f"VG-{reserva_id}"
+            fname = f"reserva-{num}.csv"
+            path = _create_reservas_csv(data, fname)
+            return send_file(str(path), as_attachment=True, download_name=fname, mimetype="text/csv")
+
+        # Fallback: JSON (solo si alguien lo invoca explícitamente)
+        return jsonify({"ok": True, "item": _reserva_to_dict(r)})
+
 
     # ---------------------- RUTA descarga comprobante ----------------------
     @app.route("/api/reservas/<int:reserva_id>/comprobante", methods=["GET"])
