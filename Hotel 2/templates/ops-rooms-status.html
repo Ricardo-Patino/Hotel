@@ -168,11 +168,10 @@
 
                 ${r.estado === "Disponible" ? `
                   <button class="btn btn-outline-success btn-sm"
-                    onclick="sendToCleaning(${r.codigo_habitacion})">
+                    onclick="sendToCleaning(${r.id})">
                     Enviar a limpieza
                   </button>` : ""}
               </div>
-
             </div>
           `;
           container.appendChild(card);

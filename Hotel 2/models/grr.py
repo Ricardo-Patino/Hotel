@@ -51,11 +51,17 @@ class CodigoDescuento(db.Model):
     Activo = db.Column(db.Boolean, nullable=False, default=True)
 
 class HousekeepingTask(db.Model):
-    __tablename__ = "Housekeeping_Task"
+    __tablename__ = "housekeepingtask"
+
     Id = db.Column(db.BigInteger, primary_key=True)
-    Codigo_Habitacion = db.Column(db.Integer, db.ForeignKey('Habitacion.Codigo_Habitacion'), nullable=False)
-    Tipo = db.Column(db.Enum('Limpieza','Mantenimiento','Inspeccion'), nullable=False)
-    Estado = db.Column(db.Enum('Pendiente','EnProceso','Lista'), nullable=False, default='Pendiente')
-    Prioridad = db.Column(db.Enum('Alta','Media','Baja'), nullable=False, default='Media')
-    Origen = db.Column(db.Enum('CheckOut','Extension','Mantenimiento','Manual'), nullable=False, default='Manual')
+    Habitacion_Id = db.Column(db.Integer, db.ForeignKey('Habitacion.Codigo_Habitacion'), nullable=False)  # ✅ CAMBIO AQUÍ
+    Estado = db.Column(
+        db.Enum('Pendiente', 'En proceso', 'Terminado', name='estado_hk_enum'),
+        nullable=False,
+        default='Pendiente'
+    )
+    Observaciones = db.Column(db.String(255))
     Fecha_Creacion = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    Fecha_Cierre = db.Column(db.DateTime)
+
+    Habitacion = db.relationship("Habitacion", backref="tareas_limpieza")

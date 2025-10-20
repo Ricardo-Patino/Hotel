@@ -961,6 +961,8 @@ WHERE NOT EXISTS (
 );
 
 
+ALTER TABLE habitacion
+MODIFY Estado ENUM('Disponible', 'Ocupada', 'Mantenimiento', 'Limpieza');
 
 
 
