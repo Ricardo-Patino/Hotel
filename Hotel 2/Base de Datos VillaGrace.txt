@@ -840,7 +840,12 @@ SELECT Codigo_Habitacion FROM Habitacion;
 /* ------------------------------------------------------------------------- */
 
 INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado)
-VALUES ('101', 'Sencilla', 15000.00, 'Disponible');
+VALUES ('101','Sencilla',15000.00,'Disponible')
+ON DUPLICATE KEY UPDATE
+  Tipo = VALUES(Tipo),
+  Precio_Noche = VALUES(Precio_Noche),
+  Estado = VALUES(Estado);
+
 
 INSERT INTO MantenimientoSolicitud
 (Codigo_Habitacion, Titulo, Descripcion, Prioridad, Estado)
@@ -873,7 +878,12 @@ INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado) VALUES
  ('101','Sencilla', 15000.00,'Disponible'),
  ('102','Doble',    30000.00,'Disponible'),
  ('201','Suite',    45000.00,'Mantenimiento'),
- ('202','Suite',    45000.00,'Disponible');
+ ('202','Suite',    45000.00,'Disponible')
+ON DUPLICATE KEY UPDATE
+  Tipo = VALUES(Tipo),
+  Precio_Noche = VALUES(Precio_Noche),
+  Estado = VALUES(Estado);
+
 
 INSERT INTO Funcionario (Cedula,Nombre,Apellido,Puesto,Fecha_Nacimiento) VALUES
  ('305410583','Juan','Jiménez','Recepcionista','1998-03-21'),
@@ -973,6 +983,7 @@ SHOW TABLES LIKE 'fin_invoices';
 
 select * from Habitacion;
 Select * from Usuario;
+Select * from Reserva;
 Select * from InvCategoria;
 Select * from InvInsumo;
 Select * from InvMovimiento;

@@ -477,15 +477,21 @@ def _reserva_belongs_to_email(reserva_id: int, email: str) -> bool:
     return bool(row)
 
 
-def _validate_no_overbooking(ci: str, co: str, rooms: int = 1) -> tuple[bool, str]:
+def _validate_no_overbooking(ci: str, co: str, rooms: int = 1, tipo: Optional[str] = None, guests: Optional[int] = None) -> tuple[bool, str]:
+    qs = {"checkin": ci, "checkout": co, "rooms": rooms}
+    if guests is not None:
+        qs["guests"] = int(guests)
+    if tipo:
+        qs["tipo"] = tipo
     with current_app.test_client() as c:
-        resp = c.get(url_for("api_availability", checkin=ci, checkout=co, rooms=rooms))
+        resp = c.get(url_for("api_availability", **qs))
         data = resp.get_json() if resp.is_json else {}
     if not data or not data.get("ok"):
         return False, "No se pudo validar disponibilidad."
     if not data.get("available"):
         return False, data.get("message") or "Sin cupo para ese rango."
     return True, ""
+
 
 
 def ensure_cliente_for_email(
@@ -925,6 +931,25 @@ def create_app() -> Flask:
             return bool(exists)
         except Exception:
             return False
+        
+        
+    def _col_nullable(table: str, column: str) -> bool:
+        try:
+            row = db.session.execute(
+                text("""
+                    SELECT CASE WHEN IS_NULLABLE='YES' THEN 1 ELSE 0 END
+                      FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME = :t
+                       AND COLUMN_NAME = :c
+                     LIMIT 1
+                """),
+                {"t": table, "c": column}
+            ).scalar()
+            return bool(row)
+        except Exception:
+            return True  # si no podemos saberlo, asumimos que sí permite NULL
+
 
     # --- Helpers seguros para castear valores de dict/JSON ---
     def _to_int(v, default=None):
@@ -1098,6 +1123,19 @@ def create_app() -> Flask:
     @app.route("/booking.html")
     def booking_html():
         return redirect(url_for("booking_search"))
+    
+    # =========================
+    # GRR-01-007: Reserva sin iniciar sesión (UI públicas)
+    # =========================
+    @app.route("/reserva-sin-sesion")
+    def anon_reserva_html():
+        # Pantalla pública (no está en PROTECTED_BOOKING_PATHS)
+        return render_template("anon-reserva.html")
+
+    @app.route("/reserva-sin-sesion/exito")
+    def anon_reserva_exito_html():
+        return render_template("anon-reserva-exito.html")
+
 
     # ---------------------- Portal / Ops / Admin (protegidas por rol) ------------
     @app.route("/portal-dashboard.html")
@@ -1164,33 +1202,87 @@ def create_app() -> Flask:
     @app.get("/api/availability")
     def api_availability():
         from datetime import datetime as dt
-
+        from math import ceil
+    
         checkin = (request.args.get("checkin") or "").strip()
         checkout = (request.args.get("checkout") or "").strip()
-        guests = int((request.args.get("guests") or "1") or 1)
-        rooms_req = int((request.args.get("rooms") or "1") or 1)
-
+        guests = int((request.args.get("guests") or 1) or 1)
+        rooms_req = int((request.args.get("rooms") or 1) or 1)
+        tipo = (request.args.get("tipo") or request.args.get("type") or "").strip()
+    
+        # Validar fechas
         try:
             ci = dt.strptime(checkin, "%Y-%m-%d").date()
             co = dt.strptime(checkout, "%Y-%m-%d").date()
         except Exception:
             return jsonify({"ok": False, "available": False, "message": "Fechas inválidas"}), 400
-
+    
         today = date.today()
         if ci < today or co <= ci:
             return jsonify({"ok": True, "available": False, "message": "Rango de fechas no válido"}), 200
-
-        try:
-            total_rooms = db.session.query(Habitacion).count()
-            if not total_rooms:
-                total_rooms = 10
-        except Exception:
-            total_rooms = 10
-
-        available_rooms = total_rooms
+    
+        # Columnas disponibles
+        has_cap = _col_exists("Habitacion", "Capacidad")
+        has_tipo = _col_exists("Habitacion", "Tipo")
+    
+        # Si pidieron un tipo pero no existe en catálogo, devuélvelo claro
+        if tipo and has_tipo:
+            exists_type = db.session.execute(
+                text("SELECT 1 FROM Habitacion WHERE Tipo = :t LIMIT 1"),
+                {"t": tipo}
+            ).first()
+            if not exists_type:
+                return jsonify({
+                    "ok": True,
+                    "available": False,
+                    "nights": (co - ci).days,
+                    "rooms_available": 0,
+                    "rooms_requested": rooms_req,
+                    "guests": guests,
+                    "checkin": checkin,
+                    "checkout": checkout,
+                    "message": f"No hay habitaciones de tipo '{tipo}' configuradas."
+                }), 200
+    
+        # Requisitos de capacidad (por habitación)
+        need_per_room = ceil(guests / max(rooms_req, 1))
+    
+        # Habitaciones libres (sin solape con reservas Confirmadas/Pendientes)
+        conditions = []
+        params = {"ci": checkin, "co": checkout}
+        if tipo and has_tipo:
+            conditions.append("h.Tipo = :tipo")
+            params["tipo"] = tipo
+        if has_cap:
+            conditions.append("h.Capacidad >= :cap")
+            params["cap"] = need_per_room
+    
+        where_extra = (" AND " + " AND ".join(conditions)) if conditions else ""
+    
+        rows = db.session.execute(
+            text(f"""
+                SELECT
+                  h.Codigo_Habitacion   AS id
+                FROM Habitacion h
+                WHERE 1=1
+                  {where_extra}
+                  AND NOT EXISTS (
+                        SELECT 1
+                          FROM Reserva r
+                         WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
+                           AND r.Estado IN ('Confirmada','Pendiente')
+                           AND DATE(r.Fecha_Entrada) < DATE(:co)
+                           AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                  )
+                ORDER BY h.Codigo_Habitacion
+            """),
+            params
+        ).mappings().all()
+    
+        available_rooms = len(rows)
         nights = (co - ci).days
         is_available = available_rooms >= rooms_req
-
+    
         return jsonify({
             "ok": True,
             "available": bool(is_available),
@@ -1198,14 +1290,508 @@ def create_app() -> Flask:
             "rooms_available": available_rooms,
             "rooms_requested": rooms_req,
             "guests": guests,
+            "per_room_capacity_required": need_per_room if has_cap else None,
             "checkin": checkin,
             "checkout": checkout,
+            "tipo": tipo or None,
             "message": ("Disponibilidad confirmada" if is_available else "Sin cupo para ese rango"),
         }), 200
+
 
     @app.get("/booking/search")
     def booking_search_alias():
         return redirect(url_for("api_availability", **request.args))
+    
+    
+    # =========================
+    # GRR-01-007: Reserva sin iniciar sesión (API + helpers locales)
+    # =========================
+
+    def _try_int_digits(s: str) -> int:
+        """Extrae dígitos de un string y devuelve int (o 0 si no hay)."""
+        if not s:
+            return 0
+        import re
+        digs = "".join(re.findall(r"\d+", str(s)))
+        try:
+            return int(digs) if digs else 0
+        except Exception:
+            return 0
+
+    def _upsert_cliente_con_doc(nombre, apellido, correo, telefono, doc_tipo, doc_num):
+        """
+        Asegura un Cliente con correo y documento.
+        - Cedula (entero) se llena si hay dígitos; si es pasaporte alfa-numérico -> 0.
+        - Si ya existe por correo, actualiza Nombre/Apellido/Telefono si vienen nuevos.
+        """
+        correo = (correo or "").strip().lower()
+        row = db.session.execute(
+            text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
+            {"e": correo}
+        ).first()
+        cedula_int = _try_int_digits(doc_num)
+        if row:
+            cid = int(row[0])
+            db.session.execute(text("""
+                UPDATE Cliente
+                   SET Nombre     = COALESCE(NULLIF(:n,''), Nombre),
+                       Apellido   = COALESCE(NULLIF(:a,''), Apellido),
+                       Telefono   = COALESCE(NULLIF(:t,''), Telefono),
+                       Cedula     = CASE WHEN :c > 0 THEN :c ELSE Cedula END
+                 WHERE Codigo_Cliente = :id
+            """), {"n": nombre, "a": apellido, "t": telefono, "c": cedula_int, "id": cid})
+            db.session.commit()
+            return cid
+        # crear
+        db.session.execute(text("""
+            INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
+            VALUES (:ced, :n, :a, :t, :e, '1990-01-01')
+        """), {"ced": cedula_int, "n": nombre or "Cliente", "a": apellido or "", "t": telefono or "00000000", "e": correo})
+        db.session.commit()
+        new_id = db.session.execute(
+            text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
+            {"e": correo}
+        ).scalar()
+        return int(new_id)
+
+    def _create_or_link_usuario(correo: str, cliente_id: int, nombre_completo: str,
+                                telefono: Optional[str] = None, doc_numero: Optional[str] = None
+                               ) -> tuple[Optional[int], Optional[str]]:
+        """
+        Crea (o enlaza) Usuario con rol 'Cliente' y devuelve (usuario_id, temp_password).
+        Incluye Telefono si la columna existe (evita error 1364) y, si existe, Cedula_Pasaporte.
+        Si no hay columna de contraseña, se crea usuario sin contraseña y se forzará reset por email.
+        """
+        correo = (correo or "").strip().lower()
+    
+        # ¿Ya existe por correo?
+        urow = db.session.execute(
+            text("SELECT Codigo_Usuario, COALESCE(Codigo_Cliente,0) FROM Usuario WHERE LOWER(Correo)=:e LIMIT 1"),
+            {"e": correo}
+        ).first()
+        temp_pwd = None
+        if urow:
+            uid, cc = int(urow[0]), int(urow[1] or 0)
+            if not cc and cliente_id:
+                db.session.execute(text("UPDATE Usuario SET Codigo_Cliente=:c WHERE Codigo_Usuario=:u"),
+                                   {"c": cliente_id, "u": uid})
+                db.session.commit()
+            return uid, temp_pwd
+    
+        # Resolver columnas disponibles en la tabla Usuario
+        tel_col  = _col_exists("Usuario", "Telefono")
+        pwd_col  = _col_exists("Usuario", "Contrasena")
+        doc_col  = _col_exists("Usuario", "Cedula_Pasaporte")
+    
+        # Telefono a usar
+        tel_val = (telefono or "").strip()
+        if not tel_val:
+            tel_val = (db.session.execute(
+                text("SELECT Telefono FROM Cliente WHERE Codigo_Cliente=:id LIMIT 1"),
+                {"id": cliente_id}
+            ).scalar() or "").strip()
+        if not tel_val:
+            tel_val = "00000000"
+        tel_val = tel_val[:20]
+    
+        # Doc a usar (si la columna existe)
+        doc_val = (doc_numero or "").strip()[:64] if doc_col else None
+    
+        # Preparar password temporal si existe columna de contraseña
+        import secrets
+        try:
+            from werkzeug.security import generate_password_hash
+            if pwd_col:
+                temp_pwd = secrets.token_urlsafe(8)
+                pwd_hash = generate_password_hash(temp_pwd)
+            else:
+                pwd_hash = None
+        except Exception:
+            if pwd_col:
+                temp_pwd = secrets.token_urlsafe(8)
+                pwd_hash = temp_pwd
+            else:
+                pwd_hash = None
+    
+        # Rol cliente
+        rol = _get_role_by_name("Cliente")
+        rol_id = getattr(rol, "Codigo_Rol", None) or getattr(rol, "id", None)
+    
+        # Construir INSERT dinámico según columnas existentes
+        cols = ["Codigo_Cliente", "Correo", "Rol_Id", "Estado", "Nombre"]
+        params = {"c": cliente_id, "e": correo, "r": rol_id, "n": nombre_completo[:80]}
+        if pwd_col:
+            cols.append("Contrasena"); params["p"] = pwd_hash
+        if tel_col:
+            cols.append("Telefono"); params["t"] = tel_val
+        if doc_col and doc_val:
+            cols.append("Cedula_Pasaporte"); params["d"] = doc_val
+    
+        placeholders = []
+        for col in cols:
+            if col == "Contrasena":
+                placeholders.append(":p")
+            elif col == "Telefono":
+                placeholders.append(":t")
+            elif col == "Cedula_Pasaporte":
+                placeholders.append(":d")
+            elif col == "Codigo_Cliente":
+                placeholders.append(":c")
+            elif col == "Correo":
+                placeholders.append(":e")
+            elif col == "Rol_Id":
+                placeholders.append(":r")
+            elif col == "Estado":
+                placeholders.append("'Activo'")
+            elif col == "Nombre":
+                placeholders.append(":n")
+            else:
+                placeholders.append("NULL")
+    
+        try:
+            sql = text(f"INSERT INTO Usuario ({', '.join(cols)}) VALUES ({', '.join(placeholders)})")
+            res = db.session.execute(sql, params)
+            db.session.commit()
+            uid = res.lastrowid or db.session.execute(
+                text("SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=:e LIMIT 1"), {"e": correo}
+            ).scalar()
+            return int(uid), temp_pwd
+        except Exception as e:
+            current_app.logger.error(f"[USUARIO] No se pudo crear: {e}")
+            db.session.rollback()
+            return None, None
+
+
+    def _send_new_account_and_reserva_email(to_email: str, numero: str, ci: str, co: str, temp_pwd: Optional[str]):
+        """
+        Envía correo de confirmación de reserva y (si aplica) contraseña temporal.
+        Incluye link a iniciar sesión y a 'olvidé mi contraseña' para forzar cambio.
+        """
+        login_link = url_for("login_html", _external=True)
+        forgot_link = url_for("forgot_password", _external=True)
+
+        # Si existe flujo de reset por token:
+        try:
+            s = _get_serializer(app)
+            token = s.dumps({"email": to_email})  # estandarizado
+            reset_url = url_for("reset_password", token=token, _external=True)
+        except Exception:
+            reset_url = forgot_link
+
+        subject = f"Reserva {numero} — Hotel Villa Grace"
+        body = [
+            "¡Gracias por reservar en Hotel Villa Grace!",
+            f"Número de reserva: {numero}",
+            f"Check-in: {ci}",
+            f"Check-out: {co}",
+            "",
+            "Tu cuenta de huésped fue creada con este correo.",
+        ]
+        if temp_pwd:
+            body += [f"Contraseña temporal: {temp_pwd}"]
+        body += [
+            "",
+            f"Inicia sesión aquí: {login_link}",
+            f"Para cambiar tu contraseña, usa este enlace: {reset_url}",
+            "",
+            "Si no solicitaste esta reserva, contáctanos.",
+            "— Hotel Villa Grace"
+        ]
+        sender = app.config.get("MAIL_DEFAULT_SENDER") or app.config.get("MAIL_USERNAME") or "no-reply@hotel.local"
+
+        try:
+            host = app.config.get("MAIL_SERVER")
+            port = int(app.config.get("MAIL_PORT", 0) or 0)
+            user = app.config.get("MAIL_USERNAME")
+            pwd  = app.config.get("MAIL_PASSWORD")
+            use_tls = bool(app.config.get("MAIL_USE_TLS", False))
+            use_ssl = bool(app.config.get("MAIL_USE_SSL", False))
+
+            if not (host and port and user and pwd):
+                current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n" + "\n".join(body))
+                return
+
+            msg = EmailMessage()
+            msg["Subject"] = subject
+            msg["From"] = sender
+            msg["To"] = to_email
+            msg.set_content("\n".join(body))
+
+            if use_ssl:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
+                    smtp.login(user, pwd); smtp.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=30) as smtp:
+                    if use_tls:
+                        smtp.starttls(context=ssl.create_default_context())
+                    smtp.login(user, pwd); smtp.send_message(msg)
+        except Exception as e:
+            current_app.logger.warning(f"[MAIL] Fallback console: {e}")
+            current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n" + "\n".join(body))
+
+    
+    @app.post("/api/reservas/anon")
+    def api_reservas_anon_create():
+        """
+        Crea una reserva pública (GRR-01-007) y asegura:
+          - Cliente creado/actualizado con documento
+          - Usuario con rol 'Cliente' creado o enlazado
+          - Inserción en Reserva incluyendo Codigo_Funcionario si la columna existe
+          - Número de comprobante único
+          - Auditoría, KPI y correo de confirmación
+        """
+        p = request.get_json(silent=True) or {}
+    
+        def req(k: str) -> str:
+            return (p.get(k) or "").strip()
+    
+        # ---- Datos del formulario ----
+        checkin = req("checkin")
+        checkout = req("checkout")
+        tipo = req("tipo")
+    
+        try:
+            huespedes = int(p.get("huespedes") or 1)
+        except Exception:
+            huespedes = 1
+    
+        nombre = req("nombre")
+        apellido = req("apellido")
+        correo = (req("correo") or "").lower()
+        telefono = req("telefono")
+        doc_tipo = req("doc_tipo")
+        doc_numero = req("doc_numero")
+        acepta = str(p.get("acepta") or "0") in ("1", "true", "True")
+    
+        # ---- Validación de campos obligatorios ----
+        if not (checkin and checkout and tipo and nombre and apellido and correo and telefono and doc_tipo and doc_numero and acepta):
+            return jsonify({"ok": False, "message": "Faltan campos obligatorios."}), 400
+        if huespedes <= 0:
+            return jsonify({"ok": False, "message": "La cantidad de huéspedes debe ser mayor a 0."}), 400
+    
+        # ---- Validar disponibilidad sin sobreventa (incluye tipo/huéspedes) ----
+        ok, msg = _validate_no_overbooking(checkin, checkout, rooms=1, tipo=tipo, guests=huespedes)
+        if not ok:
+            return jsonify({"ok": False, "message": msg or "Sin disponibilidad para el rango."}), 400
+    
+        # ---- Cliente (upsert por correo + documento) ----
+        try:
+            cliente_id = _upsert_cliente_con_doc(
+                nombre, apellido, correo, telefono, doc_tipo, doc_numero
+            )
+        except Exception as e:
+            current_app.logger.exception("[ANON] Error creando/enlazando Cliente: %s", e)
+            return jsonify({"ok": False, "message": "No se pudo crear/enlazar al cliente."}), 500
+    
+        if not cliente_id:
+            return jsonify({"ok": False, "message": "No se pudo crear/enlazar al cliente."}), 500
+    
+        # ---- Usuario (cuenta de portal, rol 'Cliente') ----
+        try:
+            uid, temp_pwd = _create_or_link_usuario(
+                correo, cliente_id, f"{nombre} {apellido}", telefono=telefono, doc_numero=doc_numero
+            )
+        except Exception as e:
+            current_app.logger.exception("[ANON] Error creando/enlazando Usuario: %s", e)
+            return jsonify({"ok": False, "message": "No se pudo crear la cuenta del huésped."}), 500
+    
+        if not uid:
+            return jsonify({"ok": False, "message": "No se pudo crear la cuenta del huésped."}), 500
+    
+        # ---- Buscar una habitación LIBRE que cumpla con tipo/capacidad y rango ----
+        has_cap = _col_exists("Habitacion", "Capacidad")
+        has_tipo = _col_exists("Habitacion", "Tipo")
+        per_room_need = huespedes  # rooms=1 en este flujo
+    
+        # (opcional) si el tipo no existe en catálogo, devolver mensaje claro
+        if tipo and has_tipo:
+            _type_exists = db.session.execute(
+                text("SELECT 1 FROM Habitacion WHERE Tipo = :t LIMIT 1"),
+                {"t": tipo}
+            ).first()
+            if not _type_exists:
+                return jsonify({"ok": False, "message": f"No hay habitaciones de tipo '{tipo}' configuradas."}), 400
+    
+        conds = []
+        params = {"ci": checkin, "co": checkout}
+        if tipo and has_tipo:
+            conds.append("h.Tipo = :t")
+            params["t"] = tipo
+        if has_cap:
+            conds.append("h.Capacidad >= :cap")
+            params["cap"] = int(per_room_need)
+    
+        where_extra = (" AND " + " AND ".join(conds)) if conds else ""
+    
+        hab = db.session.execute(
+            text(f"""
+                SELECT h.Codigo_Habitacion, h.Precio_Noche
+                  FROM Habitacion h
+                 WHERE 1=1
+                   {where_extra}
+                   AND NOT EXISTS (
+                        SELECT 1
+                          FROM Reserva r
+                         WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
+                           AND r.Estado IN ('Confirmada','Pendiente')
+                           AND DATE(r.Fecha_Entrada) < DATE(:co)
+                           AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                   )
+                 ORDER BY h.Codigo_Habitacion
+                 LIMIT 1
+            """),
+            params
+        ).mappings().first()
+    
+        if not hab:
+            return jsonify({
+                "ok": False,
+                "message": "No hay habitaciones disponibles que cumplan los criterios para ese rango."
+            }), 409
+    
+        hab_id = int(hab["Codigo_Habitacion"])
+        price_n = float(hab["Precio_Noche"] or 0.0)
+    
+        # ---- Calcular noches y monto total ----
+        try:
+            ci_dt = datetime.strptime(checkin, "%Y-%m-%d").date()
+            co_dt = datetime.strptime(checkout, "%Y-%m-%d").date()
+            nights = max((co_dt - ci_dt).days, 1)
+        except Exception:
+            nights = 1
+    
+        monto_total = round(price_n * nights * max(1, huespedes), 2)
+    
+        # ---- Observaciones (guardar doc y tel para check-in) ----
+        obs = f"GRR-01-007 | Doc: {doc_tipo} {doc_numero} | Tel: {telefono}"
+    
+        # ---- Insert dinámico en Reserva (incluye Codigo_Funcionario sólo si es válido) ----
+        try:
+            has_func_col = _col_exists("Reserva", "Codigo_Funcionario")
+        
+            # Intentar mapear usuario de sesión -> funcionario por Codigo_Usuario
+            func_id = None
+            if has_func_col:
+                try:
+                    uid = _to_int(session.get("user_id"))
+                    if uid:
+                        func_id = db.session.execute(
+                            text("SELECT Codigo_Funcionario FROM Funcionario WHERE Codigo_Usuario = :u LIMIT 1"),
+                            {"u": uid}
+                        ).scalar()
+                        func_id = _to_int(func_id)
+                except Exception:
+                    func_id = None
+        
+            cols = [
+                "Codigo_Cliente", "Codigo_Habitacion", "Fecha_Entrada", "Fecha_Salida",
+                "Canal", "Estado", "Huespedes", "Monto_Total", "Observaciones", "Fecha_Registro"
+            ]
+            vals = [
+                ":c", ":h", ":ci", ":co",
+                "'Web'", "'Pendiente'", ":pax", ":m", ":obs", "NOW()"
+            ]
+            params = {
+                "c": int(cliente_id),
+                "h": int(hab_id),
+                "ci": checkin,
+                "co": checkout,
+                "pax": int(huespedes),
+                "m": float(monto_total),
+                "obs": obs
+            }
+        
+            # Solo incluir la columna si tenemos un funcionario válido
+            if has_func_col and func_id:
+                cols.append("Codigo_Funcionario")
+                vals.append(":f")
+                params["f"] = func_id
+            elif has_func_col and not func_id:
+                # Si la columna NO permite NULL, intentamos usar algún funcionario existente (p. ej. “Web” o el primero)
+                if not _col_nullable("Reserva", "Codigo_Funcionario"):
+                    try:
+                        any_f = db.session.execute(
+                            text("SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario ASC LIMIT 1")
+                        ).scalar()
+                        if any_f:
+                            cols.append("Codigo_Funcionario")
+                            vals.append(":f")
+                            params["f"] = int(any_f)
+                        # Si no hay ninguno, dejamos fuera la columna y que falle arriba (mejor mensaje)
+                    except Exception:
+                        pass
+                # Si la columna permite NULL, simplemente no la incluimos
+        
+            sql_insert = text(f"INSERT INTO Reserva ({', '.join(cols)}) VALUES ({', '.join(vals)})")
+            res = db.session.execute(sql_insert, params)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception("[ANON] Error insertando Reserva: %s", e)
+            return jsonify({"ok": False, "message": "No se pudo registrar la reserva."}), 500
+        
+    
+        # ---- Obtener ID de la reserva recién creada ----
+        try:
+            reserva_id = int(
+                res.lastrowid
+                or db.session.execute(
+                    text("""
+                        SELECT Codigo_Reserva
+                          FROM Reserva
+                         WHERE Codigo_Cliente=:c AND Fecha_Entrada=:ci AND Fecha_Salida=:co
+                         ORDER BY Codigo_Reserva DESC
+                         LIMIT 1
+                    """),
+                    {"c": cliente_id, "ci": checkin, "co": checkout}
+                ).scalar()
+            )
+        except Exception as e:
+            current_app.logger.exception("[ANON] No se pudo recuperar Codigo_Reserva: %s", e)
+            return jsonify({"ok": False, "message": "Reserva creada, pero no se pudo obtener el ID."}), 500
+    
+        # ---- Asignar número único de comprobante ----
+        try:
+            numero = _make_unique_number(reserva_id, checkin)
+            db.session.execute(
+                text("UPDATE Reserva SET Numero_Comprobante=:n WHERE Codigo_Reserva=:id"),
+                {"n": numero, "id": reserva_id}
+            )
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.warning("[ANON] No se pudo asignar Numero_Comprobante: %s", e)
+            numero = _make_unique_number(reserva_id, checkin)  # fallback in-memory
+    
+        # ---- Auditoría + KPI (seguro por si after_request no corre) ----
+        try:
+            _audit_log(correo, "reserva.creada.publica",
+                       {"Codigo_Reserva": reserva_id, "Numero": numero},
+                       entidad_id=str(reserva_id))
+        except Exception:
+            pass
+        try:
+            _update_kpis(float(monto_total or 0), checkin)
+        except Exception:
+            pass
+    
+        # ---- Enviar correo de confirmación / credenciales ----
+        try:
+            _send_new_account_and_reserva_email(correo, numero, checkin, checkout, temp_pwd)
+        except Exception as e:
+            current_app.logger.warning("[ANON] Error enviando correo de confirmación: %s", e)
+    
+        return jsonify({
+            "ok": True,
+            "reserva_id": reserva_id,
+            "numero": numero,
+            "redirect": url_for("anon_reserva_exito_html", numero=numero)
+        }), 201
+    
+   
+
+    
 
     # === API: estado actual de todas las habitaciones (para el tablero) ===
     @app.get("/api/rooms/status")
@@ -1844,39 +2430,44 @@ def create_app() -> Flask:
         max_age = 3600  # 1 hora
         try:
             data = s.loads(token, max_age=max_age)
-            email = (data or {}).get("email")
+            # Soporta tokens antiguos (str) y nuevos (dict)
+            if isinstance(data, dict):
+                email = (data.get("email") or "").strip().lower()
+            else:
+                email = (str(data) or "").strip().lower()
         except SignatureExpired:
             flash("El enlace expiró. Solicita uno nuevo.", "warning")
             return redirect(url_for("forgot_password"))
         except BadSignature:
             flash("Enlace inválido. Solicita uno nuevo.", "danger")
             return redirect(url_for("forgot_password"))
-
-        user = Usuario.query.filter(func.lower(Usuario.Correo) == (email or "").lower()).first()
+    
+        user = Usuario.query.filter(func.lower(Usuario.Correo) == email).first()
         if not user:
             flash("El enlace no es válido o expiró.", "danger")
             return redirect(url_for("forgot_password"))
-
+    
         if request.method == "POST":
             pwd1 = (request.form.get("password") or "").strip()
             pwd2 = (request.form.get("confirm_password") or "").strip()
-
+    
             if len(pwd1) < 8:
                 flash("La contraseña debe tener al menos 8 caracteres.", "warning")
                 return render_template("reset-password.html", token=token, email=email)
             if pwd1 != pwd2:
                 flash("Las contraseñas no coinciden.", "warning")
                 return render_template("reset-password.html", token=token, email=email)
-
+    
             user.set_password(pwd1)
             db.session.commit()
-            if session.get("user_id") == user.Codigo_Usuario:
+            if session.get("user_id") == getattr(user, "Codigo_Usuario", None):
                 session.clear()
-
+    
             flash("Tu contraseña fue actualizada. Ya puedes iniciar sesión.", "success")
             return redirect(url_for("login_html"))
-
+    
         return render_template("reset-password.html", token=token, email=email)
+
 
     # ---------------------- LOGIN / LOGOUT ----------------------
     @app.route("/login.html", methods=["GET", "POST"])
@@ -2515,46 +3106,72 @@ def create_app() -> Flask:
         except Exception:
             db.session.rollback()
 
-        # pago inmediato (opcional)
-                # pago inmediato (opcional)
+                # pago inmediato (opcional y con import diferido para evitar circularidad)
         receipt = None
         pago_monto = _to_float(p.get("pago_monto"), 0.0)
         pago_metodo = (p.get("pago_metodo") or "Efectivo")[:30]
 
-
-        if pago_monto > 0.0:
+        if pago_monto and pago_monto > 0.0:
             try:
-                rec = FinReceipt(
-                    numero="PENDING",
-                    reserva_id=reserva_id,
-                    invoice_id=None,
-                    tx_id=None,
-                    metodo=pago_metodo,
-                    currency="CRC",
-                    monto=pago_monto,
-                    emitido_por=session["user_id"],
-                )
-                db.session.add(rec)
-                db.session.flush()
-                rec.numero = _make_seq("RC", rec.id_receipt)
+                # Import diferido (solo si el blueprint de caja expone los helpers)
+                # Si no existe, capturamos ImportError y seguimos sin bloquear el flujo.
+                try:
+                    from blueprints.fin_cash import FinReceipt, _make_seq, _create_receipt_pdf  # type: ignore
+                    fin_cash_ok = True
+                except Exception as _e:
+                    current_app.logger.info(f"[WALKIN] fin_cash no disponible: {_e}")
+                    fin_cash_ok = False
 
-                db.session.execute(
-                    text("""
-                        UPDATE Reserva
-                           SET Monto_Pagado = COALESCE(Monto_Pagado,0) + :p,
-                               Fecha_Ultimo_Pago = NOW(),
-                               Estado = CASE WHEN (COALESCE(Monto_Pagado,0) + :p) >= Monto_Total
-                                             THEN 'Confirmada' ELSE Estado END
-                         WHERE Codigo_Reserva = :r
-                    """),
-                    {"p": pago_monto, "r": reserva_id}
-                )
-                db.session.commit()
-                _create_receipt_pdf(rec)
-                receipt = {"id": rec.id_receipt, "numero": rec.numero}
+                if fin_cash_ok:
+                    rec = FinReceipt(
+                        numero="PENDING",
+                        reserva_id=reserva_id,
+                        invoice_id=None,
+                        tx_id=None,
+                        metodo=pago_metodo,
+                        currency="CRC",
+                        monto=pago_monto,
+                        emitido_por=session.get("user_id"),
+                    )
+                    db.session.add(rec)
+                    db.session.flush()
+                    try:
+                        rec.numero = _make_seq("RC", rec.id_receipt)
+                    except Exception:
+                        # secuencia simple de respaldo
+                        rec.numero = f"RC-{rec.id_receipt:06d}"
+                    db.session.commit()
+
+                    try:
+                        _create_receipt_pdf(rec)
+                    except Exception as _e:
+                        current_app.logger.info(f"[WALKIN] No se pudo generar PDF de recibo: {_e}")
+
+                    receipt = {"id": getattr(rec, "id_receipt", None), "numero": getattr(rec, "numero", None)}
+
+                # Actualizar Monto_Pagado/Estado en Reserva aunque no exista fin_cash
+                try:
+                    db.session.execute(
+                        text("""
+                            UPDATE Reserva
+                               SET Monto_Pagado = COALESCE(Monto_Pagado,0) + :p,
+                                   Fecha_Ultimo_Pago = NOW(),
+                                   Estado = CASE WHEN (COALESCE(Monto_Pagado,0) + :p) >= Monto_Total
+                                                 THEN 'Confirmada' ELSE Estado END
+                             WHERE Codigo_Reserva = :r
+                        """),
+                        {"p": pago_monto, "r": reserva_id}
+                    )
+                    db.session.commit()
+                except Exception as _e:
+                    current_app.logger.warning(f"[WALKIN] No se pudo actualizar pago en Reserva: {_e}")
+                    db.session.rollback()
+
             except Exception as e:
                 current_app.logger.warning(f"[WALKIN] Pago inmediato falló: {e}")
                 db.session.rollback()
+                receipt = None
+
 
         # auditoría + KPIs
         try:
@@ -2876,31 +3493,43 @@ def create_app() -> Flask:
         credit = db.Column(db.Numeric(14, 2), default=0, nullable=False)
         description = db.Column(db.String(255))
 
-    @app.post("/api/pos/tx")
-    def api_pos_tx():
-        api_key = request.headers.get("X-POS-KEY")
-        if not api_key or api_key != current_app.config.get("POS_API_KEY", "dev-pos-key"):
+    @app.post("/api/pos/ledger", endpoint="pos_ledger_post")
+    def api_pos_ledger():
+        api_key = request.headers.get("X-Api-Key") or request.headers.get("Authorization", "").replace("Bearer ", "")
+        expected = app.config.get("POS_API_KEY") or os.getenv("POS_API_KEY") or "dev-pos-key"
+        if not api_key or api_key != expected:
             return jsonify({"ok": False, "error": "unauthorized"}), 401
 
         payload = request.get_json(silent=True) or {}
-        ext_id = (payload.get("external_id") or "").strip()
-        if not ext_id:
-            return jsonify({"ok": False, "error": "external_id_required"}), 400
-
-        if FinLedgerTx.query.filter_by(external_id=ext_id).first():
-            return jsonify({"ok": True, "duplicate": True})
-
+        external_id = (payload.get("external_id") or "").strip()
         reserva_id = payload.get("reserva_id")
-        currency = (payload.get("currency") or "CRC")[:10]
-        total = float(payload.get("total") or 0)
-        lines_in = payload.get("lines") or []
+        currency = (payload.get("currency") or "CRC").strip()[:10]
+        lines = payload.get("lines") or []
         meta = payload.get("meta") or {}
 
-        if not lines_in:
-            return jsonify({"ok": False, "error": "lines_required"}), 400
+        if not external_id or not isinstance(lines, list) or not lines:
+            return jsonify({"ok": False, "error": "invalid_payload"}), 400
 
+        # Evitar duplicados por external_id
+        existing = db.session.query(FinLedgerTx).filter_by(external_id=external_id).first()
+        if existing:
+            return jsonify({"ok": True, "id_tx": existing.id_tx, "status": "already_posted"})
+
+        total_debit = sum(float(x.get("debit") or 0) for x in lines)
+        total_credit = sum(float(x.get("credit") or 0) for x in lines)
+        if round(total_debit - total_credit, 2) != 0.00:
+            return jsonify({
+                "ok": False,
+                "error": "unbalanced_entry",
+                "debit": total_debit,
+                "credit": total_credit
+            }), 422
+
+        total = max(total_debit, total_credit)
+
+        # Crear cabecera
         tx = FinLedgerTx(
-            external_id=ext_id,
+            external_id=external_id,
             source="POS",
             reserva_id=int(reserva_id) if reserva_id else None,
             currency=currency,
@@ -2911,32 +3540,48 @@ def create_app() -> Flask:
         db.session.add(tx)
         db.session.flush()
 
-        total_debit = 0.0
-        total_credit = 0.0
-        for ln in lines_in:
-            line = FinLedgerLine(
-                id_tx=tx.id_tx,
-                line_no=int(ln.get("line_no") or 0),
-                account=(ln.get("account") or "").strip()[:64] or "UNDEF",
-                debit=float(ln.get("debit") or 0),
-                credit=float(ln.get("credit") or 0),
-                description=(ln.get("description") or "").strip()[:255] or None,
-            )
-            total_debit += float(line.debit or 0)
-            total_credit += float(line.credit or 0)
-            db.session.add(line)
-
-        if round(total_debit - total_credit, 2) != 0.00:
-            current_app.logger.warning(f"[POS] Descuadre {ext_id}: debit={total_debit} credit={total_credit}")
-
-        if tx.reserva_id:
-            db.session.execute(
-                text("UPDATE Reserva SET Monto_Pagado = Monto_Pagado + :p WHERE Codigo_Reserva = :r"),
-                {"p": total_debit, "r": tx.reserva_id},
+        # Crear líneas
+        for idx, ln in enumerate(lines, start=1):
+            db.session.add(
+                FinLedgerLine(
+                    id_tx=tx.id_tx,
+                    line_no=int(ln.get("line_no") or idx),
+                    account=(ln.get("account") or "").strip()[:64] or "UNASSIGNED",
+                    debit=float(ln.get("debit") or 0),
+                    credit=float(ln.get("credit") or 0),
+                    description=(ln.get("description") or "")[:255] or None,
+                )
             )
 
         db.session.commit()
-        return jsonify({"ok": True, "id_tx": tx.id_tx, "posted_debit": total_debit, "posted_credit": total_credit})
+
+        # Vincular efectos colaterales en la reserva (si se indicó)
+        try:
+            if tx.reserva_id:
+                _apply_pos_tx_to_reserva(int(tx.reserva_id), float(total), external_id)
+        except Exception as e:
+            current_app.logger.warning(f"[POS][LEDGER] post-apply error: {e}")
+
+        try:
+            _audit_log(None, "pos.ledger.posted", {
+                "id_tx": int(tx.id_tx),
+                "external_id": external_id,
+                "reserva_id": int(tx.reserva_id) if tx.reserva_id else None,
+                "total": float(total),
+                "currency": currency
+            })
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok": True,
+            "id_tx": tx.id_tx,
+            "posted_debit": float(total_debit),
+            "posted_credit": float(total_credit),
+            "total": float(total),
+            "reserva_id": int(tx.reserva_id) if tx.reserva_id else None
+        })
+
 
     def _apply_pos_tx_to_reserva(reserva_id: int, total: float, external_id: str):
         try:
@@ -3489,17 +4134,12 @@ def create_app() -> Flask:
 # =========================
 # EJECUCIÓN
 # =========================
+# al final de app.py
 if __name__ == "__main__":
     app = create_app()
-    try:
-        print(
-            f"DB -> {os.getenv('DB_USER','root')} @ {os.getenv('DB_HOST','127.0.0.1')} : {os.getenv('DB_PORT','3306')} / {os.getenv('DB_NAME','Hotel_VillaGrace')}"
-        )
-        print(f"Comprobantes -> {COMPROBANTES_DIR}")
-        print(f"Guest Docs -> {GUEST_DOCS_DIR}")
-    except Exception:
-        pass
-    app.run(host="0.0.0.0", port=5000, debug=True)
-
-    if __name__ == "__main__":
-        app.run(debug=True)
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", 5000)),
+        debug=True,
+        use_reloader=False,   # <-- clave para quitar ese error
+    )

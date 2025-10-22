@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Reserva sin iniciar sesión — Hotel Villa Grace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+
+  <style>
+    :root{ --vg:#145a40; --vg-2:#0e3f2c; }
+    body{ background:#f7f8f9; }
+    .header-strip{ background:linear-gradient(90deg,var(--vg),var(--vg-2)); color:#fff; }
+    .card-w{ border:0; border-radius:16px; box-shadow:0 10px 32px rgba(0,0,0,.08); }
+    .btn-vg{ background:var(--vg); border-color:var(--vg); }
+    .btn-vg:hover{ background:var(--vg-2); border-color:var(--vg-2); }
+    .step{ counter-increment: step; }
+    .step::before{
+      content: counter(step);
+      width:28px;height:28px;border-radius:50%;
+      display:inline-flex;align-items:center;justify-content:center;
+      background:#e8f3ee;color:var(--vg);font-weight:700;margin-right:.5rem;
+    }
+    .small-help{ color:#6b7a89;font-size:.875rem; }
+  </style>
+</head>
+<body>
+  <div class="header-strip py-3">
+    <div class="container d-flex align-items-center justify-content-between">
+      <a class="text-white text-decoration-none fw-semibold" href="{{ url_for('index_html') }}">← Volver al inicio</a>
+      <div class="small text-white-50">Hotel Villa Grace</div>
+    </div>
+  </div>
+
+  <main class="container py-4 py-md-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-9 col-xl-8">
+        <div class="mb-4">
+          <h1 class="h3 mb-1">Solicitud de reserva</h1>
+          <p class="small-help mb-0">
+            Ingresa tus fechas y datos. Crearemos tu <strong>reserva</strong> y una <strong>cuenta</strong> con contraseña temporal para que la gestiones desde el portal.
+          </p>
+        </div>
+
+        <div id="alerts"></div>
+
+        <div class="card card-w mb-4">
+          <div class="card-body">
+            <div class="step mb-3 fw-semibold">Detalles de la estancia</div>
+            <form id="formReserva" class="row g-3">
+              <div class="col-12 col-md-4">
+                <label class="form-label">Llegada</label>
+                <input type="date" id="checkin" class="form-control" required>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">Salida</label>
+                <input type="date" id="checkout" class="form-control" required>
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label">Huéspedes</label>
+                <input type="number" id="huespedes" min="1" value="1" class="form-control" required>
+              </div>
+              <div class="col-6 col-md-2">
+                <label class="form-label">Tipo hab.</label>
+                <select id="tipo" class="form-select" required>
+                  <option value="">Selecciona</option>
+                  <option value="Doble">Doble</option>
+                  <option value="Triple">Triple</option>
+                  <option value="Familiar">Familiar</option>
+                  <option value="Económica">Económica</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <button type="button" id="btnCheck" class="btn btn-outline-success">
+                  <i class="bi bi-search"></i> Verificar disponibilidad
+                </button>
+                <span id="availMsg" class="small-help ms-2"></span>
+              </div>
+
+              <hr class="mt-1 mb-0">
+
+              <div class="col-12 mt-3">
+                <div class="step mb-3 fw-semibold">Datos personales</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Nombre</label>
+                <input type="text" id="nombre" class="form-control" maxlength="50" required>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Apellido</label>
+                <input type="text" id="apellido" class="form-control" maxlength="50" required>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Correo</label>
+                <input type="email" id="correo" class="form-control" required>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Teléfono</label>
+                <input type="tel" id="telefono" class="form-control" maxlength="20" required>
+              </div>
+              <div class="col-12 col-md-4">
+                <label class="form-label">Tipo de documento</label>
+                <select id="doc_tipo" class="form-select" required>
+                  <option value="">Selecciona</option>
+                  <option value="Cedula">Cédula</option>
+                  <option value="Pasaporte">Pasaporte</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-8">
+                <label class="form-label">Número de documento</label>
+                <input type="text" id="doc_numero" class="form-control" maxlength="32" required>
+                <div class="small-help mt-1">
+                  Se usará para el check-in. Si es pasaporte, introdúcelo tal cual aparece (letras y números).
+                </div>
+              </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="acepto" required>
+                  <label class="form-check-label" for="acepto">
+                    Acepto los <a href="terms.html" target="_blank" rel="noopener">términos y condiciones</a>.
+                  </label>
+                </div>
+              </div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-vg" type="submit" id="btnSubmit">
+                  <i class="bi bi-send"></i> Solicitar reserva
+                </button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('index_html') }}">Cancelar</a>
+                <div class="ms-auto small-help">Te enviaremos la confirmación y una contraseña temporal.</div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="alert alert-info">
+          ¿Ya tienes cuenta? <a href="{{ url_for('login_html') }}" class="alert-link">Inicia sesión</a> para reservar desde tu portal.
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script>
+    (function(){
+      const f = document.getElementById('formReserva');
+      const alerts = document.getElementById('alerts');
+      const availBtn = document.getElementById('btnCheck');
+      const availMsg = document.getElementById('availMsg');
+      const submitBtn = document.getElementById('btnSubmit');
+
+      function msg(type, text){
+        const el = document.createElement('div');
+        el.className = 'alert alert-' + type;
+        el.textContent = text;
+        alerts.innerHTML = '';
+        alerts.appendChild(el);
+        setTimeout(()=>{ el.remove(); }, 6000);
+      }
+
+      async function checkAvailability(){
+        const ci = document.getElementById('checkin').value;
+        const co = document.getElementById('checkout').value;
+        const guests = document.getElementById('huespedes').value || 1;
+
+        availMsg.textContent = 'Verificando...';
+        try{
+          const res = await fetch(`/api/availability?checkin=${encodeURIComponent(ci)}&checkout=${encodeURIComponent(co)}&guests=${encodeURIComponent(guests)}&rooms=1`);
+          const data = await res.json();
+          availMsg.textContent = data.message || (data.available ? 'Disponibilidad confirmada' : 'Sin cupo');
+          availMsg.className = 'small-help ' + (data.available ? 'text-success' : 'text-danger');
+          return !!data.available;
+        }catch(e){
+          availMsg.textContent = 'No se pudo validar disponibilidad.';
+          availMsg.className = 'small-help text-danger';
+          return false;
+        }
+      }
+
+      availBtn.addEventListener('click', checkAvailability);
+
+      f.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+
+        const payload = {
+          checkin: document.getElementById('checkin').value,
+          checkout: document.getElementById('checkout').value,
+          huespedes: document.getElementById('huespedes').value,
+          tipo: document.getElementById('tipo').value,
+          nombre: document.getElementById('nombre').value,
+          apellido: document.getElementById('apellido').value,
+          correo: document.getElementById('correo').value,
+          telefono: document.getElementById('telefono').value,
+          doc_tipo: document.getElementById('doc_tipo').value,
+          doc_numero: document.getElementById('doc_numero').value,
+          acepta: document.getElementById('acepto').checked ? 1 : 0
+        };
+
+        try{
+          const res = await fetch('/api/reservas/anon', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(payload),
+            credentials: 'same-origin'
+          });
+          const data = await res.json();
+          if(!data.ok){
+            throw new Error(data.message || 'No se pudo crear la reserva.');
+          }
+          // redirigir a exito
+          location.href = data.redirect || (`/reserva-sin-sesion/exito?numero=${encodeURIComponent(data.numero)}`);
+        }catch(err){
+          msg('danger', err.message || 'Error inesperado.');
+        }finally{
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="bi bi-send"></i> Solicitar reserva';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

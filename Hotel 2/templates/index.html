@@ -565,6 +565,20 @@
                   </a>
                 </div>
 
+                {% if not session.get('user_id') %}
+                <div class="text-center mt-3" data-aos="fade-up" data-aos-delay="450">
+                  <a href="{{ url_for('anon_reserva_html') }}"
+                     class="btn btn-warning btn-lg shadow-sm">
+                    <i class="bi bi-person-gear me-1" aria-hidden="true"></i>
+                    Reserva sin iniciar sesión
+                  </a>
+                  <p class="small text-white-50 mt-2 mb-0">
+                    Crea tu reserva y tu cuenta en un solo paso.
+                  </p>
+                </div>
+                {% endif %}
+
+
                 <div
                   class="hero-stats text-white"
                   data-aos="fade-up"

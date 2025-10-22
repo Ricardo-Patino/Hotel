@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Reserva enviada — Hotel Villa Grace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <style>
+    :root{ --vg:#145a40; --vg-2:#0e3f2c; }
+    body{ background:#f7f8f9; }
+    .hero{ background:linear-gradient(90deg,var(--vg),var(--vg-2)); color:#fff; }
+  </style>
+</head>
+<body>
+  <div class="hero py-4">
+    <div class="container">
+      <a class="text-white-50 text-decoration-none" href="{{ url_for('index_html') }}">← Volver al inicio</a>
+      <h1 class="h3 mt-2">¡Gracias! Tu solicitud fue recibida</h1>
+      <p class="mb-0">Número de reserva: <strong>{{ request.args.get('numero','—') }}</strong></p>
+    </div>
+  </div>
+
+  <main class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="alert alert-success">
+          Enviamos un correo con la confirmación, una <strong>contraseña temporal</strong> y un enlace para acceder y <strong>cambiar tu contraseña</strong>.
+        </div>
+        <p>
+          Cuando inicies sesión, podrás ver esta reserva en <em>Portal del huésped → Mis reservas</em>, descargar tu comprobante y gestionar cambios.
+        </p>
+        <div class="d-flex gap-2">
+          <a class="btn btn-primary" href="{{ url_for('login_html') }}">Ir a iniciar sesión</a>
+          <a class="btn btn-outline-secondary" href="{{ url_for('index_html') }}">Volver al inicio</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
