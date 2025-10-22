@@ -997,23 +997,28 @@ def create_app() -> Flask:
           - Auditoría de operaciones de reserva
           - Actualización de KPI (day/week/month) para Confirmadas
           - Auto-asignación óptima (GRR-01-003) para Confirmada/Pendiente
+          - GRR-01-009: Envío de confirmación automática (email/SMS) al crear reserva (flujo logueado)
         """
         try:
             status = response.status_code
             method = request.method.upper()
             path = (request.path or "").lower()
-
+    
+            # Solo en respuestas exitosas de escritura
             if status >= 400 or method not in ("POST", "PUT", "PATCH", "DELETE"):
                 return response
-
+    
+            # Solo si el endpoint es de reservas
             es_endpoint_reserva = any(
                 s in path for s in ("/api/reservas", "/grr/reservas", "/reservas")
             )
             if not es_endpoint_reserva:
                 return response
-
+    
+            # Intentar extraer el id de la reserva de la respuesta
             rid = _extraer_reserva_id_de_response(response)
-
+    
+            # Auditoría de DELETE y salir
             if method == "DELETE" and rid:
                 _audit_log(
                     _current_user_email(),
@@ -1023,14 +1028,16 @@ def create_app() -> Flask:
                 )
                 db.session.commit()
                 return response
-
+    
             if not rid:
                 return response
-
+    
+            # Cargar datos mínimos de la reserva
             r = _reserva_min(rid)
             if not r:
                 return response
-
+    
+            # Auditoría de creación / actualización
             if method == "POST":
                 _audit_log(
                     _current_user_email(),
@@ -1045,6 +1052,16 @@ def create_app() -> Flask:
                     },
                     entidad_id=str(r["Codigo_Reserva"]),
                 )
+    
+                # === GRR-01-009: Confirmación automática (email/SMS) ===
+                # Evitar doble envío en el flujo público sin sesión (/api/reservas/anon),
+                # ya que ese endpoint realiza su propio correo de confirmación.
+                try:
+                    if "/api/reservas/anon" not in path:
+                        _notify_reserva_success(int(rid))
+                except Exception as e:
+                    current_app.logger.warning(f"[GRR-01-009] Notificación omitida: {e}")
+    
             elif method in ("PUT", "PATCH"):
                 _audit_log(
                     _current_user_email(),
@@ -1052,26 +1069,29 @@ def create_app() -> Flask:
                     {"Codigo_Reserva": r["Codigo_Reserva"], "Estado": r["Estado"]},
                     entidad_id=str(r["Codigo_Reserva"]),
                 )
-
+    
+            # KPI solo cuando queda confirmada
             if r["Estado"] == "Confirmada":
                 _kpi_touch(str(r["Fecha_Entrada"]), float(r["Monto_Total"]))
-
+    
+            # Auto-asignación para Confirmada/Pendiente
             if r["Estado"] in ("Confirmada", "Pendiente"):
                 try:
                     _asegurar_auto_asignacion(int(rid))
                 except Exception as e:
                     current_app.logger.warning(f"[ASSIGN] error auto R={rid}: {e}")
-
+    
             db.session.commit()
-
+    
         except Exception as e:
             try:
                 db.session.rollback()
             except Exception:
                 pass
             current_app.logger.warning(f"[AFTER] error en grr_after_request: {e}")
-
+    
         return response
+
 
     # ---------------------- Helpers de sesión para plantillas ----------------------
     @app.context_processor
@@ -1529,6 +1549,217 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.warning(f"[MAIL] Fallback console: {e}")
             current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n" + "\n".join(body))
+            
+            
+    def _get_reserva_contacto(reserva_id: int) -> dict:
+        """
+        Devuelve los datos de contacto asociados a la reserva:
+          - email (prefiere Usuario.Correo, luego Cliente.Correo)
+          - phone (prefiere Usuario.Telefono, luego Cliente.Telefono)
+          - nombre completo
+        """
+        row = db.session.execute(text("""
+            SELECT 
+              C.Nombre, C.Apellido, C.Correo AS c_email, C.Telefono AS c_tel,
+              U.Correo AS u_email,
+              CASE WHEN EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='Usuario' AND COLUMN_NAME='Telefono')
+                   THEN U.Telefono ELSE NULL END AS u_tel
+            FROM Reserva R
+            JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
+            LEFT JOIN Usuario U ON U.Codigo_Cliente = C.Codigo_Cliente
+            WHERE R.Codigo_Reserva = :rid
+            LIMIT 1
+        """), {"rid": reserva_id}).mappings().first()
+    
+        if not row:
+            return {"email": None, "phone": None, "nombre": None}
+    
+        nombre = f"{(row['Nombre'] or '').strip()} {(row['Apellido'] or '').strip()}".strip() or None
+        email  = (row.get("u_email") or row.get("c_email") or "").strip().lower() or None
+        phone  = (row.get("u_tel") or row.get("c_tel") or "").strip() or None
+        return {"email": email, "phone": phone, "nombre": nombre}
+    
+    
+    def _send_sms(to_phone: str, message: str) -> None:
+        """
+        Envía SMS usando Twilio si está configurado; si no, hace log consola.
+        TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM deben estar en env/config para enviar real.
+        """
+        if not to_phone or not message:
+            return
+        sid    = current_app.config.get("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SID")
+        token  = current_app.config.get("TWILIO_AUTH_TOKEN") or os.getenv("TWILIO_AUTH_TOKEN")
+        from_n = current_app.config.get("TWILIO_FROM") or os.getenv("TWILIO_FROM")
+        if not (sid and token and from_n):
+            current_app.logger.info(f"[SMS MOCK] To: {to_phone}\n{message}")
+            return
+    
+        try:
+            from twilio.rest import Client  # type: ignore
+            cli = Client(sid, token)
+            cli.messages.create(to=to_phone, from_=from_n, body=message)
+            current_app.logger.info(f"[SMS SENT] {to_phone}")
+        except Exception as e:
+            current_app.logger.warning(f"[SMS ERROR] {e}. Haciendo LOG como fallback.")
+            current_app.logger.info(f"[SMS MOCK] To: {to_phone}\n{message}")
+    
+    
+    def _send_reserva_confirmation_email(to_email: str, reserva: dict, pdf_path: Optional[Path] = None) -> None:
+        """
+        Envía correo de confirmación con detalles de la reserva.
+        Adjunta comprobante PDF si se pasa pdf_path.
+        """
+        if not to_email:
+            return
+    
+        numero  = reserva.get("Numero") or reserva.get("numero")
+        ci      = str(reserva.get("Fecha_Entrada") or reserva.get("checkin") or "")[:10]
+        co      = str(reserva.get("Fecha_Salida")  or reserva.get("checkout") or "")[:10]
+        tipo    = reserva.get("Tipo") or "Habitación"
+        pax     = str(reserva.get("Huespedes") or reserva.get("huespedes") or "1")
+        monto   = float(reserva.get("Monto_Total") or reserva.get("monto") or 0.0)
+        canal   = reserva.get("Canal") or reserva.get("canal") or "Web"
+        estado  = reserva.get("Estado") or reserva.get("estado") or "Confirmada"
+    
+        portal_link = url_for("portal_reservas_html", _external=True)
+        subject = f"Confirmación de Reserva {numero} — Hotel Villa Grace"
+        body = (
+            "¡Gracias por tu reserva en Hotel Villa Grace!\n\n"
+            f"Número de reserva: {numero}\n"
+            f"Estado: {estado}\n"
+            f"Habitación: {tipo}\n"
+            f"Huéspedes: {pax}\n"
+            f"Check-in: {ci}\n"
+            f"Check-out: {co}\n"
+            f"Canal: {canal}\n"
+            f"Total: ₡ {monto:,.2f}\n\n".replace(",", "X").replace(".", ",").replace("X", ".")
+            + f"Puedes ver tus reservas y descargar tus comprobantes aquí: {portal_link}\n\n"
+            "Si no fuiste tú quien realizó esta reserva, por favor contáctanos de inmediato.\n\n"
+            "— Hotel Villa Grace"
+        )
+    
+        host = current_app.config.get("MAIL_SERVER")
+        port = int(current_app.config.get("MAIL_PORT", 0) or 0)
+        user = current_app.config.get("MAIL_USERNAME")
+        pwd  = current_app.config.get("MAIL_PASSWORD")
+        use_tls = bool(current_app.config.get("MAIL_USE_TLS", False))
+        use_ssl = bool(current_app.config.get("MAIL_USE_SSL", False))
+        sender = (current_app.config.get("MAIL_DEFAULT_SENDER")
+                  or current_app.config.get("MAIL_USERNAME")
+                  or "no-reply@hotel.local")
+    
+        # Fallback consola si SMTP no está configurado
+        if not (host and port and user and pwd):
+            current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n{body}")
+            return
+    
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = subject
+            msg["From"] = sender
+            msg["To"] = to_email
+            msg.set_content(body)
+    
+            if pdf_path and pdf_path.exists():
+                with open(pdf_path, "rb") as f:
+                    data = f.read()
+                msg.add_attachment(
+                    data,
+                    maintype="application",
+                    subtype="pdf",
+                    filename=pdf_path.name,
+                )
+    
+            if use_ssl:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
+                    smtp.login(user, pwd)
+                    smtp.send_message(msg)
+            else:
+                with smtplib.SMTP(host, port, timeout=30) as smtp:
+                    if use_tls:
+                        smtp.starttls(context=ssl.create_default_context())
+                    smtp.login(user, pwd)
+                    smtp.send_message(msg)
+    
+            current_app.logger.info(f"[MAIL SENT] Confirmación a {to_email} (reserva {numero})")
+        except Exception as e:
+            current_app.logger.warning(f"[MAIL ERROR] {e}. Fallback consola:")
+            current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n{body}")
+    
+    
+    def _ensure_reserva_numero(reserva_id: int, fecha_entrada: Optional[str]) -> str:
+        """Garantiza que la reserva tenga Numero_Comprobante; lo asigna si está vacío."""
+        numero = db.session.execute(
+            text("SELECT Numero_Comprobante FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"),
+            {"r": reserva_id}
+        ).scalar()
+        if numero:
+            return str(numero)
+        numero = _make_unique_number(reserva_id, (fecha_entrada or "")[:10])
+        try:
+            db.session.execute(
+                text("UPDATE Reserva SET Numero_Comprobante=:n WHERE Codigo_Reserva=:r"),
+                {"n": numero, "r": reserva_id}
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        return numero
+    
+    
+    def _notify_reserva_success(reserva_id: int) -> None:
+        """
+        Orquesta la notificación:
+          - Asegura número único.
+          - Genera/asegura comprobante PDF.
+          - Envía email (con PDF adjunto) y SMS si hay teléfono y provider configurado.
+        """
+        r = _get_reserva_by_id(reserva_id)
+        if not r:
+            return
+    
+        # 1) Asegurar número
+        numero = _ensure_reserva_numero(reserva_id, _normalize_date_like(r.get("Fecha_Entrada")))
+    
+        # 2) Asegurar comprobante PDF
+        pdf_path = COMPROBANTES_DIR / f"{numero}.pdf"
+        if not pdf_path.exists():
+            try:
+                pdf_path = _create_comprobante_pdf(dict(r))
+            except Exception as e:
+                current_app.logger.warning(f"[GRR-01-009] No se pudo generar comprobante: {e}")
+                pdf_path = None
+    
+        # 3) Contacto
+        contacto = _get_reserva_contacto(reserva_id)
+        email_to = contacto.get("email")
+        phone_to = contacto.get("phone")
+    
+        # 4) Email
+        try:
+            _send_reserva_confirmation_email(email_to, dict(r), pdf_path=pdf_path if pdf_path and pdf_path.exists() else None)
+        except Exception as e:
+            current_app.logger.warning(f"[GRR-01-009] Error enviando email: {e}")
+    
+        # 5) SMS (opcional)
+        try:
+            if phone_to:
+                ci = _normalize_date_like(r.get("Fecha_Entrada")) or ""
+                co = _normalize_date_like(r.get("Fecha_Salida")) or ""
+                sms_text = f"Hotel Villa Grace: Reserva {numero} confirmada. Check-in {ci}, Check-out {co}."
+                _send_sms(phone_to, sms_text)
+        except Exception as e:
+            current_app.logger.info(f"[GRR-01-009] SMS omitido: {e}")
+    
+        # 6) Auditoría
+        try:
+            _audit_log(_current_user_email(), "reserva.confirmacion_enviada",
+                       {"Codigo_Reserva": reserva_id, "Numero": numero})
+        except Exception:
+            pass
+
 
     
     @app.post("/api/reservas/anon")
@@ -1996,26 +2227,46 @@ def create_app() -> Flask:
         if request.method == "POST":
             checkin = request.form.get("checkin")
             checkout = request.form.get("checkout")
-            guests = request.form.get("guests", "1")
-            rooms = request.form.get("rooms", "1")
+            adults = int((request.form.get("adults") or 2) or 2)
+            children = int((request.form.get("children") or 0) or 0)
+            rooms = int((request.form.get("rooms") or 1) or 1)
+            guests = max(1, adults + children)
+    
             return redirect(
                 url_for(
                     "booking_results",
                     checkin=checkin,
                     checkout=checkout,
+                    adults=adults,
+                    children=children,
                     guests=guests,
                     rooms=rooms,
                 )
             )
         return render_template("booking-search.html")
 
+
     @app.route("/booking-results", methods=["GET"])
     @app.route("/booking-results.html", methods=["GET"])
     def booking_results():
+        args = request.args.to_dict(flat=True)
+    
+        # Derivar guests si no viene: adults + children
+        try:
+            a = int(args.get("adults") or 0)
+            c = int(args.get("children") or 0)
+        except Exception:
+            a, c = 0, 0
+        if not args.get("guests"):
+            args["guests"] = str(max(1, a + c) or 1)
+        if not args.get("rooms"):
+            args["rooms"] = "1"
+    
         with app.test_client() as c:
-            resp = c.get(url_for("api_availability", **request.args))
+            resp = c.get(url_for("api_availability", **args))
             data = resp.get_json() if resp.is_json else {"ok": False}
         return render_template("booking-results.html", availability=data)
+    
 
     # ---------------------- Detalle / Checkout / Confirmación ------------------
     @app.route("/booking-details", methods=["GET", "POST"])
@@ -2282,6 +2533,23 @@ def create_app() -> Flask:
 
         # Fallback: JSON (solo si alguien lo invoca explícitamente)
         return jsonify({"ok": True, "item": _reserva_to_dict(r)})
+    
+    
+    @app.post("/api/portal/reservas/<int:reserva_id>/send-confirmation")
+    @role_required("Cliente")
+    def api_portal_reserva_send_confirmation(reserva_id: int):
+        if not session.get("user_id"):
+            return jsonify({"ok": False, "error": "auth_required"}), 401
+        email = _current_user_email()
+        if not _reserva_belongs_to_email(reserva_id, email or ""):
+            return jsonify({"ok": False, "error": "forbidden"}), 403
+        try:
+            _notify_reserva_success(int(reserva_id))
+            return jsonify({"ok": True, "message": "Confirmación reenviada."})
+        except Exception as e:
+            current_app.logger.warning(f"[PORTAL] Reenvío fallo: {e}")
+            return jsonify({"ok": False, "error": "send_failed"}), 500
+
 
 
     # ---------------------- RUTA descarga comprobante ----------------------

@@ -22,6 +22,7 @@
     .card-summary img{width:88px;height:88px;object-fit:cover;border-radius:.5rem;border:1px solid #e9ecef}
     .btn-success{background:#1b7a4e;border-color:#1b7a4e}
     .btn-success:disabled{opacity:.7}
+    .muted-mini{font-size:.875rem;color:#6c757d}
   </style>
 </head>
 <body class="privacy-page">
@@ -161,7 +162,7 @@
               </div>
 
               <div class="d-flex justify-content-between">
-                <span>Tarifa (<span id="sum-nights">—</span> × <span id="sum-night-price">—</span>)</span>
+                <span>Tarifa (<span id="sum-nights">—</span> × <span id="sum-night-price">—</span> × <span id="sum-guests-mult">—</span>)</span>
                 <span id="sum-subtotal">—</span>
               </div>
               <div class="d-flex justify-content-between">
@@ -173,6 +174,10 @@
               <hr />
               <div class="d-flex justify-content-between fw-semibold">
                 <span>Total</span><span id="sum-total">—</span>
+              </div>
+
+              <div class="muted-mini mt-2">
+                <i class="bi bi-info-circle me-1"></i> Precio por noche mostrado: <em>por huésped</em>.
               </div>
 
               <a class="btn btn-outline btn-sm mt-3" href="booking-details.html">Cambiar plan</a>
@@ -234,6 +239,7 @@
       const d2 = new Date(b + "T00:00:00");
       return Math.max(1, Math.round((d2 - d1) / 86400000));
     };
+    const i = (v,def=0)=>{ const n=parseInt(v,10); return Number.isFinite(n)?n:def; };
 
     function normalizeImg(candidate) {
       if (!candidate || typeof candidate !== "string") return "";
@@ -254,6 +260,11 @@
       test.src = cand;
     }
 
+    function totalGuests(sel){
+      const a = i(sel.adults,0), c = i(sel.children,0);
+      return Math.max(1, a + c);
+    }
+
     // ---------- carga selección ----------
     function loadSelection() {
       let sel = null;
@@ -272,11 +283,10 @@
           roomCode: p.get("room"),
           roomName: "Habitación seleccionada",
           img: "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}",
-          priceNight: Number(p.get("price") || 0),
+          priceNight: Number(p.get("price") || 0), // por huésped por noche
           rateCode: p.get("rate") || "flex",
           rateName: "Tarifa Flexible",
-          tipo: p.get("tipo") || "Sencilla",
-          total: Number(p.get("total") || 0),
+          tipo: p.get("tipo") || "Sencilla"
         };
       }
       sel.nights = sel.nights || nightsDiff(sel.checkin, sel.checkout);
@@ -338,12 +348,14 @@
       $("#sum-dates").innerHTML = `<i class="bi bi-calendar-event me-1"></i>${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)}`;
       $("#sum-guests").innerHTML =
         `<i class="bi bi-people me-1"></i>${sel.adults || 2} adulto(s)` +
-        (parseInt(sel.children || "0", 10) ? ` · ${sel.children} niño(s)` : "");
+        (i(sel.children||"0") ? ` · ${sel.children} niño(s)` : "");
 
+      const guests = totalGuests(sel);
       $("#sum-nights").textContent = `${sel.nights}`;
-      $("#sum-night-price").textContent = money(sel.priceNight);
+      $("#sum-night-price").textContent = money(sel.priceNight); // por huésped
+      $("#sum-guests-mult").textContent = `${guests} huésped(es)`;
 
-      const subtotal = Number(sel.priceNight || 0) * sel.nights;
+      const subtotal = Number(sel.priceNight || 0) * sel.nights * guests;
       const tax = subtotal * TAX_RATE;
       const total = subtotal + tax;
 
@@ -354,21 +366,47 @@
 
     // ---------- crear cliente mínimo (mock/backoffice) ----------
     async function ensureClient(fullName, email, phone) {
-      return 1;
+      return 1; // Si tienes endpoint de clientes, intégralo aquí
     }
 
     // ---------- POST /grr/reservas ----------
     async function createReservation(sel, guest) {
+      const adults = i(sel.adults, 0), children = i(sel.children, 0);
+      const guests = Math.max(1, adults + children);
+      const nights = Math.max(1, i(sel.nights, 1));
+      const pricePerGuestNight = Number(sel.priceNight || 0); // por huésped por noche
+      const subtotal = pricePerGuestNight * nights * guests;
+      const tax = subtotal * TAX_RATE;
+      const total = subtotal + tax;
+
       const payload = {
         Codigo_Cliente: await ensureClient(`${guest.fname} ${guest.lname}`, guest.email, guest.phone),
         Codigo_Funcionario: 1,
         Tipo: sel.tipo || "Sencilla",
         Fecha_Entrada: sel.checkin,
         Fecha_Salida: sel.checkout,
-        Huespedes: String(sel.adults || "2"),
+
+        // 💡 FIX: enviar huéspedes correctos
+        Huespedes: String(guests),
+        Huespedes_Adultos: adults,
+        Huespedes_Ninos: children,
+
+        // 💡 Enviar info de tarifa seleccionada
+        Tarifa_Codigo: sel.rateCode || 'flex',
+        Tarifa_Nombre: sel.rateName || 'Tarifa Flexible',
+        Es_No_Reembolsable: (sel.rateCode === 'nrb'),
+
+        // 💡 Enviar desglose económico (si backend lo usa, perfecto; si no, lo ignora)
+        Noches: nights,
+        Precio_Noche: pricePerGuestNight, // por huésped
+        Monto_Subtotal: subtotal,
+        Impuesto: tax,
+        Monto_Total: total,
+        Moneda: 'CRC',
+
         Canal: "Web",
         Observaciones: guest.notes || "",
-        Usuario: guest.email || undefined,
+        Usuario: guest.email || undefined
       };
 
       const res = await fetch("/grr/reservas", {
@@ -382,7 +420,7 @@
         const msg = json.error || `HTTP ${res.status}`;
         throw new Error(msg);
       }
-      return json;
+      return { json, totals: { subtotal, tax, total }, payload };
     }
 
     // ---------- bind botón ----------
@@ -402,14 +440,7 @@
           notes: $("#notes").value.trim(),
         };
 
-        const confirmPayload = {
-          name: `${guest.fname} ${guest.lname}`.trim(),
-          roomName: sel.roomName || "Habitación",
-          plan: sel.rateName || "Tarifa Flexible",
-          dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
-          guests: { adults: sel.adults || "2", children: sel.children || "0" },
-          priceNight: sel.priceNight || 0,
-        };
+        const guestsObj = { adults: sel.adults || "2", children: sel.children || "0" };
 
         $("#btn-finalize").disabled = true;
         $("#alert-err").classList.add("d-none");
@@ -417,11 +448,19 @@
         try {
           const result = await createReservation(sel, guest);
 
-          confirmPayload.reservaId = result.id || result.Codigo_Reserva || null;
-          confirmPayload.numero = result.numero || "VG-PENDIENTE";
-          confirmPayload.total = Number(result.monto || 0);
-          confirmPayload.habitacion = result.habitacion || null;
-          confirmPayload.observaciones = guest.notes || "";
+          // Guardar confirm con números redondeados y el plan elegido
+          const confirmPayload = {
+            reservaId: result.json.id || result.json.Codigo_Reserva || null,
+            numero: result.json.numero || "VG-PENDIENTE",
+            name: `${guest.fname} ${guest.lname}`.trim(),
+            roomName: sel.roomName || "Habitación",
+            plan: sel.rateName || "Tarifa Flexible",
+            checkin: sel.checkin, checkout: sel.checkout,
+            dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
+            guests: guestsObj,
+            priceNight: sel.priceNight, // por huésped
+            total: result.totals.total
+          };
 
           sessionStorage.setItem("villaGrace.confirm", JSON.stringify(confirmPayload));
 

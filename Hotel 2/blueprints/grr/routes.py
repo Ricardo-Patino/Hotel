@@ -58,6 +58,142 @@ def _precio_noche(h: Habitacion) -> float:
             continue
     return 0.0
 
+# ======================= Cálculo autoritativo de totales ======================
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime
+
+VAT_RATE = Decimal("0.13")      # 13%
+NRB_DISCOUNT = Decimal("0.10")  # 10% descuento para tarifa No Reembolsable
+
+def _d2(v) -> Decimal:
+    if isinstance(v, Decimal):
+        d = v
+    else:
+        try:
+            d = Decimal(str(v or "0"))
+        except Exception:
+            d = Decimal("0")
+    return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+def _to_date(v):
+    if isinstance(v, date):
+        return v
+    if not v:
+        return None
+    try:
+        s = str(v).strip().replace("/", "-")
+        return date.fromisoformat(s)
+    except Exception:
+        try:
+            # fallback amplio "YYYY-MM-DDTHH:MM..."
+            return datetime.fromisoformat(str(v)).date()
+        except Exception:
+            return None
+
+def _safe_int(v, default=0):
+    try:
+        if v is None:
+            return default
+        s = str(v).strip()
+        if not s:
+            return default
+        return int(Decimal(s))
+    except Exception:
+        return default
+
+def _nights(ci: date, co: date) -> int:
+    try:
+        n = (co - ci).days
+        return max(1, n)
+    except Exception:
+        return 1
+
+def _lookup_price_per_guest_night(payload: Dict[str, Any]) -> Decimal:
+    """
+    Regla:
+    1) Si viene Precio_Noche => usarlo como 'precio por huésped/noche'.
+    2) Si viene Codigo_Habitacion => buscar Habitacion y tomar Precio_Noche (o Precio_Base).
+    3) Si viene Tipo => tomar una hab. de ese tipo.
+    4) Fallback 0.
+    Si la tarifa es NRB => aplicar -10%.
+    """
+    rate_code = (str(payload.get("Tarifa_Codigo") or payload.get("rateCode") or payload.get("rate") or "flex").strip().lower())
+    raw_price = payload.get("Precio_Noche")
+
+    if raw_price:
+        price = _d2(raw_price)
+    else:
+        # Buscar por habitación o tipo
+        price = Decimal("0.00")
+        try:
+            room_code = payload.get("Codigo_Habitacion") or payload.get("roomCode")
+            if room_code:
+                h = Habitacion.query.filter(
+                    (Habitacion.Codigo_Habitacion == _safe_int(room_code)) |
+                    (Habitacion.Numero_Habitacion == str(room_code))
+                ).first()
+            else:
+                tipo = payload.get("Tipo") or payload.get("tipo")
+                h = Habitacion.query.filter(Habitacion.Tipo.ilike(f"%{tipo}%")).first() if tipo else None
+
+            if h:
+                # Usa _precio_noche existente (ya prueba varios campos)
+                price = _d2(_precio_noche(h))
+        except Exception:
+            price = Decimal("0.00")
+
+    # Descuento NRB
+    if rate_code == "nrb" and price > 0:
+        price = _d2(price * (Decimal("1.00") - NRB_DISCOUNT))
+
+    return price
+
+def _calc_totales(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Calcula TODO del lado servidor (autoridad):
+    - adultos, niños, huéspedes
+    - noches
+    - precio por huésped/noche (con NRB si aplica)
+    - subtotal, impuesto, total
+    """
+    ci = _to_date(payload.get("Fecha_Entrada"))
+    co = _to_date(payload.get("Fecha_Salida"))
+    if not (ci and co):
+        raise ValueError("Fechas inválidas (Fecha_Entrada / Fecha_Salida).")
+
+    noches = _nights(ci, co)
+    ad = _safe_int(payload.get("Huespedes_Adultos"), 0)
+    ch = _safe_int(payload.get("Huespedes_Ninos"), 0)
+    tot = _safe_int(payload.get("Huespedes"), 0)
+    huespedes = tot if tot > 0 else (ad + ch if (ad + ch) > 0 else 1)
+
+    price = _lookup_price_per_guest_night(payload)
+
+    subtotal = _d2(price * noches * huespedes)
+    impuesto = _d2(subtotal * VAT_RATE)
+    total = _d2(subtotal + impuesto)
+
+    return {
+        "adultos": ad,
+        "ninos": ch,
+        "huespedes": huespedes,
+        "noches": noches,
+        "price_per_guest_night": price,
+        "subtotal": subtotal,
+        "impuesto": impuesto,
+        "total": total,
+        "checkin": ci,
+        "checkout": co,
+        "rate_code": str(payload.get("Tarifa_Codigo") or payload.get("rateCode") or payload.get("rate") or "flex").lower(),
+        "rate_name": str(payload.get("Tarifa_Nombre") or payload.get("rateName") or ("No Reembolsable" if (str(payload.get("Tarifa_Codigo") or '').lower()=="nrb") else "Tarifa Flexible")),
+        "es_nrb": (str(payload.get("Tarifa_Codigo") or payload.get("rateCode") or '').lower()=="nrb"),
+    }
+
+def _set_if(obj, field: str, value):
+    """Asigna sólo si el atributo existe en el modelo, para evitar AttributeError."""
+    if hasattr(obj, field):
+        setattr(obj, field, value)
+
 
 # ---------------------- Resolución de cliente desde la sesión -----------------
 
@@ -277,13 +413,15 @@ def disponibilidad():
 @grr_bp.post("/reservas")
 def crear_reserva():
     """
-    Crea una reserva usando el ReservationService PERO
-    antes fuerza que el Codigo_Cliente sea el del usuario logueado.
-    Además, tras crear, valida que la fila quedó con el propietario correcto.
+    Crea una reserva:
+      - Fuerza cliente desde sesión
+      - Calcula del lado servidor: huéspedes, noches y totales (con NRB/Flex)
+      - Inyecta al service
+      - Tras crear, refuerza los valores en BD (por si el service los ignora)
     """
     try:
         payload = request.get_json(silent=True) or {}
-        _normalize_dates(payload)
+        _normalize_dates(payload)  # deja date objects si venían strings
 
         # 1) Resolver email y cliente desde la sesión
         email, cli_id = _current_user_email_and_cliente()
@@ -298,21 +436,81 @@ def crear_reserva():
                 401,
             )
 
-        # 2) Inyectar datos de canal/fuente y Codigo_Cliente
+        # 2) Canal/Fuente + dueño
         payload.setdefault("Canal", "Web")
         payload.setdefault("Fuente", "Portal")
         payload["Codigo_Cliente"] = cli_id
 
-        # 3) Crear con el servicio
+        # 3) Cálculo autoritativo
+        calc = _calc_totales(payload)
+
+        # 3.1) Inyectar campos económicos y de tarifa en el payload al service
+        payload.update(
+            {
+                "Huespedes": calc["huespedes"],
+                "Huespedes_Adultos": calc["adultos"] or None,
+                "Huespedes_Ninos": calc["ninos"] or None,
+                "Noches": calc["noches"],
+
+                # Precio por HUÉSPED / NOCHE (clave para tu caso):
+                "Precio_Noche": float(calc["price_per_guest_night"]),  # Decimal -> float seguro
+
+                "Monto_Subtotal": float(calc["subtotal"]),
+                "Impuesto": float(calc["impuesto"]),
+                "Monto_Total": float(calc["total"]),
+
+                # Tarifa
+                "Tarifa_Codigo": calc["rate_code"],
+                "Tarifa_Nombre": calc["rate_name"],
+                "Es_No_Reembolsable": bool(calc["es_nrb"]),
+
+                # Asegura fechas (si front las mandó como string)
+                "Fecha_Entrada": calc["checkin"],
+                "Fecha_Salida": calc["checkout"],
+            }
+        )
+
+        # 4) Crear con el servicio
         res = _res_service.create(payload)
 
-        # 4) Si OK, asegurar pertenencia (por si el servicio impuso otro cliente)
+        # 5) Si OK, asegurar pertenencia y **reforzar valores** en la fila real
         if res.get("ok") and res.get("id"):
+            rid = int(res["id"])
             try:
-                rid = int(res["id"])
                 _force_owner(rid, cli_id)
-            except Exception:
-                pass
+
+                r: Optional[Reserva] = Reserva.query.get(rid)
+                if r:
+                    # Reforzar valores críticos por si el service no los aplicó
+                    _set_if(r, "Huespedes", calc["huespedes"])
+                    _set_if(r, "Fecha_Entrada", calc["checkin"])
+                    _set_if(r, "Fecha_Salida", calc["checkout"])
+
+                    _set_if(r, "Noches", calc["noches"])
+                    _set_if(r, "Precio_Noche", calc["price_per_guest_night"])
+                    _set_if(r, "Monto_Subtotal", calc["subtotal"])
+                    _set_if(r, "Impuesto", calc["impuesto"])
+                    _set_if(r, "Monto_Total", calc["total"])
+
+                    _set_if(r, "Tarifa_Codigo", calc["rate_code"])
+                    _set_if(r, "Tarifa_Nombre", calc["rate_name"])
+                    _set_if(r, "Es_No_Reembolsable", calc["es_nrb"])
+
+                    # por claridad de modelo
+                    _set_if(r, "Huespedes_Adultos", calc["adultos"] or None)
+                    _set_if(r, "Huespedes_Ninos", calc["ninos"] or None)
+
+                    db.session.commit()
+
+                # Ajustar respuesta con los números reales
+                res["monto"] = float(calc["total"])
+                res["huespedes"] = calc["huespedes"]
+                res["noches"] = calc["noches"]
+                res["price_per_guest_night"] = float(calc["price_per_guest_night"])
+
+            except Exception as e:
+                if current_app:
+                    current_app.logger.warning(f"[GRR] refuerzo post-create R={rid} falló: {e}")
 
         return jsonify(res), (201 if res.get("ok") else 409)
 
@@ -320,6 +518,7 @@ def crear_reserva():
         if current_app:
             current_app.logger.exception(f"[GRR] crear_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
+
 
 
 @grr_bp.get("/reservas")

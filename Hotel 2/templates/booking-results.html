@@ -83,7 +83,7 @@
 
         <div id="note" class="text-muted small mt-3 d-none">
           <i class="bi bi-info-circle me-1"></i>
-          Impuestos no incluidos. Los precios son por noche.
+          Impuestos no incluidos. <strong>Los precios son por huésped y por noche</strong>. El total refleja todos los huéspedes.
         </div>
 
         <div id="alert" class="alert alert-warning d-none mt-4">
@@ -145,7 +145,13 @@
           checkout: p.get("checkout"),
           adults: p.get("adults") || "2",
           children: p.get("children") || "0",
+          guests: p.get("guests") || null,
+          rooms: p.get("rooms") || "1",
         };
+        // Deriva guests si no viene
+        const a = parseInt(search.adults || "0", 10) || 0;
+        const c = parseInt(search.children || "0", 10) || 0;
+        if (!search.guests) search.guests = String(Math.max(1, a + c));
         // Guardar/usar backup
         try { sessionStorage.setItem("villaGrace.search", JSON.stringify(search)); } catch(_) {}
         if (!(search.checkin && search.checkout)) {
@@ -156,6 +162,7 @@
         }
         return search;
       }
+      const totalGuests = (search) => Math.max(1, (parseInt(search.adults||"0",10)||0) + (parseInt(search.children||"0",10)||0));
 
       // ------------ Construcción de card -------------
       function roomCard(room, nights, search) {
@@ -166,16 +173,19 @@
         const desc = room.desc || room.Descripcion || "—";
         const capacity = room.capacity || room.Capacidad || 2;
 
+        // Precio unitario (asumimos por huésped por noche si backend lo entrega por noche)
         const priceNight = Number(room.price ?? room.Precio_Noche ?? room.Precio_Base ?? 0);
         const img = room.img || room.Imagen_URL || "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}";
-        const total = priceNight * Math.max(1, nights || 1);
+
+        const pax = totalGuests(search);
+        const total = priceNight * Math.max(1, nights || 1) * pax;
 
         const payload = {
           roomCode: code,
           roomNumber: numero,
           roomName: name,
           tipo,
-          priceNight,
+          priceNight, // precio por huésped por noche
           img,
           rateName: "Tarifa Flexible",
           checkin: search.checkin,
@@ -207,8 +217,8 @@
                 <div class="col-12 col-md-3 text-md-end">
                   <div class="mb-2">
                     <div class="fw-semibold">${money(priceNight)}</div>
-                    <div class="text-muted">/noche</div>
-                    <div class="text-muted small">Total estimado: ${money(total)}</div>
+                    <div class="text-muted">/noche <span class="small">(por huésped)</span></div>
+                    <div class="text-muted small">Total estimado: ${money(total)} <span class="small">(${pax} huésped(es))</span></div>
                   </div>
                   <button class="btn btn-success w-100"
                           data-select='${encodeURIComponent(JSON.stringify(payload))}'>
@@ -263,6 +273,8 @@
           checkout: search.checkout || "",
           adults: String(search.adults || "2"),
           children: String(search.children || "0"),
+          guests: String(search.guests || String(totalGuests(search))),
+          rooms: String(search.rooms || "1"),
         }).toString();
 
         // Prueba varios endpoints en orden
@@ -288,7 +300,7 @@
 
           // Fallback cuando es /grr/habitaciones (lista completa):
           if (url.endsWith("/habitaciones") && r.json && r.json.ok && Array.isArray(r.json.rooms)) {
-            const totalPax = Math.max(1, Number(search.adults||2) + Number(search.children||0));
+            const totalPax = totalGuests(search);
             rooms = r.json.rooms.filter(x => Number(x.Capacidad ?? x.capacity ?? 2) >= totalPax);
             break;
           }
@@ -312,13 +324,14 @@
           if (!btn) return;
           const payload = JSON.parse(decodeURIComponent(btn.getAttribute("data-select")));
           try { sessionStorage.setItem("villaGrace.selection", JSON.stringify(payload)); } catch (_){}
+
           const qsSel = new URLSearchParams({
             checkin: payload.checkin || "",
             checkout: payload.checkout || "",
             adults: String(payload.adults || "2"),
             children: String(payload.children || "0"),
             room: String(payload.roomCode || ""),
-            price: String(payload.priceNight || "")
+            price: String(payload.priceNight || ""),
           }).toString();
           location.href = `booking-details.html?${qsSel}`;
         });
