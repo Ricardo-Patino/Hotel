@@ -34,3 +34,7 @@ tmp/
 Hotel 2/blueprints/grr/__pycache__/__init__.cpython-313.pyc
 Hotel 2/blueprints/grr/__pycache__/__init__.cpython-313.pyc
 Hotel 2/blueprints/grr/__pycache__/routes.cpython-313.pyc
+
+# Python bytecode
+__pycache__/
+*.pyc
