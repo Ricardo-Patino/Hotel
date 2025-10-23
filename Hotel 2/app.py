@@ -73,6 +73,11 @@ COMPROBANTES_DIR.mkdir(parents=True, exist_ok=True)
 EXPORTS_DIR = STORAGE_DIR / "exports"
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
+# Facturas (archivos PDF u otros adjuntos de factura)
+INVOICE_UPLOAD_FOLDER = STORAGE_DIR / "invoices"
+INVOICE_UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+
+
 
 RECIBOS_DIR = STORAGE_DIR / "recibos"
 NOTAS_DIR = STORAGE_DIR / "notas"
@@ -741,14 +746,15 @@ def _create_comprobante_pdf(reserva: dict) -> Path:
 
     # Registrar en tablas Documento / ReservaDocumento (si existen)
     try:
+        ruta = f"/storage/comprobantes/{filename}"
         res = db.session.execute(
-            text(
-                """
-            INSERT INTO Documento (Tipo, Ruta, MimeType, TamanoBytes)
-            VALUES ('Comprobante','/storage/comprobantes/:fn','application/pdf', :sz)
-        """
-            ).bindparams(fn=filename, sz=out_path.stat().st_size)
+            text("""
+                INSERT INTO Documento (Tipo, Ruta, MimeType, TamanoBytes)
+                VALUES ('Comprobante', :ruta, 'application/pdf', :sz)
+            """),
+            {"ruta": ruta, "sz": out_path.stat().st_size}
         )
+        
         doc_id = res.lastrowid
 
         db.session.execute(
@@ -836,6 +842,8 @@ def create_app() -> Flask:
         except Exception:
             pass
 
+    
+    
     # Blueprint de cierres mensuales
     from blueprints.fin_periods import fin_periods_bp
     app.register_blueprint(fin_periods_bp)
@@ -1305,7 +1313,7 @@ def create_app() -> Flask:
         return render_template("ops-coupons.html")
 
 
-# === GRR — Preview de cupón (no persiste) ===
+    # === GRR — Preview de cupón (no persiste) ===
     @app.get("/grr/coupons/preview")
     def grr_coupon_preview():
         code = (request.args.get("code") or "").strip().upper()
@@ -1465,6 +1473,7 @@ def create_app() -> Flask:
                   h.Codigo_Habitacion   AS id
                 FROM Habitacion h
                 WHERE 1=1
+                  AND h.Estado = 'Disponible'
                   {where_extra}
                   AND NOT EXISTS (
                         SELECT 1
@@ -2164,9 +2173,10 @@ def create_app() -> Flask:
             text(f"""
                 SELECT h.Codigo_Habitacion, h.Precio_Noche
                   FROM Habitacion h
-                 WHERE 1=1
-                   {where_extra}
-                   AND NOT EXISTS (
+                WHERE 1=1
+                  AND h.Estado = 'Disponible'
+                  {where_extra}
+                  AND NOT EXISTS  (
                         SELECT 1
                           FROM Reserva r
                          WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
@@ -3661,7 +3671,11 @@ def create_app() -> Flask:
 
         # crear reserva con la habitación indicada (NUNCA NULL)
         # funcionario que crea el walk-in (NOT NULL en la tabla)
-        func_id = _to_int(session.get("user_id"), 0)
+        func_id = db.session.execute(
+            text("SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario LIMIT 1")
+        ).scalar()
+        if not func_id:
+            return jsonify({"ok": False, "error": "no_funcionario_config"}), 500
         res_ins = db.session.execute(
             text("""
                 INSERT INTO Reserva (Codigo_Cliente, Codigo_Habitacion, Fecha_Entrada, Fecha_Salida,
@@ -4779,18 +4793,22 @@ def create_app() -> Flask:
     except NameError:
         from sqlalchemy import func
 
-        class FinInvoice(db.Model):  # Fallback mínimo para que funcione
+            # ========= FIN-INV-01 — Gestión de Facturas ===========
+        class FinInvoice(db.Model):
             __tablename__ = "fin_invoices"
-            id = db.Column(db.Integer, primary_key=True)
-            numero = db.Column(db.String(64), unique=True, nullable=False)
-            cliente_nombre = db.Column(db.String(150), nullable=False)
-            cliente_email = db.Column(db.String(150), nullable=True)
-            moneda = db.Column(db.String(10), nullable=False, default="CRC")
-            monto_total = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-            fecha_emision = db.Column(db.Date, nullable=False, default=date.today)
-            estado = db.Column(db.String(20), nullable=False, default="Emitida")  # Emitida, Pagada, Anulada
-            comprobante_path = db.Column(db.String(255), nullable=True)
-            created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+            id_factura      = db.Column(db.Integer, primary_key=True)
+            numero          = db.Column(db.String(20), unique=True, nullable=False)
+            cliente_nombre  = db.Column(db.String(120))
+            cliente_email   = db.Column(db.String(120))
+            moneda          = db.Column(db.Enum("CRC", "USD", name="fin_invoice_moneda"), server_default="CRC")
+            monto_total     = db.Column(db.Numeric(12, 2), nullable=False)
+            descripcion     = db.Column(db.String(255))
+            archivo_path    = db.Column(db.String(255))  # <— ¡IMPORTANTE! columna correcta
+            id_reserva      = db.Column(db.Integer, index=True)
+            id_usuario      = db.Column(db.Integer, index=True)
+            fecha_emision   = db.Column(db.Date, server_default=func.current_date())
+            estado          = db.Column(db.Enum("Emitida", "Anulada", name="fin_invoice_estado"), server_default="Emitida")
+    
 
     # ------------------------------------------------------------
     # UI — Lista de facturas
@@ -4817,61 +4835,193 @@ def create_app() -> Flask:
     #   moneda (CRC|USD,...), monto_total, fecha_emision (YYYY-MM-DD),
     #   comprobante (file input)
     # ------------------------------------------------------------
-    @app.route("/fin/invoices/nuevo", methods=["POST"])
-    @login_required
+    
+    
+    
+    # Listado JSON para la tabla del front
+    @app.get("/api/fin/invoices")
+    @role_required("Administrador", "Recepcionista")
+    def api_fin_invoices_list():
+        rows = db.session.query(FinInvoice).order_by(FinInvoice.id_factura.desc()).all()
+        items = []
+        for r in rows:
+            items.append({
+                "id": r.id_factura,
+                "numero": r.numero,
+                "cliente_nombre": r.cliente_nombre,
+                "cliente_email": r.cliente_email,
+                "moneda": r.moneda,
+                "monto_total": float(r.monto_total or 0),
+                "fecha_emision": r.fecha_emision.isoformat() if r.fecha_emision else None,
+                "estado": r.estado,
+                "archivo_path": r.archivo_path,  # <— nombre correcto
+            })
+        return jsonify({"ok": True, "items": items})
+
+    # Alta de factura (lo que estás intentando con POST /fin/invoices/nuevo)
+    
+
+    from sqlalchemy.exc import IntegrityError
+    from werkzeug.utils import secure_filename
+    
+    @app.post("/fin/invoices/nuevo")
     @role_required("Administrador", "Recepcionista")
     def fin_invoice_nuevo():
-        numero = (request.form.get("numero") or "").strip()
-        cliente_nombre = (request.form.get("cliente_nombre") or "").strip()
-        cliente_email = (request.form.get("cliente_email") or "").strip().lower()
-        moneda = (request.form.get("moneda") or "CRC").strip()[:10]
-        monto_total_raw = (request.form.get("monto_total") or "0").replace(",", "").strip()
-        fecha_emision_raw = (request.form.get("fecha_emision") or "").strip()
-
-        # Validaciones básicas
-        if not numero or not cliente_nombre:
-            flash("Número y cliente son obligatorios.", "warning")
-            return redirect(url_for("fin_invoices_html"))
-
+        """
+        Crea una fila en fin_invoices con los datos del formulario:
+          numero, cliente_nombre, cliente_email, moneda, monto_total, descripcion,
+          archivo_path (opcional), id_reserva (opcional), id_usuario (obligatorio), estado.
+        Guarda el archivo en /static/uploads/invoices o genera un PDF mínimo si no hay adjunto.
+        """
+        # Asegura que la tabla exista
+        if not _tabla_existe("fin_invoices"):
+            flash("No existe la tabla de facturas 'fin_invoices' en la BD.", "danger")
+            return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
+    
+        # Campos del form
+        f = request.form
+        numero        = (f.get("numero") or "").strip()
+        cliente_nombre= (f.get("cliente_nombre") or "").strip()
+        cliente_email = (f.get("cliente_email") or "").strip().lower()
+        moneda        = (f.get("moneda") or "CRC").strip()
+        descripcion   = (f.get("descripcion") or "").strip()
+        estado        = "Emitida"
+    
         try:
-            from decimal import Decimal
-            monto_total = Decimal(monto_total_raw)
+            monto_total = float(f.get("monto_total") or 0)
         except Exception:
-            flash("Monto inválido.", "warning")
-            return redirect(url_for("fin_invoices_html"))
-
+            monto_total = 0.0
+    
+        # Opcional: id_reserva
         try:
-            _fecha = date.fromisoformat(fecha_emision_raw) if fecha_emision_raw else date.today()
+            id_reserva = int(f.get("id_reserva")) if f.get("id_reserva") else None
         except Exception:
-            _fecha = date.today()
+            id_reserva = None
+    
+        # Obligatorio por esquema: id_usuario
+        uid = session.get("user_id")
+        if not uid:
+            flash("Sesión requerida para emitir facturas.", "warning")
+            return redirect(url_for("login_html"))
+    
+        # Validaciones mínimas
+        if not numero or monto_total <= 0:
+            flash("Número/folio y monto total son obligatorios.", "warning")
+            return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
+    
+        # ===== Guardar/generar archivo =====
+        STATIC_INVOICES_DIR = BASE_DIR / "static" / "uploads" / "invoices"
+        STATIC_INVOICES_DIR.mkdir(parents=True, exist_ok=True)
+    
+        archivo_file = request.files.get("archivo")
+        archivo_filename = None
+        try:
+            if archivo_file and getattr(archivo_file, "filename", ""):
+                raw = secure_filename(archivo_file.filename)
+                ts  = datetime.now().strftime("%Y%m%d-%H%M%S")
+                archivo_filename = f"{numero}-{ts}-{raw}"
+                archivo_file.save(STATIC_INVOICES_DIR / archivo_filename)
+            else:
+                # Generar PDF mínimo si no se adjunta nada
+                archivo_filename = f"{numero}.pdf"
+                _write_minimal_pdf(
+                    STATIC_INVOICES_DIR / archivo_filename,
+                    "Factura — Hotel Villa Grace",
+                    [
+                        f"Folio:       {numero}",
+                        f"Fecha:       {datetime.now():%Y-%m-%d}",
+                        f"Cliente:     {cliente_nombre or '-'}",
+                        f"Email:       {cliente_email or '-'}",
+                        f"Moneda:      {moneda}",
+                        f"Total:       {('₡' if moneda=='CRC' else '$')} {monto_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                        f"Descripción: {descripcion or '-'}",
+                        f"Estado:      {estado}",
+                    ],
+                )
+        except Exception as e:
+            current_app.logger.warning(f"[fin_invoices] No se pudo guardar/generar archivo: {e}")
+            archivo_filename = None  # insertaremos NULL en archivo_path
+    
+        # ===== Insert en fin_invoices =====
+        try:
+            params = {
+                "numero": numero,
+                "cliente_nombre": cliente_nombre or None,
+                "cliente_email": cliente_email or None,
+                "moneda": moneda,
+                "monto_total": float(monto_total),
+                "descripcion": descripcion or None,
+                "archivo_path": archivo_filename,  # la plantilla arma la URL con /static/uploads/invoices/<archivo_path>
+                "id_reserva": id_reserva,
+                "id_usuario": int(uid),
+                "estado": estado,
+            }
+            sql = text("""
+                INSERT INTO fin_invoices
+                    (numero, cliente_nombre, cliente_email, moneda, monto_total, descripcion,
+                     archivo_path, id_reserva, id_usuario, estado)
+                VALUES
+                    (:numero, :cliente_nombre, :cliente_email, :moneda, :monto_total, :descripcion,
+                     :archivo_path, :id_reserva, :id_usuario, :estado)
+            """)
+            res = db.session.execute(sql, params)
+            db.session.commit()
+            new_id = int(res.lastrowid or 0)
+    
+            _audit_log(_current_user_email(), "fin.invoice.emitida",
+                       {"id": new_id, "numero": numero, "total": monto_total}, entidad_id=str(new_id))
+    
+            flash("Factura emitida correctamente.", "success")
+            return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
+    
+        except IntegrityError as ie:
+            db.session.rollback()
+            # Unicidad de numero
+            if "UQ_fin_invoices_numero" in str(ie.orig) or "Duplicate" in str(ie.orig).lower():
+                flash("El número/folio ya existe. Elige otro.", "warning")
+            else:
+                flash(f"No se pudo crear la factura (integridad): {ie.orig}", "danger")
+            return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
+    
+        except Exception as e:
+            db.session.rollback()
+            flash(f"No se pudo crear la factura: {e}", "danger")
+            return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
+    
+    
+    
 
-        # Manejo de comprobante
-        file = request.files.get("comprobante")
-        saved_path = None
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            # Evita colisiones: prefijo con número y timestamp corto
-            ts = datetime.now().strftime("%Y%m%d%H%M%S")
-            filename = f"{numero}_{ts}_{filename}"
-            path = os.path.join(INVOICE_UPLOAD_FOLDER, filename)
-            file.save(path)
-            saved_path = os.path.relpath(path, start=BASE_DIR)  # guarda relativo a BASE_DIR
+    # =========================
+    # FIN-UI: Caja y Cierres Períodos
+    # =========================
 
-        # Inserta
-        inv = FinInvoice(
-            numero=numero,
-            cliente_nombre=cliente_nombre,
-            cliente_email=cliente_email or None,
-            moneda=moneda,
-            monto_total=monto_total,
-            fecha_emision=_fecha,
-            estado="Emitida",
-            comprobante_path=saved_path,
-        )
-        db.session.add(inv)
-        db.session.commit()
-        flash("Factura creada correctamente.", "success")
-        return redirect(url_for("fin_invoices_html"))
+    @app.route("/fin-caja.html")
+    @app.route("/fin-caja")
+    @app.route("/fin/caja")
+    @role_required("Administrador", "Recepcionista")
+    def fin_caja_html():
+        """
+        UI de Caja (apertura, movimientos, cierre diario).
+        Requiere Administrador o Recepcionista.
+        Renderiza templates/fin-caja.html
+        """
+        return render_template("fin-caja.html")
+
+    @app.route("/fin-periods.html")
+    @app.route("/fin-periodos.html")
+    @app.route("/fin/periods")
+    @app.route("/fin/periodos")
+    @role_required("Administrador")
+    def fin_periods_html():
+        """
+        UI de Cierres de período (mensual) y re-aperturas.
+        Solo Administrador.
+        Renderiza templates/fin-periods.html
+        """
+        return render_template("fin-periods.html")
+
+
+
 
     # ------------------------------------------------------------
     # Marcar como Pagada
