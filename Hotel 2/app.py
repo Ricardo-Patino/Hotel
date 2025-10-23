@@ -3203,7 +3203,7 @@ def create_app() -> Flask:
         doc_image_path = db.Column(db.String(255))
         signature_path = db.Column(db.String(255))
         key_activated = db.Column(db.Boolean, nullable=False, server_default=text("0"))
-        created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
         meta = db.Column(db.JSON)
 
     class KeyActivation(db.Model):
@@ -3212,7 +3212,7 @@ def create_app() -> Flask:
         reserva_id = db.Column(db.Integer, nullable=False, index=True)
         habitacion_id = db.Column(db.Integer, index=True)
         cliente_id = db.Column(db.Integer, index=True)
-        activated_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        activated_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
         status = db.Column(db.Enum("activated", "failed", name="key_activation_status"), server_default="activated")
         meta = db.Column(db.JSON)
 
@@ -4066,7 +4066,7 @@ def create_app() -> Flask:
         currency = db.Column(db.String(10), default="CRC", nullable=False)
         total = db.Column(db.Numeric(14, 2), default=0, nullable=False)
         status = db.Column(db.Enum("posted", "voided", name="fin_ledger_status"), default="posted", nullable=False)
-        created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
         meta = db.Column(db.JSON)
         lines = db.relationship("FinLedgerLine", backref="tx", cascade="all, delete-orphan")
 
@@ -4268,7 +4268,7 @@ def create_app() -> Flask:
         currency = db.Column(db.String(10), default="CRC", nullable=False)
         monto = db.Column(db.Numeric(14, 2), nullable=False)
         emitido_por = db.Column(db.Integer, nullable=False)
-        creado_en = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        creado_en = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
         estado = db.Column(db.Enum("Emitido", "Anulado", name="fin_receipt_status"), default="Emitido", nullable=False)
 
     class FinNote(db.Model):
@@ -4282,7 +4282,7 @@ def create_app() -> Flask:
         monto_abs = db.Column(db.Numeric(14, 2), nullable=False)
         motivo = db.Column(db.String(255))
         emitido_por = db.Column(db.Integer, nullable=False)
-        creado_en = db.Column(db.DateTime, nullable=False, server_default=func.now())
+        creado_en = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
         estado = db.Column(db.Enum("Emitida", "Anulada", name="fin_note_status"), default="Emitida", nullable=False)
 
     def _make_seq(prefix: str, nid: int) -> str:
@@ -4723,6 +4723,168 @@ def create_app() -> Flask:
 
         bd_after = _checkout_breakdown(int(reserva_id), estancia_id=estancia_id) or bd_before
         return jsonify({"ok": True, "reserva_id": int(reserva_id), "receipt": receipt, "breakdown": bd_after})
+    
+    ## Parte de Brandon
+
+    # ============================================================
+    # FIN — UI y endpoints de Facturas (fin-invoices.html, CRUD)
+    # ============================================================
+
+    # Requiere:
+    # - from flask import render_template, request, redirect, url_for, flash, send_file
+    # - from werkzeug.utils import secure_filename
+    # - from flask_login import login_required
+    # - decorador role_required(...) ya definido
+    # - 'db' ya inicializado
+    # - BASE_DIR definido (Path de la app)
+    # Si no tienes alguno de los imports arriba en tu app.py, agrégalos.
+
+    # Carpeta de uploads para facturas (PDF/imagen del comprobante)
+    INVOICE_UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads", "invoices")
+    os.makedirs(INVOICE_UPLOAD_FOLDER, exist_ok=True)
+
+    # Extensiones de archivo permitidas (ajústalas si ocupás otras)
+    def allowed_file(filename: str) -> bool:
+        if not filename or "." not in filename:
+            return False
+        ext = filename.rsplit(".", 1)[1].lower()
+        return ext in {"pdf", "jpg", "jpeg", "png"}
+
+    # ------------------------------------------------------------
+    # Modelo opcional (si YA tienes FinInvoice en tus modelos, no
+    # dupliques: puedes borrar esta clase "fallback").
+    # ------------------------------------------------------------
+    try:
+        FinInvoice  # type: ignore[name-defined]
+    except NameError:
+        from sqlalchemy import func
+
+        class FinInvoice(db.Model):  # Fallback mínimo para que funcione
+            __tablename__ = "fin_invoices"
+            id = db.Column(db.Integer, primary_key=True)
+            numero = db.Column(db.String(64), unique=True, nullable=False)
+            cliente_nombre = db.Column(db.String(150), nullable=False)
+            cliente_email = db.Column(db.String(150), nullable=True)
+            moneda = db.Column(db.String(10), nullable=False, default="CRC")
+            monto_total = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+            fecha_emision = db.Column(db.Date, nullable=False, default=date.today)
+            estado = db.Column(db.String(20), nullable=False, default="Emitida")  # Emitida, Pagada, Anulada
+            comprobante_path = db.Column(db.String(255), nullable=True)
+            created_at = db.Column(db.DateTime, nullable=False, server_default=func.now())
+
+    # ------------------------------------------------------------
+    # UI — Lista de facturas
+    # ------------------------------------------------------------
+    @app.route("/fin-invoices.html", methods=["GET"])
+    @login_required
+    @role_required("Administrador", "Recepcionista")
+    def fin_invoices_html():
+        try:
+            facturas = (
+                FinInvoice.query.order_by(FinInvoice.fecha_emision.desc())
+                .limit(200)
+                .all()
+            )
+        except Exception:
+            # Si aún no has corrido migrations, evita romper la UI
+            facturas = []
+        return render_template("fin-invoices.html", facturas=facturas)
+
+    # ------------------------------------------------------------
+    # Crear factura (POST)
+    # Espera campos:
+    #   numero, cliente_nombre, cliente_email (opcional),
+    #   moneda (CRC|USD,...), monto_total, fecha_emision (YYYY-MM-DD),
+    #   comprobante (file input)
+    # ------------------------------------------------------------
+    @app.route("/fin/invoices/nuevo", methods=["POST"])
+    @login_required
+    @role_required("Administrador", "Recepcionista")
+    def fin_invoice_nuevo():
+        numero = (request.form.get("numero") or "").strip()
+        cliente_nombre = (request.form.get("cliente_nombre") or "").strip()
+        cliente_email = (request.form.get("cliente_email") or "").strip().lower()
+        moneda = (request.form.get("moneda") or "CRC").strip()[:10]
+        monto_total_raw = (request.form.get("monto_total") or "0").replace(",", "").strip()
+        fecha_emision_raw = (request.form.get("fecha_emision") or "").strip()
+
+        # Validaciones básicas
+        if not numero or not cliente_nombre:
+            flash("Número y cliente son obligatorios.", "warning")
+            return redirect(url_for("fin_invoices_html"))
+
+        try:
+            from decimal import Decimal
+            monto_total = Decimal(monto_total_raw)
+        except Exception:
+            flash("Monto inválido.", "warning")
+            return redirect(url_for("fin_invoices_html"))
+
+        try:
+            _fecha = date.fromisoformat(fecha_emision_raw) if fecha_emision_raw else date.today()
+        except Exception:
+            _fecha = date.today()
+
+        # Manejo de comprobante
+        file = request.files.get("comprobante")
+        saved_path = None
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            # Evita colisiones: prefijo con número y timestamp corto
+            ts = datetime.now().strftime("%Y%m%d%H%M%S")
+            filename = f"{numero}_{ts}_{filename}"
+            path = os.path.join(INVOICE_UPLOAD_FOLDER, filename)
+            file.save(path)
+            saved_path = os.path.relpath(path, start=BASE_DIR)  # guarda relativo a BASE_DIR
+
+        # Inserta
+        inv = FinInvoice(
+            numero=numero,
+            cliente_nombre=cliente_nombre,
+            cliente_email=cliente_email or None,
+            moneda=moneda,
+            monto_total=monto_total,
+            fecha_emision=_fecha,
+            estado="Emitida",
+            comprobante_path=saved_path,
+        )
+        db.session.add(inv)
+        db.session.commit()
+        flash("Factura creada correctamente.", "success")
+        return redirect(url_for("fin_invoices_html"))
+
+    # ------------------------------------------------------------
+    # Marcar como Pagada
+    # ------------------------------------------------------------
+    @app.route("/fin/invoices/<int:id>/pagar", methods=["POST"])
+    @login_required
+    @role_required("Administrador", "Recepcionista")
+    def fin_invoice_pagar(id: int):
+        factura = FinInvoice.query.get_or_404(id)
+        if factura.estado not in ("Emitida", "Anulada"):  # si usas otra lógica, ajusta
+            # Permitimos pasar de 'Emitida' a 'Pagada'. Si estaba 'Anulada' no debería, pero lo controlamos arriba si querés.
+            pass
+        factura.estado = "Pagada"
+        db.session.commit()
+        flash("Factura marcada como pagada.", "success")
+        return redirect(url_for("fin_invoices_html"))
+
+    # ------------------------------------------------------------
+    # Anular factura
+    # ------------------------------------------------------------
+    @app.route("/fin/invoices/<int:id>/anular", methods=["POST"])
+    @login_required
+    @role_required("Administrador")
+    def fin_invoice_anular(id: int):
+        factura = FinInvoice.query.get_or_404(id)
+        if factura.estado == "Anulada":
+            flash("La factura ya está anulada.", "info")
+            return redirect(url_for("fin_invoices_html"))
+        factura.estado = "Anulada"
+        db.session.commit()
+        flash("Factura anulada.", "info")
+        return redirect(url_for("fin_invoices_html"))
+
 
     return app
 
