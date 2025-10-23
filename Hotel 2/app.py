@@ -1208,6 +1208,26 @@ def create_app() -> Flask:
     def admin_dashboard_html():
         return render_template("admin-dashboard.html")
 
+    @app.route("/admin-rooms.html")
+    @role_required("Administrador")
+    def admin_rooms_html():
+        return render_template("admin-rooms.html")
+    
+    @app.route("/admin-taxes.html")
+    @role_required("Administrador")
+    def admin_taxes_html():
+        return render_template("admin-taxes.html")
+
+    @app.route("/admin-rates.html")
+    @role_required("Administrador")
+    def admin_rates_html():
+        return render_template("admin-rates.html")
+    
+    @app.route("/admin-channels.html")
+    @role_required("Administrador")
+    def admin_channels_html():
+        return render_template("admin-channels.html")
+
     # === OPS: tablero de estados por habitación (tablero en tiempo real) ===
     @app.route("/ops-rooms-status.html")
     @role_required("Administrador", "Recepcionista")
@@ -4899,5 +4919,5 @@ if __name__ == "__main__":
         host="127.0.0.1",
         port=int(os.getenv("PORT", 5000)),
         debug=True,
-        use_reloader=False,   # <-- clave para quitar ese error
+        use_reloader=True,   # <-- clave para quitar ese error
     )

@@ -125,7 +125,7 @@ def categorias_toggle(cat_id: int):
 # =========================================================
 
 # LISTA DE INSUMOS (endpoint único)
-@inv_bp.route("/insumos", methods=["GET"], endpoint="insumos_list")
+@inv_bp.route("/insumos", methods=["GET"])
 @role_required("Administrador", "Recepcionista")
 def insumos_list():
     q = (
