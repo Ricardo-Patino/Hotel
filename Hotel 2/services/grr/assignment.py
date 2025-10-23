@@ -73,17 +73,22 @@ def auto_assign_for_reserva(reserva_id: int, preferir_tipo: bool = True, allow_s
       2) Si no hay, y allow_split=True: dividir en tramos contiguos con distintas habitaciones.
     Guarda AsignacionDecision con el detalle.
     """
-    r = db.session.execute(
-        text("""
-          SELECT Codigo_Reserva, Codigo_Cliente, Fecha_Entrada ci, Fecha_Salida co,
-                 Huespedes, Observaciones, Estado,
-                 H.Tipo AS TipoHabitacionDeseada
-          FROM Reserva R
-          JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
-          WHERE R.Codigo_Reserva=:id
-          LIMIT 1
-        """), {"id": reserva_id}
-    ).mappings().first()
+    r= db.session.execute(text("""
+      SELECT R.Codigo_Reserva,
+             R.Codigo_Cliente,
+             R.Fecha_Entrada AS ci,
+             R.Fecha_Salida  AS co,
+             R.Huespedes,
+             R.Observaciones,
+             R.Estado        AS Estado,
+             H.Tipo          AS TipoHabitacionDeseada
+        FROM Reserva AS R
+        JOIN Habitacion AS H
+          ON H.Codigo_Habitacion = R.Codigo_Habitacion
+       WHERE R.Codigo_Reserva = :id
+       LIMIT 1
+    """), {"id": reserva_id}).mappings().first()
+    
     if not r:
         return {"ok": False, "error": "not_found"}
 

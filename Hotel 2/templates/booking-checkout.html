@@ -67,7 +67,7 @@
         ¡Reserva confirmada! Redirigiendo…
       </div>
       <div id="alert-err" class="alert alert-danger d-none" role="alert">
-        No se pudo crear la reserva. <span id="err-txt"></span>
+        <span id="err-txt"></span>
       </div>
 
       <div class="row g-4">
@@ -112,7 +112,26 @@
           <div class="card shadow-sm border-0">
             <div class="card-body">
               <h5 class="card-title">Pago</h5>
-              <!-- UI simulada; el cobro real se integrará después -->
+
+              <!-- Cupón (GRR-01-015) -->
+              <div class="border rounded-3 p-3 mb-3 bg-light">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-8">
+                    <label class="form-label">Cupón de descuento</label>
+                    <input id="coupon-code" class="form-control" placeholder="Ej. ACME10">
+                  </div>
+                  <div class="col-md-4 d-grid">
+                    <button class="btn btn-outline-primary" id="btn-apply-coupon" type="button">
+                      Aplicar cupón
+                    </button>
+                  </div>
+                </div>
+                <div class="small text-muted mt-2" id="coupon-msg">
+                  Los cupones válidos se definen en recepción/administración y se seleccionan aquí para aplicarlos en el cobro.
+                </div>
+              </div>
+
+              <!-- UI simulada de tarjeta -->
               <form class="row g-3">
                 <div class="col-12"><label class="form-label">Tarjeta</label>
                   <input class="form-control" placeholder="**** **** **** 4242" />
@@ -169,6 +188,9 @@
                 <span>Impuestos (13%)</span><span id="sum-tax">—</span>
               </div>
               <div class="d-flex justify-content-between">
+                <span>Cupón</span><span id="sum-coupon">₡ 0,00</span>
+              </div>
+              <div class="d-flex justify-content-between">
                 <span>Cargos</span><span id="sum-fees">₡ 0,00</span>
               </div>
               <hr />
@@ -184,7 +206,7 @@
 
               <div class="alert alert-info small mt-3 mb-0">
                 <i class="bi bi-info-circle me-1"></i>
-                Sin costo de cancelación hasta 48 h antes de la llegada (salvo tarifas NR).
+                Los importes son estimados; el total final se calcula al confirmar la reserva.
               </div>
             </div>
           </div>
@@ -228,7 +250,8 @@
     // ---------- utils ----------
     const TAX_RATE = 0.13;
     const money = (n) =>
-      new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 }).format(Number(n || 0));
+      new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 })
+        .format(Number(n || 0));
     const fmtLong = (iso) => {
       if (!iso) return "";
       const d = new Date(iso + "T00:00:00");
@@ -239,41 +262,12 @@
       const d2 = new Date(b + "T00:00:00");
       return Math.max(1, Math.round((d2 - d1) / 86400000));
     };
-    const i = (v,def=0)=>{ const n=parseInt(v,10); return Number.isFinite(n)?n:def; };
-
-    function normalizeImg(candidate) {
-      if (!candidate || typeof candidate !== "string") return "";
-      let c = candidate.trim();
-      if (c && !c.startsWith("/") && !/^https?:\/\//i.test(c)) {
-        c = c.startsWith("static/") ? "/" + c : "/" + c;
-      }
-      if (/^http:\/\//i.test(c)) c = c.replace(/^http:/i, "https:");
-      return c;
-    }
-
-    function setImgWithFallback(imgEl, candidate, fallback) {
-      if (!imgEl) return;
-      const cand = normalizeImg(candidate) || fallback;
-      const test = new Image();
-      test.onload = () => { imgEl.src = cand; };
-      test.onerror = () => { imgEl.src = fallback; };
-      test.src = cand;
-    }
-
-    function totalGuests(sel){
-      const a = i(sel.adults,0), c = i(sel.children,0);
-      return Math.max(1, a + c);
-    }
 
     // ---------- carga selección ----------
     function loadSelection() {
       let sel = null;
-      try {
-        sel = JSON.parse(sessionStorage.getItem("villaGrace.selection") || "null");
-      } catch (_) { sel = null; }
-
+      try { sel = JSON.parse(sessionStorage.getItem("villaGrace.selection") || "null"); } catch (_) { sel = null; }
       const p = new URLSearchParams(location.search);
-
       if (!sel) {
         sel = {
           checkin: p.get("checkin"),
@@ -283,130 +277,91 @@
           roomCode: p.get("room"),
           roomName: "Habitación seleccionada",
           img: "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}",
-          priceNight: Number(p.get("price") || 0), // por huésped por noche
+          priceNight: Number(p.get("price") || 0),     // por persona / noche (ya con descuento si NRB)
           rateCode: p.get("rate") || "flex",
           rateName: "Tarifa Flexible",
-          tipo: p.get("tipo") || "Sencilla"
+          tipo: p.get("tipo") || "Sencilla",
+          total: Number(p.get("total") || 0),
         };
       }
       sel.nights = sel.nights || nightsDiff(sel.checkin, sel.checkout);
       return sel;
     }
 
-    // ---------- si faltan precio/imagen: intenta recuperar desde backend ----------
-    async function hydrateFromBackend(sel) {
-      if (sel.priceNight > 0 && sel.img) return sel;
-      try {
-        const r = await fetch("/grr/habitaciones", { headers: { Accept: "application/json" } });
-        const json = await r.json();
-        if (!json || !json.ok || !Array.isArray(json.rooms)) return sel;
-
-        const room = json.rooms.find(x => String(x.Codigo_Habitacion || x.code) === String(sel.roomCode));
-        if (room) {
-          if (!sel.roomName) sel.roomName = room.Nombre || room.name || sel.roomName;
-          if (!(sel.priceNight > 0)) sel.priceNight = Number(room.Precio_Noche ?? room.Precio_Base ?? room.price ?? 0) || 0;
-          if (!sel.img) sel.img = room.Imagen_URL || room.img || sel.img;
-        }
-        return sel;
-      } catch(_) { return sel; }
-    }
-
-    // ---------- prefill huésped ----------
-    function splitName(full) {
-      if (!full) return { fname: "", lname: "" };
-      const parts = String(full).trim().split(/\s+/);
-      if (parts.length === 1) return { fname: parts[0], lname: "" };
-      return { fname: parts.slice(0, -1).join(" "), lname: parts.slice(-1).join(" ") };
-    }
-    function tryGetStoredProfile() {
-      try { return JSON.parse(sessionStorage.getItem("villaGrace.profile") || "null"); }
-      catch(_) { return null; }
-    }
-    function prefillGuestFields() {
-      const u = (window.__user || {});
-      const { fname: sFN, lname: sLN } = splitName(u.name || "");
-      const prof = tryGetStoredProfile() || {};
-
-      const f = $("#fname"), l = $("#lname"), e = $("#email"), p = $("#phone");
-      if (f && !f.value) f.value = sFN || prof.firstName || "";
-      if (l && !l.value) l.value = sLN || prof.lastName  || "";
-      if (e && !e.value) e.value = (u.email || prof.email || "");
-      if (p && !p.value) p.value = (u.phone || prof.phone || "");
-    }
-
     // ---------- render resumen ----------
+    const state = { coupon: { code: '', amount: 0, type: 'none' } };
+
     function renderSummary(sel) {
-      $("#hdr-sub").textContent =
-        `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${sel.nights>1?"s":""})`;
+      const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
+      $("#hdr-sub").textContent = `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${sel.nights>1?"s":""})`;
 
       const imgEl = $("#sum-img");
       const fallback = imgEl.getAttribute("data-fallback") || imgEl.src;
-      setImgWithFallback(imgEl, sel.img, fallback);
+      const test = new Image();
+      test.onload = () => { imgEl.src = sel.img || fallback; };
+      test.onerror = () => { imgEl.src = fallback; };
+      test.src = sel.img || fallback;
 
       $("#sum-room").textContent = sel.roomName || "Habitación seleccionada";
       $("#sum-room-sub").textContent = sel.tipo ? `${sel.tipo}` : "—";
       $("#sum-dates").innerHTML = `<i class="bi bi-calendar-event me-1"></i>${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)}`;
       $("#sum-guests").innerHTML =
         `<i class="bi bi-people me-1"></i>${sel.adults || 2} adulto(s)` +
-        (i(sel.children||"0") ? ` · ${sel.children} niño(s)` : "");
+        (parseInt(sel.children || "0", 10) ? ` · ${sel.children} niño(s)` : "");
 
-      const guests = totalGuests(sel);
-      $("#sum-nights").textContent = `${sel.nights}`;
-      $("#sum-night-price").textContent = money(sel.priceNight); // por huésped
-      $("#sum-guests-mult").textContent = `${guests} huésped(es)`;
-
-      const subtotal = Number(sel.priceNight || 0) * sel.nights * guests;
+      const nightPP = Number(sel.priceNight || 0); // por persona / noche (con descuento si NRB)
+      const subtotal = nightPP * sel.nights * totalPax;
       const tax = subtotal * TAX_RATE;
-      const total = subtotal + tax;
+      const coupon = Number(state.coupon.amount || 0);
+      const total = Math.max(0, subtotal + tax - coupon);
 
+      $("#sum-nights").textContent = `${sel.nights} × ${totalPax} huésped(es)`;
+      $("#sum-night-price").textContent = money(nightPP);
+      $("#sum-guests-mult").textContent = String(totalPax);
       $("#sum-subtotal").textContent = money(subtotal);
       $("#sum-tax").textContent = money(tax);
+      $("#sum-coupon").textContent = coupon ? `- ${money(coupon)}` : money(0);
       $("#sum-total").textContent = money(total);
     }
 
-    // ---------- crear cliente mínimo (mock/backoffice) ----------
-    async function ensureClient(fullName, email, phone) {
-      return 1; // Si tienes endpoint de clientes, intégralo aquí
+    // ---------- cupón (preview opcional, sin scope leak) ----------
+    async function previewCoupon(code, ctx) {
+      try {
+        const url = new URL('/grr/coupons/preview', location.origin);
+        url.searchParams.set('code', code);
+        if (ctx) {
+          Object.entries(ctx).forEach(([k,v]) => {
+            if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+          });
+        }
+        const r = await fetch(url, { headers: { Accept:'application/json' }});
+        if (!r.ok) return null;
+        return await r.json();
+      } catch { return null; }
     }
+
+    // ---------- crear cliente mínimo (dummy/backoffice) ----------
+    async function ensureClient(fullName, email, phone) { return 1; }
 
     // ---------- POST /grr/reservas ----------
     async function createReservation(sel, guest) {
-      const adults = i(sel.adults, 0), children = i(sel.children, 0);
-      const guests = Math.max(1, adults + children);
-      const nights = Math.max(1, i(sel.nights, 1));
-      const pricePerGuestNight = Number(sel.priceNight || 0); // por huésped por noche
-      const subtotal = pricePerGuestNight * nights * guests;
-      const tax = subtotal * TAX_RATE;
-      const total = subtotal + tax;
-
+      const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
       const payload = {
         Codigo_Cliente: await ensureClient(`${guest.fname} ${guest.lname}`, guest.email, guest.phone),
         Codigo_Funcionario: 1,
+        Codigo_Habitacion: sel.roomCode ? Number(sel.roomCode) : undefined,
         Tipo: sel.tipo || "Sencilla",
         Fecha_Entrada: sel.checkin,
         Fecha_Salida: sel.checkout,
-
-        // 💡 FIX: enviar huéspedes correctos
-        Huespedes: String(guests),
-        Huespedes_Adultos: adults,
-        Huespedes_Ninos: children,
-
-        // 💡 Enviar info de tarifa seleccionada
-        Tarifa_Codigo: sel.rateCode || 'flex',
-        Tarifa_Nombre: sel.rateName || 'Tarifa Flexible',
-        Es_No_Reembolsable: (sel.rateCode === 'nrb'),
-
-        // 💡 Enviar desglose económico (si backend lo usa, perfecto; si no, lo ignora)
-        Noches: nights,
-        Precio_Noche: pricePerGuestNight, // por huésped
-        Monto_Subtotal: subtotal,
-        Impuesto: tax,
-        Monto_Total: total,
-        Moneda: 'CRC',
-
+        Huespedes: String(totalPax),
+        Adults: String(sel.adults || "2"),
+        Children: String(sel.children || "0"),
+        RateCode: sel.rateCode || "flex",               // "flex" | "nrb"
+        Precio_Base_Noche: Number(sel.priceNight || 0), // por persona / noche
+        CouponCode: state.coupon.code || '',
         Canal: "Web",
         Observaciones: guest.notes || "",
-        Usuario: guest.email || undefined
+        Usuario: guest.email || undefined,
       };
 
       const res = await fetch("/grr/reservas", {
@@ -416,22 +371,73 @@
       });
 
       const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) {
-        const msg = json.error || `HTTP ${res.status}`;
+      if (!res.ok) {
+        const msg = json.msg || json.error || `HTTP ${res.status}`;
         throw new Error(msg);
       }
-      return { json, totals: { subtotal, tax, total }, payload };
+      return json; // devuelve lo que envíe el backend
     }
 
-    // ---------- bind botón ----------
-    function bindFinalize(sel) {
+    // ---------- POST /grr/reservas/{id}/apply-coupon ----------
+    async function applyCouponToReservation(reservaId, code){
+      if(!reservaId || !code) return null;
+      const r = await fetch(`/grr/reservas/${encodeURIComponent(reservaId)}/apply-coupon`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+        body: JSON.stringify({ codigo: String(code).trim() })
+      });
+      const j = await r.json().catch(()=> ({}));
+      if(!r.ok || j.ok === false) throw new Error(j.msg || `HTTP ${r.status}`);
+      return j; // { ok:true, monto, descuento, ... }
+    }
+
+    // ---------- bind ----------
+    function bind(sel) {
+      // Cupón: preview y pre-cálculo visual
+      $("#btn-apply-coupon").addEventListener('click', async () => {
+        const code = ($("#coupon-code").value || '').trim();
+        if (!code) {
+          state.coupon = { code:'', amount:0, type:'none' };
+          $("#coupon-msg").textContent = "Cupón borrado.";
+          renderSummary(sel);
+          return;
+        }
+
+        // Calcula el subtotal aquí (donde sí tenemos 'sel')
+        const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
+        const nightPP = Number(sel.priceNight || 0);
+        const nights  = Number(sel.nights || 1);
+        const subtotal = nightPP * nights * totalPax;
+
+        const ctx = {
+          checkin: sel.checkin, checkout: sel.checkout,
+          guests: totalPax, nights, priceNight: nightPP, subtotal
+        };
+
+        const preview = await previewCoupon(code, ctx);
+
+        if (preview && preview.ok) {
+          state.coupon = {
+            code,
+            type: preview.type || 'monto',
+            amount: Number(preview.amount || 0)
+          };
+          $("#coupon-msg").textContent = preview.msg || "Cupón aplicado (pre-cálculo). El importe final se valida al confirmar.";
+        } else {
+          state.coupon = { code, amount: 0, type:'pendiente' };
+          $("#coupon-msg").textContent = "Cupón registrado. Se validará al confirmar.";
+        }
+        renderSummary(sel);
+      });
+
+      // Finalizar
       $("#btn-finalize").addEventListener("click", async () => {
         const form = $("#guest-form");
         if (!form.checkValidity()) {
           form.reportValidity();
           return;
         }
-
+        const btn = $("#btn-finalize");
         const guest = {
           fname: $("#fname").value.trim(),
           lname: $("#lname").value.trim(),
@@ -440,71 +446,108 @@
           notes: $("#notes").value.trim(),
         };
 
-        const guestsObj = { adults: sel.adults || "2", children: sel.children || "0" };
+        const payloadConfirm = {
+          name: `${guest.fname} ${guest.lname}`.trim(),
+          roomName: sel.roomName || "Habitación",
+          plan: sel.rateName || (sel.rateCode==='nrb'?'No Reembolsable':'Tarifa Flexible'),
+          dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
+          guests: { adults: sel.adults || "2", children: sel.children || "0" },
+          priceNight: sel.priceNight || 0,
+          coupon: state.coupon
+        };
 
-        $("#btn-finalize").disabled = true;
+        btn.disabled = true;
+        const original = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando…';
         $("#alert-err").classList.add("d-none");
 
         try {
+          // 1) Crear reserva
           const result = await createReservation(sel, guest);
 
-          // Guardar confirm con números redondeados y el plan elegido
-          const confirmPayload = {
-            reservaId: result.json.id || result.json.Codigo_Reserva || null,
-            numero: result.json.numero || "VG-PENDIENTE",
-            name: `${guest.fname} ${guest.lname}`.trim(),
-            roomName: sel.roomName || "Habitación",
-            plan: sel.rateName || "Tarifa Flexible",
-            checkin: sel.checkin, checkout: sel.checkout,
-            dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
-            guests: guestsObj,
-            priceNight: sel.priceNight, // por huésped
-            total: result.totals.total
-          };
+          // Detectar ID con tolerancia a nombres
+          const reservaId =
+            (result.id ?? result.reserva_id ?? result.Codigo_Reserva ??
+             result.Reserva_Id ?? result.CodigoReserva ?? result.Codigo) || null;
 
-          sessionStorage.setItem("villaGrace.confirm", JSON.stringify(confirmPayload));
+          if(!reservaId) throw new Error('Reserva creada, pero no se pudo obtener el ID.');
 
+          // 2) Total inicial (si viene)
+          let totalFinal = Number(
+            result.total ?? result.total_monto ?? result.monto ?? result.Monto_Total ?? 0
+          );
+          let descuento  = 0;
+
+          // 3) Aplicar cupón (real) si el cliente ingresó uno
+          if (state.coupon && state.coupon.code) {
+            try{
+              const ap = await applyCouponToReservation(reservaId, state.coupon.code);
+              if (ap && ap.ok) {
+                const previo   = totalFinal || Number(result.Monto_Total || 0);
+                totalFinal     = Number(ap.monto ?? ap.total ?? previo);
+                descuento      = Math.max(0, +(previo - totalFinal).toFixed(2));
+                state.coupon.amount = descuento;
+              }
+            }catch(err){
+              console.warn('apply-coupon error:', err);
+              $("#coupon-msg").textContent = "Cupón no aplicable o inválido. Se cobrará sin descuento.";
+            }
+          }
+
+          // 4) Guardar datos para confirmation y redirigir
+          payloadConfirm.reservaId = reservaId;
+          payloadConfirm.numero    = result.numero ?? result.Numero ?? result.Numero_Comprobante ?? `VG-${reservaId}`;
+          payloadConfirm.total     = totalFinal;
+          payloadConfirm.habitacion= result.habitacion || null;
+          payloadConfirm.observaciones = guest.notes || "";
+
+          sessionStorage.setItem("villaGrace.confirm", JSON.stringify(payloadConfirm));
           $("#alert-ok").classList.remove("d-none");
           setTimeout(() => (location.href = "booking-confirmation.html"), 900);
         } catch (err) {
-          $("#btn-finalize").disabled = false;
-          $("#err-txt").textContent = String(err.message || err);
+          btn.disabled = false;
+          btn.innerHTML = original;
+          const msg = String(err?.message || err || 'No se pudo completar la operación.');
+          $("#err-txt").textContent = msg;
           $("#alert-err").classList.remove("d-none");
         }
       });
     }
 
     // ---------- init ----------
-    (async function init() {
-      const selection = loadSelection();
-      if (!selection || !selection.checkin || !selection.checkout) {
+    (function init() {
+      const sel = loadSelection();
+      if (!sel || !sel.checkin || !sel.checkout) {
         location.href = "booking-search.html";
         return;
       }
-      if (!selection.tipo) {
-        const n = (selection.roomName || "").toLowerCase();
-        selection.tipo =
+      // Inferir tipo si no vino
+      if (!sel.tipo) {
+        const n = (sel.roomName || "").toLowerCase();
+        sel.tipo =
           n.includes("suite") ? "Suite" :
           (n.includes("deluxe") || n.includes("doble")) ? "Doble" : "Sencilla";
       }
 
-      await hydrateFromBackend(selection);
+      // Prefill de usuario si existe sesión
+      try{
+        const u = window.__user || {};
+        if(u.name){
+          const [f,...r]=String(u.name).split(' ');
+          if(!$("#fname").value) $("#fname").value = f||'';
+          if(!$("#lname").value) $("#lname").value = r.join(' ')||'';
+        }
+        if(u.email && !$("#email").value) $("#email").value = u.email;
+        if(u.phone && !$("#phone").value) $("#phone").value = u.phone;
+      }catch(_){}
 
-      if (!(selection.priceNight > 0)) {
-        const backQS = new URLSearchParams({
-          checkin: selection.checkin || "",
-          checkout: selection.checkout || "",
-          adults: String(selection.adults || "2"),
-          children: String(selection.children || "0"),
-          room: selection.roomCode || ""
-        });
-        location.replace(`booking-details.html?${backQS.toString()}`);
-        return;
-      }
+      // Si vino cupón en query (?coupon=ACME10)
+      const qp = new URLSearchParams(location.search);
+      const cupQ = (qp.get('coupon')||'').trim();
+      if(cupQ){ $("#coupon-code").value = cupQ; state.coupon.code = cupQ; }
 
-      renderSummary(selection);
-      prefillGuestFields();
-      bindFinalize(selection);
+      renderSummary(sel);
+      bind(sel);
     })();
   })();
 </script>

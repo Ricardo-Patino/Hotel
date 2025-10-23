@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operaciones — No-Show | Hotel Villa Grace</title>
+  <meta name="description" content="Marcar reservas No-Show y liberar habitaciones.">
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="ops-coupons.html">Cupones</a></li>
+        <li><a href="ops-no-show.html" class="active">No-Show</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title" data-aos="fade" style="background:#0b1220;color:#fff;">
+    <div class="container position-relative">
+      <h1>No-Show</h1>
+      <p class="mb-0">Ejecuta el proceso para reservas sin check-in a la hora de corte. (GRR-01-016)</p>
+    </div>
+  </div>
+
+  <section class="section pt-3">
+    <div class="container" data-aos="fade-up">
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <h5 class="card-title mb-1">Procesar No-Show</h5>
+              <div class="text-muted small">Usa la configuración <code>NOSHOW_CUTOFF_HOUR</code> del servidor. Cambia el estado de reservas que no hicieron check-in y libera las habitaciones.</div>
+            </div>
+            <button class="btn btn-dark" id="btn-run"><i class="bi bi-person-x me-1"></i> Ejecutar ahora</button>
+          </div>
+
+          <div class="mt-3">
+            <div id="ns-alert" class="alert d-none" role="alert"></div>
+          </div>
+
+          <div class="mt-3">
+            <h6 class="mb-2">Último resultado</h6>
+            <pre id="ns-log" class="small bg-light p-3 rounded mb-0" style="min-height:72px">—</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-info small mt-3 mb-0">
+        <strong>Cómo probar:</strong> crea una reserva con <em>Entrada = hoy</em>, sin check-in; ajusta <code>NOSHOW_CUTOFF_HOUR</code> a una hora pasada; pulsa “Ejecutar ahora” y verifica que la reserva pasa a <em>NoShow</em> y la habitación queda <em>Disponible</em>.
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+  const $ = (s)=>document.querySelector(s);
+
+  async function postJSON(url, body){
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json', 'Accept':'application/json'}, body: JSON.stringify(body||{})});
+    const js = await r.json().catch(()=>({}));
+    return {ok:r.ok && js.ok!==false, js};
+  }
+
+  document.getElementById('btn-run').addEventListener('click', async ()=>{
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    const alertEl = $('#ns-alert');
+    alertEl.className = 'alert alert-info';
+    alertEl.textContent = 'Procesando...';
+    alertEl.classList.remove('d-none');
+    try{
+      const {ok, js} = await postJSON('/grr/jobs/run-noshow', {});
+      if (!ok) throw new Error(js.msg || 'Error en la ejecución');
+      alertEl.className = 'alert alert-success';
+      alertEl.textContent = `Listo. Procesadas: ${js.processed || 0}`;
+      $('#ns-log').textContent = JSON.stringify(js, null, 2);
+    }catch(e){
+      alertEl.className = 'alert alert-danger';
+      alertEl.textContent = e.message || 'Error desconocido';
+    }finally{
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

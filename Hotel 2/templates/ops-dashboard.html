@@ -27,10 +27,15 @@
     .kpi-card .icon { font-size: 1.75rem; opacity:.9 }
     .kpi-card .value { font-size: 1.5rem; font-weight: 700 }
     .soft { color:#6c757d }
-    .menu-card .btn { min-width: 220px }
     .section-title h1 { font-size: 1.6rem; margin:0 }
     .table thead th { white-space: nowrap }
     .badge-pill { border-radius: 50rem }
+    /* Menú mejorado */
+    .ops-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap:12px }
+    .ops-item { border:1px solid rgba(0,0,0,.06); border-radius:14px; padding:14px; display:flex; align-items:center; gap:12px; background:#fff; transition:all .15s ease }
+    .ops-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.06) }
+    .ops-item i { font-size: 1.25rem }
+    .ops-item .txt small{ color:#6c757d }
   </style>
 </head>
 <body class="inner-page">
@@ -52,7 +57,8 @@
               <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
               <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
               <li><a href="ops-rooms-status.html">Estado de habitaciones</a></li>
-              <li><a href="ops-housekeeping.html">Limpieza</a></li>
+              <li><a href="/ops/housekeeping">Limpieza</a></li>
+              <li><a href="/ops/coupons">Cupones</a></li>
             </ul>
           </li>
           <li><a href="admin-calendario.html">Calendario</a></li>
@@ -99,7 +105,10 @@
                 </div>
                 <i class="bi bi-calendar2-week icon text-success"></i>
               </div>
-              <div class="card-footer bg-white border-0 soft small">Monto: <span id="kpi-day-amt">—</span></div>
+              <div class="card-footer bg-white border-0 soft small">
+                Monto: <span id="kpi-day-amt">—</span><br>
+                ADR: <span id="kpi-day-adr">—</span>
+              </div>
             </div>
           </div>
 
@@ -142,26 +151,48 @@
             </div>
           </div>
 
-          <!-- Menú de accesos -->
+          <!-- Menú de accesos (mejorado) -->
           <div class="col-12">
-            <div class="card shadow-sm border-0 menu-card">
+            <div class="card shadow-sm border-0">
               <div class="card-header bg-white border-0">
                 <h5 class="mb-0"><i class="bi bi-menu-button-wide me-2"></i>Menú de operaciones</h5>
               </div>
               <div class="card-body">
-                <div class="d-flex flex-wrap gap-2">
-                  <a class="btn btn-outline-primary" href="ops-checkin.html"><i class="bi bi-person-badge me-1"></i> Check-in</a>
-                  <a class="btn btn-outline-primary" href="ops-checkout.html"><i class="bi bi-box-arrow-right me-1"></i> Check-out</a>
-                  <a class="btn btn-outline-primary" href="ops-walkin.html"><i class="bi bi-person-plus me-1"></i> Estancia sin reserva</a>
-                  <a class="btn btn-outline-secondary" href="ops-arrivals-departures.html"><i class="bi bi-box-arrow-in-right me-1"></i> Llegadas/Salidas</a>
-                  <a class="btn btn-outline-secondary" href="ops-rooms-status.html"><i class="bi bi-door-closed me-1"></i> Estado de habitaciones</a>
-                  <a class="btn btn-outline-secondary" href="/grr/ops/housekeeping"><i class="bi bi-bucket me-1"></i> Limpieza</a>
+                <div class="ops-grid">
+                  <a class="ops-item text-decoration-none" href="ops-checkin.html">
+                    <i class="bi bi-person-badge text-primary"></i>
+                    <div class="txt"><div class="fw-semibold">Check-in</div><small>Registrar llegadas</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-checkout.html">
+                    <i class="bi bi-box-arrow-right text-primary"></i>
+                    <div class="txt"><div class="fw-semibold">Check-out</div><small>Salir y cobrar</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-walkin.html">
+                    <i class="bi bi-person-plus text-primary"></i>
+                    <div class="txt"><div class="fw-semibold">Estancia sin reserva</div><small>Walk-in</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-arrivals-departures.html">
+                    <i class="bi bi-box-arrow-in-right text-secondary"></i>
+                    <div class="txt"><div class="fw-semibold">Llegadas/Salidas</div><small>Listado del día</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-rooms-status.html">
+                    <i class="bi bi-door-closed text-secondary"></i>
+                    <div class="txt"><div class="fw-semibold">Estado habitaciones</div><small>Tablero</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="/ops/housekeeping">
+                    <i class="bi bi-bucket text-secondary"></i>
+                    <div class="txt"><div class="fw-semibold">Limpieza</div><small>Asignaciones</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="/ops/coupons">
+                    <i class="bi bi-tag text-secondary"></i>
+                    <div class="txt"><div class="fw-semibold">Cupones</div><small>GRR-01-015</small></div>
+                  </a>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Llegadas / salidas & Incidentes -->
+          <!-- Llegadas / salidas -->
           <div class="col-lg-7">
             <div class="card shadow-sm border-0 mb-4">
               <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
@@ -185,6 +216,7 @@
               </div>
             </div>
 
+            <!-- Bitácora -->
             <div class="card shadow-sm border-0">
               <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
                 <h5 class="mb-0">Bitácora de turnos</h5>
@@ -199,7 +231,7 @@
             </div>
           </div>
 
-          <!-- Estado de habitaciones -->
+          <!-- Estado y No-Show -->
           <div class="col-lg-5">
             <div class="card shadow-sm border-0 mb-4">
               <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
@@ -233,23 +265,21 @@
                     </div>
                   </div>
                 </div>
-                <div class="soft small mt-3">Fuente: /api/rooms/status</div>
+                <div class="soft small mt-3">Fuente: /grr/api/rooms/status</div>
               </div>
             </div>
 
+            <!-- Cierre / No-Show -->
             <div class="card shadow-sm border-0">
               <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
-                <h5 class="mb-0">Mantenimiento</h5>
-                <a href="ops-maintenance.html" class="btn btn-success btn-sm">Gestionar</a>
+                <h5 class="mb-0">Corte de No-Show (GRR-01-016)</h5>
+                <button id="btn-noshow" class="btn btn-warning btn-sm"><i class="bi bi-exclamation-triangle me-1"></i> Ejecutar</button>
               </div>
               <div class="card-body">
-                <div class="d-flex justify-content-between">
-                  <div><span class="badge text-bg-danger badge-pill me-2">Críticos</span> <span id="mt-critical">—</span></div>
-                  <div class="soft">Pendientes totales: <span id="mt-total">—</span></div>
-                </div>
-                <div class="soft small mt-2">Integra aquí tu endpoint si tienes /api/maintenance/list.</div>
+                <div id="noshow-out" class="soft small">Ejecuta el job para marcar reservas sin check-in como No-Show, liberar habitación y aplicar penalización.</div>
               </div>
             </div>
+
           </div>
 
         </div> <!-- /row -->
@@ -286,6 +316,10 @@
         const d=j.day||{}, w=j.week||{}, m=j.month||{};
         document.getElementById('kpi-day-res').textContent = d.reservas ?? '0';
         document.getElementById('kpi-day-amt').textContent = moneyCRC(d.monto ?? 0);
+        // ADR (aprox)
+        const adr = (Number(d.reservas||0) > 0) ? (Number(d.monto||0) / Number(d.reservas||1)) : 0;
+        document.getElementById('kpi-day-adr').textContent = moneyCRC(adr);
+
         document.getElementById('kpi-week-res').textContent = w.reservas ?? '0';
         document.getElementById('kpi-week-amt').textContent = moneyCRC(w.monto ?? 0);
         document.getElementById('kpi-month-res').textContent = m.reservas ?? '0';
@@ -295,7 +329,7 @@
 
     async function loadRooms(){
       try{
-        const r = await fetch('/api/rooms/status', {headers:{Accept:'application/json'}});
+        const r = await fetch('/grr/api/rooms/status', {headers:{Accept:'application/json'}});
         const j = await r.json();
         if(!j || !j.ok) return;
         const items = j.items || [];
@@ -303,7 +337,9 @@
         for(const it of items){
           switch(String(it.estado||'').toLowerCase()){
             case 'disponible': free++; break;
-            case 'ocupada': occ++; break;
+            case 'ocupada':
+            case 'ocupada-temprana':
+            case 'ocupada-extendida': occ++; break;
             case 'limpieza': hk++; break;
             case 'mantenimiento': mt++; break;
           }
@@ -319,6 +355,20 @@
         document.getElementById('kpi-free').textContent = free;
       }catch(e){ console.warn('rooms error', e); }
     }
+
+    // Ejecutar No-Show (GRR-01-016)
+    document.getElementById('btn-noshow').addEventListener('click', async ()=>{
+      const out = document.getElementById('noshow-out');
+      out.textContent = 'Ejecutando corte…';
+      try{
+        const r = await fetch('/grr/jobs/run-noshow', { method:'POST' });
+        const j = await r.json().catch(()=>({}));
+        if(!j.ok){ out.textContent = 'No se pudo ejecutar el corte de No-Show.'; return; }
+        out.textContent = `Procesadas: ${j.processed||0}. Liberadas: ${j.liberadas||j.released||0}.`;
+        loadRooms();
+        loadKpis();
+      }catch(e){ out.textContent = 'Error de conexión al ejecutar el job.'; }
+    });
 
     loadKpis();
     loadRooms();

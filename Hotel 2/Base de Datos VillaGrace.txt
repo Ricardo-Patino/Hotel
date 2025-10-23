@@ -1,7 +1,8 @@
 /* ============================================================================
    Hotel Villa Grace — Esquema MySQL 8.x (InnoDB, UTF8MB4)
    Script limpio para recrear la BD con seeds mínimos
-   Incluye GRR-01-002 (KPIs/Auditoría) y GRR-01-003 (Auto-asignación)
+   Incluye GRR-01-002 (KPIs/Auditoría), GRR-01-003 (Auto-asignación) y
+   GRR-01-014..017 (Waitlist, Cupones/Ajustes, No-Show, Early/Late)
    ============================================================================ */
 
 SET sql_mode = 'STRICT_ALL_TABLES';
@@ -17,7 +18,7 @@ USE Hotel_VillaGrace;
 -- Limpieza
 SET FOREIGN_KEY_CHECKS = 0;
 
--- Limpieza total
+-- Vistas y triggers primero
 DROP VIEW IF EXISTS v_reservas_ext;
 DROP VIEW IF EXISTS v_reserva_pagos_pos;
 DROP VIEW IF EXISTS v_fin_caja_resumen;
@@ -26,34 +27,7 @@ DROP TRIGGER IF EXISTS trg_auditoria_log_after_ins;
 DROP TRIGGER IF EXISTS trg_reserva_sync_before_ins;
 DROP TRIGGER IF EXISTS trg_reserva_sync_before_upd;
 
-DROP TABLE IF EXISTS fin_cash_movement;
-DROP TABLE IF EXISTS fin_cash_session;
-DROP TABLE IF EXISTS fin_notes;
-DROP TABLE IF EXISTS fin_receipts;
-DROP TABLE IF EXISTS fin_ledger_line;
-DROP TABLE IF EXISTS fin_ledger_tx;
-DROP TABLE IF EXISTS fin_invoices;
-DROP TABLE IF EXISTS fin_monthly_close;
-DROP TABLE IF EXISTS fin_period_lock;
-DROP TABLE IF EXISTS AsignacionDecision;
-DROP TABLE IF EXISTS ReglaAsignacion;
-DROP TABLE IF EXISTS PreferenciaHuesped;
-DROP TABLE IF EXISTS ReservaEstancia;
-DROP TABLE IF EXISTS MaintenanceRequest;
-DROP TABLE IF EXISTS HousekeepingTask;
-DROP TABLE IF EXISTS Villa;
-
-DROP TABLE IF EXISTS ReservaDocumento;
-DROP TABLE IF EXISTS Documento;
-DROP TABLE IF EXISTS Reserva;
-DROP TABLE IF EXISTS Usuario;
-DROP TABLE IF EXISTS Rol;
-DROP TABLE IF EXISTS Cliente;
-DROP TABLE IF EXISTS Funcionario;
-DROP TABLE IF EXISTS Habitacion;
-DROP TABLE IF EXISTS KPI_Stats;
-DROP TABLE IF EXISTS Audit_Log;
-DROP TABLE IF EXISTS Auditoria_Log;
+-- Tablas (orden inverso de dependencias)
 DROP TABLE IF EXISTS fin_cash_movement;
 DROP TABLE IF EXISTS fin_cash_session;
 DROP TABLE IF EXISTS fin_notes;
@@ -73,40 +47,44 @@ DROP TABLE IF EXISTS InvMovimiento;
 DROP TABLE IF EXISTS InvInsumo;
 DROP TABLE IF EXISTS InvCategoria;
 
+DROP TABLE IF EXISTS ReservaDocumento;
+DROP TABLE IF EXISTS Documento;
+
+DROP TABLE IF EXISTS HousekeepingTask;
+DROP TABLE IF EXISTS MaintenanceRequest;
+DROP TABLE IF EXISTS Villa;
+
+DROP TABLE IF EXISTS ReservaEstancia;
 DROP TABLE IF EXISTS AsignacionDecision;
 DROP TABLE IF EXISTS ReglaAsignacion;
 DROP TABLE IF EXISTS PreferenciaHuesped;
-DROP TABLE IF EXISTS ReservaEstancia;
 
-DROP TABLE IF EXISTS ReservaDocumento;
-DROP TABLE IF EXISTS Documento;
+DROP TABLE IF EXISTS ReservaAjuste;
+DROP TABLE IF EXISTS Coupon;
+DROP TABLE IF EXISTS Waitlist;
+
 DROP TABLE IF EXISTS Reserva;
 DROP TABLE IF EXISTS Usuario;
 DROP TABLE IF EXISTS Rol;
 DROP TABLE IF EXISTS Cliente;
 DROP TABLE IF EXISTS Funcionario;
 DROP TABLE IF EXISTS Habitacion;
+
 DROP TABLE IF EXISTS KPI_Stats;
 DROP TABLE IF EXISTS Audit_Log;
 DROP TABLE IF EXISTS Auditoria_Log;
-DROP TABLE IF EXISTS Villa;
-
 
 SET FOREIGN_KEY_CHECKS = 1;
 
-
-
 /* ------------------------------------------------------------------------- */
-/* Tablas base																*/
-/*comprobar que n hayan tablas existentes:															*/
-/*show tables;                                                               */
+/* Tablas base                                                               */
 /* ------------------------------------------------------------------------- */
 CREATE TABLE Habitacion (
   Codigo_Habitacion   INT NOT NULL AUTO_INCREMENT,
   Numero_Habitacion   VARCHAR(10) NOT NULL,
   Tipo                ENUM('Sencilla','Doble','Suite') NOT NULL,
   Precio_Noche        DECIMAL(12,2) NOT NULL,
-  Estado              ENUM('Disponible','Ocupada','Mantenimiento') NOT NULL DEFAULT 'Disponible',
+  Estado              ENUM('Disponible','Ocupada','Ocupada-temprana','Ocupada-extendida','Mantenimiento','Limpieza') NOT NULL DEFAULT 'Disponible',
   Fecha_modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_Habitacion PRIMARY KEY (Codigo_Habitacion),
   CONSTRAINT UQ_Habitacion_Numero UNIQUE (Numero_Habitacion),
@@ -177,7 +155,7 @@ CREATE TABLE Reserva (
   Fecha_Entrada        DATE NOT NULL,
   Fecha_Salida         DATE NOT NULL,
   Monto_Total          DECIMAL(12,2) NOT NULL,
-  Estado               ENUM('Confirmada','Cancelada','Pendiente') NOT NULL DEFAULT 'Confirmada',
+  Estado               ENUM('Confirmada','Cancelada','Pendiente','NoShow') NOT NULL DEFAULT 'Confirmada',
   Canal                VARCHAR(30) NULL,
   Numero_Comprobante   VARCHAR(40) NULL,
   Fuente               VARCHAR(30) NULL,
@@ -236,11 +214,67 @@ ALTER TABLE Reserva
     FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
     ON UPDATE CASCADE ON DELETE RESTRICT;
 
+/* ------------------------------------------------------------------------- */
+/* GRR-01-014: Lista de espera                                               */
+/* ------------------------------------------------------------------------- */
+CREATE TABLE Waitlist (
+  Id                 INT AUTO_INCREMENT PRIMARY KEY,
+  Correo             VARCHAR(120) NOT NULL,
+  Nombre             VARCHAR(120) NOT NULL,
+  Tipo_Solicitado    VARCHAR(80)  NOT NULL,
+  Fecha_Entrada      DATE         NOT NULL,
+  Fecha_Salida       DATE         NOT NULL,
+  Huespedes          INT          NOT NULL DEFAULT 1,
+  Preferir_Superior  TINYINT(1)   NOT NULL DEFAULT 1,
+  Estado             ENUM('Pendiente','Ofertado','Confirmado','Expirado','Cancelado') NOT NULL DEFAULT 'Pendiente',
+  Expira_Oferta      DATETIME NULL,
+  Oferta_Reserva_Id  INT NULL,
+  Observaciones      VARCHAR(255),
+  Fecha_Creacion     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_WL_Estado (Estado),
+  KEY IX_WL_Fechas (Fecha_Entrada, Fecha_Salida),
+  KEY IX_WL_Correo (Correo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* ------------------------------------------------------------------------- */
-/* INV-07-001 - Creación de categorías de insumos e Insumos                              */
+/* GRR-01-015: Cupones / Ajustes de tarifa                                   */
 /* ------------------------------------------------------------------------- */
+CREATE TABLE Coupon (
+  Codigo        VARCHAR(40) PRIMARY KEY,
+  Tipo          ENUM('porcentaje','monto','corporativo') NOT NULL,
+  Valor         DECIMAL(12,2) NOT NULL,    -- % o monto (según Tipo)
+  Valido_Desde  DATE NULL,
+  Valido_Hasta  DATE NULL,
+  Max_Usos      INT NULL,
+  Usos          INT NOT NULL DEFAULT 0,
+  Segmento      VARCHAR(40) NULL,
+  Anticipacion_Min INT NULL,
+  Temporada     VARCHAR(40) NULL,
+  Activo        TINYINT(1) NOT NULL DEFAULT 1,
+  KEY IX_Coupon_Activo (Activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE ReservaAjuste (
+  Id               INT AUTO_INCREMENT PRIMARY KEY,
+  Codigo_Reserva   INT NOT NULL,
+  Tipo             ENUM('coupon','corporativo','manual') NOT NULL,
+  Codigo           VARCHAR(40) NULL,
+  Monto_Antes      DECIMAL(12,2) NOT NULL,
+  Monto_Despues    DECIMAL(12,2) NOT NULL,
+  ADR_Antes        DECIMAL(12,2) NULL,
+  ADR_Despues      DECIMAL(12,2) NULL,
+  Usuario          VARCHAR(120) NULL,
+  Motivo           VARCHAR(255) NULL,
+  Fecha            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_ResAjuste_Reserva (Codigo_Reserva),
+  CONSTRAINT FK_ResAjuste_Reserva
+    FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* ------------------------------------------------------------------------- */
+/* INV-07-001 - Categorías de insumos / Insumos                              */
+/* ------------------------------------------------------------------------- */
 CREATE TABLE InvCategoria (
   Id               INT NOT NULL AUTO_INCREMENT,
   Nombre           VARCHAR(80)  NOT NULL,
@@ -259,7 +293,7 @@ CREATE TABLE InvInsumo (
   Nombre           VARCHAR(120) NOT NULL,
   Unidad           VARCHAR(20)  NOT NULL, -- 'un', 'kg', 'g', 'lt', 'ml', 'paq', 'caja', etc.
   Stock_Actual     DECIMAL(12,3) NOT NULL DEFAULT 0,
-  Stock_Minimo     DECIMAL(12,3) NOT NULL DEFAULT 0,  -- pensado para INV-07-005
+  Stock_Minimo     DECIMAL(12,3) NOT NULL DEFAULT 0,
   Activo           TINYINT(1)   NOT NULL DEFAULT 1,
   Fecha_Creacion   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Actualiza  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -324,7 +358,6 @@ CREATE TABLE AsignacionDecision (
   KEY IX_AD_Resultado (Resultado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Preferencias por huésped (usada por seeds y reglas)
 CREATE TABLE PreferenciaHuesped (
   Id_Pref        INT NOT NULL AUTO_INCREMENT,
   Codigo_Cliente INT NOT NULL,
@@ -421,14 +454,18 @@ CREATE TABLE ReservaDocumento (
   KEY IX_ResDoc_Documento (Documento_Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* KPIs y Auditoría */
+/* ------------------------------------------------------------------------- */
+/* KPIs y Auditoría                                                          */
+/* ------------------------------------------------------------------------- */
 CREATE TABLE KPI_Stats (
-  Id             INT NOT NULL AUTO_INCREMENT,
-  Periodo        ENUM('day','week','month') NOT NULL,
-  Clave          VARCHAR(16) NOT NULL,
-  Total_Reservas INT NOT NULL DEFAULT 0,
-  Total_Monto    DECIMAL(14,2) NOT NULL DEFAULT 0.00,
-  Fecha_Ultima   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  Id                     INT NOT NULL AUTO_INCREMENT,
+  Periodo                ENUM('day','week','month') NOT NULL,
+  Clave                  VARCHAR(16) NOT NULL,
+  Total_Reservas         INT NOT NULL DEFAULT 0,
+  Total_Monto            DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  Revenue_SinImpuesto    DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  Total_Noches           INT NOT NULL DEFAULT 0,
+  Fecha_Ultima           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_KPI_Stats PRIMARY KEY (Id),
   CONSTRAINT UQ_KPI UNIQUE (Periodo, Clave),
   KEY IX_KPI_Periodo (Periodo),
@@ -483,7 +520,7 @@ CREATE TABLE fin_invoices (
   id_factura      INT NOT NULL AUTO_INCREMENT,
   numero          VARCHAR(50) NOT NULL,
   cliente_nombre  VARCHAR(120) NULL,
-  cliente_email   VARCHAR(120) NULL,
+  cliente_email  VARCHAR(120) NULL,
   moneda          VARCHAR(10)  NOT NULL DEFAULT 'CRC',
   monto_total     DECIMAL(12,2) NOT NULL,
   descripcion     TEXT NULL,
@@ -570,7 +607,7 @@ CREATE TABLE fin_notes (
   KEY IX_fin_notes_reserva (ref_reserva)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Caja: sesiones y movimientos (CREADOS ANTES de la vista)
+-- Caja
 CREATE TABLE fin_cash_session (
   id_session            INT NOT NULL AUTO_INCREMENT,
   fecha                 DATE NOT NULL,
@@ -595,7 +632,7 @@ CREATE TABLE fin_cash_movement (
   metodo        ENUM('Efectivo','Tarjeta','Transferencia','Otro') NOT NULL DEFAULT 'Efectivo',
   concepto      VARCHAR(160) NOT NULL,
   referencia    VARCHAR(60) NULL,
-  monto         DECIMAL(14,2) NOT NULL, -- positivo suma; negativo resta
+  monto         DECIMAL(14,2) NOT NULL,
   created_by    INT NOT NULL,
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   source        ENUM('Manual','POS','BackOffice') NOT NULL DEFAULT 'Manual',
@@ -652,8 +689,7 @@ SELECT
   s.opening_cash,
   IFNULL(r.ingresos_efectivo, 0.00) AS ingresos_efectivo,
   IFNULL(m.egresos_efectivo, 0.00)  AS egresos_efectivo,
-  IFNULL(m.ajustes_mas, 0.00)       AS 
-  ajustes_mas,
+  IFNULL(m.ajustes_mas, 0.00)       AS ajustes_mas,
   IFNULL(m.ajustes_menos, 0.00)     AS ajustes_menos,
   (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
     + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0)) AS efectivo_esperado,
@@ -677,14 +713,14 @@ LEFT JOIN (
   GROUP BY DATE(created_at)
 ) m ON m.fecha = s.fecha;
 
-
-
--- Cierres mensuales e historial
+/* ------------------------------------------------------------------------- */
+/* Cierres mensuales e historial                                             */
+/* ------------------------------------------------------------------------- */
 CREATE TABLE IF NOT EXISTS fin_period_lock (
   id_lock        INT AUTO_INCREMENT PRIMARY KEY,
   period_key     CHAR(7) NOT NULL,              -- 'YYYY-MM'
-  period_start   DATE     NOT NULL,             -- primer día del mes
-  period_end     DATE     NOT NULL,             -- último día del mes
+  period_start   DATE     NOT NULL,
+  period_end     DATE     NOT NULL,
   status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
   note           VARCHAR(255) NULL,
   closed_by      INT NULL,
@@ -694,28 +730,23 @@ CREATE TABLE IF NOT EXISTS fin_period_lock (
   UNIQUE KEY uq_fin_period_lock (period_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Snapshot de totales del mes (para auditoría/consulta)
 CREATE TABLE IF NOT EXISTS fin_monthly_close (
   id_close       INT AUTO_INCREMENT PRIMARY KEY,
   period_key     CHAR(7) NOT NULL,
-  totals_json    JSON NOT NULL,                 -- resumen por cuentas/métodos/efectivo
+  totals_json    JSON NOT NULL,
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   created_by     INT NULL,
-  hash_sum       CHAR(64) NULL,                 -- opcional: hash de integridad
+  hash_sum       CHAR(64) NULL,
   UNIQUE KEY uq_fin_monthly_close (period_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 /* ------------------------------------------------------------------------- */
-/*  Inventario (INV) — Categorías, Insumos y Movimientos (ajustes/historial) */
+/* Inventario — Movimientos                                                  */
 /* ------------------------------------------------------------------------- */
-
-
--- Tu tabla InvMovimiento (tal cual la compartiste):
 CREATE TABLE InvMovimiento (
   Id               INT NOT NULL AUTO_INCREMENT,
   Insumo_Id        INT NOT NULL,
-  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION',
-                          'ENTRADA_COMPRA','ENTRADA_DEVOLUCION') NOT NULL,
+  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION','ENTRADA_COMPRA','ENTRADA_DEVOLUCION') NOT NULL,
   Campo            VARCHAR(60)  NULL,
   Valor_Antes      VARCHAR(120) NULL,
   Valor_Despues    VARCHAR(120) NULL,
@@ -737,24 +768,9 @@ CREATE TABLE InvMovimiento (
   KEY IX_InvMovimiento_Fecha  (Fecha_Mov)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Datos de prueba
-
-INSERT INTO InvCategoria (Nombre, Descripcion, Activa)
-VALUES ('General', 'Categoría por defecto para insumos generales', 1);
-
-INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad)
-VALUES (1, 'Cloro piscina', 'lt');
-
-
-
-
-
-INSERT INTO InvMovimiento (Insumo_Id, Tipo, Motivo, Delta)
-VALUES (1, 'AJUSTE', 'Carga inicial', 50.000);
-
--- ==============================
---  MantenimientoSolicitud
--- ==============================
+/* ------------------------------------------------------------------------- */
+/* Mantenimiento                                                             */
+/* ------------------------------------------------------------------------- */
 CREATE TABLE IF NOT EXISTS MantenimientoSolicitud (
   Id                INT NOT NULL AUTO_INCREMENT,
   Codigo_Habitacion INT NOT NULL,
@@ -773,9 +789,6 @@ CREATE TABLE IF NOT EXISTS MantenimientoSolicitud (
   KEY IX_MantenimientoSolicitud_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ==============================
---  MantenimientoCambioEstado
--- ==============================
 CREATE TABLE IF NOT EXISTS MantenimientoCambioEstado (
   Id              INT NOT NULL AUTO_INCREMENT,
   Solicitud_Id    INT NOT NULL,
@@ -793,9 +806,6 @@ CREATE TABLE IF NOT EXISTS MantenimientoCambioEstado (
   KEY IX_MantenimientoCambioEstado_Fecha (Fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ==============================
---  MantenimientoPreventivo
--- ==============================
 CREATE TABLE IF NOT EXISTS MantenimientoPreventivo (
   Id              INT NOT NULL AUTO_INCREMENT,
   Equipo          VARCHAR(120) NOT NULL,
@@ -809,9 +819,6 @@ CREATE TABLE IF NOT EXISTS MantenimientoPreventivo (
   KEY IX_MantenimientoPreventivo_ProximaFecha (Proxima_Fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ==============================
---  MantenimientoNotificacion
--- ==============================
 CREATE TABLE IF NOT EXISTS MantenimientoNotificacion (
   Id             INT NOT NULL AUTO_INCREMENT,
   Solicitud_Id   INT,
@@ -831,49 +838,11 @@ CREATE TABLE IF NOT EXISTS MantenimientoNotificacion (
   KEY IX_MantenimientoNotificacion_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Dato de prueba
-
-SELECT * FROM Habitacion;
-SELECT Codigo_Habitacion FROM Habitacion;
 /* ------------------------------------------------------------------------- */
 /* Seeds                                                                     */
 /* ------------------------------------------------------------------------- */
 
-INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado)
-VALUES ('101','Sencilla',15000.00,'Disponible')
-ON DUPLICATE KEY UPDATE
-  Tipo = VALUES(Tipo),
-  Precio_Noche = VALUES(Precio_Noche),
-  Estado = VALUES(Estado);
-
-
-INSERT INTO MantenimientoSolicitud
-(Codigo_Habitacion, Titulo, Descripcion, Prioridad, Estado)
-VALUES (1, 'A/C con ruido', 'Vibración fuerte por la noche', 'Alta', 'Abierta');
-
-
-INSERT INTO InvCategoria (Nombre, Descripcion, Activa)
-VALUES ('Limpieza', 'Insumos de limpieza y desinfección', 1)
-     , ('Cocina', 'Insumos de cocina y alimentos no perecederos', 1)
-     , ('Amenities', 'Amenities para habitaciones', 1)
-     ,('Recepción','Papelería y suministros de front desk', 1)
-ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion);
-
-INSERT INTO InvCategoria (Nombre, Activa)
-SELECT 'General', 1
-WHERE NOT EXISTS (SELECT 1 FROM InvCategoria WHERE Nombre='General');
-
-INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad, Stock_Actual, Stock_Minimo, Activo)
-SELECT (SELECT Id FROM InvCategoria WHERE Nombre='General' LIMIT 1),
-       'Toallas', 'unidad', 50, 10, 1
-WHERE NOT EXISTS (SELECT 1 FROM InvInsumo WHERE Nombre='Toallas');
-
-INSERT INTO Rol (Nombre, Descripcion, Estado) VALUES
- ('Administrador','Rol Administrador','Activo'),
- ('Recepcionista','Rol Recepción','Activo'),
- ('Limpieza','Rol Limpieza','Activo'),
- ('Cliente','Rol Cliente','Activo');
-
+-- Habitaciones
 INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado) VALUES
  ('101','Sencilla', 15000.00,'Disponible'),
  ('102','Doble',    30000.00,'Disponible'),
@@ -884,21 +853,96 @@ ON DUPLICATE KEY UPDATE
   Precio_Noche = VALUES(Precio_Noche),
   Estado = VALUES(Estado);
 
+-- Roles
+INSERT INTO Rol (Nombre, Descripcion, Estado) VALUES
+ ('Administrador','Rol Administrador','Activo'),
+ ('Recepcionista','Rol Recepción','Activo'),
+ ('Limpieza','Rol Limpieza','Activo'),
+ ('Cliente','Rol Cliente','Activo')
+ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion), Estado = VALUES(Estado);
 
+-- Funcionarios
 INSERT INTO Funcionario (Cedula,Nombre,Apellido,Puesto,Fecha_Nacimiento) VALUES
  ('305410583','Juan','Jiménez','Recepcionista','1998-03-21'),
  ('107720872','María','Jimenez','Administrador','1991-04-11'),
  ('105440693','Ana','Coto','Limpieza','1993-02-22');
 
+-- Clientes
 INSERT INTO Cliente (Cedula,Nombre,Apellido,Telefono,Correo,Fecha_Nacimiento) VALUES
  ('407550891','Rosa','Coto','88889999','rosa@mail.com','1994-04-01'),
  ('308220992','Ana','Porras','88776655','ana@mail.com','1998-06-01'),
  ('507660893','Catalina','Rojas','88112233','cata@mail.com','2001-05-15');
 
+-- Usuarios
 INSERT INTO Usuario (Nombre, Cedula_Pasaporte, Correo, Telefono, Contrasena, Rol_Id, Estado)
 VALUES ('Admin General','ADM001','admin@hotel.test','00000000','PBKDF2_HASH_AQUI',
         (SELECT Codigo_Rol FROM Rol WHERE Nombre='Administrador'),'Activo');
 
+INSERT INTO Usuario (Nombre, Cedula_Pasaporte, Correo, Telefono, Rol_Id, Estado, Contrasena)
+SELECT
+  'Laura Recepción',
+  'R-001',
+  'recepcion@hotel.test',
+  '+506 6000 0000',
+  (SELECT Codigo_Rol FROM Rol WHERE Nombre = 'Recepcionista' LIMIT 1),
+  'Activo',
+  'Recep1234!'
+WHERE NOT EXISTS (SELECT 1 FROM Usuario WHERE LOWER(Correo)=LOWER('recepcion@hotel.test'));
+
+-- KPI inicial
+INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto, Revenue_SinImpuesto, Total_Noches) VALUES
+ ('day',   DATE_FORMAT(CURDATE(), '%Y-%m-%d'), 0, 0, 0, 0),
+ ('week',  DATE_FORMAT(CURDATE(), '%x-W%v'),   0, 0, 0, 0),
+ ('month', DATE_FORMAT(CURDATE(), '%Y-%m'),    0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE
+  Total_Reservas=VALUES(Total_Reservas),
+  Total_Monto=VALUES(Total_Monto),
+  Revenue_SinImpuesto=VALUES(Revenue_SinImpuesto),
+  Total_Noches=VALUES(Total_Noches);
+
+-- Inventario básico
+INSERT INTO InvCategoria (Nombre, Descripcion, Activa)
+VALUES ('General', 'Categoría por defecto para insumos generales', 1)
+ON DUPLICATE KEY UPDATE Descripcion=VALUES(Descripcion), Activa=VALUES(Activa);
+
+INSERT INTO InvCategoria (Nombre, Descripcion, Activa)
+VALUES ('Limpieza','Insumos de limpieza y desinfección',1),
+       ('Cocina','Insumos de cocina y alimentos no perecederos',1),
+       ('Amenities','Amenities para habitaciones',1),
+       ('Recepción','Papelería y suministros de front desk',1)
+ON DUPLICATE KEY UPDATE Descripcion=VALUES(Descripcion), Activa=VALUES(Activa);
+
+INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad)
+SELECT (SELECT Id FROM InvCategoria WHERE Nombre='General' LIMIT 1), 'Toallas', 'unidad'
+WHERE NOT EXISTS (SELECT 1 FROM InvInsumo WHERE Nombre='Toallas');
+
+INSERT INTO InvInsumo (Categoria_Id, Nombre, Unidad)
+SELECT (SELECT Id FROM InvCategoria WHERE Nombre='General' LIMIT 1), 'Cloro piscina', 'lt'
+WHERE NOT EXISTS (SELECT 1 FROM InvInsumo WHERE Nombre='Cloro piscina');
+
+INSERT INTO InvMovimiento (Insumo_Id, Tipo, Motivo, Delta)
+VALUES (
+  (SELECT Id FROM InvInsumo WHERE Nombre='Cloro piscina' LIMIT 1),
+  'AJUSTE', 'Carga inicial', 50.000
+);
+
+-- Mantenimiento de ejemplo
+INSERT INTO MantenimientoSolicitud (Codigo_Habitacion, Titulo, Descripcion, Prioridad, Estado)
+VALUES (1, 'A/C con ruido', 'Vibración fuerte por la noche', 'Alta', 'Abierta');
+
+-- Reglas de asignación / preferencias
+INSERT INTO PreferenciaHuesped (Codigo_Cliente, Clave, Valor) VALUES
+ (2,'piso_alto','true'),
+ (2,'cuna','true'),
+ (3,'vista','mar');
+
+INSERT INTO ReglaAsignacion (Nombre, Prioridad, Peso, Activa, Criterio_JSON)
+VALUES
+ ('Match tipo de habitación', 10, 2.0, 1, JSON_OBJECT('campo','Tipo','operador','eq','valor','(solicitado)')),
+ ('Capacidad suficiente',     20, 1.5, 1, JSON_OBJECT('campo','Capacidad','operador','>=','valor','(pax)')),
+ ('Evitar mantenimiento',     30, 3.0, 1, JSON_OBJECT('campo','Estado','operador','neq','valor','Mantenimiento'));
+
+-- Reservas demo (asegura IDs de habitaciones 1..4)
 INSERT INTO Reserva (
   Codigo_Cliente, Codigo_Habitacion, Habitacion_Id, Codigo_Funcionario,
   Fecha_Entrada, Fecha_Salida, Monto_Total, Estado, Canal, Numero_Comprobante,
@@ -911,28 +955,22 @@ INSERT INTO Reserva (
  (3, 4, 4, 1, '2025-11-10','2025-11-12', 90000.00,'Confirmada','Web','VG-20251110-0001',
   'Late checkout','2 adultos','Web','48h antes sin costo');
 
--- Preferencias (la tabla ya existe)
-INSERT INTO PreferenciaHuesped (Codigo_Cliente, Clave, Valor) VALUES
- (2,'piso_alto','true'),
- (2,'cuna','true'),
- (3,'vista','mar');
+-- Decisión + estancia ejemplo (para reserva 2)
+INSERT INTO AsignacionDecision (Codigo_Reserva, Tipo, Resultado, Score_Total, Detalle_JSON)
+VALUES (2, 'Auto', 'OK', 4.50, JSON_OBJECT('candidatos', JSON_ARRAY(101,102,202), 'seleccion', 102));
 
-INSERT INTO ReglaAsignacion (Nombre, Prioridad, Peso, Activa, Criterio_JSON)
-VALUES
- ('Match tipo de habitación', 10, 2.0, 1, JSON_OBJECT('campo','Tipo','operador','eq','valor','(solicitado)')),
- ('Capacidad suficiente',     20, 1.5, 1, JSON_OBJECT('campo','Capacidad','operador','>=','valor','(pax)')),
- ('Evitar mantenimiento',     30, 3.0, 1, JSON_OBJECT('campo','Estado','operador','neq','valor','Mantenimiento'));
+INSERT INTO ReservaEstancia (Codigo_Reserva, Habitacion_Id, Fecha_Desde, Fecha_Hasta, Origen, Decision_Id, Score_Total, Motivos_JSON, Preferencias_JSON)
+VALUES (2, 2, '2025-10-01','2025-10-05','Automatico',
+        (SELECT Id_Decision FROM AsignacionDecision WHERE Codigo_Reserva=2 ORDER BY Id_Decision DESC LIMIT 1),
+        4.50,
+        JSON_OBJECT('tipo','match','capacidad','ok','mantenimiento','ok'),
+        JSON_OBJECT('piso_alto','true','cuna','true'));
 
-INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto) VALUES
- ('day',   DATE_FORMAT(CURDATE(), '%Y-%m-%d'), 0, 0),
- ('week',  DATE_FORMAT(CURDATE(), '%x-W%v'),   0, 0),
- ('month', DATE_FORMAT(CURDATE(), '%Y-%m'),    0, 0)
-ON DUPLICATE KEY UPDATE Total_Reservas=VALUES(Total_Reservas), Total_Monto=VALUES(Total_Monto);
-
+-- Datos de POS/finanzas demo
 INSERT INTO fin_invoices (numero, cliente_nombre, cliente_email, moneda, monto_total, descripcion, id_usuario, estado)
 VALUES ('VG-TEST-0001','Cliente Demo','demo@mail.com','CRC',12345.67,'Factura de prueba', 1, 'Emitida');
 
--- Extra para pruebas de POS
+-- Cliente extra + reserva Pendiente (para pruebas POS)
 INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
 VALUES ('208990123', 'Carlos', 'Mora', '88887777', 'carlos@test.com', '1990-05-15');
 
@@ -945,49 +983,28 @@ INSERT INTO Reserva (
   'Web', '48h antes sin costo', 'Reserva generada para prueba POS', '2 adultos'
 );
 
--- Decisión + estancia ejemplo
-INSERT INTO AsignacionDecision (Codigo_Reserva, Tipo, Resultado, Score_Total, Detalle_JSON)
-VALUES (2, 'Auto', 'OK', 4.50, JSON_OBJECT('candidatos', JSON_ARRAY(101,102,202), 'seleccion', 102));
+-- Waitlist & Cupones demo
+INSERT INTO Waitlist (Correo, Nombre, Tipo_Solicitado, Fecha_Entrada, Fecha_Salida, Huespedes, Preferir_Superior)
+VALUES ('demo@cliente.com','Cliente Demo','Doble','2025-10-01','2025-10-03',2,1);
 
-INSERT INTO ReservaEstancia (Codigo_Reserva, Habitacion_Id, Fecha_Desde, Fecha_Hasta, Origen, Decision_Id, Score_Total, Motivos_JSON, Preferencias_JSON)
-VALUES (2, 2, '2025-10-01','2025-10-05','Automatico',
-        (SELECT Id_Decision FROM AsignacionDecision WHERE Codigo_Reserva=2 ORDER BY Id_Decision DESC LIMIT 1),
-        4.50,
-        JSON_OBJECT('tipo','match','capacidad','ok','mantenimiento','ok'),
-        JSON_OBJECT('piso_alto','true','cuna','true'));
-        
-        
-INSERT INTO Usuario (Nombre, Cedula_Pasaporte, Correo, Telefono, Rol_Id, Estado, Contrasena)
-SELECT
-  'Laura Recepción'        AS Nombre,
-  'R-001'                  AS Cedula_Pasaporte,
-  'recepcion@hotel.test'   AS Correo,
-  '+506 6000 0000'         AS Telefono,
-  (SELECT Codigo_Rol FROM Rol WHERE Nombre = 'Recepcionista' LIMIT 1) AS Rol_Id,
-  'Activo'                 AS Estado,
-  'Recep1234!'             AS Contrasena       -- contraseña temporal (legada)
-WHERE NOT EXISTS (
-  SELECT 1 FROM Usuario WHERE LOWER(Correo) = LOWER('recepcion@hotel.test')
-);
+INSERT INTO Coupon (Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Activo)
+VALUES ('ACME10','porcentaje',10,CURDATE(),DATE_ADD(CURDATE(),INTERVAL 30 DAY),100,1)
+ON DUPLICATE KEY UPDATE Valor=VALUES(Valor), Valido_Desde=VALUES(Valido_Desde), Valido_Hasta=VALUES(Valido_Hasta), Max_Usos=VALUES(Max_Usos), Activo=VALUES(Activo);
 
+/* ------------------------------------------------------------------------- */
+/* Verificaciones rápidas                                                    */
+/* ------------------------------------------------------------------------- */
+SELECT DATABASE() AS db_actual;
+SHOW TABLES;
 
-ALTER TABLE habitacion
-MODIFY Estado ENUM('Disponible', 'Ocupada', 'Mantenimiento', 'Limpieza');
-
-
-
-
--- Verificaciones rápidas
-SELECT DATABASE();
-SHOW TABLES LIKE 'fin_invoices';
-
-select * from Habitacion;
-Select * from Usuario;
-Select * from Reserva;
-Select * from InvCategoria;
-Select * from InvInsumo;
-Select * from InvMovimiento;
-SELECT 'General', 1
-WHERE NOT EXISTS (SELECT 1 FROM InvCategoria WHERE Nombre='General');
-
-
+-- Muestras
+SELECT * FROM Habitacion;
+SELECT * FROM Usuario;
+SELECT * FROM Cliente;
+SELECT * FROM Reserva;
+SELECT * FROM InvCategoria;
+SELECT * FROM InvInsumo;
+SELECT * FROM InvMovimiento;
+SELECT * FROM KPI_Stats;
+SELECT * FROM Coupon;
+SELECT * FROM Waitlist;

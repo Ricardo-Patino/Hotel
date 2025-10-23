@@ -34,6 +34,9 @@ from flask import (
     abort,
 )
 
+
+
+
 # ---------------------------------------------------------------------------
 # Bootstrap de ruta para imports absolutos (extensions, config, blueprints)
 # ---------------------------------------------------------------------------
@@ -544,36 +547,44 @@ def _make_unique_number(reserva_id: int, fecha_entrada: str) -> str:
     return f"VG-{ymd}-{int(reserva_id):04d}"
 
 
-def _update_kpis(monto: float, fecha_entrada: str):
+def _update_kpis(monto_total: float, fecha_entrada: str, noches: int = 1, iva_rate: float = DEFAULT_IVA):
     """
     Upsert en KPI_Stats para day/week/month.
-    Clave day:  YYYY-MM-DD
-          week: ISO 'YYYY-Www'
-          month: YYYY-MM
+    - Total_Reservas: +1
+    - Total_Monto:    +monto_total (con impuesto, como antes)
+    - Revenue_SinImpuesto: + (monto_total / (1+IVA))
+    - Total_Noches:   + noches
     """
     try:
-        dt = datetime.strptime(fecha_entrada[:10], "%Y-%m-%d")
+        from datetime import datetime as _dt
+        dt = _dt.strptime((fecha_entrada or "")[:10], "%Y-%m-%d")
     except Exception:
-        dt = datetime.utcnow()
-    key_day = dt.strftime("%Y-%m-%d")
-    key_mon = dt.strftime("%Y-%m")
+        from datetime import datetime as _dt
+        dt = _dt.utcnow()
+
+    key_day  = dt.strftime("%Y-%m-%d")
+    key_mon  = dt.strftime("%Y-%m")
     isoy, isow, _ = dt.isocalendar()
     key_week = f"{isoy}-W{isow:02d}"
 
+    rev_sin_iva = float(monto_total or 0) / (1.0 + float(iva_rate or 0.0))
+    n = int(noches or 1)
+
     for periodo, clave in (("day", key_day), ("week", key_week), ("month", key_mon)):
         db.session.execute(
-            text(
-                """
-            INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto)
-            VALUES (:p, :c, 1, :m)
-            ON DUPLICATE KEY UPDATE
-              Total_Reservas = Total_Reservas + 1,
-              Total_Monto    = Total_Monto + :m
-        """
-            ),
-            {"p": periodo, "c": clave, "m": float(monto or 0)},
+            text("""
+                INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto, Revenue_SinImpuesto, Total_Noches)
+                VALUES (:p, :c, 1, :m, :r, :n)
+                ON DUPLICATE KEY UPDATE
+                  Total_Reservas = Total_Reservas + 1,
+                  Total_Monto    = Total_Monto + :m,
+                  Revenue_SinImpuesto = Revenue_SinImpuesto + :r,
+                  Total_Noches   = Total_Noches + :n
+            """),
+            {"p": periodo, "c": clave, "m": float(monto_total or 0), "r": rev_sin_iva, "n": n}
         )
     db.session.commit()
+
 
 
 def _audit_log(
@@ -912,25 +923,23 @@ def create_app() -> Flask:
             ).scalar()
             return bool(exists)
         
-    def _col_exists(table: str, column: str) -> bool:
-        """
-        True si existe la columna `column` en la tabla `table` del esquema actual.
-        """
+    def _col_exists(table_name: str, column_name: str) -> bool:
         try:
-            exists = db.session.execute(
+            row = db.session.execute(
                 text("""
                     SELECT 1
-                      FROM INFORMATION_SCHEMA.COLUMNS
+                      FROM information_schema.COLUMNS
                      WHERE TABLE_SCHEMA = DATABASE()
                        AND TABLE_NAME = :t
                        AND COLUMN_NAME = :c
                      LIMIT 1
                 """),
-                {"t": table, "c": column},
+                {"t": table_name, "c": column_name}
             ).first()
-            return bool(exists)
+            return bool(row)
         except Exception:
             return False
+    
         
         
     def _col_nullable(table: str, column: str) -> bool:
@@ -1211,13 +1220,164 @@ def create_app() -> Flask:
     def admin_calendario_html():
         return render_template("admin-calendario.html")
     
+        # ---------------------- OPS/ADMIN: Gestión de Cupones ----------------------
+    @app.get("/api/coupons")
+    @role_required("Administrador", "Recepcionista")
+    def api_coupons_list():
+        rows = db.session.execute(text("""
+            SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
+              FROM Coupon
+             ORDER BY Codigo ASC
+        """)).mappings().all()
+        return jsonify({"ok": True, "items": [dict(r) for r in rows]})
+
+    @app.post("/api/coupons")
+    @role_required("Administrador", "Recepcionista")
+    def api_coupons_create():
+        p = request.get_json(silent=True) or {}
+        codigo = (p.get("codigo") or "").strip().upper()
+        tipo   = (p.get("tipo") or "porcentaje").strip()         # 'porcentaje' | 'monto' | 'corporativo'
+        valor  = float(p.get("valor") or 0)
+        vd     = (p.get("valido_desde") or None)
+        vh     = (p.get("valido_hasta") or None)
+        max_usos = int(p.get("max_usos") or 0)
+
+        if not codigo or valor <= 0:
+            return jsonify({"ok": False, "msg": "Código y valor son obligatorios."}), 400
+
+        db.session.execute(text("""
+            INSERT INTO Coupon (Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo)
+            VALUES (:c, :t, :v, :vd, :vh, :m, 0, 1)
+            ON DUPLICATE KEY UPDATE
+                Tipo=:t, Valor=:v, Valido_Desde=:vd, Valido_Hasta=:vh, Max_Usos=:m, Activo=1
+        """), {"c": codigo, "t": tipo, "v": valor, "vd": vd, "vh": vh, "m": max_usos})
+        db.session.commit()
+        return jsonify({"ok": True, "codigo": codigo})
+
+    @app.post("/api/coupons/<string:codigo>/toggle")
+    @role_required("Administrador", "Recepcionista")
+    def api_coupons_toggle(codigo: str):
+        db.session.execute(text("""
+            UPDATE Coupon SET Activo = CASE WHEN Activo=1 THEN 0 ELSE 1 END WHERE Codigo=:c
+        """), {"c": codigo})
+        db.session.commit()
+        return jsonify({"ok": True})
+    
+    # app.py — debajo de api_coupons_toggle
+    @app.delete("/api/coupons/<string:codigo>")
+    @role_required("Administrador", "Recepcionista")
+    def api_coupons_delete(codigo: str):
+        db.session.execute(text("DELETE FROM Coupon WHERE Codigo = :c"), {"c": codigo})
+        db.session.commit()
+        return jsonify({"ok": True})
+
+
     
     @app.route("/ops-walkin.html")
     @role_required("Administrador", "Recepcionista")
     def ops_walkin_html():
         return render_template("ops-walkin.html")
+    
+    # app.py — sección de vistas HTML de OPS/ADMIN
+    @app.route("/ops/coupons")
+    @role_required("Administrador", "Recepcionista")
+    def ops_coupons_html():
+        return render_template("ops-coupons.html")
 
 
+# === GRR — Preview de cupón (no persiste) ===
+    @app.get("/grr/coupons/preview")
+    def grr_coupon_preview():
+        code = (request.args.get("code") or "").strip().upper()
+        try:
+            subtotal = float(request.args.get("subtotal") or 0)
+        except Exception:
+            subtotal = 0.0
+    
+        row = db.session.execute(text("""
+            SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
+              FROM Coupon
+             WHERE Codigo = :c
+             LIMIT 1
+        """), {"c": code}).mappings().first()
+    
+        if not row or not row["Activo"]:
+            return jsonify({"ok": False, "msg": "Cupón inválido o inactivo."}), 200
+    
+        # vigencia y usos
+        today = date.today()
+        vd, vh = row["Valido_Desde"], row["Valido_Hasta"]
+        if (vd and str(vd)[:10] > str(today)) or (vh and str(vh)[:10] < str(today)):
+            return jsonify({"ok": False, "msg": "Fuera de vigencia."}), 200
+        if row["Max_Usos"] and row["Usos"] is not None and row["Usos"] >= row["Max_Usos"]:
+            return jsonify({"ok": False, "msg": "Cupón agotado."}), 200
+    
+        amount = 0.0
+        if row["Tipo"] == "porcentaje":
+            amount = round(subtotal * (float(row["Valor"] or 0) / 100.0), 2)
+        elif row["Tipo"] in ("monto", "monto_fijo"):
+            amount = float(row["Valor"] or 0)
+    
+        return jsonify({
+            "ok": True,
+            "type": row["Tipo"],
+            "amount": amount,
+            "msg": f"Descuento: ₡ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        })
+    
+    
+    # === GRR — Aplicar cupón a una reserva (persiste) ===
+    @app.post("/grr/reservas/<int:reserva_id>/apply-coupon")
+    @role_required("Cliente","Administrador","Recepcionista")
+    def grr_apply_coupon(reserva_id: int):
+        p = request.get_json(silent=True) or {}
+        code = (p.get("codigo") or p.get("code") or "").strip().upper()
+        if not code:
+            return jsonify({"ok": False, "msg": "Código requerido."}), 400
+    
+        # Cargar reserva
+        r = _get_reserva_by_id(reserva_id)
+        if not r:
+            return jsonify({"ok": False, "msg": "Reserva no encontrada."}), 404
+    
+        # Si es cliente, verificar pertenencia
+        if _user_role().lower() == "cliente":
+            if not _reserva_belongs_to_email(reserva_id, _current_user_email() or ""):
+                return jsonify({"ok": False, "msg": "No autorizado."}), 403
+    
+        # Cargar cupón
+        row = db.session.execute(text("""
+            SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
+              FROM Coupon WHERE Codigo=:c LIMIT 1
+        """), {"c": code}).mappings().first()
+        if not row or not row["Activo"]:
+            return jsonify({"ok": False, "msg": "Cupón inválido o inactivo."}), 200
+    
+        today = date.today()
+        vd, vh = row["Valido_Desde"], row["Valido_Hasta"]
+        if (vd and str(vd)[:10] > str(today)) or (vh and str(vh)[:10] < str(today)):
+            return jsonify({"ok": False, "msg": "Fuera de vigencia."}), 200
+        if row["Max_Usos"] and row["Usos"] is not None and row["Usos"] >= row["Max_Usos"]:
+            return jsonify({"ok": False, "msg": "Cupón agotado."}), 200
+    
+        total_actual = float(r.get("Monto_Total") or 0.0)
+        if row["Tipo"] == "porcentaje":
+            descuento = round(total_actual * (float(row["Valor"] or 0)/100.0), 2)
+        else:
+            descuento = float(row["Valor"] or 0)
+    
+        nuevo_total = max(0.0, round(total_actual - descuento, 2))
+    
+        # Persistir cambios
+        db.session.execute(
+            text("UPDATE Reserva SET Monto_Total=:t, Observaciones = CONCAT(COALESCE(Observaciones,''),' | CUPON ', :c) WHERE Codigo_Reserva=:r"),
+            {"t": nuevo_total, "c": code, "r": reserva_id}
+        )
+        db.session.execute(text("UPDATE Coupon SET Usos = COALESCE(Usos,0)+1 WHERE Codigo=:c"), {"c": code})
+        db.session.commit()
+    
+        return jsonify({"ok": True, "monto": nuevo_total, "descuento": descuento, "codigo": code})
+    
     # ---------------------- API Disponibilidad --------------------------
     @app.get("/api/availability")
     def api_availability():
@@ -1316,6 +1476,131 @@ def create_app() -> Flask:
             "tipo": tipo or None,
             "message": ("Disponibilidad confirmada" if is_available else "Sin cupo para ese rango"),
         }), 200
+        
+    @app.get("/api/availability/rooms")
+    def api_availability_rooms():
+        """
+        Devuelve TODAS las habitaciones con estado por habitación:
+        available=True/False, disabled=True si está bloqueada y waitlist_url para aplicar.
+        Query: ?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&guests=2&tipo=Suite
+        """
+        from datetime import datetime as dt
+        from sqlalchemy import or_
+    
+        checkin = (request.args.get("checkin") or "").strip()
+        checkout = (request.args.get("checkout") or "").strip()
+        guests = int((request.args.get("guests") or request.args.get("adults") or 1) or 1)
+        tipo = (request.args.get("tipo") or request.args.get("type") or "").strip()
+    
+        # Validar fechas
+        try:
+            ci = dt.strptime(checkin, "%Y-%m-%d").date()
+            co = dt.strptime(checkout, "%Y-%m-%d").date()
+            if co <= ci:
+                return jsonify({"ok": False, "msg": "checkout debe ser posterior a checkin"}), 400
+        except Exception:
+            return jsonify({"ok": False, "msg": "Fechas inválidas (YYYY-MM-DD)"}), 400
+    
+        # ¿Existen estas columnas en la BD?
+        has_cap  = _col_exists("Habitacion", "Capacidad")
+        has_tipo = _col_exists("Habitacion", "Tipo")
+    
+        # 1) Traer habitaciones con ORM (evita referenciar columnas inexistentes)
+        q = Habitacion.query
+        if tipo and has_tipo:
+            q = q.filter(Habitacion.Tipo == tipo)
+        if has_cap:
+            # si hay columna capacidad, aceptar null o suficiente para 'guests'
+            q = q.filter(or_(Habitacion.Capacidad == None, Habitacion.Capacidad >= guests))  # noqa: E711
+    
+        # Orden: por número si existe, si no por código
+        if hasattr(Habitacion, "Numero_Habitacion"):
+            q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
+        else:
+            q = q.order_by(Habitacion.Codigo_Habitacion.asc())
+    
+        habs = q.all()
+        ids = [int(getattr(h, "Codigo_Habitacion")) for h in habs] or []
+    
+        # 2) ¿Cuáles están bloqueadas por reservas en [ci, co)?
+        blocked = set()
+        if ids:
+            try:
+                # import local para no romper otros contextos
+                from models_sql import Reserva
+                blocked_rows = (
+                    db.session.query(Reserva.Codigo_Habitacion)
+                    .filter(Reserva.Codigo_Habitacion.in_(ids))
+                    .filter(Reserva.Estado.in_(("Confirmada", "Pendiente")))
+                    .filter(Reserva.Fecha_Entrada < co, Reserva.Fecha_Salida > ci)  # solape [ci, co)
+                    .distinct()
+                    .all()
+                )
+                blocked = {int(r[0]) for r in blocked_rows}
+            except Exception as e:
+                current_app.logger.exception(f"[availability/rooms] error obteniendo bloqueadas: {e}")
+                # No abortamos; seguimos y marcamos todas como disponibles para no romper la UI
+    
+        # 3) Armar salida (con flags available/disabled y URL de waitlist para bloqueadas)
+        rooms = []
+        for h in habs:
+            hid   = int(getattr(h, "Codigo_Habitacion"))
+            num   = getattr(h, "Numero_Habitacion", None)
+            tipoh = getattr(h, "Tipo", None) or ""
+    
+            # precio noche robusto
+            price = getattr(h, "Precio_Noche", None) or getattr(h, "Precio_Base", None) or getattr(h, "Precio", None) or 0
+            try:
+                price = float(price or 0)
+            except Exception:
+                price = 0.0
+    
+            capacidad = getattr(h, "Capacidad", None)
+            try:
+                capacidad = int(capacidad or 2)
+            except Exception:
+                capacidad = 2
+    
+            img = getattr(h, "Imagen_URL", None) or ""
+    
+            is_blocked = hid in blocked
+            rooms.append({
+                "id": hid,
+                "number": num,
+                "tipo": tipoh,
+                "capacity": capacidad,
+                "price": price,
+                "img": img,
+                "available": (not is_blocked),
+                "disabled": bool(is_blocked),
+                "blockedReason": ("booked" if is_blocked else None),
+                "waitlistEligible": bool(is_blocked),
+                "waitlist_url": (
+                    url_for(
+                        "grr.waitlist_add_room",
+                        room_id=hid,
+                        checkin=checkin,
+                        checkout=checkout,
+                        guests=guests,
+                        tipo=tipoh,
+                    )
+                    if is_blocked else None
+                ),
+
+
+            })
+    
+        return jsonify({
+            "ok": True,
+            "checkin": checkin,
+            "checkout": checkout,
+            "guests": guests,
+            "tipo": (tipo or None),
+            "rooms": rooms
+        }), 200
+    
+
+
 
 
     @app.get("/booking/search")
@@ -1892,7 +2177,7 @@ def create_app() -> Flask:
         except Exception:
             nights = 1
     
-        monto_total = round(price_n * nights * max(1, huespedes), 2)
+        monto_total = round(price_n * nights * max(1, huespedes) * 1.13, 2)
     
         # ---- Observaciones (guardar doc y tel para check-in) ----
         obs = f"GRR-01-007 | Doc: {doc_tipo} {doc_numero} | Tel: {telefono}"
@@ -2263,9 +2548,16 @@ def create_app() -> Flask:
             args["rooms"] = "1"
     
         with app.test_client() as c:
-            resp = c.get(url_for("api_availability", **args))
-            data = resp.get_json() if resp.is_json else {"ok": False}
-        return render_template("booking-results.html", availability=data)
+            resp_av = c.get(url_for("api_availability", **args))
+            data_av = resp_av.get_json() if resp_av.is_json else {"ok": False}
+
+            resp_rooms = c.get(url_for("api_availability_rooms", **args))
+            data_rooms = resp_rooms.get_json() if resp_rooms.is_json else {"ok": False, "rooms": []}
+
+        return render_template("booking-results.html",
+                               availability=data_av,
+                               availability_rooms=data_rooms)
+
     
 
     # ---------------------- Detalle / Checkout / Confirmación ------------------
@@ -2608,31 +2900,32 @@ def create_app() -> Flask:
     @app.get("/api/kpi/summary")
     @role_required("Administrador", "Recepcionista")
     def api_kpi_summary():
-        def _fetch(periodo, key_fmt_sql):
+        def _fetch(periodo, key_sql):
             row = db.session.execute(
-                text(
-                    f"""
-                SELECT Total_Reservas, Total_Monto
-                  FROM KPI_Stats
-                 WHERE Periodo = :p AND Clave = {key_fmt_sql}
-                 LIMIT 1
-            """
-                ),
+                text(f"""
+                    SELECT Total_Reservas, Total_Monto, Revenue_SinImpuesto, Total_Noches
+                      FROM KPI_Stats
+                     WHERE Periodo = :p AND Clave = {key_sql}
+                     LIMIT 1
+                """),
                 {"p": periodo},
             ).first()
-            return {
-                "reservas": int(row[0]) if row else 0,
-                "monto": float(row[1]) if row else 0.0,
-            }
-
-        return jsonify(
-            {
-                "ok": True,
-                "day": _fetch("day", "DATE_FORMAT(CURDATE(), '%Y-%m-%d')"),
-                "week": _fetch("week", "DATE_FORMAT(CURDATE(), '%x-W%v')"),
-                "month": _fetch("month", "DATE_FORMAT(CURDATE(), '%Y-%m')"),
-            }
-        )
+            if not row:
+                return {"reservas": 0, "monto": 0.0, "adr": 0.0}
+            reservas = int(row[0] or 0)
+            monto    = float(row[1] or 0)
+            rev      = float(row[2] or 0)
+            noches   = int(row[3] or 0)
+            adr = (rev / noches) if noches > 0 else 0.0
+            return {"reservas": reservas, "monto": monto, "adr": round(adr, 2)}
+    
+        return jsonify({
+            "ok": True,
+            "day":   _fetch("day",   "DATE_FORMAT(CURDATE(), '%Y-%m-%d')"),
+            "week":  _fetch("week",  "DATE_FORMAT(CURDATE(), '%x-W%v')"),
+            "month": _fetch("month", "DATE_FORMAT(CURDATE(), '%Y-%m')"),
+        })
+    
 
     # ---------------------- Auditoría reciente ----------------------
     @app.get("/api/audit/recent")
@@ -3461,6 +3754,32 @@ def create_app() -> Flask:
             "receipt": receipt
         })
 
+    @app.post("/ops/run-noshow")
+    @role_required("Administrador", "Recepcionista")
+    def ops_run_noshow():
+        with app.test_client() as c:
+            r = c.post(url_for("grr.run_noshow"))
+            data = r.get_json() if r.is_json else {"ok": False}
+        return jsonify(data), (200 if data.get("ok") else 500)
+
+    @app.post("/ops/test-early/<int:reserva_id>")
+    @role_required("Administrador", "Recepcionista")
+    def ops_test_early(reserva_id: int):
+        payload = {"porcentaje": request.json.get("porcentaje", None)} if request.is_json else {}
+        with app.test_client() as c:
+            r = c.post(url_for("grr.reservas_early_checkin", reserva_id=reserva_id), json=payload)
+            data = r.get_json() if r.is_json else {"ok": False}
+        return jsonify(data), (200 if data.get("ok") else 400)
+
+    @app.post("/ops/test-late/<int:reserva_id>")
+    @role_required("Administrador", "Recepcionista")
+    def ops_test_late(reserva_id: int):
+        payload = {"tramo": request.json.get("tramo", "tarde")} if request.is_json else {"tramo": "tarde"}
+        with app.test_client() as c:
+            r = c.post(url_for("grr.reservas_late_checkout", reserva_id=reserva_id), json=payload)
+            data = r.get_json() if r.is_json else {"ok": False}
+        return jsonify(data), (200 if data.get("ok") else 400)
+
 
     @app.post("/api/ops/walkin")
     @role_required("Administrador", "Recepcionista")
@@ -4273,6 +4592,15 @@ def create_app() -> Flask:
         if not path.exists():
             _create_note_pdf(note)
         return send_file(str(path), as_attachment=True, download_name=f"{note.numero}.pdf")
+    
+    @app.get("/ops/coupons")
+    def view_ops_coupons():
+        return render_template("ops-coupons.html")
+    
+    @app.get("/ops/no-show")
+    def view_ops_noshow():
+        return render_template("ops-no-show.html")
+
 
     # ================== Confirmación de Check-out ==================
     @app.post("/api/ops/checkout")

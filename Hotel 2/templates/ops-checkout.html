@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Operaciones – Check-out | Hotel Villa Grace</title>
-  <meta name="description" content="Check-out de huéspedes con cálculo de cargos.">
+  <meta name="description" content="Check-out de huéspedes con cálculo de cargos, cupones y late check-out.">
   <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
@@ -22,6 +22,7 @@
         <li><a href="ops-dashboard.html" class="active">Operaciones</a></li>
         <li><a href="ops-checkin.html">Check-in</a></li>
         <li><a href="ops-checkout.html" class="active">Check-out</a></li>
+        <li><a href="/grr/ops/coupons">Cupones</a></li>
       </ul>
       <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
     </nav>
@@ -31,7 +32,7 @@
 
 <main class="main">
   <div class="page-title dark-background" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative"><h1>Check-out</h1><p>Calcula cargos, registra pago y envía a Limpieza.</p></div>
+    <div class="container position-relative"><h1>Check-out</h1><p>Calcula cargos, aplica cupones, registra late check-out, pago y envía a Limpieza.</p></div>
   </div>
 
   <section class="section">
@@ -64,6 +65,30 @@
             <div class="col-sm-6 col-lg-3"><div class="kpi"><div class="muted">Saldo</div><div class="fs-5 fw-bold" id="kSaldo">₡ 0,00</div></div></div>
           </div>
 
+          <!-- aplicar cupón (GRR-01-015) -->
+          <div class="row g-3 mt-3 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label">Código de descuento</label>
+              <div class="input-group">
+                <input id="coupon-code" class="form-control" placeholder="Ej. ACME10">
+                <button class="btn btn-outline-primary" id="coupon-apply">Aplicar</button>
+              </div>
+              <div class="small text-muted" id="coupon-msg"></div>
+            </div>
+
+            <!-- late checkout (GRR-01-017) -->
+            <div class="col-md-8">
+              <label class="form-label">Late check-out</label>
+              <div class="btn-group" role="group" aria-label="Late Checkout">
+                <button class="btn btn-outline-secondary" data-tramo="medio">Medio (30%)</button>
+                <button class="btn btn-outline-secondary" data-tramo="tarde">Tarde (60%)</button>
+                <button class="btn btn-outline-secondary" data-tramo="noche">Noche (100%)</button>
+              </div>
+              <div class="small text-muted" id="late-msg"></div>
+            </div>
+          </div>
+
+          <!-- pago y confirmación -->
           <div class="row g-3 mt-3 align-items-end">
             <div class="col-md-3">
               <label class="form-label">Pago (opcional)</label>
@@ -171,6 +196,46 @@ document.getElementById('btnCheckout').addEventListener('click', async ()=>{
   }catch(e){
     err.textContent = 'No se pudo completar el check-out.'; err.classList.remove('d-none');
   }
+});
+
+// --------- GRR-01-015: aplicar cupón (recepción) ----------
+document.getElementById('coupon-apply').addEventListener('click', async ()=>{
+  const code = (document.getElementById('coupon-code').value||'').trim();
+  const msg = document.getElementById('coupon-msg');
+  if(!selectedReserva){ msg.textContent = 'Selecciona una reserva primero.'; return; }
+  if(!code){ msg.textContent = 'Ingresa un código.'; return; }
+  msg.textContent = 'Aplicando…';
+  try{
+    const r = await fetch(`/grr/reservas/${selectedReserva}/apply-coupon`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ codigo: code })
+    });
+    const js = await r.json();
+    if(!js.ok) throw new Error(js.msg || 'No se pudo aplicar el cupón');
+    msg.textContent = `Cupón aplicado. Nuevo total: ${fmtCRC(js.monto)}`;
+    // refrescar desglose
+    await loadPreview(selectedReserva);
+  }catch(e){ msg.textContent = e.message || 'Error al aplicar cupón.'; }
+});
+
+// --------- GRR-01-017: late check-out ----------
+document.querySelectorAll('[data-tramo]').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    const tramo = btn.getAttribute('data-tramo');
+    const msg = document.getElementById('late-msg');
+    if(!selectedReserva){ msg.textContent = 'Selecciona una reserva primero.'; return; }
+    msg.textContent = 'Aplicando cargo por late…';
+    try{
+      const r = await fetch(`/grr/reservas/${selectedReserva}/late-checkout`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tramo })
+      });
+      const js = await r.json();
+      if(!js.ok) throw new Error(js.error || 'No se aplicó el cargo');
+      msg.textContent = `Late check-out (${tramo}) aplicado. Cargo: ${fmtCRC(js.cargo||0)}.`;
+      await loadPreview(selectedReserva);
+    }catch(e){ msg.textContent = e.message || 'Error al aplicar cargo.'; }
+  });
 });
 </script>
 </body>

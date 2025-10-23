@@ -25,6 +25,21 @@
   <!-- Estilos -->
   <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet" />
+
+  <style>
+    /* Overlay para habitaciones no disponibles (GRR-01-014) */
+    .room-card.blocked .img-wrap img{opacity:.35;filter:grayscale(12%)}
+    .room-card .overlay{
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+      pointer-events:none;
+    }
+    .room-card .overlay > div{
+      pointer-events:auto; background:rgba(17,24,39,.82); color:#fff; padding:14px 16px; border-radius:.75rem; text-align:center;
+      max-width: 90%;
+    }
+    .room-card .overlay small{opacity:.9}
+    .room-card .overlay .btn{margin-top:10px}
+  </style>
 </head>
 
 <body>
@@ -95,6 +110,38 @@
     </section>
   </main>
 
+  <!-- Modal: Lista de espera -->
+  <div class="modal fade" id="wlModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" id="wl-form">
+        <div class="modal-header">
+          <h5 class="modal-title">Unirse a lista de espera</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="wl-room-id">
+          <input type="hidden" id="wl-ci">
+          <input type="hidden" id="wl-co">
+          <input type="hidden" id="wl-pax">
+          <!-- Corrección mínima: enviar también el tipo solicitado -->
+          <input type="hidden" id="wl-tipo">
+          <div class="mb-3">
+            <label class="form-label">Tu nombre</label>
+            <input type="text" class="form-control" id="wl-name" required>
+          </div>
+          <div class="mb-0">
+            <label class="form-label">Correo</label>
+            <input type="email" class="form-control" id="wl-mail" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+          <button class="btn btn-warning" type="submit">Solicitar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer id="footer" class="footer position-relative dark-background">
     <div class="copyright text-center">
@@ -120,11 +167,10 @@
     (function () {
       const $ = (s) => document.querySelector(s);
 
-      // ------------ Utilidades fecha/dinero -------------
+      // ------------ Utilidades -------------
       const money = (n) =>
-        new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 }).format(
-          Number(n || 0)
-        );
+        new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 })
+          .format(Number(n || 0));
       const fmtLong = (iso) => {
         if (!iso) return "";
         const d = new Date(iso + "T00:00:00");
@@ -145,14 +191,7 @@
           checkout: p.get("checkout"),
           adults: p.get("adults") || "2",
           children: p.get("children") || "0",
-          guests: p.get("guests") || null,
-          rooms: p.get("rooms") || "1",
         };
-        // Deriva guests si no viene
-        const a = parseInt(search.adults || "0", 10) || 0;
-        const c = parseInt(search.children || "0", 10) || 0;
-        if (!search.guests) search.guests = String(Math.max(1, a + c));
-        // Guardar/usar backup
         try { sessionStorage.setItem("villaGrace.search", JSON.stringify(search)); } catch(_) {}
         if (!(search.checkin && search.checkout)) {
           try {
@@ -161,74 +200,6 @@
           } catch (_) {}
         }
         return search;
-      }
-      const totalGuests = (search) => Math.max(1, (parseInt(search.adults||"0",10)||0) + (parseInt(search.children||"0",10)||0));
-
-      // ------------ Construcción de card -------------
-      function roomCard(room, nights, search) {
-        const code = room.code || room.Codigo_Habitacion || room.id;
-        const numero = room.numero || room.Numero_Habitacion || code;
-        const tipo = room.tipo || room.Tipo || "Habitación";
-        const name = room.name || room.Nombre || `${tipo}${numero ? " " + numero : ""}`;
-        const desc = room.desc || room.Descripcion || "—";
-        const capacity = room.capacity || room.Capacidad || 2;
-
-        // Precio unitario (asumimos por huésped por noche si backend lo entrega por noche)
-        const priceNight = Number(room.price ?? room.Precio_Noche ?? room.Precio_Base ?? 0);
-        const img = room.img || room.Imagen_URL || "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}";
-
-        const pax = totalGuests(search);
-        const total = priceNight * Math.max(1, nights || 1) * pax;
-
-        const payload = {
-          roomCode: code,
-          roomNumber: numero,
-          roomName: name,
-          tipo,
-          priceNight, // precio por huésped por noche
-          img,
-          rateName: "Tarifa Flexible",
-          checkin: search.checkin,
-          checkout: search.checkout,
-          nights: Math.max(1, nights || 1),
-          adults: search.adults,
-          children: search.children,
-        };
-
-        return `
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="row g-3 align-items-center">
-                <div class="col-12 col-md-3">
-                  <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}" alt="${name}"
-                       class="img-fluid rounded w-100" style="object-fit:cover;height:170px;">
-                </div>
-                <div class="col-12 col-md-6">
-                  <h5 class="mb-1">${name}</h5>
-                  <div class="text-muted small mb-2">${tipo}</div>
-                  <div class="text-muted small mb-3">Capacidad: ${capacity} · Régimen: —</div>
-
-                  <div class="border rounded-3 p-3">
-                    <div class="fw-semibold mb-1">${room.rateName || "Tarifa Flexible"}</div>
-                    <div class="text-muted small">Cancela gratis hasta 7 días antes.</div>
-                    <div class="text-muted small mt-1">Impuestos no incluidos.</div>
-                  </div>
-                </div>
-                <div class="col-12 col-md-3 text-md-end">
-                  <div class="mb-2">
-                    <div class="fw-semibold">${money(priceNight)}</div>
-                    <div class="text-muted">/noche <span class="small">(por huésped)</span></div>
-                    <div class="text-muted small">Total estimado: ${money(total)} <span class="small">(${pax} huésped(es))</span></div>
-                  </div>
-                  <button class="btn btn-success w-100"
-                          data-select='${encodeURIComponent(JSON.stringify(payload))}'>
-                    Seleccionar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
       }
 
       async function fetchJSON(url) {
@@ -246,67 +217,128 @@
         }
       }
 
+      // ------------ Card de habitación (incluye overlay de espera) -------------
+      function roomCard(room, nights, search, disabled=false) {
+        const code = room.code || room.Codigo_Habitacion || room.id;
+        const tipo = room.tipo || room.Tipo || "Habitación";
+        const name = room.name || room.Nombre || `${tipo} ${room.Numero_Habitacion || code}`;
+        const capacity = Number(room.capacity ?? room.Capacidad ?? 2);
+        const priceNight = Number(room.price ?? room.Precio_Noche ?? room.Precio_Base ?? 0); // PRECIO POR PERSONA
+        const totalPax = Math.max(1, Number(search.adults || 0) + Number(search.children || 0));
+        const nightsInt = Math.max(1, nights || 1);
+        const total = priceNight * nightsInt * totalPax;
+
+        const payload = {
+          roomCode: code,
+          roomName: name,
+          tipo,
+          priceNight,                    // precio por persona / noche
+          rateName: "Tarifa Flexible",
+          rateCode: "flex",
+          checkin: search.checkin,
+          checkout: search.checkout,
+          nights: nightsInt,
+          adults: String(search.adults || "2"),
+          children: String(search.children || "0"),
+        };
+
+        const imgURL = room.Imagen_URL || room.img || "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}";
+
+        return `
+          <div class="card shadow-sm border-0 room-card ${disabled ? 'blocked' : ''}">
+            <div class="card-body position-relative">
+              <div class="row g-3 align-items-center">
+                <div class="col-12 col-md-3 img-wrap">
+                  <img src="${imgURL}"
+                       alt="${name}" class="img-fluid rounded w-100" style="object-fit:cover;height:170px;">
+                </div>
+                <div class="col-12 col-md-6">
+                  <h5 class="mb-1">${name}</h5>
+                  <div class="text-muted small mb-2">${tipo} · Capacidad: ${capacity}</div>
+
+                  <div class="border rounded-3 p-3">
+                    <div class="fw-semibold mb-1">${room.rateName || "Tarifa Flexible"}</div>
+                    <div class="text-muted small">Cancela gratis hasta 7 días antes.</div>
+                    <div class="text-muted small mt-1">Impuestos no incluidos.</div>
+                  </div>
+                </div>
+                <div class="col-12 col-md-3 text-md-end">
+                  <div class="mb-2">
+                    <div class="fw-semibold">${money(priceNight)}</div>
+                    <div class="text-muted small">por persona / noche</div>
+                    <div class="text-muted small">Total estimado: ${money(total)}</div>
+                  </div>
+                  <button class="btn btn-success w-100" ${disabled ? 'disabled' : ''} data-select='${encodeURIComponent(JSON.stringify(payload))}'>
+                    Seleccionar
+                  </button>
+                </div>
+              </div>
+
+              ${disabled ? `
+                <div class="overlay">
+                  <div>
+                    <strong>Reservada en estas fechas</strong>
+                    <small class="d-block">Puedes unirte a la lista de espera para esta habitación.</small>
+                    <button type="button" class="btn btn-warning btn-sm mt-2" data-wait='${encodeURIComponent(JSON.stringify({ id: code, name, tipo }))}'>
+                      Unirme a lista de espera
+                    </button>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }
+
       // ------------ Render principal -------------
       async function render() {
         const search = getSearch();
         const nights = diffNights(search.checkin, search.checkout);
 
-        // Encabezado
-        const sum = $("#summary");
-        if (search.checkin && search.checkout) {
-          const txt = `${fmtLong(search.checkin)} – ${fmtLong(search.checkout)} · ${search.adults} adulto(s)${
-            parseInt(search.children || "0", 10) ? ` · ${search.children} niño(s)` : ""
-          }`;
-          sum.textContent = txt;
-        } else {
-          sum.textContent = "Selecciona fechas para ver disponibilidad";
-        }
+        $("#summary").textContent = (search.checkin && search.checkout)
+          ? `${fmtLong(search.checkin)} – ${fmtLong(search.checkout)} · ${search.adults} adulto(s)${
+              parseInt(search.children || "0", 10) ? ` · ${search.children} niño(s)` : ""}`
+          : "Selecciona fechas para ver disponibilidad";
         $("#nights-pill").textContent = nights ? `${nights} noche(s)` : "";
 
         const box = $("#results");
-        box.innerHTML =
-          '<div class="text-center text-muted py-4"><div class="spinner-border me-2"></div>Cargando disponibilidad…</div>';
+        box.innerHTML = '<div class="text-center text-muted py-4"><div class="spinner-border me-2"></div>Cargando disponibilidad…</div>';
 
-        // Construye QS
         const qs = new URLSearchParams({
           checkin: search.checkin || "",
           checkout: search.checkout || "",
           adults: String(search.adults || "2"),
           children: String(search.children || "0"),
-          guests: String(search.guests || String(totalGuests(search))),
-          rooms: String(search.rooms || "1"),
         }).toString();
 
-        // Prueba varios endpoints en orden
-        const attempts = [
-          `/grr/habitaciones/disponibles?${qs}`,
-          `/grr/availability?${qs}`,
-          `/grr/disponibilidad?${qs}`,
-          `/grr/habitaciones`, // fallback
-        ];
+        // Estrategia: traemos TODAS las habitaciones, y la disponibilidad (subset).
+        // Luego, renderizamos todas; las que NO estén disponibles se marcan bloqueadas (GRR-01-014).
+        const [allRoomsRes, availRes] = await Promise.all([
+          fetchJSON('/grr/habitaciones'),
+          (async () => {
+            // intentos múltiples por compatibilidad con tus rutas
+            const attempts = [`/grr/availability?${qs}`, `/grr/disponibilidad?${qs}`];
+            for (const url of attempts) {
+              const r = await fetchJSON(url);
+              if (r.okHTTP && r.json && r.json.ok && Array.isArray(r.json.rooms)) return r;
+            }
+            return { okHTTP: false, json: null, raw: 'No availability endpoint' };
+          })()
+        ]);
 
-        let rooms = [];
         const debugLines = [];
-
-        for (const url of attempts) {
-          const r = await fetchJSON(url);
-          debugLines.push(`[${r.okHTTP ? "OK" : "ERR"}] ${url} → ${r.json ? "JSON" : "NO JSON"}`);
-          if (!r.okHTTP) continue;
-
-          if (r.json && r.json.ok && Array.isArray(r.json.rooms)) {
-            rooms = r.json.rooms;
-            break;
-          }
-
-          // Fallback cuando es /grr/habitaciones (lista completa):
-          if (url.endsWith("/habitaciones") && r.json && r.json.ok && Array.isArray(r.json.rooms)) {
-            const totalPax = totalGuests(search);
-            rooms = r.json.rooms.filter(x => Number(x.Capacidad ?? x.capacity ?? 2) >= totalPax);
-            break;
-          }
+        if (!allRoomsRes.okHTTP || !allRoomsRes.json || !allRoomsRes.json.ok) {
+          debugLines.push('Error cargando habitaciones /grr/habitaciones');
+        }
+        if (!availRes.okHTTP || !availRes.json || !availRes.json.ok) {
+          debugLines.push('Error cargando disponibilidad /grr/availability');
         }
 
-        if (!rooms.length) {
+        const allRooms = (allRoomsRes.json && allRoomsRes.json.rooms) || [];
+        const availRooms = (availRes.json && availRes.json.rooms) || [];
+        const setAvail = new Set(availRooms.map(r => String(r.Codigo_Habitacion || r.code || r.id)));
+
+        if (!allRooms.length) {
           box.innerHTML = "";
           $("#note").classList.add("d-none");
           $("#alert").classList.remove("d-none");
@@ -314,26 +346,74 @@
           return;
         }
 
-        const html = rooms.map((r) => roomCard(r, nights || 1, search)).join("");
-        box.innerHTML = html;
+        const cards = allRooms.map(r => {
+          const id = String(r.Codigo_Habitacion || r.code || r.id);
+          const disabled = !setAvail.has(id);
+          return roomCard(r, nights || 1, search, disabled);
+        }).join("");
+
+        box.innerHTML = cards;
         $("#note").classList.remove("d-none");
 
-        // Manejar selección
+        // seleccionar habitación
         box.addEventListener("click", (ev) => {
           const btn = ev.target.closest("button[data-select]");
           if (!btn) return;
           const payload = JSON.parse(decodeURIComponent(btn.getAttribute("data-select")));
           try { sessionStorage.setItem("villaGrace.selection", JSON.stringify(payload)); } catch (_){}
-
           const qsSel = new URLSearchParams({
             checkin: payload.checkin || "",
             checkout: payload.checkout || "",
             adults: String(payload.adults || "2"),
             children: String(payload.children || "0"),
             room: String(payload.roomCode || ""),
-            price: String(payload.priceNight || ""),
+            price: String(payload.priceNight || "")
           }).toString();
           location.href = `booking-details.html?${qsSel}`;
+        });
+
+        // abrir lista de espera
+        const wlModal = new bootstrap.Modal('#wlModal');
+        box.addEventListener('click', (ev) => {
+          const btn = ev.target.closest('button[data-wait]');
+          if (!btn) return;
+          const info = JSON.parse(decodeURIComponent(btn.getAttribute('data-wait')));
+          $('#wl-room-id').value = info.id;
+          $('#wl-ci').value = search.checkin || '';
+          $('#wl-co').value = search.checkout || '';
+          const pax = Math.max(1, Number(search.adults||0) + Number(search.children||0));
+          $('#wl-pax').value = String(pax);
+          // Corrección mínima: guardar el tipo solicitado para enviarlo al backend
+          $('#wl-tipo').value = info.tipo || '';
+          wlModal.show();
+        });
+
+        // enviar lista de espera
+        $('#wl-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const payload = {
+            room_id: Number($('#wl-room-id').value || 0),
+            checkin: $('#wl-ci').value || '',
+            checkout: $('#wl-co').value || '',
+            huespedes: Number($('#wl-pax').value || 1),
+            nombre: $('#wl-name').value.trim(),
+            correo: $('#wl-mail').value.trim(),
+            // Corrección mínima: incluir el tipo solicitado para cubrir Tipo_Solicitado NOT NULL
+            tipo: ($('#wl-tipo').value || undefined),
+          };
+          try {
+            const r = await fetch('/grr/waitlist', {
+              method: 'POST',
+              headers: { 'Content-Type':'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const js = await r.json();
+            if (!js.ok) throw new Error(js.msg || 'No se pudo registrar en la lista de espera.');
+            wlModal.hide();
+            alert('¡Listo! Te avisaremos si se libera la habitación.');
+          } catch (err) {
+            alert(err.message || String(err));
+          }
         });
       }
 

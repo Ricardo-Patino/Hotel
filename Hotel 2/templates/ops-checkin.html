@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recepción – Check-in | Hotel Villa Grace</title>
-  <meta name="description" content="Módulo de check-in para recepción, validación por cédula/pasaporte.">
+  <meta name="description" content="Módulo de check-in para recepción con early check-in (GRR-01-017).">
 
   <!-- Favicons -->
   <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
@@ -44,8 +44,8 @@
           <li><a href="ops-dashboard.html">Tablero</a></li>
           <li><a href="ops-arrivals-departures.html">Llegadas/Salidas</a></li>
           <li><a href="ops-rooms-status.html">Estado Hab.</a></li>
-          <li><a href="ops-housekeeping.html">Limpieza</a></li>
-          <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
+          <li><a href="/grr/ops/housekeeping">Limpieza</a></li>
+          <li><a href="/grr/ops/coupons">Cupones</a></li>
         </ul>
         <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
       </nav>
@@ -58,7 +58,7 @@
     <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
       <div class="container position-relative">
         <h1>Check-in de Huéspedes</h1>
-        <p class="mb-0">Primero valida por <strong>cédula/pasaporte</strong>. Firma e imagen del documento son <strong>opcionales</strong>.</p>
+        <p class="mb-0">Valida por <strong>cédula/pasaporte</strong>. Early check-in opcional.</p>
         <nav class="breadcrumbs"><ol><li><a href="index.html">Inicio</a></li><li><a href="ops-dashboard.html">Recepción</a></li><li class="current">Check-in</li></ol></nav>
       </div>
     </div>
@@ -112,22 +112,44 @@
                     <th></th>
                   </tr>
                 </thead>
-                <tbody id="tbody-results">
-                  <!-- filas dinámicas -->
-                </tbody>
+                <tbody id="tbody-results"></tbody>
               </table>
             </div>
           </div>
         </div>
 
-        <!-- Sección opcional: Firma y documento -->
+        <!-- Early check-in (GRR-01-017) -->
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <h5 class="mb-0"><i class="bi bi-alarm me-2"></i>Early check-in (opcional)</h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-3">
+                <label class="form-label">Porcentaje</label>
+                <div class="input-group">
+                  <input id="early-pct" type="number" min="0" max="100" class="form-control" value="30">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div class="col-md-3 d-grid">
+                <button class="btn btn-outline-primary" id="btn-early">Aplicar</button>
+              </div>
+              <div class="col-md-6">
+                <div class="soft small" id="early-msg">Añade cargo por ingreso temprano y marcará la habitación como “Ocupada-temprana”.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Datos opcionales -->
         <div class="card shadow-sm border-0">
           <div class="card-header bg-white border-0">
             <h5 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Datos opcionales</h5>
           </div>
           <div class="card-body">
             <div class="row g-4">
-              <!-- Firma digital (opcional) -->
+              <!-- Firma -->
               <div class="col-lg-6">
                 <div class="form-check form-switch mb-2">
                   <input class="form-check-input" type="checkbox" role="switch" id="toggle-sign">
@@ -138,12 +160,12 @@
                   <div class="d-flex gap-2 mt-2">
                     <button class="btn btn-sm btn-outline-secondary" id="btn-clear-sign"><i class="bi bi-eraser me-1"></i> Limpiar</button>
                     <button class="btn btn-sm btn-outline-primary" id="btn-save-sign"><i class="bi bi-check2 me-1"></i> Guardar firma</button>
-                    <span class="hint align-self-center">Se adjunta a la reserva/estancia si decides guardarla.</span>
+                    <span class="hint align-self-center">Se adjunta si decides guardarla.</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Foto del documento (opcional) -->
+              <!-- Doc -->
               <div class="col-lg-6">
                 <div class="form-check form-switch mb-2">
                   <input class="form-check-input" type="checkbox" role="switch" id="toggle-docimg">
@@ -152,7 +174,6 @@
                 <div id="docimg-wrap" class="toggleable">
                   <input type="file" id="docimg" accept="image/*,application/pdf" class="form-control">
                   <img id="docimg-preview" class="doc-preview mt-2 d-none" alt="Preview">
-                  <div class="hint mt-2">La imagen (o PDF) se guardará en “guest_docs”.</div>
                 </div>
               </div>
             </div>
@@ -164,7 +185,7 @@
           <div class="card-body d-flex flex-wrap gap-2">
             <button class="btn btn-success" id="btn-checkin" disabled><i class="bi bi-box-arrow-in-right me-1"></i> Realizar Check-in</button>
             <a class="btn btn-outline-secondary" href="ops-dashboard.html"><i class="bi bi-arrow-left me-1"></i> Volver</a>
-            <div class="ms-auto soft small">Requiere documento válido + reserva encontrada (o walk-in creado).</div>
+            <div class="ms-auto soft small">Requiere documento válido + reserva seleccionada.</div>
           </div>
         </div>
 
@@ -201,11 +222,6 @@
       $('#btn-checkin').disabled = !enable;
     }
 
-    function readQuery(k){
-      const u = new URL(window.location.href);
-      return u.searchParams.get(k);
-    }
-
     // -------- Firma (opcional) --------
     let isDrawing=false, last={x:0,y:0};
     function setupSignPad(){
@@ -215,28 +231,14 @@
       const dpr = window.devicePixelRatio || 1;
       const w = pad.clientWidth;
       const h = pad.getAttribute('height');
-      pad.width = w*dpr;
-      pad.height = h*dpr;
-      ctx.scale(dpr,dpr);
+      pad.width = w*dpr; pad.height = h*dpr; ctx.scale(dpr,dpr);
       ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222';
-
-      const pos = (e) => {
-        const r = pad.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
-        return {x, y};
-      };
-
+      const pos = (e) => { const r = pad.getBoundingClientRect(); const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left; const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top; return {x, y}; };
       const start = (e)=>{ isDrawing=true; last=pos(e); };
       const move = (e)=>{ if(!isDrawing) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
       const end = ()=>{ isDrawing=false; };
-
-      pad.addEventListener('mousedown', start);
-      pad.addEventListener('mousemove', move);
-      window.addEventListener('mouseup', end);
-      pad.addEventListener('touchstart', start, {passive:true});
-      pad.addEventListener('touchmove', move, {passive:true});
-      pad.addEventListener('touchend', end);
+      pad.addEventListener('mousedown', start); pad.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+      pad.addEventListener('touchstart', start, {passive:true}); pad.addEventListener('touchmove', move, {passive:true}); pad.addEventListener('touchend', end);
       $('#btn-clear-sign').addEventListener('click',()=>{ ctx.clearRect(0,0,pad.width,pad.height); });
       $('#btn-save-sign').addEventListener('click',()=>{ try{ sessionStorage.setItem('ops.sign', pad.toDataURL('image/png')); }catch(_){ } });
     }
@@ -247,12 +249,8 @@
         const f = e.target.files?.[0];
         const prev = $('#docimg-preview');
         if(!f){ prev.classList.add('d-none'); return; }
-        if(f.type.startsWith('image/')){
-          const url = URL.createObjectURL(f);
-          prev.src = url; prev.classList.remove('d-none');
-        }else{
-          prev.classList.add('d-none'); // PDF u otros
-        }
+        if(f.type.startsWith('image/')){ prev.src = URL.createObjectURL(f); prev.classList.remove('d-none'); }
+        else { prev.classList.add('d-none'); }
       });
     }
 
@@ -264,21 +262,19 @@
 
     // -------- Render resultados --------
     let selectedReserva = null;
+    let resultsCache = [];
 
     function renderResults(items){
-      const tbody = $('#tbody-results');
-      tbody.innerHTML = '';
+      const tbody = $('#tbody-results'); tbody.innerHTML = '';
       const card = $('#card-results');
       $('#result-count').textContent = `${items.length} coincidencia(s)`;
       if(!items.length){
         card.style.display = 'block';
         tbody.innerHTML = `<tr><td colspan="6" class="text-center soft">No se encontraron reservas para el documento indicado.</td></tr>`;
-        enableCheckin(false);
-        return;
+        enableCheckin(false); return;
       }
       items.forEach(it=>{
-        const tr = document.createElement('tr');
-        tr.className = 'result-row';
+        const tr = document.createElement('tr'); tr.className = 'result-row';
         tr.innerHTML = `
           <td><strong>${it.numero || ('VG-' + it.id)}</strong></td>
           <td>${it.huesped || '—'}</td>
@@ -293,11 +289,10 @@
       });
       card.style.display = 'block';
 
-      // seleccionar
       $$('.btn-select').forEach(btn=>{
         btn.addEventListener('click', ()=>{
           const id = Number(btn.dataset.id);
-          selectedReserva = items.find(x=> Number(x.id)===id) || null;
+          selectedReserva = resultsCache.find(x=> Number(x.id)===id) || null;
           enableCheckin(!!selectedReserva);
           $$('.result-row').forEach(r=> r.classList.remove('table-success'));
           btn.closest('tr').classList.add('table-success');
@@ -307,54 +302,29 @@
 
     // -------- Búsqueda por documento --------
     async function doSearch(){
-      setAlert('');
-      enableCheckin(false);
-      selectedReserva = null;
-
-      const doc = $('#doc').value.trim();
-      const when = $('#when').value || '';
-
-      if(!doc){
-        setAlert('Debes ingresar la cédula o pasaporte para validar la reserva.', 'warning');
-        return;
-      }
-
+      setAlert(''); enableCheckin(false); selectedReserva = null;
+      const doc = $('#doc').value.trim(); const when = $('#when').value || '';
+      if(!doc){ setAlert('Debes ingresar la cédula o pasaporte para validar la reserva.', 'warning'); return; }
       try{
         const url = `/api/ops/checkin/search?doc=${encodeURIComponent(doc)}${when?`&when=${encodeURIComponent(when)}`:''}`;
         const r = await fetch(url, {headers:{Accept:'application/json'}});
         if(!r.ok){ throw new Error('Respuesta no OK'); }
         const j = await r.json();
-
-        if(!j || !j.ok){
-          renderResults([]);
-          setAlert('No se encontraron reservas asociadas a ese documento.', 'warning');
-          return;
-        }
-        const items = Array.isArray(j.items) ? j.items : [];
-        renderResults(items);
-        if(!items.length){
-          setAlert('No se encontraron reservas asociadas a ese documento.', 'warning');
-        }
+        resultsCache = Array.isArray(j.items) ? j.items : [];
+        renderResults(resultsCache);
+        if(!resultsCache.length){ setAlert('No se encontraron reservas asociadas a ese documento.', 'warning'); }
       }catch(e){
         console.warn('search error', e);
-        renderResults([]);
-        setAlert('No se pudo consultar la reserva. Verifica la conexión o el endpoint /api/ops/checkin/search.', 'danger');
+        renderResults([]); setAlert('No se pudo consultar la reserva. Verifica /api/ops/checkin/search.', 'danger');
       }
     }
 
     // -------- Check-in --------
     async function doCheckin(){
       const doc = $('#doc').value.trim();
-      if(!doc){
-        setAlert('El documento es obligatorio para realizar el check-in.', 'warning');
-        return;
-      }
-      if(!selectedReserva){
-        setAlert('Debes seleccionar una reserva encontrada.', 'warning');
-        return;
-      }
+      if(!doc){ setAlert('El documento es obligatorio para realizar el check-in.', 'warning'); return; }
+      if(!selectedReserva){ setAlert('Debes seleccionar una reserva encontrada.', 'warning'); return; }
 
-      // Construcción de payload
       const payload = {
         reserva_id: selectedReserva.id,
         documento: doc,
@@ -363,48 +333,44 @@
 
       try{
         const resp = await fetch('/api/ops/checkin/complete', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
+          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
         });
-
         if(!resp.ok){ throw new Error('Respuesta no OK'); }
         const j = await resp.json();
-        if(!j || !j.ok){
-          setAlert(j.message || 'No se pudo completar el check-in.', 'danger');
-          return;
-        }
-
-        setAlert('Check-in realizado correctamente.', 'success');
-        enableCheckin(false);
-
-        if(j.comprobante_reserva_id){
-          try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){}
-        }
+        if(!j || !j.ok){ setAlert(j.message || 'No se pudo completar el check-in.', 'danger'); return; }
+        setAlert('Check-in realizado correctamente.', 'success'); enableCheckin(false);
+        if(j.comprobante_reserva_id){ try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){ } }
       }catch(e){
-        console.warn('checkin error', e);
-        setAlert('No se pudo completar el check-in. Revisa el endpoint /api/ops/checkin/complete.', 'danger');
+        console.warn('checkin error', e); setAlert('No se pudo completar el check-in. Revisa /api/ops/checkin/complete.', 'danger');
       }
     }
 
+    // -------- Early check-in (GRR-01-017) --------
+    document.getElementById('btn-early').addEventListener('click', async ()=>{
+      const pct = Number(document.getElementById('early-pct').value || 30);
+      const msg = document.getElementById('early-msg');
+      if(!selectedReserva){ msg.textContent = 'Selecciona una reserva primero.'; return; }
+      msg.textContent = 'Aplicando cargo por early…';
+      try{
+        const r = await fetch(`/grr/reservas/${selectedReserva.id}/early-checkin`, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ porcentaje: pct })
+        });
+        const js = await r.json();
+        if(!js.ok) throw new Error(js.error || 'No se aplicó el cargo');
+        msg.textContent = `Early check-in aplicado. Cargo: ₡${Number(js.cargo||0).toFixed(2)}`;
+      }catch(e){ msg.textContent = e.message || 'Error al aplicar early check-in.'; }
+    });
+
     // -------- Bind & init --------
-    function prefillFromQuery(){
-      const u = new URL(window.location.href);
-      const q = u.searchParams.get('q');
-      if(q){ $('#doc').value = q; }
-    }
-
     document.addEventListener('DOMContentLoaded', ()=>{
-      bindToggles();
-      setupSignPad();
-      setupDocImg();
-
+      bindToggles(); setupSignPad(); setupDocImg();
       $('#frm-search').addEventListener('submit', (e)=>{ e.preventDefault(); doSearch(); });
       $('#btn-search').addEventListener('click', (e)=>{ e.preventDefault(); doSearch(); });
       $('#btn-checkin').addEventListener('click', (e)=>{ e.preventDefault(); doCheckin(); });
 
-      prefillFromQuery();
-      if($('#doc').value.trim()){ doSearch(); }
+      const u = new URL(window.location.href); const q = u.searchParams.get('q');
+      if(q){ $('#doc').value = q; doSearch(); }
     });
   </script>
 </body>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operaciones — Cupones | Hotel Villa Grace</title>
+  <meta name="description" content="Administración de cupones y reglas de tarifas (GRR-01-015).">
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .k { color:#6c757d }
+    .pill { border-radius: .75rem; padding: .25rem .5rem; background:#f1f3f5 }
+  </style>
+</head>
+<body class="inner-page">
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="ops-dashboard.html">Tablero</a></li>
+        <li><a href="/ops/coupons" class="active">Cupones</a></li>
+        <li><a href="/ops/housekeeping">Limpieza</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="container position-relative">
+      <h1>Cupones / Tarifas dinámicas</h1>
+      <p class="mb-0">Define códigos, vigencias y límites. (GRR-01-015)</p>
+      <nav class="breadcrumbs"><ol><li><a href="ops-dashboard.html">Recepción</a></li><li class="current">Cupones</li></ol></nav>
+    </div>
+  </div>
+
+  <section class="section pt-3">
+    <div class="container" data-aos="fade-up">
+
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+          <h5 class="card-title">Crear o editar cupón</h5>
+          <form id="cp-form" class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Código</label>
+              <input class="form-control" name="Codigo" required placeholder="ACME10">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Tipo</label>
+              <select class="form-select" name="Tipo">
+                <option value="porcentaje">Porcentaje (%)</option>
+                <option value="monto">Monto fijo</option>
+                <option value="corporativo">Corporativo (%)</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Valor</label>
+              <input class="form-control" name="Valor" type="number" step="0.01" min="0" required placeholder="10">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Máx. usos</label>
+              <input class="form-control" name="Max_Usos" type="number" min="0" placeholder="0 = ilimitado">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">Válido desde</label>
+              <input class="form-control" name="Valido_Desde" type="date">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Válido hasta</label>
+              <input class="form-control" name="Valido_Hasta" type="date">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Notas</label>
+              <input class="form-control" name="Notas" placeholder="Descripción interna / segmento / temporada">
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-dark" type="submit"><i class="bi bi-save me-1"></i>Guardar</button>
+              <button class="btn btn-outline-secondary" type="reset">Limpiar</button>
+              <span id="cp-msg" class="align-self-center k"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0">Listado</h5>
+            <div class="d-flex gap-2">
+              <input id="cp-search" class="form-control form-control-sm" placeholder="Buscar código…">
+              <button class="btn btn-outline-secondary btn-sm" id="btn-refresh"><i class="bi bi-arrow-repeat me-1"></i>Refrescar</button>
+            </div>
+          </div>
+
+          <div class="table-responsive mt-2">
+            <table class="table align-middle">
+              <thead>
+                <tr>
+                  <th>Código</th><th>Tipo</th><th>Valor</th><th>Vigencia</th><th>Usos</th><th>Estado</th><th class="text-end"></th>
+                </tr>
+              </thead>
+              <tbody id="cp-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+  const $ = (s)=>document.querySelector(s);
+  const money = (n)=> new Intl.NumberFormat("es-CR",{style:"currency",currency:"CRC"}).format(Number(n||0));
+  async function j(url, opts){ const r = await fetch(url, opts||{}); const js = await r.json().catch(()=>({})); if(!r.ok || js.ok===false) throw new Error(js.msg || `HTTP ${r.status}`); return js; }
+
+  async function loadCoupons(){
+    const search = ($('#cp-search').value||'').trim().toLowerCase();
+    const js = await j('/api/coupons'); // <--- correcto
+    const tb = $('#cp-tbody');
+    tb.innerHTML = '';
+    (js.items||[]).filter(row => !search || String(row.Codigo||'').toLowerCase().includes(search))
+    .forEach(row => {
+      const usos = `${row.Usos||0} / ${row.Max_Usos||'∞'}`;
+      const vig = `${row.Valido_Desde || '—'} → ${row.Valido_Hasta || '—'}`;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><code>${row.Codigo}</code></td>
+        <td class="text-capitalize">${row.Tipo}</td>
+        <td>${row.Tipo==='monto' ? money(row.Valor) : `${Number(row.Valor||0)} %`}</td>
+        <td>${vig}</td>
+        <td>${usos}</td>
+        <td>${row.Activo ? '<span class="badge text-bg-success">Activo</span>' : '<span class="badge text-bg-secondary">Inactivo</span>'}</td>
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" data-action="toggle" data-code="${row.Codigo}" data-active="${row.Activo?0:1}">
+              ${row.Activo ? 'Desactivar' : 'Activar'}
+            </button>
+            <button class="btn btn-outline-danger" data-action="del" data-code="${row.Codigo}"><i class="bi bi-trash"></i></button>
+          </div>
+        </td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+
+  document.getElementById('cp-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+
+    // Mapear a las claves que el backend espera (minúsculas) y normalizar valores
+    const payload = {
+      codigo:        (fd.get('Codigo') || '').trim().toUpperCase(),
+      tipo:          (fd.get('Tipo') || 'porcentaje').trim(),
+      valor:         Number(fd.get('Valor') || 0),
+      valido_desde:  fd.get('Valido_Desde') || null,
+      valido_hasta:  fd.get('Valido_Hasta') || null,
+      max_usos:      Number(fd.get('Max_Usos') || 0),
+      notas:         fd.get('Notas') || ''   // si el modelo lo ignora, no afecta
+    };
+
+    const msg = document.querySelector('#cp-msg');
+    msg.textContent = 'Guardando…';
+    try{
+      await j('/api/coupons', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      msg.textContent = 'Cupón guardado.';
+      e.target.reset();
+      await loadCoupons();
+    }catch(err){
+      msg.textContent = err.message || 'Error al guardar.';
+    }
+  });
+
+  document.getElementById('btn-refresh').addEventListener('click', loadCoupons);
+  document.getElementById('cp-search').addEventListener('input', loadCoupons);
+
+  document.getElementById('cp-tbody').addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-action]');
+    if(!btn) return;
+    const action = btn.dataset.action;
+    const code = btn.dataset.code;
+    if(action === 'toggle'){
+      const activo = btn.dataset.active === '1';
+      await j(`/api/coupons/${encodeURIComponent(code)}/toggle`, { method:'POST',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify({activo}) });
+      await loadCoupons();
+    } else if (action === 'del'){
+      if(!confirm('¿Eliminar cupón?')) return;
+      await j(`/api/coupons/${encodeURIComponent(code)}`, { method:'DELETE' });
+      await loadCoupons();
+    }
+  });
+
+  loadCoupons();
+</script>
+</body>
+</html>
