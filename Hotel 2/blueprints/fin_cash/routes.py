@@ -46,37 +46,30 @@ def _is_admin() -> bool:
 # =========================
 # Caja helpers
 # =========================
-def _get_open_session(fecha: date):
-    """
-    Devuelve la sesión de caja ABIERTA (open/reopened) para la fecha indicada (1 como máximo).
-    """
+def _get_any_open_session():
+    """Devuelve True si hay alguna caja abierta o reabierta en el sistema."""
     row = _db().session.execute(
         text("""
             SELECT id_session
               FROM fin_cash_session
-             WHERE fecha=:f AND status IN ('open','reopened')
-             ORDER BY id_session DESC
+             WHERE status IN ('open','reopened')
              LIMIT 1
-        """),
-        {"f": fecha},
+        """)
     ).fetchone()
-    return (row[0] if row else None)
+    return bool(row)
 
 
-def _create_session(fecha: date, opened_by: int, opening_cash: float = 0.0):
-    """
-    Crea una nueva sesión de caja (si NO hay otra abierta en la misma fecha).
-    Retorna id o None si ya existe abierta.
-    """
-    if _get_open_session(fecha) is not None:
-        return None
+def _create_session_unique(fecha: date, opened_by: int, opening_cash: float = 0.0):
+    """Crea una nueva caja solo si no hay otra abierta en todo el sistema."""
+    if _get_any_open_session():
+        return None  # No permite abrir otra caja mientras exista una abierta
 
     _db().session.execute(
         text("""
             INSERT INTO fin_cash_session (fecha, opened_by, opening_cash, status)
             VALUES (:f, :u, :cash, 'open')
         """),
-        {"f": fecha, "u": opened_by, "cash": opening_cash},
+        {"f": fecha, "u": opened_by, "cash": float(opening_cash)},
     )
     _db().session.commit()
 
@@ -93,10 +86,23 @@ def _create_session(fecha: date, opened_by: int, opening_cash: float = 0.0):
     return (row[0] if row else None)
 
 
+def _get_open_session(fecha: date):
+    """Devuelve la sesión de caja ABIERTA (open/reopened) para la fecha indicada."""
+    row = _db().session.execute(
+        text("""
+            SELECT id_session
+              FROM fin_cash_session
+             WHERE fecha=:f AND status IN ('open','reopened')
+             ORDER BY id_session DESC
+             LIMIT 1
+        """),
+        {"f": fecha},
+    ).fetchone()
+    return (row[0] if row else None)
+
+
 def _calc_resume(fecha: date):
-    """
-    Lee la vista de resumen y devuelve dict o None (usa .mappings()).
-    """
+    """Lee la vista de resumen y devuelve dict o None."""
     row = _db().session.execute(
         text("SELECT * FROM v_fin_caja_resumen WHERE fecha=:f"),
         {"f": fecha}
@@ -112,10 +118,7 @@ def _calc_resume(fecha: date):
 def apertura():
     """
     Abre caja del día.
-    Reglas:
-      - No permite si el periodo (mes) está cerrado -> 423 Locked.
-      - No permite abrir si ya hay otra abierta ese día -> 409 Conflict.
-      - Sí permite varias cajas el mismo día mientras la anterior esté cerrada.
+    Solo se permite UNA caja abierta a la vez (sin importar usuario).
     """
     payload = request.get_json(force=True, silent=True) or {}
     opened_by = int(payload.get("opened_by", 1))
@@ -129,20 +132,13 @@ def apertura():
             "message": f"El periodo {_month_key(fecha)} está cerrado. No se puede abrir caja."
         }), 423
 
-    if _get_open_session(fecha) is not None:
-        return jsonify({
-            "ok": False,
-            "error": "already_open",
-            "message": "Ya existe una caja abierta para esa fecha. Debe cerrarse antes de abrir otra."
-        }), 409
-
-    sid = _create_session(fecha, opened_by, opening_cash)
+    sid = _create_session_unique(fecha, opened_by, opening_cash)
     if not sid:
         return jsonify({
             "ok": False,
-            "error": "open_failed",
-            "message": "No se pudo abrir la caja. Intente nuevamente."
-        }), 500
+            "error": "already_open",
+            "message": "Ya existe una caja abierta o reabierta. Debe cerrarse antes de abrir otra."
+        }), 409
 
     return jsonify({"ok": True, "id_session": sid})
 
@@ -151,10 +147,6 @@ def apertura():
 def movimiento():
     """
     Inserta un movimiento MANUAL en la caja ABIERTA del día.
-    Reglas:
-      - Periodo cerrado -> 423.
-      - Debe existir caja abierta para esa fecha -> 409.
-      - El movimiento se asocia SIEMPRE a la caja abierta del día.
     """
     payload = request.get_json(force=True, silent=True) or {}
     required = ("tipo", "metodo", "concepto", "monto", "created_by")
@@ -203,9 +195,6 @@ def movimiento():
 def cierre():
     """
     Cierra la caja ABIERTA del día (si existe).
-    Reglas:
-      - Periodo cerrado -> 423.
-      - Requiere caja abierta -> 404.
     """
     payload = request.get_json(force=True, silent=True) or {}
     fecha = datetime.fromisoformat(payload.get("fecha") or date.today().isoformat()).date()
@@ -245,12 +234,6 @@ def cierre():
 def reabrir():
     """
     Reabre una caja (solo Administrador).
-    Payload: { "id_session": <int> }
-    Reglas:
-      - Solo Admin -> 403 si no lo es.
-      - Periodo cerrado -> 423.
-      - Debe estar CERRADA actualmente -> 409 si ya está abierta.
-      - No puede haber OTRA caja abierta en la MISMA FECHA -> 409.
     """
     if not _is_admin():
         return jsonify({"ok": False, "error": "forbidden", "message": "Solo Administrador puede reabrir cajas."}), 403
@@ -260,7 +243,6 @@ def reabrir():
     if not sid:
         return jsonify({"ok": False, "error": "missing_id"}), 400
 
-    # Obtiene fecha y estado de la sesión solicitada
     row = _db().session.execute(
         text("""
             SELECT id_session, fecha, status
@@ -287,22 +269,18 @@ def reabrir():
     if status in ("open", "reopened"):
         return jsonify({"ok": False, "error": "already_open", "message": "La caja ya está abierta."}), 409
 
-    # No puede haber otra caja abierta en la misma fecha
-    other_open = _get_open_session(fecha)
-    if other_open and int(other_open) != int(sid):
+    if _get_any_open_session():
         return jsonify({
             "ok": False,
             "error": "another_open",
-            "message": "Ya existe otra caja abierta en esa fecha. Ciérrala antes de reabrir."
+            "message": "Ya existe otra caja abierta. Ciérrala antes de reabrir otra."
         }), 409
 
-    # Reabrir (solo cambiamos el estado; si tu tabla tuviera reopened_at/by, puedes setearlos aquí)
     _db().session.execute(
         text("""
             UPDATE fin_cash_session
                SET status='reopened'
              WHERE id_session=:sid
-             LIMIT 1
         """),
         {"sid": sid}
     )
@@ -313,9 +291,7 @@ def reabrir():
 
 @fin_cash_bp.get("/estado")
 def estado():
-    """
-    Devuelve el id de caja abierta (si existe) para la fecha dada (o hoy por defecto).
-    """
+    """Devuelve el id de caja abierta (si existe) para la fecha dada (o hoy por defecto)."""
     fecha = datetime.fromisoformat(request.args.get("fecha") or date.today().isoformat()).date()
     sid = _get_open_session(fecha)
     return jsonify({"ok": True, "fecha": fecha.isoformat(), "id_open_session": sid})
@@ -323,18 +299,14 @@ def estado():
 
 @fin_cash_bp.get("/conciliacion")
 def conciliacion():
-    """
-    Devuelve el resumen de conciliación de la vista para la fecha dada.
-    """
+    """Devuelve el resumen de conciliación de la vista para la fecha dada."""
     fecha = datetime.fromisoformat(request.args.get("fecha") or date.today().isoformat()).date()
     return jsonify({"ok": True, "resumen": _calc_resume(fecha)})
 
 
 @fin_cash_bp.get("/reporte.pdf")
 def reporte_pdf():
-    """
-    Genera el PDF de conciliación para la fecha indicada.
-    """
+    """Genera el PDF de conciliación para la fecha indicada."""
     fecha = datetime.fromisoformat(request.args.get("fecha") or date.today().isoformat()).date()
     resumen = _calc_resume(fecha)
     if not resumen:
@@ -360,23 +332,23 @@ def reporte_pdf():
         c.drawRightString(W-2*cm, y, f"₡ {val:,.2f}")
 
     y = H - 4*cm
-    row(y, "Efectivo inicial",    resumen.get("opening_cash", 0));          y -= 0.6*cm
-    row(y, "Ingresos (efectivo)", resumen.get("ingresos_efectivo", 0));     y -= 0.6*cm
-    row(y, "Egresos (efectivo)",  resumen.get("egresos_efectivo", 0));      y -= 0.6*cm
-    row(y, "Ajustes (+)",         resumen.get("ajustes_mas", 0));           y -= 0.6*cm
-    row(y, "Ajustes (-)",         resumen.get("ajustes_menos", 0));         y -= 0.6*cm
+    row(y, "Efectivo inicial", resumen.get("opening_cash", 0)); y -= 0.6*cm
+    row(y, "Ingresos (efectivo)", resumen.get("ingresos_efectivo", 0)); y -= 0.6*cm
+    row(y, "Egresos (efectivo)", resumen.get("egresos_efectivo", 0)); y -= 0.6*cm
+    row(y, "Ajustes (+)", resumen.get("ajustes_mas", 0)); y -= 0.6*cm
+    row(y, "Ajustes (-)", resumen.get("ajustes_menos", 0)); y -= 0.6*cm
 
     c.setLineWidth(0.5)
     c.line(2*cm, y-0.2*cm, W-2*cm, y-0.2*cm)
     y -= 0.8*cm
 
     esperado = resumen.get("efectivo_esperado", 0)
-    contado  = resumen.get("efectivo_contado", 0)
-    desc     = resumen.get("descuadre", 0)
+    contado = resumen.get("efectivo_contado", 0)
+    desc = resumen.get("descuadre", 0)
 
     c.setFont("Helvetica-Bold", 11)
     row(y, "Efectivo ESPERADO", esperado); y -= 0.6*cm
-    row(y, "Efectivo CONTADO",  contado);  y -= 0.6*cm
+    row(y, "Efectivo CONTADO", contado); y -= 0.6*cm
 
     c.setStrokeColor(colors.black)
     box_y = y - 0.2*cm
@@ -404,7 +376,7 @@ def reporte_pdf():
 # =========================
 @fin_cash_bp.get("/ui")
 def ui():
-    # Tu template: templates/fin-caja.html (con header/footer del hotel)
     return render_template("fin-caja.html")
+
 
 
