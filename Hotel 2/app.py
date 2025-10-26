@@ -860,8 +860,7 @@ def create_app() -> Flask:
     from blueprints.grr.routes import grr_bp
     app.register_blueprint(grr_bp, url_prefix="/grr")
 
-
-        # Blueprint de Inventario (INV-07)
+    # Blueprint de Inventario (INV-07)
     from blueprints.inv import inv_bp
     app.register_blueprint(inv_bp, url_prefix="/inv")
 
@@ -872,7 +871,12 @@ def create_app() -> Flask:
     from blueprints.mnt import mnt_bp  # <-- IMPORTA
     app.register_blueprint(mnt_bp)     # <-- REGISTRA (después de inv_bp / admin_bp)
 
+    # === Punto de Venta (POS) ===
+    from blueprints.pos import pos_bp
+    app.register_blueprint(pos_bp)
+
     
+
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:

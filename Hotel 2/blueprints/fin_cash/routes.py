@@ -23,7 +23,7 @@ def _month_key(d: date) -> str:
     return f"{d:%Y-%m}"
 
 def _is_locked(d: date) -> bool:
-    """True si el mes de 'd' está cerrado en fin_period_lock."""
+    """(legacy) True si el mes de 'd' está cerrado explícitamente con status='closed'."""
     row = _db().session.execute(
         text("""
             SELECT 1
@@ -34,6 +34,47 @@ def _is_locked(d: date) -> bool:
         {"p": _month_key(d)},
     ).fetchone()
     return bool(row)
+
+def _is_locked_effective(d: date) -> bool:
+    """
+    Política contable nueva (HU-06 / Periodos):
+    - Si existe fila en fin_period_lock para ese period_key:
+        * status = 'closed'    => bloqueado
+        * status = 'open'      => NO bloqueado
+        * status = 'reopened'  => NO bloqueado
+    - Si NO existe fila:
+        * si es el mes actual (según date.today()) => NO bloqueado
+        * si NO es el mes actual => BLOQUEADO
+
+    Resultado: por defecto todos los meses están bloqueados,
+    excepto el mes actual que está abierto, a menos que un admin
+    meta una fila 'open'/'reopened' para otro mes o 'closed' para cerrar el actual.
+    """
+    pk = _month_key(d)
+
+    row = _db().session.execute(
+        text("""
+            SELECT status
+              FROM fin_period_lock
+             WHERE period_key = :p
+             LIMIT 1
+        """),
+        {"p": pk},
+    ).mappings().fetchone()
+
+    if row:
+        st = (row["status"] or "").lower()
+        if st == "closed":
+            return True  # bloqueado
+        # 'open' o 'reopened' => permitido
+        return False
+
+    # No hay fila. ¿Es el mes actual?
+    current_month = date.today().strftime("%Y-%m")
+    if pk == current_month:
+        return False  # mes actual libre por defecto
+    return True       # cualquier otro mes bloqueado por defecto
+
 
 def _is_admin() -> bool:
     """Permite controlar acciones reservadas al Admin (según sesión)."""
@@ -60,7 +101,14 @@ def _get_any_open_session():
 
 
 def _create_session_unique(fecha: date, opened_by: int, opening_cash: float = 0.0):
-    """Crea una nueva caja solo si no hay otra abierta en todo el sistema."""
+    """
+    Crea una nueva caja solo si no hay otra abierta en todo el sistema
+    y si el periodo contable de esa fecha está permitido.
+    """
+    # bloqueado? entonces no abras caja
+    if _is_locked_effective(fecha):
+        return None
+
     if _get_any_open_session():
         return None  # No permite abrir otra caja mientras exista una abierta
 
@@ -119,12 +167,22 @@ def apertura():
     """
     Abre caja del día.
     Solo se permite UNA caja abierta a la vez (sin importar usuario).
+    También respeta el bloqueo contable efectivo.
     """
     payload = request.get_json(force=True, silent=True) or {}
     opened_by = int(payload.get("opened_by", 1))
     opening_cash = float(payload.get("opening_cash", 0.0))
     fecha = datetime.fromisoformat(payload.get("fecha") or date.today().isoformat()).date()
 
+    # Regla nueva HU-06
+    if _is_locked_effective(fecha):
+        return jsonify({
+            "ok": False,
+            "error": "period_locked",
+            "message": f"El periodo {_month_key(fecha)} está bloqueado. No se puede abrir caja."
+        }), 423
+
+    # (legacy check explícito por si marcaron 'closed' manualmente)
     if _is_locked(fecha):
         return jsonify({
             "ok": False,
@@ -137,7 +195,7 @@ def apertura():
         return jsonify({
             "ok": False,
             "error": "already_open",
-            "message": "Ya existe una caja abierta o reabierta. Debe cerrarse antes de abrir otra."
+            "message": "Ya existe una caja abierta o reabierta, o el periodo está bloqueado."
         }), 409
 
     return jsonify({"ok": True, "id_session": sid})
@@ -147,6 +205,7 @@ def apertura():
 def movimiento():
     """
     Inserta un movimiento MANUAL en la caja ABIERTA del día.
+    Respeta bloqueo contable.
     """
     payload = request.get_json(force=True, silent=True) or {}
     required = ("tipo", "metodo", "concepto", "monto", "created_by")
@@ -154,6 +213,13 @@ def movimiento():
         return jsonify({"ok": False, "error": "missing_fields"}), 400
 
     fecha = datetime.fromisoformat(payload.get("fecha") or date.today().isoformat()).date()
+
+    if _is_locked_effective(fecha):
+        return jsonify({
+            "ok": False,
+            "error": "period_locked",
+            "message": f"El periodo {_month_key(fecha)} está bloqueado. No se pueden registrar movimientos."
+        }), 423
 
     if _is_locked(fecha):
         return jsonify({
@@ -195,11 +261,19 @@ def movimiento():
 def cierre():
     """
     Cierra la caja ABIERTA del día (si existe).
+    Respeta bloqueo contable.
     """
     payload = request.get_json(force=True, silent=True) or {}
     fecha = datetime.fromisoformat(payload.get("fecha") or date.today().isoformat()).date()
     closed_by = int(payload.get("closed_by", 1))
     contado = float(payload.get("closing_cash_counted", 0.0))
+
+    if _is_locked_effective(fecha):
+        return jsonify({
+            "ok": False,
+            "error": "period_locked",
+            "message": f"El periodo {_month_key(fecha)} está bloqueado. No se puede cerrar caja en este mes."
+        }), 423
 
     if _is_locked(fecha):
         return jsonify({
@@ -234,6 +308,7 @@ def cierre():
 def reabrir():
     """
     Reabre una caja (solo Administrador).
+    Respeta bloqueo contable + unicidad de caja abierta.
     """
     if not _is_admin():
         return jsonify({"ok": False, "error": "forbidden", "message": "Solo Administrador puede reabrir cajas."}), 403
@@ -258,6 +333,13 @@ def reabrir():
 
     fecha = row["fecha"]
     status = (row["status"] or "").lower()
+
+    if _is_locked_effective(fecha):
+        return jsonify({
+            "ok": False,
+            "error": "period_locked",
+            "message": f"El periodo {_month_key(fecha)} está bloqueado. No se puede reabrir cajas."
+        }), 423
 
     if _is_locked(fecha):
         return jsonify({
@@ -377,6 +459,7 @@ def reporte_pdf():
 @fin_cash_bp.get("/ui")
 def ui():
     return render_template("fin-caja.html")
+
 
 
 

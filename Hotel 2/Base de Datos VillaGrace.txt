@@ -1,3 +1,4 @@
+
 /* ============================================================================
    Hotel Villa Grace — Esquema MySQL 8.x (InnoDB, UTF8MB4)
    Script limpio para recrear la BD con seeds mínimos
@@ -1015,6 +1016,54 @@ ALTER TABLE fin_period_lock
 ALTER TABLE fin_period_lock
   CHANGE COLUMN note legacy_note VARCHAR(255) NULL;
 
+/* ===============================================================
+   HU 2 de FAC — Integración POS-Caja-Reserva-Contabilidad
+   Ajustado al esquema Hotel VillaGrace (tabla Reserva)
+   =============================================================== */
+
+/* 1️⃣ fin_cash_movement → agregar vínculos */
+ALTER TABLE fin_cash_movement
+  ADD COLUMN reserva_id INT NULL AFTER estado,
+  ADD COLUMN ledger_entry_id INT NULL AFTER reserva_id,
+  ADD INDEX idx_fin_cash_movement_reserva (reserva_id),
+  ADD INDEX idx_fin_cash_movement_ledger (ledger_entry_id);
+
+/* 2️⃣ fin_payment → crear o asegurar columnas */
+CREATE TABLE IF NOT EXISTS fin_payment (
+    id_payment        INT AUTO_INCREMENT PRIMARY KEY,
+    reserva_id        INT NOT NULL,
+    metodo            VARCHAR(50) NOT NULL,
+    monto             DECIMAL(12,2) NOT NULL,
+    referencia        VARCHAR(100) NULL,
+    created_at        DATETIME NOT NULL DEFAULT NOW(),
+    created_by        INT NOT NULL,
+    source            VARCHAR(50) NOT NULL DEFAULT 'Caja',
+    cash_session_id   INT NULL,
+    cash_movement_id  INT NULL,
+    notes             VARCHAR(255) NULL,
+    INDEX idx_fin_payment_reserva (reserva_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* 3️⃣ Reserva → agregar columnas para totales y pagos */
+ALTER TABLE Reserva
+  ADD COLUMN Monto_Total_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total,
+  ADD COLUMN Monto_Pagado_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total_Acumulado,
+  ADD INDEX idx_reserva_balance (Monto_Total_Acumulado, Monto_Pagado_Acumulado);
+
+/* 4️⃣ Libro contable (fin_ledger) */
+CREATE TABLE IF NOT EXISTS fin_ledger (
+    id_entry        INT AUTO_INCREMENT PRIMARY KEY,
+    fecha           DATETIME NOT NULL DEFAULT NOW(),
+    reserva_id      INT NULL,
+    cash_session_id INT NULL,
+    descripcion     VARCHAR(255) NOT NULL,
+    account_debit   VARCHAR(50) NOT NULL,
+    account_credit  VARCHAR(50) NOT NULL,
+    monto           DECIMAL(12,2) NOT NULL,
+    created_by      INT NOT NULL,
+    INDEX idx_fin_ledger_reserva (reserva_id),
+    INDEX idx_fin_ledger_cash (cash_session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 /* ------------------------------------------------------------------------- */
@@ -1034,3 +1083,13 @@ SELECT * FROM InvMovimiento;
 SELECT * FROM KPI_Stats;
 SELECT * FROM Coupon;
 SELECT * FROM Waitlist;
+
+
+SELECT period_key, status, locked_at
+FROM fin_period_lock
+ORDER BY period_key;
+
+DESC fin_cash_movement;
+DESC fin_payment;
+DESC Reserva;
+DESC fin_ledger;

@@ -57,12 +57,11 @@
 </header>
 
 <main class="main">
-  <!-- Hero/Breadcrumb igual al resto -->
   <div class="page-title dark-background" data-aos="fade"
        style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
     <div class="container position-relative">
       <h1>Conciliación de caja</h1>
-      <p>Apertura, movimientos manuales y cierre diario con reporte.</p>
+      <p>Apertura, movimientos manuales, cobros POS y cierre diario con reporte.</p>
       <nav class="breadcrumbs">
         <ol>
           <li><a href="#">Finanzas</a></li>
@@ -72,7 +71,7 @@
     </div>
   </div>
 
-  <!-- Toast (no bloquea) -->
+  <!-- Toast -->
   <div class="position-fixed top-0 end-0 p-3" style="z-index:1080">
     <div id="appToast" class="toast align-items-center text-bg-success border-0" role="status" aria-live="polite" aria-atomic="true">
       <div class="d-flex">
@@ -94,7 +93,7 @@
               <div class="row g-2">
                 <div class="col-md-2"><input id="ap_opened_by" class="form-control" type="number" placeholder="opened_by" value="1"></div>
                 <div class="col-md-3"><input id="ap_opening_cash" class="form-control" type="number" step="0.01" placeholder="Efectivo inicial"></div>
-                <div class="col-md-3"><input id="ap_fecha" class="form-control" type="date" value="{{ (namespace().today if 0 else '') }}"></div>
+                <div class="col-md-3"><input id="ap_fecha" class="form-control" type="date"></div>
                 <div class="col-md-4 d-grid"><button class="btn btn-primary" onclick="apertura()"><i class="bi bi-box-arrow-in-right me-1"></i> Abrir caja</button></div>
               </div>
             </div>
@@ -133,6 +132,52 @@
                 </div>
               </div>
               <small class="text-muted d-block mt-2">Para restar efectivo con <strong>Ajuste</strong>, ingresa el monto en negativo.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cobro POS a Reserva -->
+        <div class="col-lg-6">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-0">
+              <h5 class="mb-0">Cobro POS a Reserva</h5>
+              <small class="text-muted">Registra el pago en caja, aplica abono y genera asiento contable.</small>
+            </div>
+            <div class="card-body">
+              <div class="row g-2">
+                <div class="col-6 col-md-4">
+                  <label class="form-label kv">ID Reserva</label>
+                  <input id="pos_reserva_id" class="form-control" type="number" placeholder="Ej: 2">
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label kv">Monto (₡)</label>
+                  <input id="pos_monto" class="form-control" type="number" step="0.01" placeholder="10000">
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label kv">Método</label>
+                  <select id="pos_metodo" class="form-select">
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Tarjeta">Tarjeta</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label kv">Concepto</label>
+                  <input id="pos_concepto" class="form-control" placeholder="Pago de estadía / minibar / etc">
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label kv">Referencia</label>
+                  <input id="pos_referencia" class="form-control" placeholder="VISA AUTH 12345">
+                </div>
+              </div>
+
+              <div class="mt-3 d-grid">
+                <button class="btn btn-warning" onclick="enviarCobroPOS()">
+                  <i class="bi bi-cash-coin me-1"></i> Cobrar reserva
+                </button>
+              </div>
+              <div id="pos_resultado" class="small text-muted mt-2"></div>
             </div>
           </div>
         </div>
@@ -185,7 +230,6 @@
   </section>
 </main>
 
-<!-- ===== Footer igual al tema ===== -->
 <footer id="footer" class="footer position-relative dark-background">
   <div class="copyright text-center">
     <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
@@ -197,16 +241,14 @@
 </a>
 <div id="preloader"></div>
 
-<!-- JS vendors del tema -->
 <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
 <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
 <script>
-  // Base del blueprint
   const BASE = "{{ url_for('fin_cash.conciliacion') }}".replace('/conciliacion','');
+  const POS_BASE = "/pos"; // nuevo blueprint
 
-  // Toast helper
   function toast(msg, type='success', ms=2500) {
     const el = document.getElementById('appToast');
     const body = document.getElementById('appToastBody');
@@ -229,11 +271,8 @@
     };
     const r = await fetch(BASE+'/apertura', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const txt = await r.text();
-    try {
-      const j = JSON.parse(txt);
-      if (j.ok) toast(`Apertura OK. Sesión: ${j.id_session}`, 'success');
-      else toast(`Apertura: ${txt}`, 'warning', 4500);
-    } catch { toast(`Error apertura: ${txt}`, 'danger', 6000); }
+    try { const j = JSON.parse(txt); if (j.ok) toast(`Apertura OK. Sesión: ${j.id_session}`, 'success'); else toast(`Apertura: ${txt}`, 'warning', 4500); }
+    catch { toast(`Error apertura: ${txt}`, 'danger', 6000); }
   }
 
   async function movimiento(){
@@ -246,11 +285,42 @@
     };
     const r = await fetch(BASE+'/movimiento', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const txt = await r.text();
-    try {
-      const j = JSON.parse(txt);
-      if (j.ok) toast(`Movimiento agregado. Sesión: ${j.session_id}`, 'success');
-      else toast(`Movimiento: ${txt}`, 'warning', 4500);
-    } catch { toast(`Error movimiento: ${txt}`, 'danger', 6000); }
+    try { const j = JSON.parse(txt); if (j.ok) toast(`Movimiento agregado. Sesión: ${j.session_id}`, 'success'); else toast(`Movimiento: ${txt}`, 'warning', 4500); }
+    catch { toast(`Error movimiento: ${txt}`, 'danger', 6000); }
+  }
+
+  async function enviarCobroPOS() {
+    const body = {
+      reserva_id: parseInt(document.getElementById('pos_reserva_id').value||'0'),
+      monto: parseFloat(document.getElementById('pos_monto').value||'0'),
+      metodo: document.getElementById('pos_metodo').value,
+      concepto: document.getElementById('pos_concepto').value,
+      referencia: document.getElementById('pos_referencia').value,
+      created_by: 1
+    };
+    const box = document.getElementById('pos_resultado');
+    box.textContent = "Procesando...";
+
+    const r = await fetch(POS_BASE+'/checkout', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await r.json();
+
+    if (!data.ok) {
+      box.className = "small text-danger";
+      box.textContent = `Error: ${data.error || 'desconocido'} - ${data.message || ''}`;
+      toast('Error en cobro POS', 'danger');
+    } else {
+      box.className = "small text-success";
+      box.innerHTML = `
+        Cobro OK. Saldo pendiente: ₡${Number(data.saldo_pendiente || 0).toLocaleString('es-CR', {minimumFractionDigits:2})}
+        <br>Estado: <strong>${data.estado_pago}</strong>
+        <br>Movimiento #${data.cash_movement_id} | Ledger #${data.ledger_entry_id}
+      `;
+      toast('Cobro POS registrado correctamente', 'success');
+    }
   }
 
   async function cierre(){
@@ -261,11 +331,8 @@
     };
     const r = await fetch(BASE+'/cierre', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const txt = await r.text();
-    try {
-      const j = JSON.parse(txt);
-      if (j.ok) toast('Caja cerrada correctamente.', 'success');
-      else toast(`Cierre: ${txt}`, 'warning', 4500);
-    } catch { toast(`Error cierre: ${txt}`, 'danger', 6000); }
+    try { const j = JSON.parse(txt); if (j.ok) toast('Caja cerrada correctamente.', 'success'); else toast(`Cierre: ${txt}`, 'warning', 4500); }
+    catch { toast(`Error cierre: ${txt}`, 'danger', 6000); }
   }
 
   async function conciliacion(){
@@ -279,5 +346,6 @@
 </script>
 </body>
 </html>
+
 
 
