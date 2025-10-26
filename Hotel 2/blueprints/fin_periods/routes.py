@@ -23,20 +23,12 @@ def _is_admin() -> bool:
 
 
 def _norm_period(p: Optional[str]) -> Optional[str]:
-    """
-    Normaliza distintos formatos a 'YYYY-MM'.
-    Acepta:
-      - 2025-10 / 2025/10 / 2025.10
-      - October 2025 / Oct 2025 / 2025 October / 2025 Oct
-      - Si es None o vacío -> mes actual
-    Devuelve None si no se puede interpretar.
-    """
+    """Normaliza distintos formatos a 'YYYY-MM'."""
     if not p or not str(p).strip():
         return date.today().strftime("%Y-%m")
 
     s = str(p).strip()
 
-    # Caso 1: 'YYYY-MM' exacto
     if re.fullmatch(r"\d{4}-\d{2}", s):
         try:
             datetime.strptime(s, "%Y-%m")
@@ -44,7 +36,6 @@ def _norm_period(p: Optional[str]) -> Optional[str]:
         except ValueError:
             return None
 
-    # Caso 2: 'YYYY/MM' o 'YYYY.MM'
     m = re.fullmatch(r"(\d{4})[\/\.](\d{1,2})", s)
     if m:
         y, mth = int(m.group(1)), int(m.group(2))
@@ -52,7 +43,6 @@ def _norm_period(p: Optional[str]) -> Optional[str]:
             return f"{y:04d}-{mth:02d}"
         return None
 
-    # Caso 3: Month-name + Year (en varias combinaciones)
     for fmt in ("%B %Y", "%b %Y", "%Y %B", "%Y %b"):
         try:
             dt = datetime.strptime(s, fmt)
@@ -66,7 +56,6 @@ def _norm_period(p: Optional[str]) -> Optional[str]:
 def _month_bounds(period_key: str) -> Tuple[date, date]:
     """Devuelve (primer_dia, ultimo_dia) para 'YYYY-MM'."""
     dt0 = datetime.strptime(period_key + "-01", "%Y-%m-%d").date()
-    # próximo mes - 1 día
     if dt0.month == 12:
         next_m = date(dt0.year + 1, 1, 1)
     else:
@@ -75,6 +64,7 @@ def _month_bounds(period_key: str) -> Tuple[date, date]:
 
 
 def _get_lock_row(period_key: str):
+    """Obtiene una fila de fin_period_lock, si existe."""
     row = db.session.execute(
         text("""
             SELECT id_lock, period_key, status, locked_by, locked_at, notes
@@ -104,10 +94,7 @@ def _has_open_cash_in_month(period_key: str) -> bool:
 
 
 def _shift_months(d: date, months_back: int) -> date:
-    """
-    Devuelve la fecha 'd' movida 'months_back' meses hacia atrás, con el día forzado a 1.
-    Ej: d=2025-10-01, months_back=3 => 2025-07-01
-    """
+    """Devuelve la fecha 'd' movida 'months_back' meses atrás."""
     year = d.year
     month = d.month - months_back
     while month <= 0:
@@ -116,21 +103,50 @@ def _shift_months(d: date, months_back: int) -> date:
     return date(year, month, 1)
 
 
+# NUEVO: función que aplica la política global de bloqueo por defecto
+def _effective_status(period_key: str) -> str:
+    """
+    Calcula el estado efectivo de un periodo según la política:
+      - Si existe fila en fin_period_lock:
+            closed    => closed
+            open/reopened => open
+      - Si NO existe fila:
+            Si es el mes actual => open
+            En cualquier otro caso => closed
+    """
+    row = _get_lock_row(period_key)
+    if row:
+        st = (row["status"] or "").lower().strip()
+        if st in ("open", "reopened"):
+            return "open"
+        if st == "closed":
+            return "closed"
+        # cualquier otro valor inesperado => cerrado por seguridad
+        return "closed"
+
+    # Si no hay fila registrada, aplicamos la regla automática
+    current_month = date.today().strftime("%Y-%m")
+    if period_key == current_month:
+        return "open"
+    return "closed"
+
+
 # ============== Endpoints ==============
 
 @fin_periods_bp.get("/status")
 def get_status():
     """
-    Si pasas ?period=YYYY-MM (o un formato aceptado) -> estado de ese periodo.
-    Si no, devuelve una lista de los últimos 12 periodos (status si existe, 'open' si no).
+    Si pasas ?period=YYYY-MM (o formato aceptado) -> estado efectivo del periodo.
+    Si no, devuelve lista de los últimos 12 meses con su estado.
     """
     raw = request.args.get("period")
     if raw is not None:
         period = _norm_period(raw)
         if not period:
             return jsonify({"ok": False, "error": "period_invalid"}), 400
+
+        status = _effective_status(period)
         row = _get_lock_row(period)
-        status = row["status"] if row else "open"
         return jsonify({
             "ok": True,
             "period": period,
@@ -138,16 +154,17 @@ def get_status():
             "lock": dict(row) if row else None
         })
 
-    # últimos 12 meses (incluye el actual)
+    # Últimos 12 meses incluyendo el actual
     out = []
     start = date.today().replace(day=1)
     for i in range(12):
         dt = _shift_months(start, i)
         pk = dt.strftime("%Y-%m")
+        status = _effective_status(pk)
         row = _get_lock_row(pk)
         out.append({
             "period": pk,
-            "status": row["status"] if row else "open",
+            "status": status,
             "lock": dict(row) if row else None
         })
 
@@ -167,17 +184,20 @@ def list_periods():
         """),
         {"lim": limit}
     ).mappings().all()
-    return jsonify({"ok": True, "items": [dict(r) for r in rows]})
+
+    # aplicar estado efectivo si no tiene registro
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["status"] = (d.get("status") or "").lower().strip() or "closed"
+        out.append(d)
+
+    return jsonify({"ok": True, "items": out})
 
 
 @fin_periods_bp.post("/lock")
 def lock_period():
-    """
-    Bloquea un periodo (YYYY-MM). Solo Administrador.
-    Reglas:
-      - Si hay cajas abiertas dentro del mes -> 409.
-      - Si ya está 'closed' -> idempotente (devuelve ok, status=closed).
-    """
+    """Bloquea un periodo (YYYY-MM). Solo Administrador."""
     if not _is_admin():
         return jsonify({"ok": False, "error": "forbidden",
                         "message": "Solo Administrador puede bloquear periodos."}), 403
@@ -229,11 +249,7 @@ def lock_period():
 
 @fin_periods_bp.post("/unlock")
 def unlock_period():
-    """
-    Desbloquea un periodo (YYYY-MM). Solo Administrador.
-    Reglas:
-      - Si ya está 'open' (o no existe registro) -> idempotente (status='open').
-    """
+    """Desbloquea un periodo (YYYY-MM). Solo Administrador."""
     if not _is_admin():
         return jsonify({"ok": False, "error": "forbidden",
                         "message": "Solo Administrador puede desbloquear periodos."}), 403
@@ -262,7 +278,6 @@ def unlock_period():
         row2 = _get_lock_row(period)
         return jsonify({"ok": True, "period": period, "status": "open", "lock": dict(row2)})
 
-    # si no existía, lo creamos como 'open' para dejar constancia
     db.session.execute(
         text("""
             INSERT INTO fin_period_lock (period_key, status, locked_by, locked_at, notes)
@@ -277,7 +292,7 @@ def unlock_period():
 
 @fin_periods_bp.get("/ui")
 def ui_periods():
-    """Página mínima (si deseas un panel visual)."""
+    """Render de la página HTML de gestión de cierres."""
     return render_template("fin-periods.html")
 
 

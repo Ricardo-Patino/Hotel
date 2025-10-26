@@ -991,6 +991,32 @@ INSERT INTO Coupon (Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, A
 VALUES ('ACME10','porcentaje',10,CURDATE(),DATE_ADD(CURDATE(),INTERVAL 30 DAY),100,1)
 ON DUPLICATE KEY UPDATE Valor=VALUES(Valor), Valido_Desde=VALUES(Valido_Desde), Valido_Hasta=VALUES(Valido_Hasta), Max_Usos=VALUES(Max_Usos), Activo=VALUES(Activo);
 
+-- HU 6 de FAC necesita esto
+
+-- 1) Aceptar también 'open' en el ENUM de status
+ALTER TABLE fin_period_lock
+  MODIFY COLUMN status ENUM('open','closed','reopened')
+  NOT NULL DEFAULT 'open';
+
+-- 2) Hacer period_start y period_end opcionales
+ALTER TABLE fin_period_lock
+  MODIFY COLUMN period_start DATE NULL,
+  MODIFY COLUMN period_end   DATE NULL;
+
+-- 3) Permitir que closed_at sea NULL para periodos aún abiertos
+ALTER TABLE fin_period_lock
+  MODIFY COLUMN closed_at DATETIME NULL;
+
+ALTER TABLE fin_period_lock
+  ADD COLUMN locked_by INT NULL AFTER status,
+  ADD COLUMN locked_at DATETIME NULL AFTER locked_by,
+  ADD COLUMN notes VARCHAR(255) NULL AFTER locked_at;
+
+ALTER TABLE fin_period_lock
+  CHANGE COLUMN note legacy_note VARCHAR(255) NULL;
+
+
+
 /* ------------------------------------------------------------------------- */
 /* Verificaciones rápidas                                                    */
 /* ------------------------------------------------------------------------- */

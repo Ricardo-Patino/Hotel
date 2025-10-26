@@ -158,15 +158,19 @@
     setTimeout(()=>{ try{div.remove();}catch{} }, 6000);
   }
 
+  // 🔁 LÓGICA AJUSTADA AQUÍ
+  // - Solo mostramos "Abierto" si el backend dice 'open' o 'reopened'.
+  // - TODO lo demás (closed, undefined, null, vacío, error) se muestra "Cerrado".
+  //   Esto evita que meses viejos/futuros parezcan abiertos por accidente.
   function badgeFor(status){
-    switch((status||'').toLowerCase()){
-      case 'closed': return '<span class="badge bg-danger">Cerrado</span>';
-      case 'open':
-      default: return '<span class="badge bg-success">Abierto</span>';
+    const st = (status || '').toLowerCase().trim();
+    if (st === 'open' || st === 'reopened') {
+      return '<span class="badge bg-success">Abierto</span>';
     }
+    return '<span class="badge bg-danger">Cerrado</span>';
   }
 
-  // Cargar lista inicial
+  // Cargar lista inicial (usa /fin/periods/list tal cual)
   async function loadList(){
     const tbody = document.getElementById('tblPeriods');
     tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Cargando…</td></tr>';
@@ -237,6 +241,7 @@
       alertBox('danger','No se pudo bloquear el periodo.');
     }
   }
+
   async function unlockPeriod(period, notes=null){
     try{
       const payload = {period, notes: notes || ''};
@@ -278,6 +283,7 @@
 </script>
 </body>
 </html>
+
 
 
 
