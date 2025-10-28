@@ -875,7 +875,9 @@ def create_app() -> Flask:
     from blueprints.pos import pos_bp
     app.register_blueprint(pos_bp)
 
-    
+    #Bluprint de HRM
+    from blueprints.hrm import hrm_bp
+    app.register_blueprint(hrm_bp)
 
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
