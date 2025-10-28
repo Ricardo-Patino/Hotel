@@ -1,10 +1,13 @@
 from datetime import datetime, date
-from flask import request, jsonify
+from flask import request, jsonify, render_template
 from extensions import db
 from . import hrm_bp
 from models import Funcionario, FuncionarioHistorial
 
 
+# -------------------------------------------------------------------
+# Funciones utilitarias para serialización
+# -------------------------------------------------------------------
 def _funcionario_to_dict(f: Funcionario):
     return {
         "Codigo_Funcionario": f.Codigo_Funcionario,
@@ -37,26 +40,25 @@ def _historial_to_dict(h: FuncionarioHistorial):
     }
 
 
-# ----------------------------------------
-# GET /hrm/empleados?estado=Activo|Inactivo|Suspendido|todos
-# ----------------------------------------
+# -------------------------------------------------------------------
+# API JSON
+# -------------------------------------------------------------------
+
+# Listar empleados
 @hrm_bp.route("/empleados", methods=["GET"])
 def listar_empleados():
     estado = request.args.get("estado", default="Activo")
-
     query = Funcionario.query
+
     if estado != "todos":
         query = query.filter(Funcionario.Estado_Empleado == estado)
 
     empleados = query.order_by(Funcionario.Nombre, Funcionario.Apellido).all()
     data = [_funcionario_to_dict(f) for f in empleados]
-
     return jsonify({"ok": True, "data": data})
 
 
-# ----------------------------------------
-# GET /hrm/empleados/<id>  (detalle + historial)
-# ----------------------------------------
+# Detalle + historial
 @hrm_bp.route("/empleados/<int:codigo_func>", methods=["GET"])
 def detalle_empleado(codigo_func):
     f = Funcionario.query.get(codigo_func)
@@ -77,18 +79,12 @@ def detalle_empleado(codigo_func):
     })
 
 
-# ----------------------------------------
-# POST /hrm/empleados
-# Crea un colaborador nuevo y registra evento "Ingreso"
-# ----------------------------------------
+# Crear empleado
 @hrm_bp.route("/empleados", methods=["POST"])
 def crear_empleado():
     payload = request.get_json(silent=True) or {}
 
-    # Si no mandan Fecha_Ingreso, usamos hoy
-    fecha_ingreso = payload.get("Fecha_Ingreso")
-    if not fecha_ingreso:
-        fecha_ingreso = date.today().isoformat()
+    fecha_ingreso = payload.get("Fecha_Ingreso") or date.today().isoformat()
 
     nuevo = Funcionario(
         Cedula               = payload.get("Cedula"),
@@ -108,61 +104,47 @@ def crear_empleado():
     )
 
     db.session.add(nuevo)
-    db.session.flush()  # para obtener Codigo_Funcionario antes del commit
+    db.session.flush()  # obtiene Código antes del commit
 
-    historial_ingreso = FuncionarioHistorial(
+    # Registro histórico
+    hist = FuncionarioHistorial(
         Codigo_Funcionario = nuevo.Codigo_Funcionario,
         Fecha_Evento       = datetime.utcnow(),
         Tipo_Evento        = "Ingreso",
         Detalle            = "Ingreso al hotel",
         Valor_Anterior     = None,
         Valor_Nuevo        = f"Salario inicial {payload.get('Salario_Base_Mensual', 0.00)}",
-        Registrado_Por     = payload.get("Registrado_Por")  # opcional: Código_Usuario del que creó
+        Registrado_Por     = payload.get("Registrado_Por")
     )
-    db.session.add(historial_ingreso)
-
+    db.session.add(hist)
     db.session.commit()
 
     return jsonify({"ok": True, "empleado": _funcionario_to_dict(nuevo)}), 201
 
 
-# ----------------------------------------
-# PUT /hrm/empleados/<id>
-# Actualiza datos. Si cambia Puesto o Salario → se guarda en historial
-# ----------------------------------------
+# Actualizar empleado
 @hrm_bp.route("/empleados/<int:codigo_func>", methods=["PUT"])
 def actualizar_empleado(codigo_func):
     payload = request.get_json(silent=True) or {}
-
     f = Funcionario.query.get(codigo_func)
     if not f:
         return jsonify({"ok": False, "error": "Empleado no encontrado"}), 404
 
-    cambios_historial = []
+    cambios = []
 
-    # Cambio de Puesto
+    # Cambio de puesto
     nuevo_puesto = payload.get("Puesto", f.Puesto)
     if nuevo_puesto != f.Puesto:
-        cambios_historial.append({
-            "Tipo_Evento": "Cambio Puesto",
-            "Detalle": "Actualización de puesto",
-            "Valor_Anterior": f.Puesto,
-            "Valor_Nuevo": nuevo_puesto
-        })
+        cambios.append(("Cambio Puesto", "Actualización de puesto", f.Puesto, nuevo_puesto))
         f.Puesto = nuevo_puesto
 
-    # Cambio de Salario
+    # Cambio de salario
     nuevo_salario = payload.get("Salario_Base_Mensual", f.Salario_Base_Mensual)
     if str(nuevo_salario) != str(f.Salario_Base_Mensual):
-        cambios_historial.append({
-            "Tipo_Evento": "Cambio Salario",
-            "Detalle": "Ajuste salarial",
-            "Valor_Anterior": str(f.Salario_Base_Mensual),
-            "Valor_Nuevo": str(nuevo_salario)
-        })
+        cambios.append(("Cambio Salario", "Ajuste salarial", str(f.Salario_Base_Mensual), str(nuevo_salario)))
         f.Salario_Base_Mensual = nuevo_salario
 
-    # Otros campos normales
+    # Campos generales
     f.Cedula           = payload.get("Cedula", f.Cedula)
     f.Nombre           = payload.get("Nombre", f.Nombre)
     f.Apellido         = payload.get("Apellido", f.Apellido)
@@ -173,37 +155,30 @@ def actualizar_empleado(codigo_func):
     f.Tipo_Contrato    = payload.get("Tipo_Contrato", f.Tipo_Contrato)
     f.Cuenta_Bancaria  = payload.get("Cuenta_Bancaria", f.Cuenta_Bancaria)
     f.Banco            = payload.get("Banco", f.Banco)
-
     f.Fecha_modificacion = datetime.utcnow()
     f.Fecha_mod_alta     = datetime.utcnow()
 
     db.session.flush()
 
-    # Guardar las entradas de historial generadas
-    for cambio in cambios_historial:
+    for tipo, detalle, val_ant, val_nuevo in cambios:
         db.session.add(FuncionarioHistorial(
             Codigo_Funcionario = f.Codigo_Funcionario,
             Fecha_Evento       = datetime.utcnow(),
-            Tipo_Evento        = cambio["Tipo_Evento"],
-            Detalle            = cambio["Detalle"],
-            Valor_Anterior     = cambio["Valor_Anterior"],
-            Valor_Nuevo        = cambio["Valor_Nuevo"],
+            Tipo_Evento        = tipo,
+            Detalle            = detalle,
+            Valor_Anterior     = val_ant,
+            Valor_Nuevo        = val_nuevo,
             Registrado_Por     = payload.get("Registrado_Por")
         ))
 
     db.session.commit()
-
     return jsonify({"ok": True, "empleado": _funcionario_to_dict(f)})
 
 
-# ----------------------------------------
-# DELETE /hrm/empleados/<id>
-# No borra el registro. Lo marca Inactivo + guarda evento "Salida".
-# ----------------------------------------
+# Eliminar / desactivar
 @hrm_bp.route("/empleados/<int:codigo_func>", methods=["DELETE"])
 def desactivar_empleado(codigo_func):
     payload = request.get_json(silent=True) or {}
-
     f = Funcionario.query.get(codigo_func)
     if not f:
         return jsonify({"ok": False, "error": "Empleado no encontrado"}), 404
@@ -215,7 +190,7 @@ def desactivar_empleado(codigo_func):
 
         db.session.flush()
 
-        salida = FuncionarioHistorial(
+        hist = FuncionarioHistorial(
             Codigo_Funcionario = f.Codigo_Funcionario,
             Fecha_Evento       = datetime.utcnow(),
             Tipo_Evento        = "Salida",
@@ -224,12 +199,26 @@ def desactivar_empleado(codigo_func):
             Valor_Nuevo        = "Estado Inactivo",
             Registrado_Por     = payload.get("Registrado_Por")
         )
-        db.session.add(salida)
+        db.session.add(hist)
 
     db.session.commit()
-
     return jsonify({"ok": True, "empleado": _funcionario_to_dict(f)})
 
+
+# -------------------------------------------------------------------
+# Interfaz HTML
+# -------------------------------------------------------------------
+@hrm_bp.route("/empleados-ui", methods=["GET"])
+def empleados_ui():
+    estado = request.args.get("estado", default="Activo")
+
+    query = Funcionario.query
+    if estado != "todos":
+        query = query.filter(Funcionario.Estado_Empleado == estado)
+
+    empleados = query.order_by(Funcionario.Nombre, Funcionario.Apellido).all()
+
+    return render_template("hrm/empleados.html", empleados=empleados, estado=estado)
 
 
 

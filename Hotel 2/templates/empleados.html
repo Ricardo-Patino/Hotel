@@ -1,0 +1,141 @@
+{% extends 'partials/base.html' %}
+{% block content %}
+
+<div class="container" style="max-width:1200px; margin:0 auto; padding:1rem 1.5rem;">
+    
+    <h2 style="font-size:1.4rem; font-weight:600; margin-bottom:0.5rem;">
+        Colaboradores {{ estado|lower }}
+    </h2>
+
+    <p style="color:#666; font-size:0.9rem; margin-bottom:1.5rem;">
+        Lista de funcionarios registrados en el sistema. Aquí se muestra nombre, puesto, salario base y estado laboral.
+    </p>
+
+    <!-- Barra de acciones -->
+    <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:.75rem;">
+        <div style="font-size:.9rem; color:#444;">
+            Total: {{ empleados|length }} colaboradores
+        </div>
+
+        <div style="display:flex; gap:.5rem;">
+            <!-- Nuevo colaborador -->
+            <button
+                style="background:#ff7a00; color:#fff; border:none; border-radius:6px; padding:.5rem .75rem; font-size:.9rem; cursor:pointer; font-weight:600;"
+                onclick="alert('Formulario para agregar colaborador (próxima HU)')"
+            >
+                + Nuevo colaborador
+            </button>
+
+            <!-- Filtros -->
+            <button onclick="window.location.href='/hrm/empleados-ui?estado=Activo'"
+                style="background:{{ 'orange' if estado=='Activo' else '#f0f0f0' }};
+                       color:{{ 'white' if estado=='Activo' else '#333' }};
+                       border:1px solid #ccc; border-radius:6px; padding:.5rem .75rem; font-size:.9rem; cursor:pointer;">
+                Activos
+            </button>
+
+            <button onclick="window.location.href='/hrm/empleados-ui?estado=Inactivo'"
+                style="background:{{ 'orange' if estado=='Inactivo' else '#f0f0f0' }};
+                       color:{{ 'white' if estado=='Inactivo' else '#333' }};
+                       border:1px solid #ccc; border-radius:6px; padding:.5rem .75rem; font-size:.9rem; cursor:pointer;">
+                Inactivos
+            </button>
+
+            <button onclick="window.location.href='/hrm/empleados-ui?estado=todos'"
+                style="background:{{ 'orange' if estado=='todos' else '#f0f0f0' }};
+                       color:{{ 'white' if estado=='todos' else '#333' }};
+                       border:1px solid #ccc; border-radius:6px; padding:.5rem .75rem; font-size:.9rem; cursor:pointer;">
+                Todos
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div style="background:#fff; border:1px solid #ddd; border-radius:8px; overflow-x:auto; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+        <table style="width:100%; border-collapse:collapse; min-width:800px; font-size:0.9rem;">
+            <thead style="background:#fafafa;">
+                <tr>
+                    <th style="text-align:left; padding:.75rem; border-bottom:1px solid #ddd;">Código</th>
+                    <th style="text-align:left; padding:.75rem; border-bottom:1px solid #ddd;">Nombre</th>
+                    <th style="text-align:left; padding:.75rem; border-bottom:1px solid #ddd;">Puesto</th>
+                    <th style="text-align:left; padding:.75rem; border-bottom:1px solid #ddd;">Departamento</th>
+                    <th style="text-align:right; padding:.75rem; border-bottom:1px solid #ddd;">Salario base</th>
+                    <th style="text-align:left; padding:.75rem; border-bottom:1px solid #ddd;">Estado</th>
+                    <th style="text-align:center; padding:.75rem; border-bottom:1px solid #ddd; width:120px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if empleados|length == 0 %}
+                <tr>
+                    <td colspan="7" style="padding:1rem; text-align:center; color:#777;">
+                        No hay colaboradores registrados con este filtro.
+                    </td>
+                </tr>
+                {% else %}
+                {% for e in empleados %}
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:.75rem; color:#444;">{{ e.Codigo_Funcionario }}</td>
+                    <td style="padding:.75rem; font-weight:500;">{{ e.Nombre }} {{ e.Apellido }}
+                        <div style="font-size:.75rem; color:#888;">Céd: {{ e.Cedula }}</div>
+                    </td>
+                    <td style="padding:.75rem;">{{ e.Puesto }}</td>
+                    <td style="padding:.75rem;">{{ e.Departamento or '—' }}</td>
+                    <td style="padding:.75rem; text-align:right;">₡{{ e.Salario_Base_Mensual }}</td>
+                    <td style="padding:.75rem;">
+                        {% if e.Estado_Empleado == 'Activo' %}
+                            <span style="background:#d9f5d9; color:#117a11; border-radius:4px; padding:.2rem .4rem; font-size:.75rem; font-weight:600;">Activo</span>
+                        {% elif e.Estado_Empleado == 'Suspendido' %}
+                            <span style="background:#fff3cd; color:#856404; border-radius:4px; padding:.2rem .4rem; font-size:.75rem; font-weight:600;">Suspendido</span>
+                        {% else %}
+                            <span style="background:#f5d9d9; color:#7a1111; border-radius:4px; padding:.2rem .4rem; font-size:.75rem; font-weight:600;">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:.75rem; text-align:center;">
+                        <button style="background:#fff; color:#333; border:1px solid #bbb; border-radius:6px; padding:.4rem .6rem; font-size:.8rem; cursor:pointer; margin-right:.25rem;"
+                                onclick="window.location.href='/hrm/empleados/{{ e.Codigo_Funcionario }}'">
+                            Ver
+                        </button>
+
+                        {% if e.Estado_Empleado == 'Activo' %}
+                        <button style="background:#fff; color:#c00000; border:1px solid #c00000; border-radius:6px; padding:.4rem .6rem; font-size:.8rem; cursor:pointer;"
+                                onclick="desactivarEmpleado({{ e.Codigo_Funcionario }})">
+                            Baja
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    function desactivarEmpleado(idFunc) {
+        if (!confirm("¿Marcar este colaborador como Inactivo?")) return;
+
+        fetch(`/hrm/empleados/${idFunc}`, {
+            method: "DELETE",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({Registrado_Por: 1})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                alert("Colaborador marcado como inactivo.");
+                location.reload();
+            } else {
+                alert("Error: " + (data.error || "No se pudo actualizar"));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error de red");
+        });
+    }
+    </script>
+
+</div>
+
+{% endblock %}
+
