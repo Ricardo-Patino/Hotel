@@ -458,8 +458,15 @@ class InvCategoria(db.Model):
         server_onupdate=func.current_timestamp()
     )
 
+    # Relación inversa (ruta calificada para evitar colisiones en el registry)
+    insumos = db.relationship(
+        "models_sql.InvInsumo",
+        back_populates="categoria"
+    )
+
     def __repr__(self) -> str:
         return f"<InvCategoria {self.Id} {self.Nombre}>"
+
 
 
 class InvInsumo(db.Model):
@@ -489,15 +496,16 @@ class InvInsumo(db.Model):
         server_onupdate=func.current_timestamp()
     )
 
+    # Relación correcta (sin db.back_populates, y con ruta calificada)
     categoria = db.relationship(
-        "InvCategoria",
-        backref=db.backref("insumos", lazy=True),
+        "models_sql.InvCategoria",
+        back_populates="insumos",
         foreign_keys=[Categoria_Id],
+        lazy="joined"
     )
 
     @property
     def bajo_minimo(self) -> bool:
-        """Devuelve True si el stock actual está por debajo del mínimo."""
         actual = self.Stock_Actual or Decimal("0")
         minimo = self.Stock_Minimo or Decimal("0")
         return actual < minimo
@@ -507,6 +515,7 @@ class InvInsumo(db.Model):
             f"<InvInsumo {self.Id} {self.Nombre} - "
             f"Stock: {self.Stock_Actual} {self.Unidad}>"
         )
+
 
 
 # ---------------------------

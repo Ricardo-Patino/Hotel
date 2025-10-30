@@ -1,3 +1,4 @@
+from __future__ import annotations
 # app.py — Aplicación principal Flask para Hotel_VillaGrace
 # Ejecuta:  python "Hotel 2/app.py"
 
@@ -55,7 +56,10 @@ except Exception:
 from services.grr.assignment import auto_assign_for_reserva, reassign_reserva, split_reserva, merge_reserva  # noqa
 from config import Config
 from extensions import db, migrate
-from models_sql import Usuario, Rol, Habitacion
+
+from models.hrm import Funcionario, FuncionarioHistorial
+import models_sql
+
 
 try:
     from models_sql import Reserva as ReservaModel  # si existiera
@@ -98,6 +102,13 @@ ROOM_TOTAL_INCLUDES_TAX = os.getenv("ROOM_TOTAL_INCLUDES_TAX", "1") in ("1", "tr
 # Helpers (roles/redirects)
 # =========================
 DEFAULT_ROLES = ("Administrador", "Recepcionista", "Limpieza", "Cliente")
+
+# === Exponer modelos usados en el resto del archivo ===
+# (mantén también "import models_sql" como lo dejaste)
+Usuario = models_sql.Usuario
+Rol = models_sql.Rol
+Habitacion = models_sql.Habitacion  # OJO: sin tilde
+
 
 
 def _ensure_seed_roles() -> None:

@@ -25,7 +25,7 @@ class Config:
 
    
     DB_USER_RAW = os.environ.get("DB_USER", "root")
-    DB_PASSWORD_RAW = os.environ.get("DB_PASSWORD", "1234")
+    DB_PASSWORD_RAW = os.environ.get("DB_PASSWORD", "TempP@ssw0rd_2025")
     DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
     DB_PORT = os.environ.get("DB_PORT", "3306")
     DB_NAME = os.environ.get("DB_NAME", "Hotel_VillaGrace")
