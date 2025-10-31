@@ -32,14 +32,12 @@ def _funcionario_to_dict(f: Funcionario):
 
 def _registrado_por():
     # Ajusta a como guardes al usuario en sesión
-    # p.ej. session["Codigo_Usuario"] o session["user_id"]
     return session.get("Codigo_Usuario") or session.get("user_id")
 
 
 # -------------------------------------------------------------------
 # API JSON
 # -------------------------------------------------------------------
-
 @hrm_bp.route("/empleados", methods=["GET"])
 def listar_empleados():
     estado = request.args.get("estado", default="Activo")
@@ -200,7 +198,7 @@ def desactivar_empleado(codigo_func):
     return jsonify({"ok": True, "empleado": _funcionario_to_dict(f)})
 
 
-# ---------- NUEVO: actualizar perfil (salario, puesto y departamento) ----------
+# ---------- Actualizar perfil (salario, puesto y departamento) ----------
 @hrm_bp.route("/empleados/<int:codigo_func>/perfil", methods=["PATCH"])
 def actualizar_perfil(codigo_func):
     payload = request.get_json(silent=True) or {}
@@ -250,12 +248,13 @@ def actualizar_perfil(codigo_func):
 
 
 # -------------------------------------------------------------------
-# Interfaz HTML
+# Interfaz HTML: Listado
 # -------------------------------------------------------------------
 @hrm_bp.route("/empleados-ui", methods=["GET"])
 def empleados_ui():
     estado = request.args.get("estado", default="Activo")
 
+    # Conteos para chips
     conteos = dict(
         db.session.query(Funcionario.Estado_Empleado, func.count(Funcionario.Codigo_Funcionario))
         .group_by(Funcionario.Estado_Empleado)
@@ -276,5 +275,29 @@ def empleados_ui():
         conteos=conteos,
         total=total,
     )
+
+
+# -------------------------------------------------------------------
+# Interfaz HTML: Detalle formal
+# -------------------------------------------------------------------
+@hrm_bp.route("/empleados/detalle/<int:codigo_func>", methods=["GET"])
+def ver_empleado_detalle(codigo_func):
+    f = Funcionario.query.get(codigo_func)
+    if not f:
+        return render_template("404.html", mensaje="Colaborador no encontrado"), 404
+
+    historial = (
+        FuncionarioHistorial.query
+        .filter_by(Codigo_Funcionario=codigo_func)
+        .order_by(FuncionarioHistorial.Fecha_Evento.desc())
+        .all()
+    )
+
+    return render_template(
+        "empleado_detalle.html",
+        empleado=f,
+        historial=historial
+    )
+
 
 

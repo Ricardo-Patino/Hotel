@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle de {{ empleado.Nombre }} {{ empleado.Apellido }} | Hotel Villa Grace</title>
+
+  <!-- Favicon, fuentes y vendor -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet>
+
+  <style>
+    body{background:#f9fafb}
+    .btn-theme{background:#1c4b3c;color:#fff;border-color:#1c4b3c}
+    .btn-theme:hover{filter:brightness(1.05)}
+    .btn-outline-theme{color:#1c4b3c;border-color:#1c4b3c}
+    .btn-outline-theme:hover{background:#1c4b3c;color:#fff}
+    .badge-activo{background:#d7f0e7;color:#1c4b3c;font-weight:600;padding:.3rem .6rem;border-radius:.4rem}
+    .badge-inactivo{background:#f7d9d9;color:#7a1111;font-weight:600;padding:.3rem .6rem;border-radius:.4rem}
+    .info-label{font-weight:500;color:#555}
+    .kv{display:grid;grid-template-columns:180px 1fr;gap:.35rem 1rem}
+    @media(max-width:576px){.kv{grid-template-columns:1fr}}
+    .avatar-wrap{position:relative;width:96px;height:96px}
+    .avatar-wrap img{width:96px;height:96px;object-fit:cover;border-radius:50%;border:1px solid #e5e7eb}
+    .avatar-btn{position:absolute;right:-6px;bottom:-6px}
+  </style>
+</head>
+<body>
+
+<!-- Header igual a empleados -->
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="/" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="/">Inicio</a></li>
+        <li><a href="/grr">Reservas</a></li>
+        <li class="dropdown"><a href="#"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+          <ul>
+            <li><a href="/fin">Tablero</a></li>
+            <li><a href="/fin/cobros">Cobros y folios</a></li>
+            <li><a href="/fin/facturas">Facturas</a></li>
+          </ul>
+        </li>
+        <li><a href="/hrm/empleados-ui" class="active">Colaboradores</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="/grr">Reservar</a>
+  </div>
+</header>
+
+<!-- Banner con la MISMA “page-title” del listado -->
+<div class="page-title dark-background" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Detalle del colaborador</h1>
+    <p>Visualice y modifique la información del personal del hotel.</p>
+    <nav class="breadcrumbs"><ol>
+      <li><a href="/">Inicio</a></li>
+      <li><a href="/hrm/empleados-ui">Colaboradores</a></li>
+      <li class="current">{{ empleado.Nombre }} {{ empleado.Apellido }}</li>
+    </ol></nav>
+  </div>
+</div>
+
+<main class="main">
+  <section class="section">
+    <div class="container" data-aos="fade-up">
+
+      <!-- Acciones -->
+      <div class="d-flex justify-content-end mb-3 gap-2">
+        <a href="/hrm/empleados-ui" class="btn btn-outline-theme"><i class="bi bi-arrow-left"></i> Volver</a>
+        <button class="btn btn-theme" onclick="openEdit()"><i class="bi bi-pencil-square"></i> Editar datos</button>
+        {% if empleado.Estado_Empleado == 'Activo' %}
+        <button class="btn btn-outline-danger" onclick="desactivarEmpleado({{ empleado.Codigo_Funcionario }})"><i class="bi bi-person-x"></i> Baja</button>
+        {% endif %}
+      </div>
+
+      <!-- Perfil -->
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+          <div class="avatar-wrap">
+            <img id="avatarImg" src="{{ avatar_url }}" alt="Avatar">
+            <button class="btn btn-sm btn-theme avatar-btn" title="Cambiar foto" onclick="openFoto()">
+              <i class="bi bi-camera"></i>
+            </button>
+          </div>
+          <div>
+            <h4 class="mb-1">{{ empleado.Nombre }} {{ empleado.Apellido }}</h4>
+            <p class="text-muted mb-1">
+              {{ empleado.Puesto or '—' }}{% if empleado.Departamento %} · {{ empleado.Departamento }}{% endif %}
+            </p>
+            {% if empleado.Estado_Empleado == 'Activo' %}
+              <span class="badge-activo">Activo</span>
+            {% else %}
+              <span class="badge-inactivo">Inactivo</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Datos -->
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header">Información personal</div>
+            <div class="card-body kv">
+              <div class="info-label">Código</div><div>{{ empleado.Codigo_Funcionario }}</div>
+              <div class="info-label">Cédula</div><div>{{ empleado.Cedula or '—' }}</div>
+              <div class="info-label">Fecha de nacimiento</div><div>{{ empleado.Fecha_Nacimiento.strftime('%d/%m/%Y') if empleado.Fecha_Nacimiento else '—' }}</div>
+              <div class="info-label">Banco</div><div>{{ empleado.Banco or '—' }}</div>
+              <div class="info-label">Cuenta bancaria</div><div>{{ empleado.Cuenta_Bancaria or '—' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-header">Información laboral</div>
+            <div class="card-body kv">
+              <div class="info-label">Puesto</div><div>{{ empleado.Puesto or '—' }}</div>
+              <div class="info-label">Departamento</div><div>{{ empleado.Departamento or '—' }}</div>
+              <div class="info-label">Tipo de contrato</div><div>{{ empleado.Tipo_Contrato or '—' }}</div>
+              <div class="info-label">Salario base</div><div>₡{{ empleado.Salario_Base_Mensual }}</div>
+              <div class="info-label">Fecha de ingreso</div><div>{{ empleado.Fecha_Ingreso.strftime('%d/%m/%Y') if empleado.Fecha_Ingreso else '—' }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historial -->
+      <div class="card shadow-sm border-0 mt-4">
+        <div class="card-header">Historial de cambios</div>
+        <div class="card-body">
+          {% if historial|length == 0 %}
+            <p class="text-muted mb-0"><i class="bi bi-info-circle"></i> Sin movimientos registrados.</p>
+          {% else %}
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Antes</th><th>Después</th></tr>
+              </thead>
+              <tbody>
+                {% for h in historial %}
+                <tr>
+                  <td>{{ h.Fecha_Evento.strftime('%d/%m/%Y %H:%M') if h.Fecha_Evento else '—' }}</td>
+                  <td>{{ h.Tipo_Evento }}</td>
+                  <td>{{ h.Detalle }}</td>
+                  <td>{{ h.Valor_Anterior or '—' }}</td>
+                  <td>{{ h.Valor_Nuevo or '—' }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<!-- Footer igual -->
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<!-- MODAL: Editar datos -->
+<div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar datos de {{ empleado.Nombre }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formEdit" class="row g-3">
+          <div class="col-md-4"><label class="form-label">Cédula</label><input name="Cedula" class="form-control" value="{{ empleado.Cedula or '' }}"></div>
+          <div class="col-md-4"><label class="form-label">Nombre</label><input name="Nombre" class="form-control" value="{{ empleado.Nombre }}"></div>
+          <div class="col-md-4"><label class="form-label">Apellido</label><input name="Apellido" class="form-control" value="{{ empleado.Apellido }}"></div>
+          <div class="col-md-4"><label class="form-label">Puesto</label><input name="Puesto" class="form-control" value="{{ empleado.Puesto or '' }}"></div>
+          <div class="col-md-4"><label class="form-label">Departamento</label><input name="Departamento" class="form-control" value="{{ empleado.Departamento or '' }}"></div>
+          <div class="col-md-4"><label class="form-label">Tipo de contrato</label>
+            <select name="Tipo_Contrato" class="form-select">
+              {% set tipo = empleado.Tipo_Contrato or '' %}
+              <option {% if tipo=='Tiempo completo' %}selected{% endif %}>Tiempo completo</option>
+              <option {% if tipo=='Medio tiempo' %}selected{% endif %}>Medio tiempo</option>
+              <option {% if tipo=='Temporal' %}selected{% endif %}>Temporal</option>
+              <option {% if tipo=='Práctica' %}selected{% endif %}>Práctica</option>
+            </select>
+          </div>
+          <div class="col-md-4"><label class="form-label">Fecha de nacimiento</label>
+            <input type="date" name="Fecha_Nacimiento" class="form-control" value="{{ empleado.Fecha_Nacimiento.strftime('%Y-%m-%d') if empleado.Fecha_Nacimiento else '' }}">
+          </div>
+          <div class="col-md-4"><label class="form-label">Fecha de ingreso</label>
+            <input type="date" name="Fecha_Ingreso" class="form-control" value="{{ empleado.Fecha_Ingreso.strftime('%Y-%m-%d') if empleado.Fecha_Ingreso else '' }}">
+          </div>
+          <div class="col-md-4"><label class="form-label">Salario base (₡)</label>
+            <input name="Salario_Base_Mensual" class="form-control" value="{{ empleado.Salario_Base_Mensual }}">
+          </div>
+          <div class="col-md-6"><label class="form-label">Banco</label><input name="Banco" class="form-control" value="{{ empleado.Banco or '' }}"></div>
+          <div class="col-md-6"><label class="form-label">Cuenta bancaria</label><input name="Cuenta_Bancaria" class="form-control" value="{{ empleado.Cuenta_Bancaria or '' }}"></div>
+          <div class="col-md-6"><label class="form-label">Estado</label>
+            <select name="Estado_Empleado" class="form-select">
+              {% set est = empleado.Estado_Empleado or 'Activo' %}
+              <option value="Activo" {% if est=='Activo' %}selected{% endif %}>Activo</option>
+              <option value="Inactivo" {% if est=='Inactivo' %}selected{% endif %}>Inactivo</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-theme" onclick="guardarEdit()">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Cambiar foto -->
+<div class="modal fade" id="modalFoto" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-camera"></i> Cambiar foto</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="formFoto" class="d-grid gap-3">
+          <input type="file" name="foto" accept=".jpg,.jpeg,.png,.webp" class="form-control" onchange="previewFoto(event)">
+          <div class="text-center">
+            <img id="previewImg" src="{{ avatar_url }}" alt="preview" style="max-width:180px;border-radius:50%;border:1px solid #e5e7eb">
+          </div>
+        </form>
+        <div class="small text-muted mt-2">Formatos permitidos: JPG, PNG o WEBP.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-theme" onclick="guardarFoto()">Guardar foto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script>
+const EMP_ID = {{ empleado.Codigo_Funcionario }};
+
+function openEdit(){ new bootstrap.Modal(document.getElementById('modalEdit')).show(); }
+function openFoto(){ new bootstrap.Modal(document.getElementById('modalFoto')).show(); }
+
+function previewFoto(ev){
+  const f = ev.target.files?.[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById('previewImg').src = e.target.result; };
+  reader.readAsDataURL(f);
+}
+
+async function guardarEdit(){
+  const form = document.getElementById('formEdit');
+  const data = Object.fromEntries(new FormData(form).entries());
+  data.Registrado_Por = 1;
+  try{
+    const r = await fetch(`/hrm/empleados/${EMP_ID}`,{
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+    });
+    const j = await r.json();
+    if(r.ok && j.ok){
+      bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
+      location.reload();
+    }else{ alert('No se pudo actualizar: ' + (j.error || 'Error')); }
+  }catch(e){ console.error(e); alert('Error de red'); }
+}
+
+async function desactivarEmpleado(id){
+  if(!confirm('¿Marcar este colaborador como Inactivo?')) return;
+  try{
+    const r = await fetch(`/hrm/empleados/${id}`,{
+      method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({Registrado_Por:1})
+    });
+    const j = await r.json();
+    if(r.ok && j.ok){ window.location.href='/hrm/empleados-ui?estado=Inactivo'; }
+    else{ alert('Error: ' + (j.error || 'No se pudo actualizar')); }
+  }catch(e){ console.error(e); alert('Error de red'); }
+}
+
+async function guardarFoto(){
+  const formEl = document.getElementById('formFoto');
+  const fd = new FormData(formEl);
+  if(!fd.get('foto')){ alert('Seleccioná una imagen.'); return; }
+
+  try{
+    const r = await fetch(`/hrm/empleados/${EMP_ID}/foto`, { method:'POST', body: fd });
+    const j = await r.json();
+    if(r.ok && j.ok){
+      document.getElementById('avatarImg').src = j.url + '?t=' + Date.now();
+      bootstrap.Modal.getInstance(document.getElementById('modalFoto')).hide();
+    }else{
+      alert('No se pudo subir la foto: ' + (j.error || 'Error'));
+    }
+  }catch(e){ console.error(e); alert('Error de red'); }
+}
+</script>
+</body>
+</html>
+
+
+
+
