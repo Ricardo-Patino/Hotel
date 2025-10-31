@@ -22,6 +22,7 @@ from sqlalchemy import func
 from extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from decimal import Decimal
+from models.hrm import Funcionario as FuncionarioHRM
 
 
 class ReservaEstancia(db.Model):
@@ -257,7 +258,7 @@ class Reserva(db.Model):
     # Esta relación sigue válida porque Funcionario ahora vive en models/hrm.py,
     # pero comparte el mismo __tablename__ = "Funcionario".
     # SQLAlchemy la resuelve igual mientras exista UNA sola clase Funcionario activa.
-    Funcionario = db.relationship("Funcionario", lazy="joined")
+    Funcionario = db.relationship(FuncionarioHRM, lazy='joined')
 
 
 # ---------------------------
