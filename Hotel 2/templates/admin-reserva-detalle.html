@@ -1,93 +1,222 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Back-office – Reservas | Hotel Villa Grace</title>
-  <meta name="description" content="Listado, búsqueda y acciones de reservas.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-</head>
-<body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li class="dropdown"><a href="#"><span>Back-office</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Back-office – Reservas | Hotel Villa Grace</title>
+    <meta
+      name="description"
+      content="Listado, búsqueda y acciones de reservas."
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
+      rel="apple-touch-icon"
+    />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/style.css') }}"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="privacy-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div
+        class="container position-relative d-flex align-items-center justify-content-between"
+      >
+        <a
+          href="index.html"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+          ><h1 class="sitename">Hotel Villa Grace</h1></a
+        >
+        <nav id="navmenu" class="navmenu">
           <ul>
-            <li><a href="admin-reservas-dashboard.html">Dashboard</a></li>
-            <li><a href="admin-reservas-list.html" class="active">Reservas</a></li>
-            <li><a href="admin-calendario.html">Calendario</a></li>
+            <li class="dropdown">
+              <a href="#"
+                ><span>Back-office</span>
+                <i class="bi bi-chevron-down toggle-dropdown"></i
+              ></a>
+              <ul>
+                <li><a href="admin-reservas-dashboard.html">Dashboard</a></li>
+                <li>
+                  <a href="admin-reservas-list.html" class="active">Reservas</a>
+                </li>
+                <li class="nav-item">
+                  <a
+                    class="nav-link"
+                    href="{{ url_for('evt.calendario_evt') }}"
+                  >
+                    <i class="bi bi-calendar3"></i> Eventos</a
+                  >
+                </li>
+                <li><a href="admin-calendario.html">Calendario</a></li>
+              </ul>
+            </li>
           </ul>
-        </li>
-      </ul><i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="booking-search.html">Crear nueva</a>
-  </div>
-</header>
+          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+        </nav>
+        <a class="btn-getstarted d-none d-sm-block" href="booking-search.html"
+          >Crear nueva</a
+        >
+      </div>
+    </header>
 
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Reservas</h1>
-      <p>Busca, filtra y gestiona reservas.</p>
-    </div>
-  </div>
-
-  <section class="section pt-3">
-    <div class="container" data-aos="fade-up">
-
-      <div class="row g-3 align-items-end mb-3">
-        <div class="col-md-3"><label class="form-label">Código / Huésped</label><input class="form-control" placeholder="VG-2025-104, Juan..."></div>
-        <div class="col-md-3"><label class="form-label">Rango de fechas</label><input class="form-control" placeholder="12–15 Oct 2025"></div>
-        <div class="col-md-2"><label class="form-label">Estado</label>
-          <select class="form-select"><option>Todas</option><option>Confirmada</option><option>Cancelada</option><option>No show</option><option>Completada</option></select>
-        </div>
-        <div class="col-md-4 d-grid d-md-flex gap-2">
-          <button class="btn btn-primary"><i class="bi bi-search me-1"></i>Buscar</button>
-          <a class="btn btn-outline" href="#"><i class="bi bi-download me-1"></i>Exportar</a>
+    <main class="main">
+      <div
+        class="page-title dark-background"
+        data-aos="fade"
+        style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
+      >
+        <div class="container position-relative">
+          <h1>Reservas</h1>
+          <p>Busca, filtra y gestiona reservas.</p>
         </div>
       </div>
 
-      <div class="card shadow-sm border-0">
-        <div class="table-responsive">
-          <table class="table align-middle mb-0">
-            <thead><tr><th>Código</th><th>Huésped</th><th>Fechas</th><th>Hab.</th><th>Total</th><th>Estado</th><th></th></tr></thead>
-            <tbody>
-              <tr>
-                <td>VG-2025-104</td><td>María González</td><td>12–15 Oct</td><td>Suite Junior</td><td>$950.82</td>
-                <td><span class="badge bg-success">Confirmada</span></td>
-                <td class="text-end">
-                  <a class="btn btn-outline btn-sm" href="admin-reserva-detalle.html"><i class="bi bi-eye"></i></a>
-                  <a class="btn btn-outline btn-sm" href="portal-facturas.html"><i class="bi bi-receipt"></i></a>
-                </td>
-              </tr>
-              <tr>
-                <td>VG-2024-872</td><td>Carlos Rojas</td><td>04–06 Ago</td><td>Deluxe</td><td>$520.00</td>
-                <td><span class="badge bg-secondary">Completada</span></td>
-                <td class="text-end"><a class="btn btn-outline btn-sm" href="admin-reserva-detalle.html"><i class="bi bi-eye"></i></a></td>
-              </tr>
-            </tbody>
-          </table>
+      <section class="section pt-3">
+        <div class="container" data-aos="fade-up">
+          <div class="row g-3 align-items-end mb-3">
+            <div class="col-md-3">
+              <label class="form-label">Código / Huésped</label
+              ><input class="form-control" placeholder="VG-2025-104, Juan..." />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Rango de fechas</label
+              ><input class="form-control" placeholder="12–15 Oct 2025" />
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Estado</label>
+              <select class="form-select">
+                <option>Todas</option>
+                <option>Confirmada</option>
+                <option>Cancelada</option>
+                <option>No show</option>
+                <option>Completada</option>
+              </select>
+            </div>
+            <div class="col-md-4 d-grid d-md-flex gap-2">
+              <button class="btn btn-primary">
+                <i class="bi bi-search me-1"></i>Buscar
+              </button>
+              <a class="btn btn-outline" href="#"
+                ><i class="bi bi-download me-1"></i>Exportar</a
+              >
+            </div>
+          </div>
+
+          <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Huésped</th>
+                    <th>Fechas</th>
+                    <th>Hab.</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>VG-2025-104</td>
+                    <td>María González</td>
+                    <td>12–15 Oct</td>
+                    <td>Suite Junior</td>
+                    <td>$950.82</td>
+                    <td><span class="badge bg-success">Confirmada</span></td>
+                    <td class="text-end">
+                      <a
+                        class="btn btn-outline btn-sm"
+                        href="admin-reserva-detalle.html"
+                        ><i class="bi bi-eye"></i
+                      ></a>
+                      <a
+                        class="btn btn-outline btn-sm"
+                        href="portal-facturas.html"
+                        ><i class="bi bi-receipt"></i
+                      ></a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>VG-2024-872</td>
+                    <td>Carlos Rojas</td>
+                    <td>04–06 Ago</td>
+                    <td>Deluxe</td>
+                    <td>$520.00</td>
+                    <td><span class="badge bg-secondary">Completada</span></td>
+                    <td class="text-end">
+                      <a
+                        class="btn btn-outline btn-sm"
+                        href="admin-reserva-detalle.html"
+                        ><i class="bi bi-eye"></i
+                      ></a>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div
+              class="card-body border-top d-flex justify-content-between align-items-center"
+            >
+              <small class="text-muted">2 resultados</small>
+              <nav>
+                <ul class="pagination pagination-sm mb-0">
+                  <li class="page-item disabled">
+                    <span class="page-link">«</span>
+                  </li>
+                  <li class="page-item active">
+                    <span class="page-link">1</span>
+                  </li>
+                  <li class="page-item"><a class="page-link" href="#">2</a></li>
+                  <li class="page-item"><a class="page-link" href="#">»</a></li>
+                </ul>
+              </nav>
+            </div>
+          </div>
         </div>
-        <div class="card-body border-top d-flex justify-content-between align-items-center">
-          <small class="text-muted">2 resultados</small>
-          <nav><ul class="pagination pagination-sm mb-0"><li class="page-item disabled"><span class="page-link">«</span></li><li class="page-item active"><span class="page-link">1</span></li><li class="page-item"><a class="page-link" href="#">2</a></li><li class="page-item"><a class="page-link" href="#">»</a></li></ul></nav>
+      </section>
+    </main>
+
+    <footer id="footer" class="footer position-relative dark-background">
+      <div class="copyright text-center">
+        <div class="container">
+          ©
+          <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong>
         </div>
       </div>
+    </footer>
 
-    </div>
-  </section>
-</main>
-
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong></div></div>
-</footer>
-
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script><script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script><script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
+    <a
+      href="#"
+      id="scroll-top"
+      class="scroll-top d-flex align-items-center justify-content-center"
+      ><i class="bi bi-arrow-up-short"></i
+    ></a>
+    <div id="preloader"></div>
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  </body>
 </html>

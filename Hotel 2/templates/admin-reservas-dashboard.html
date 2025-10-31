@@ -1,87 +1,175 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Back-office – Dashboard | Hotel Villa Grace</title>
-  <meta name="description" content="Panel interno de reservas, ocupación y KPIs.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-</head>
-<body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li class="dropdown"><a href="#"><span>Back-office</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Back-office – Dashboard | Hotel Villa Grace</title>
+    <meta
+      name="description"
+      content="Panel interno de reservas, ocupación y KPIs."
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
+      rel="apple-touch-icon"
+    />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/style.css') }}"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="privacy-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div
+        class="container position-relative d-flex align-items-center justify-content-between"
+      >
+        <a
+          href="index.html"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+          ><h1 class="sitename">Hotel Villa Grace</h1></a
+        >
+        <nav id="navmenu" class="navmenu">
           <ul>
-            <li><a href="admin-reservas-dashboard.html" class="active">Dashboard</a></li>
-            <li><a href="admin-reservas-list.html">Reservas</a></li>
-            <li><a href="admin-calendario.html">Calendario</a></li>
+            <li class="dropdown">
+              <a href="#"
+                ><span>Back-office</span>
+                <i class="bi bi-chevron-down toggle-dropdown"></i
+              ></a>
+              <ul>
+                <li>
+                  <a href="admin-reservas-dashboard.html" class="active"
+                    >Dashboard</a
+                  >
+                </li>
+                <li><a href="admin-reservas-list.html">Reservas</a></li>
+                <li><a href="admin-calendario.html">Calendario</a></li>
+                <li class="nav-item">
+                  <a
+                    class="nav-link"
+                    href="{{ url_for('evt.calendario_evt') }}"
+                  >
+                    <i class="bi bi-calendar3"></i> Eventos</a
+                  >
+                </li>
+              </ul>
+            </li>
           </ul>
-        </li>
-      </ul><i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="portal-dashboard.html">Portal Huésped</a>
-  </div>
-</header>
+          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+        </nav>
+        <a class="btn-getstarted d-none d-sm-block" href="portal-dashboard.html"
+          >Portal Huésped</a
+        >
+      </div>
+    </header>
 
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Back-office · Reservas</h1>
-      <p>Visión general de ocupación y actividad.</p>
-    </div>
-  </div>
-
-  <section class="section pt-3">
-    <div class="container" data-aos="fade-up">
-      <div class="row g-4">
-        <div class="col-md-4">
-          <div class="card shadow-sm border-0"><div class="card-body">
-            <h6 class="text-muted mb-1">Ocupación hoy</h6>
-            <div class="display-6">82%</div>
-            <small class="text-muted">24 / 29 habitaciones</small>
-          </div></div>
-        </div>
-        <div class="col-md-4">
-          <div class="card shadow-sm border-0"><div class="card-body">
-            <h6 class="text-muted mb-1">Check-ins</h6>
-            <div class="display-6">12</div>
-            <small class="text-muted">3 early / 2 late</small>
-          </div></div>
-        </div>
-        <div class="col-md-4">
-          <div class="card shadow-sm border-0"><div class="card-body">
-            <h6 class="text-muted mb-1">Check-outs</h6>
-            <div class="display-6">9</div>
-            <small class="text-muted">4 late</small>
-          </div></div>
+    <main class="main">
+      <div
+        class="page-title dark-background"
+        data-aos="fade"
+        style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
+      >
+        <div class="container position-relative">
+          <h1>Back-office · Reservas</h1>
+          <p>Visión general de ocupación y actividad.</p>
         </div>
       </div>
 
-      <div class="card shadow-sm border-0 mt-4">
-        <div class="card-body">
-          <h5 class="card-title">Actividad reciente</h5>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item px-0 d-flex justify-content-between"><span>Reserva VG-2025-104 confirmada</span><small class="text-muted">hace 2 h</small></li>
-            <li class="list-group-item px-0 d-flex justify-content-between"><span>Cancelación VG-2025-098 (NR)</span><small class="text-muted">hace 5 h</small></li>
-            <li class="list-group-item px-0 d-flex justify-content-between"><span>Pago recibido INV-24110</span><small class="text-muted">ayer</small></li>
-          </ul>
+      <section class="section pt-3">
+        <div class="container" data-aos="fade-up">
+          <div class="row g-4">
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0">
+                <div class="card-body">
+                  <h6 class="text-muted mb-1">Ocupación hoy</h6>
+                  <div class="display-6">82%</div>
+                  <small class="text-muted">24 / 29 habitaciones</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0">
+                <div class="card-body">
+                  <h6 class="text-muted mb-1">Check-ins</h6>
+                  <div class="display-6">12</div>
+                  <small class="text-muted">3 early / 2 late</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0">
+                <div class="card-body">
+                  <h6 class="text-muted mb-1">Check-outs</h6>
+                  <div class="display-6">9</div>
+                  <small class="text-muted">4 late</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card shadow-sm border-0 mt-4">
+            <div class="card-body">
+              <h5 class="card-title">Actividad reciente</h5>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item px-0 d-flex justify-content-between">
+                  <span>Reserva VG-2025-104 confirmada</span
+                  ><small class="text-muted">hace 2 h</small>
+                </li>
+                <li class="list-group-item px-0 d-flex justify-content-between">
+                  <span>Cancelación VG-2025-098 (NR)</span
+                  ><small class="text-muted">hace 5 h</small>
+                </li>
+                <li class="list-group-item px-0 d-flex justify-content-between">
+                  <span>Pago recibido INV-24110</span
+                  ><small class="text-muted">ayer</small>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="footer" class="footer position-relative dark-background">
+      <div class="copyright text-center">
+        <div class="container">
+          ©
+          <strong
+            ><span> Vista Administrativa - Hotel Villa Grace</span></strong
+          >
         </div>
       </div>
-    </div>
-  </section>
-</main>
+    </footer>
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span> Vista Administrativa - Hotel Villa Grace</span></strong></div></div>
-</footer>
-
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script><script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script><script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
+    <a
+      href="#"
+      id="scroll-top"
+      class="scroll-top d-flex align-items-center justify-content-center"
+      ><i class="bi bi-arrow-up-short"></i
+    ></a>
+    <div id="preloader"></div>
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  </body>
 </html>

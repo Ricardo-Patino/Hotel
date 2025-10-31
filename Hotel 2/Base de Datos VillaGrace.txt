@@ -75,6 +75,21 @@ DROP TABLE IF EXISTS KPI_Stats;
 DROP TABLE IF EXISTS Audit_Log;
 DROP TABLE IF EXISTS Auditoria_Log;
 
+ET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS EvtWorkOrder;
+DROP TABLE IF EXISTS EvtNotificacion;
+DROP TABLE IF EXISTS EvtEncuesta;
+DROP TABLE IF EXISTS EvtCosto;
+DROP TABLE IF EXISTS EvtPresupuesto;
+DROP TABLE IF EXISTS EvtWaitlist;
+DROP TABLE IF EXISTS EvtAsistente;
+DROP TABLE IF EXISTS EvtEventoRecurso;
+DROP TABLE IF EXISTS EvtEvento;
+DROP TABLE IF EXISTS EvtPlantilla;
+DROP TABLE IF EXISTS EvtRecurso;
+DROP TABLE IF EXISTS EvtSalon;
+SET FOREIGN_KEY_CHECKS = 1;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 /* ------------------------------------------------------------------------- */
@@ -839,6 +854,372 @@ CREATE TABLE IF NOT EXISTS MantenimientoNotificacion (
   KEY IX_MantenimientoNotificacion_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+
+
+-- HU 6 de FAC necesita esto
+
+-- 1) Aceptar también 'open' en el ENUM de status
+ALTER TABLE fin_period_lock
+  MODIFY COLUMN status ENUM('open','closed','reopened')
+  NOT NULL DEFAULT 'open';
+
+-- 2) Hacer period_start y period_end opcionales
+ALTER TABLE fin_period_lock
+  MODIFY COLUMN period_start DATE NULL,
+  MODIFY COLUMN period_end   DATE NULL;
+
+-- 3) Permitir que closed_at sea NULL para periodos aún abiertos
+ALTER TABLE fin_period_lock
+  MODIFY COLUMN closed_at DATETIME NULL;
+
+ALTER TABLE fin_period_lock
+  ADD COLUMN locked_by INT NULL AFTER status,
+  ADD COLUMN locked_at DATETIME NULL AFTER locked_by,
+  ADD COLUMN notes VARCHAR(255) NULL AFTER locked_at;
+
+ALTER TABLE fin_period_lock
+  CHANGE COLUMN note legacy_note VARCHAR(255) NULL;
+
+/* ===============================================================
+   HU 2 de FAC — Integración POS-Caja-Reserva-Contabilidad
+   Ajustado al esquema Hotel VillaGrace (tabla Reserva)
+   =============================================================== */
+
+/* 1️⃣ fin_cash_movement → agregar vínculos */
+ALTER TABLE fin_cash_movement
+  ADD COLUMN reserva_id INT NULL AFTER estado,
+  ADD COLUMN ledger_entry_id INT NULL AFTER reserva_id,
+  ADD INDEX idx_fin_cash_movement_reserva (reserva_id),
+  ADD INDEX idx_fin_cash_movement_ledger (ledger_entry_id);
+
+/* 2️⃣ fin_payment → crear o asegurar columnas */
+CREATE TABLE IF NOT EXISTS fin_payment (
+    id_payment        INT AUTO_INCREMENT PRIMARY KEY,
+    reserva_id        INT NOT NULL,
+    metodo            VARCHAR(50) NOT NULL,
+    monto             DECIMAL(12,2) NOT NULL,
+    referencia        VARCHAR(100) NULL,
+    created_at        DATETIME NOT NULL DEFAULT NOW(),
+    created_by        INT NOT NULL,
+    source            VARCHAR(50) NOT NULL DEFAULT 'Caja',
+    cash_session_id   INT NULL,
+    cash_movement_id  INT NULL,
+    notes             VARCHAR(255) NULL,
+    INDEX idx_fin_payment_reserva (reserva_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* 3️⃣ Reserva → agregar columnas para totales y pagos */
+ALTER TABLE Reserva
+  ADD COLUMN Monto_Total_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total,
+  ADD COLUMN Monto_Pagado_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total_Acumulado,
+  ADD INDEX idx_reserva_balance (Monto_Total_Acumulado, Monto_Pagado_Acumulado);
+
+/* 4️⃣ Libro contable (fin_ledger) */
+CREATE TABLE IF NOT EXISTS fin_ledger (
+    id_entry        INT AUTO_INCREMENT PRIMARY KEY,
+    fecha           DATETIME NOT NULL DEFAULT NOW(),
+    reserva_id      INT NULL,
+    cash_session_id INT NULL,
+    descripcion     VARCHAR(255) NOT NULL,
+    account_debit   VARCHAR(50) NOT NULL,
+    account_credit  VARCHAR(50) NOT NULL,
+    monto           DECIMAL(12,2) NOT NULL,
+    created_by      INT NOT NULL,
+    INDEX idx_fin_ledger_reserva (reserva_id),
+    INDEX idx_fin_ledger_cash (cash_session_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* ===============================================================
+   HU 1 de HRM — Empleados y expediente
+   =============================================================== */
+
+/* ============================================================
+   HRM-08-001 — Extensión de tabla Funcionario
+   Agrega campos laborales, bancarios y de control de estado
+   ============================================================ */
+
+ALTER TABLE Funcionario
+  ADD COLUMN Departamento         VARCHAR(80) NULL AFTER Puesto,
+  ADD COLUMN Fecha_Ingreso        DATE NOT NULL DEFAULT (CURDATE()) AFTER Fecha_Nacimiento,
+  ADD COLUMN Salario_Base_Mensual DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Fecha_Ingreso,
+  ADD COLUMN Estado_Empleado      ENUM('Activo','Inactivo','Suspendido') NOT NULL DEFAULT 'Activo' AFTER Salario_Base_Mensual,
+  ADD COLUMN Tipo_Contrato        ENUM('Tiempo completo','Medio tiempo','Servicios profesionales','Temporal') NOT NULL DEFAULT 'Tiempo completo' AFTER Estado_Empleado,
+  ADD COLUMN Cuenta_Bancaria      VARCHAR(60) NULL AFTER Tipo_Contrato,
+  ADD COLUMN Banco                VARCHAR(60) NULL AFTER Cuenta_Bancaria,
+  ADD COLUMN Fecha_mod_alta       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER Fecha_modificacion;
+
+-- Índices útiles para búsquedas
+ALTER TABLE Funcionario
+  ADD INDEX IX_Funcionario_Departamento (Departamento),
+  ADD INDEX IX_Funcionario_Estado (Estado_Empleado),
+  ADD INDEX IX_Funcionario_FechaIngreso (Fecha_Ingreso);
+
+CREATE TABLE FuncionarioHistorial (
+  Id_Historial        INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario  INT NOT NULL,
+  Fecha_Evento        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Tipo_Evento         ENUM(
+      'Ingreso',
+      'Cambio Puesto',
+      'Cambio Salario',
+      'Amonestacion',
+      'Reconocimiento',
+      'Vacaciones',
+      'Incapacidad',
+      'Salida'
+  ) NOT NULL,
+  Detalle             VARCHAR(500) NULL,
+  Valor_Anterior      VARCHAR(200) NULL,
+  Valor_Nuevo         VARCHAR(200) NULL,
+  Registrado_Por      INT NULL,              -- Codigo_Usuario que hizo el cambio
+  CONSTRAINT PK_FuncionarioHistorial PRIMARY KEY (Id_Historial),
+  CONSTRAINT FK_FuncHist_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  KEY IX_FuncHist_Funcionario (Codigo_Funcionario),
+  KEY IX_FuncHist_Tipo (Tipo_Evento),
+  KEY IX_FuncHist_Fecha (Fecha_Evento)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* --------------------------
+   Gestión de Eventos y Actividades (EVT)
+   -------------------------- */
+  /* --------------------------
+   Catálogo de salones
+   -------------------------- */
+CREATE TABLE EvtSalon (
+  Id            INT NOT NULL AUTO_INCREMENT,
+  Nombre        VARCHAR(120) NOT NULL,
+  Capacidad     INT NOT NULL DEFAULT 10,
+  Ubicacion     VARCHAR(120) NULL,
+  Activo        TINYINT(1) NOT NULL DEFAULT 1,
+  ColorHex      VARCHAR(7) NOT NULL DEFAULT '#8a6cff',
+  Fecha_Creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_EvtSalon PRIMARY KEY (Id),
+  CONSTRAINT UQ_EvtSalon_Nombre UNIQUE (Nombre),
+  KEY IX_EvtSalon_Activo (Activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Catálogo de recursos A/V y mobiliario
+   -------------------------- */
+CREATE TABLE EvtRecurso (
+  Id            INT NOT NULL AUTO_INCREMENT,
+  Nombre        VARCHAR(120) NOT NULL,
+  Tipo          ENUM('AV','MOBILIARIO','CONSUMIBLE','OTRO') NOT NULL DEFAULT 'AV',
+  InvInsumo_Id  INT NULL,
+  Activo        TINYINT(1) NOT NULL DEFAULT 1,
+  Fecha_Creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_EvtRecurso PRIMARY KEY (Id),
+  CONSTRAINT UQ_EvtRecurso_Nombre UNIQUE (Nombre),
+  KEY IX_EvtRecurso_Tipo (Tipo),
+  KEY IX_EvtRecurso_Activo (Activo),
+  CONSTRAINT FK_EvtRecurso_Insumo
+    FOREIGN KEY (InvInsumo_Id) REFERENCES InvInsumo(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Plantillas de eventos
+   -------------------------- */
+CREATE TABLE EvtPlantilla (
+  Id           INT NOT NULL AUTO_INCREMENT,
+  Nombre       VARCHAR(120) NOT NULL,
+  Descripcion  VARCHAR(255) NULL,
+  Duracion_Min INT NOT NULL DEFAULT 60,
+  Fecha_Creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_EvtPlantilla PRIMARY KEY (Id),
+  CONSTRAINT UQ_EvtPlantilla_Nombre UNIQUE (Nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Evento principal
+   -------------------------- */
+CREATE TABLE EvtEvento (
+  Id                  INT NOT NULL AUTO_INCREMENT,
+  Titulo              VARCHAR(200) NOT NULL,
+  Estado              ENUM('BORRADOR','CONFIRMADO','CANCELADO') NOT NULL DEFAULT 'BORRADOR',
+  Inicio              DATETIME NOT NULL,
+  Fin                 DATETIME NOT NULL,
+  TZ                  VARCHAR(64) NOT NULL DEFAULT 'America/Costa_Rica',
+  Organizador         VARCHAR(120) NULL,
+  Notas               TEXT NULL,
+  Salon_Id            INT NULL,
+  ReservaEstancia_Id  INT NULL,   -- vínculo con estancia del huésped
+  Plantilla_Id        INT NULL,
+  Fecha_Creacion      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_EvtEvento PRIMARY KEY (Id),
+  KEY IX_EvtEvento_Rango (Inicio, Fin),
+  KEY IX_EvtEvento_Estado (Estado),
+  KEY IX_EvtEvento_Salon (Salon_Id),
+  KEY IX_EvtEvento_Estancia (ReservaEstancia_Id),
+  CONSTRAINT FK_EvtEvento_Salon
+    FOREIGN KEY (Salon_Id) REFERENCES EvtSalon(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_EvtEvento_Plantilla
+    FOREIGN KEY (Plantilla_Id) REFERENCES EvtPlantilla(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_EvtEvento_Estancia
+    FOREIGN KEY (ReservaEstancia_Id) REFERENCES ReservaEstancia(Id_Estancia)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Recursos por evento (cantidades)
+   -------------------------- */
+CREATE TABLE EvtEventoRecurso (
+  Id         INT NOT NULL AUTO_INCREMENT,
+  Evento_Id  INT NOT NULL,
+  Recurso_Id INT NOT NULL,
+  Cantidad   INT NOT NULL DEFAULT 1,
+  CONSTRAINT PK_EvtEventoRecurso PRIMARY KEY (Id),
+  CONSTRAINT UQ_EvtEventoRecurso UNIQUE (Evento_Id, Recurso_Id),
+  KEY IX_EvtEvRec_Evento (Evento_Id),
+  KEY IX_EvtEvRec_Recurso (Recurso_Id),
+  CONSTRAINT FK_EvtEvRec_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_EvtEvRec_Recurso
+    FOREIGN KEY (Recurso_Id) REFERENCES EvtRecurso(Id)
+    ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Asistentes y lista de espera del evento
+   -------------------------- */
+CREATE TABLE EvtAsistente (
+  Id          INT NOT NULL AUTO_INCREMENT,
+  Evento_Id   INT NOT NULL,
+  Nombre      VARCHAR(120) NOT NULL,
+  Email       VARCHAR(180) NULL,
+  Estado      ENUM('REGISTRADO','CHECKIN','CANCELADO') NOT NULL DEFAULT 'REGISTRADO',
+  CheckIn_At  DATETIME NULL,
+  CONSTRAINT PK_EvtAsistente PRIMARY KEY (Id),
+  CONSTRAINT UQ_EvtAsistente UNIQUE (Evento_Id, Email),
+  KEY IX_EvtAsistente_Evento (Evento_Id),
+  KEY IX_EvtAsistente_Estado (Estado),
+  CONSTRAINT FK_EvtAsistente_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE EvtWaitlist (
+  Id         INT NOT NULL AUTO_INCREMENT,
+  Evento_Id  INT NOT NULL,
+  Nombre     VARCHAR(120) NOT NULL,
+  Email      VARCHAR(180) NULL,
+  Estado     ENUM('EN_ESPERA','INVITADO','DESCARTADO') NOT NULL DEFAULT 'EN_ESPERA',
+  CONSTRAINT PK_EvtWaitlist PRIMARY KEY (Id),
+  KEY IX_EvtWaitlist_Evento (Evento_Id),
+  KEY IX_EvtWaitlist_Estado (Estado),
+  CONSTRAINT FK_EvtWaitlist_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Presupuesto y costos reales
+   -------------------------- */
+CREATE TABLE EvtPresupuesto (
+  Id         INT NOT NULL AUTO_INCREMENT,
+  Evento_Id  INT NOT NULL,
+  Concepto   VARCHAR(200) NOT NULL,
+  Monto      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  CONSTRAINT PK_EvtPresupuesto PRIMARY KEY (Id),
+  CONSTRAINT UQ_EvtPresupuesto UNIQUE (Evento_Id, Concepto),
+  KEY IX_EvtPres_Evento (Evento_Id),
+  CONSTRAINT FK_EvtPres_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE EvtCosto (
+  Id         INT NOT NULL AUTO_INCREMENT,
+  Evento_Id  INT NOT NULL,
+  Concepto   VARCHAR(200) NOT NULL,
+  Monto      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  CONSTRAINT PK_EvtCosto PRIMARY KEY (Id),
+  KEY IX_EvtCosto_Evento (Evento_Id),
+  CONSTRAINT FK_EvtCosto_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Encuesta post-evento (NPS)
+   -------------------------- */
+CREATE TABLE EvtEncuesta (
+  Id         INT NOT NULL AUTO_INCREMENT,
+  Evento_Id  INT NOT NULL,
+  NPS        INT NULL,              -- 0..10
+  Comentario TEXT NULL,
+  Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_EvtEncuesta PRIMARY KEY (Id),
+  KEY IX_EvtEncuesta_Evento (Evento_Id),
+  CONSTRAINT FK_EvtEncuesta_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Notificaciones programadas
+   -------------------------- */
+CREATE TABLE EvtNotificacion (
+  Id            INT NOT NULL AUTO_INCREMENT,
+  Evento_Id     INT NOT NULL,
+  Tipo          ENUM('7D','24H','2H','CONFIRMACION','UPGRADE') NOT NULL,
+  Enviado       TINYINT(1) NOT NULL DEFAULT 0,
+  Destinatario  VARCHAR(180) NULL,
+  Payload       JSON NULL,
+  Programado_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_EvtNotificacion PRIMARY KEY (Id),
+  KEY IX_EvtNotif_Evento (Evento_Id),
+  KEY IX_EvtNotif_Enviado (Enviado),
+  CONSTRAINT FK_EvtNotif_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* --------------------------
+   Órdenes de trabajo por confirmación
+   -------------------------- */
+CREATE TABLE EvtWorkOrder (
+  Id        INT NOT NULL AUTO_INCREMENT,
+  Evento_Id INT NOT NULL,
+  Area      ENUM('HOUSEKEEPING','MANTENIMIENTO','COCINA') NOT NULL,
+  Tarea     VARCHAR(240) NOT NULL,
+  Prioridad ENUM('BAJA','MEDIA','ALTA','URGENTE') NOT NULL DEFAULT 'MEDIA',
+  Fecha     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Estado    ENUM('PENDIENTE','EN_PROCESO','COMPLETADA','CANCELADA') NOT NULL DEFAULT 'PENDIENTE',
+  CONSTRAINT PK_EvtWorkOrder PRIMARY KEY (Id),
+  KEY IX_EvtWO_Evento (Evento_Id),
+  KEY IX_EvtWO_Area (Area),
+  KEY IX_EvtWO_Estado (Estado),
+  CONSTRAINT FK_EvtWO_Evento
+    FOREIGN KEY (Evento_Id) REFERENCES EvtEvento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+/* --------------------------------------------------------------Notas:----------------------------------------------*/
+/* 1) EvtSalon.Nombre, EvtRecurso.Nombre y EvtPlantilla.Nombre deben ser UNIQUE para que ON DUPLICATE funcione.---- */
+/* 2) Si deseas vincular EvtRecurso con inventario (InvInsumo_Id), reemplaza NULL por el Id correcto, por ejemplo:--*/
+/*    -UPDATE EvtRecurso SET InvInsumo_Id = (SELECT Id FROM InvInsumo WHERE Nombre='Cloro piscina' LIMIT 1)-------- */
+/*    -WHERE Nombre='Consola Audio 8ch' AND InvInsumo_Id IS NULL;-------------------------------------------------- */
+/* 3) El evento demo queda en BORRADOR para que pruebes moverlo en el calendario y luego CONFIRMAR desde la UI.----*/
+/* ----------------------------------------------------------------------------------------------------------------*/
+
+
+
+
+
 /* ------------------------------------------------------------------------- */
 /* Seeds                                                                     */
 /* ------------------------------------------------------------------------- */
@@ -992,130 +1373,91 @@ INSERT INTO Coupon (Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, A
 VALUES ('ACME10','porcentaje',10,CURDATE(),DATE_ADD(CURDATE(),INTERVAL 30 DAY),100,1)
 ON DUPLICATE KEY UPDATE Valor=VALUES(Valor), Valido_Desde=VALUES(Valido_Desde), Valido_Hasta=VALUES(Valido_Hasta), Max_Usos=VALUES(Max_Usos), Activo=VALUES(Activo);
 
--- HU 6 de FAC necesita esto
 
--- 1) Aceptar también 'open' en el ENUM de status
-ALTER TABLE fin_period_lock
-  MODIFY COLUMN status ENUM('open','closed','reopened')
-  NOT NULL DEFAULT 'open';
 
--- 2) Hacer period_start y period_end opcionales
-ALTER TABLE fin_period_lock
-  MODIFY COLUMN period_start DATE NULL,
-  MODIFY COLUMN period_end   DATE NULL;
+-- ==========================================
+-- Seeds de EVT – Gestión de Eventos y Actividades 
+-- ==========================================
 
--- 3) Permitir que closed_at sea NULL para periodos aún abiertos
-ALTER TABLE fin_period_lock
-  MODIFY COLUMN closed_at DATETIME NULL;
+-- Salones
+INSERT INTO EvtSalon (Nombre, Capacidad, Ubicacion, Activo, ColorHex) VALUES
+ ('Salón Pacífico',  80, 'Edificio Principal', 1, '#6f42c1'),
+ ('Salón Montezuma', 40, 'Edificio Principal', 1, '#0d6efd'),
+ ('Terraza Mal País',30, 'Área Externa',       1, '#20c997')
+ON DUPLICATE KEY UPDATE
+  Capacidad = VALUES(Capacidad),
+  Ubicacion = VALUES(Ubicacion),
+  Activo    = VALUES(Activo),
+  ColorHex  = VALUES(ColorHex);
 
-ALTER TABLE fin_period_lock
-  ADD COLUMN locked_by INT NULL AFTER status,
-  ADD COLUMN locked_at DATETIME NULL AFTER locked_by,
-  ADD COLUMN notes VARCHAR(255) NULL AFTER locked_at;
+-- Recursos A/V y mobiliario
+INSERT INTO EvtRecurso (Nombre, Tipo, InvInsumo_Id, Activo) VALUES
+ ('Proyector Epson',      'AV',         NULL, 1),
+ ('Consola Audio 8ch',    'AV',         NULL, 1),
+ ('Sillas plegables',     'MOBILIARIO', NULL, 1),
+ ('Mesas rectangulares',  'MOBILIARIO', NULL, 1)
+ON DUPLICATE KEY UPDATE
+  Tipo         = VALUES(Tipo),
+  InvInsumo_Id = VALUES(InvInsumo_Id),
+  Activo       = VALUES(Activo);
 
-ALTER TABLE fin_period_lock
-  CHANGE COLUMN note legacy_note VARCHAR(255) NULL;
+-- Plantillas típicas
+INSERT INTO EvtPlantilla (Nombre, Descripcion, Duracion_Min) VALUES
+ ('Boda',        'Ceremonia + recepción básica',        240),
+ ('Congreso',    'Ponencias, paneles y coffee break',   480),
+ ('Coffee Break','Receso con bebidas y bocadillos',      30)
+ON DUPLICATE KEY UPDATE
+  Descripcion  = VALUES(Descripcion),
+  Duracion_Min = VALUES(Duracion_Min);
 
-/* ===============================================================
-   HU 2 de FAC — Integración POS-Caja-Reserva-Contabilidad
-   Ajustado al esquema Hotel VillaGrace (tabla Reserva)
-   =============================================================== */
+-- Evento de demostración (solo si no existe en la fecha actual)
+INSERT INTO EvtEvento (Titulo, Estado, Inicio, Fin, TZ, Organizador, Notas, Salon_Id)
+SELECT
+  'Demo: Visita de inspección',
+  'BORRADOR',
+  CONCAT(CURDATE(), ' 15:00:00'),
+  CONCAT(CURDATE(), ' 16:00:00'),
+  'America/Costa_Rica',
+  'organizador@hotelvgrace.cr',
+  'Evento de prueba para validar calendario y drag-drop.',
+  (SELECT Id FROM EvtSalon WHERE Nombre='Salón Pacífico' LIMIT 1)
+WHERE NOT EXISTS (
+  SELECT 1 FROM EvtEvento
+  WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE()
+);
 
-/* 1️⃣ fin_cash_movement → agregar vínculos */
-ALTER TABLE fin_cash_movement
-  ADD COLUMN reserva_id INT NULL AFTER estado,
-  ADD COLUMN ledger_entry_id INT NULL AFTER reserva_id,
-  ADD INDEX idx_fin_cash_movement_reserva (reserva_id),
-  ADD INDEX idx_fin_cash_movement_ledger (ledger_entry_id);
+-- Recursos del evento de demostración (se agregan solo si no existen)
+INSERT INTO EvtEventoRecurso (Evento_Id, Recurso_Id, Cantidad)
+SELECT
+  (SELECT Id FROM EvtEvento WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE() LIMIT 1),
+  (SELECT Id FROM EvtRecurso WHERE Nombre='Proyector Epson' LIMIT 1),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM EvtEventoRecurso
+  WHERE Evento_Id = (SELECT Id FROM EvtEvento WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE() LIMIT 1)
+    AND Recurso_Id = (SELECT Id FROM EvtRecurso WHERE Nombre='Proyector Epson' LIMIT 1)
+);
 
-/* 2️⃣ fin_payment → crear o asegurar columnas */
-CREATE TABLE IF NOT EXISTS fin_payment (
-    id_payment        INT AUTO_INCREMENT PRIMARY KEY,
-    reserva_id        INT NOT NULL,
-    metodo            VARCHAR(50) NOT NULL,
-    monto             DECIMAL(12,2) NOT NULL,
-    referencia        VARCHAR(100) NULL,
-    created_at        DATETIME NOT NULL DEFAULT NOW(),
-    created_by        INT NOT NULL,
-    source            VARCHAR(50) NOT NULL DEFAULT 'Caja',
-    cash_session_id   INT NULL,
-    cash_movement_id  INT NULL,
-    notes             VARCHAR(255) NULL,
-    INDEX idx_fin_payment_reserva (reserva_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+INSERT INTO EvtEventoRecurso (Evento_Id, Recurso_Id, Cantidad)
+SELECT
+  (SELECT Id FROM EvtEvento WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE() LIMIT 1),
+  (SELECT Id FROM EvtRecurso WHERE Nombre='Sillas plegables' LIMIT 1),
+  20
+WHERE NOT EXISTS (
+  SELECT 1 FROM EvtEventoRecurso
+  WHERE Evento_Id = (SELECT Id FROM EvtEvento WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE() LIMIT 1)
+    AND Recurso_Id = (SELECT Id FROM EvtRecurso WHERE Nombre='Sillas plegables' LIMIT 1)
+);
 
-/* 3️⃣ Reserva → agregar columnas para totales y pagos */
-ALTER TABLE Reserva
-  ADD COLUMN Monto_Total_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total,
-  ADD COLUMN Monto_Pagado_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total_Acumulado,
-  ADD INDEX idx_reserva_balance (Monto_Total_Acumulado, Monto_Pagado_Acumulado);
-
-/* 4️⃣ Libro contable (fin_ledger) */
-CREATE TABLE IF NOT EXISTS fin_ledger (
-    id_entry        INT AUTO_INCREMENT PRIMARY KEY,
-    fecha           DATETIME NOT NULL DEFAULT NOW(),
-    reserva_id      INT NULL,
-    cash_session_id INT NULL,
-    descripcion     VARCHAR(255) NOT NULL,
-    account_debit   VARCHAR(50) NOT NULL,
-    account_credit  VARCHAR(50) NOT NULL,
-    monto           DECIMAL(12,2) NOT NULL,
-    created_by      INT NOT NULL,
-    INDEX idx_fin_ledger_reserva (reserva_id),
-    INDEX idx_fin_ledger_cash (cash_session_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* ===============================================================
-   HU 1 de HRM — Empleados y expediente
-   =============================================================== */
-
-/* ============================================================
-   HRM-08-001 — Extensión de tabla Funcionario
-   Agrega campos laborales, bancarios y de control de estado
-   ============================================================ */
-
-ALTER TABLE Funcionario
-  ADD COLUMN Departamento         VARCHAR(80) NULL AFTER Puesto,
-  ADD COLUMN Fecha_Ingreso        DATE NOT NULL DEFAULT (CURDATE()) AFTER Fecha_Nacimiento,
-  ADD COLUMN Salario_Base_Mensual DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Fecha_Ingreso,
-  ADD COLUMN Estado_Empleado      ENUM('Activo','Inactivo','Suspendido') NOT NULL DEFAULT 'Activo' AFTER Salario_Base_Mensual,
-  ADD COLUMN Tipo_Contrato        ENUM('Tiempo completo','Medio tiempo','Servicios profesionales','Temporal') NOT NULL DEFAULT 'Tiempo completo' AFTER Estado_Empleado,
-  ADD COLUMN Cuenta_Bancaria      VARCHAR(60) NULL AFTER Tipo_Contrato,
-  ADD COLUMN Banco                VARCHAR(60) NULL AFTER Cuenta_Bancaria,
-  ADD COLUMN Fecha_mod_alta       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER Fecha_modificacion;
-
--- Índices útiles para búsquedas
-ALTER TABLE Funcionario
-  ADD INDEX IX_Funcionario_Departamento (Departamento),
-  ADD INDEX IX_Funcionario_Estado (Estado_Empleado),
-  ADD INDEX IX_Funcionario_FechaIngreso (Fecha_Ingreso);
-
-CREATE TABLE FuncionarioHistorial (
-  Id_Historial        INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario  INT NOT NULL,
-  Fecha_Evento        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Tipo_Evento         ENUM(
-      'Ingreso',
-      'Cambio Puesto',
-      'Cambio Salario',
-      'Amonestacion',
-      'Reconocimiento',
-      'Vacaciones',
-      'Incapacidad',
-      'Salida'
-  ) NOT NULL,
-  Detalle             VARCHAR(500) NULL,
-  Valor_Anterior      VARCHAR(200) NULL,
-  Valor_Nuevo         VARCHAR(200) NULL,
-  Registrado_Por      INT NULL,              -- Codigo_Usuario que hizo el cambio
-  CONSTRAINT PK_FuncionarioHistorial PRIMARY KEY (Id_Historial),
-  CONSTRAINT FK_FuncHist_Func
-    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
-    ON UPDATE CASCADE ON DELETE CASCADE,
-  KEY IX_FuncHist_Funcionario (Codigo_Funcionario),
-  KEY IX_FuncHist_Tipo (Tipo_Evento),
-  KEY IX_FuncHist_Fecha (Fecha_Evento)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/* -------------------------------------------
+   Verificaciones EVT (opcional)
+   ------------------------------------------- */
+SELECT DATABASE() AS db_actual;
+SHOW TABLES LIKE 'Evt%';
+SELECT * FROM EvtSalon;
+SELECT e.Id, e.Titulo, e.Estado, e.Inicio, s.Nombre AS Salon
+FROM EvtEvento e LEFT JOIN EvtSalon s ON s.Id=e.Salon_Id
+ORDER BY e.Inicio DESC;
 
 
 /* ------------------------------------------------------------------------- */

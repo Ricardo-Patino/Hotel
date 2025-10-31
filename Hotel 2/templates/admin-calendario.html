@@ -1,128 +1,266 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Back-office – Calendario | Hotel Villa Grace</title>
-  <meta name="description" content="Calendario de ocupación por habitación.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.js"></script>
-  <style>
-    /* Placeholder simple para el calendario tipo Gantt */
-    .cal-row{display:flex;gap:.25rem;align-items:center}
-    .cal-cell{flex:1;border:1px solid rgba(0,0,0,.08);height:36px;border-radius:.4rem;position:relative;overflow:hidden;background:rgba(0,0,0,.02)}
-    .cal-book{position:absolute;inset:4px 30% 4px 4px;border-radius:.4rem}
-  </style>
-</head>
-<body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li class="dropdown"><a href="#"><span>Back-office</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Back-office – Calendario | Hotel Villa Grace</title>
+    <meta
+      name="description"
+      content="Calendario de ocupación por habitación."
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
+      rel="apple-touch-icon"
+    />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/style.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.js"></script>
+    <style>
+      /* Placeholder simple para el calendario tipo Gantt */
+      .cal-row {
+        display: flex;
+        gap: 0.25rem;
+        align-items: center;
+      }
+      .cal-cell {
+        flex: 1;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        height: 36px;
+        border-radius: 0.4rem;
+        position: relative;
+        overflow: hidden;
+        background: rgba(0, 0, 0, 0.02);
+      }
+      .cal-book {
+        position: absolute;
+        inset: 4px 30% 4px 4px;
+        border-radius: 0.4rem;
+      }
+    </style>
+  </head>
+  <body class="privacy-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div
+        class="container position-relative d-flex align-items-center justify-content-between"
+      >
+        <a
+          href="index.html"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+          ><h1 class="sitename">Hotel Villa Grace</h1></a
+        >
+        <nav id="navmenu" class="navmenu">
           <ul>
-            <li><a href="admin-reservas-list.html">Reservas</a></li>
-            <li><a href="admin-calendario.html" class="active">Calendario</a></li>
+            <li class="dropdown">
+              <a href="#"
+                ><span>Back-office</span>
+                <i class="bi bi-chevron-down toggle-dropdown"></i
+              ></a>
+              <ul>
+                <li><a href="admin-reservas-list.html">Reservas</a></li>
+                <li>
+                  <a href="admin-calendario.html" class="active">Calendario</a>
+                </li>
+                <li>
+                  <a href="evt-calendario.html" class="active"
+                    >Calendario Eventos</a
+                  >
+                </li>
+              </ul>
+            </li>
           </ul>
-        </li>
-      </ul><i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="booking-search.html">Nueva reserva</a>
-  </div>
-</header>
-
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Calendario de ocupación</h1>
-      <p>Vista semanal por habitación</p>
-    </div>
-  </div>
-
-  <section class="section pt-3">
-    <div class="container" data-aos="fade-up">
-      <div class="d-flex justify-content-between mb-2">
-        <div class="btn-group">
-          <a class="btn btn-outline btn-sm" href="#"><i class="bi bi-chevron-left"></i></a>
-          <span class="btn btn-outline btn-sm disabled">12–18 Oct 2025</span>
-          <a class="btn btn-outline btn-sm" href="#"><i class="bi bi-chevron-right"></i></a>
-        </div>
-        <div class="d-flex gap-2">
-          <span class="badge bg-success">Confirmada</span>
-          <span class="badge bg-warning text-dark">Pendiente</span>
-          <span class="badge bg-secondary">Bloqueo</span>
-        </div>
+          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+        </nav>
+        <a class="btn-getstarted d-none d-sm-block" href="booking-search.html"
+          >Nueva reserva</a
+        >
       </div>
-      <div id="calendar"></div>
-      <script>
-      document.addEventListener('DOMContentLoaded', async () => {
-        const params = new URLSearchParams(location.search);
-        const room_id = params.get('room_id') || '';
-        const calendarEl = document.getElementById('calendar');
-        const calendar = new FullCalendar.Calendar(calendarEl, {
-          initialView: 'dayGridMonth',
-          height: 'auto',
-          events: '/grr/api/rooms/calendar' + (room_id ? ('?room_id='+room_id) : '')
-        });
-        calendar.render();
-      });
-      </script>
+    </header>
 
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <!-- Cabecera de días -->
-          <div class="d-flex mb-2 ms-5 gap-1 text-muted small">
-            <span class="flex-shrink-0" style="width:140px;">Habitación</span>
-            <div class="d-flex flex-grow-1 w-100 gap-1">
-              <div class="text-center flex-fill">Dom</div><div class="text-center flex-fill">Lun</div><div class="text-center flex-fill">Mar</div><div class="text-center flex-fill">Mié</div><div class="text-center flex-fill">Jue</div><div class="text-center flex-fill">Vie</div><div class="text-center flex-fill">Sáb</div>
-            </div>
-          </div>
-          <!-- Filas -->
-          <div class="cal-row mb-2">
-            <div class="flex-shrink-0 fw-semibold" style="width:140px;">Deluxe 101</div>
-            <div class="d-flex flex-grow-1 gap-1 w-100">
-              <div class="cal-cell"><span class="cal-book bg-success d-block"></span></div>
-              <div class="cal-cell"></div><div class="cal-cell"></div>
-              <div class="cal-cell"><span class="cal-book bg-warning d-block" style="inset:4px 50% 4px 4px"></span></div>
-              <div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div>
-            </div>
-          </div>
-          <div class="cal-row mb-2">
-            <div class="flex-shrink-0 fw-semibold" style="width:140px;">Junior 202</div>
-            <div class="d-flex flex-grow-1 gap-1 w-100">
-              <div class="cal-cell"></div><div class="cal-cell"></div>
-              <div class="cal-cell"><span class="cal-book bg-success d-block" style="inset:4px 4px 4px 30%"></span></div>
-              <div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div>
-            </div>
-          </div>
-          <div class="cal-row">
-            <div class="flex-shrink-0 fw-semibold" style="width:140px;">Suite 305</div>
-            <div class="d-flex flex-grow-1 gap-1 w-100">
-              <div class="cal-cell"></div><div class="cal-cell"><span class="cal-book bg-secondary d-block"></span></div>
-              <div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div><div class="cal-cell"></div>
-            </div>
-          </div>
-          <div class="mt-3 text-end">
-            <a class="btn btn-outline btn-sm" href="admin-reservas-list.html"><i class="bi bi-list-ul me-1"></i>Ver lista</a>
-            <a class="btn btn-primary btn-sm" href="booking-search.html"><i class="bi bi-plus-lg me-1"></i>Nueva reserva</a>
-          </div>
+    <main class="main">
+      <div
+        class="page-title dark-background"
+        data-aos="fade"
+        style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
+      >
+        <div class="container position-relative">
+          <h1>Calendario de ocupación</h1>
+          <p>Vista semanal por habitación</p>
         </div>
       </div>
 
-    </div>
-  </section>
-</main>
+      <section class="section pt-3">
+        <div class="container" data-aos="fade-up">
+          <div class="d-flex justify-content-between mb-2">
+            <div class="btn-group">
+              <a class="btn btn-outline btn-sm" href="#"
+                ><i class="bi bi-chevron-left"></i
+              ></a>
+              <span class="btn btn-outline btn-sm disabled"
+                >12–18 Oct 2025</span
+              >
+              <a class="btn btn-outline btn-sm" href="#"
+                ><i class="bi bi-chevron-right"></i
+              ></a>
+            </div>
+            <div class="d-flex gap-2">
+              <span class="badge bg-success">Confirmada</span>
+              <span class="badge bg-warning text-dark">Pendiente</span>
+              <span class="badge bg-secondary">Bloqueo</span>
+            </div>
+          </div>
+          <div id="calendar"></div>
+          <script>
+            document.addEventListener("DOMContentLoaded", async () => {
+              const params = new URLSearchParams(location.search);
+              const room_id = params.get("room_id") || "";
+              const calendarEl = document.getElementById("calendar");
+              const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: "dayGridMonth",
+                height: "auto",
+                events:
+                  "/grr/api/rooms/calendar" +
+                  (room_id ? "?room_id=" + room_id : ""),
+              });
+              calendar.render();
+            });
+          </script>
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong></div></div>
-</footer>
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <!-- Cabecera de días -->
+              <div class="d-flex mb-2 ms-5 gap-1 text-muted small">
+                <span class="flex-shrink-0" style="width: 140px"
+                  >Habitación</span
+                >
+                <div class="d-flex flex-grow-1 w-100 gap-1">
+                  <div class="text-center flex-fill">Dom</div>
+                  <div class="text-center flex-fill">Lun</div>
+                  <div class="text-center flex-fill">Mar</div>
+                  <div class="text-center flex-fill">Mié</div>
+                  <div class="text-center flex-fill">Jue</div>
+                  <div class="text-center flex-fill">Vie</div>
+                  <div class="text-center flex-fill">Sáb</div>
+                </div>
+              </div>
+              <!-- Filas -->
+              <div class="cal-row mb-2">
+                <div class="flex-shrink-0 fw-semibold" style="width: 140px">
+                  Deluxe 101
+                </div>
+                <div class="d-flex flex-grow-1 gap-1 w-100">
+                  <div class="cal-cell">
+                    <span class="cal-book bg-success d-block"></span>
+                  </div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell">
+                    <span
+                      class="cal-book bg-warning d-block"
+                      style="inset: 4px 50% 4px 4px"
+                    ></span>
+                  </div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                </div>
+              </div>
+              <div class="cal-row mb-2">
+                <div class="flex-shrink-0 fw-semibold" style="width: 140px">
+                  Junior 202
+                </div>
+                <div class="d-flex flex-grow-1 gap-1 w-100">
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell">
+                    <span
+                      class="cal-book bg-success d-block"
+                      style="inset: 4px 4px 4px 30%"
+                    ></span>
+                  </div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                </div>
+              </div>
+              <div class="cal-row">
+                <div class="flex-shrink-0 fw-semibold" style="width: 140px">
+                  Suite 305
+                </div>
+                <div class="d-flex flex-grow-1 gap-1 w-100">
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell">
+                    <span class="cal-book bg-secondary d-block"></span>
+                  </div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                  <div class="cal-cell"></div>
+                </div>
+              </div>
+              <div class="mt-3 text-end">
+                <a
+                  class="btn btn-outline btn-sm"
+                  href="admin-reservas-list.html"
+                  ><i class="bi bi-list-ul me-1"></i>Ver lista</a
+                >
+                <a class="btn btn-primary btn-sm" href="booking-search.html"
+                  ><i class="bi bi-plus-lg me-1"></i>Nueva reserva</a
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script><script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script><script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
+    <footer id="footer" class="footer position-relative dark-background">
+      <div class="copyright text-center">
+        <div class="container">
+          ©
+          <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong>
+        </div>
+      </div>
+    </footer>
+
+    <a
+      href="#"
+      id="scroll-top"
+      class="scroll-top d-flex align-items-center justify-content-center"
+      ><i class="bi bi-arrow-up-short"></i
+    ></a>
+    <div id="preloader"></div>
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  </body>
 </html>

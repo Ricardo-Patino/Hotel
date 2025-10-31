@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Back-office – Eventos | Hotel Villa Grace</title>
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/style.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.js"></script>
+    <style>
+      .evt-toolbar .btn {
+        border-radius: 0.6rem;
+      }
+      .fc .fc-toolbar-title {
+        color: #4b49ac;
+      } /* tono de tu paleta */
+    </style>
+  </head>
+  <body class="privacy-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div class="container d-flex align-items-center justify-content-between">
+        <a href="/" class="logo d-flex align-items-center me-auto me-xl-0"
+          ><h1 class="sitename">Hotel Villa Grace</h1></a
+        >
+        <!-- incluye tu mismo menú -->
+      </div>
+    </header>
+
+    <main id="main" class="main">
+      <section class="section">
+        <div class="container">
+          <div
+            class="d-flex justify-content-between align-items-center mb-3 evt-toolbar"
+          >
+            <h2 class="mb-0">Calendario de Eventos</h2>
+            <div>
+              <a class="btn btn-outline-primary" id="btn-nuevo"
+                ><i class="bi bi-plus-lg"></i> Nuevo</a
+              >
+              <a class="btn btn-outline-secondary" id="btn-hoy">Hoy</a>
+              <a class="btn btn-outline-success" id="btn-agenda"
+                >Descargar Agenda (PDF)</a
+              >
+            </div>
+          </div>
+          <div id="calendar"></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const calendarEl = document.getElementById("calendar");
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: "dayGridMonth",
+          headerToolbar: {
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek,timeGridDay",
+          },
+          locale: "es",
+          selectable: true,
+          editable: true,
+          eventSources: [
+            { url: '{{ url_for("evt.api_events_list") }}', method: "GET" },
+          ],
+          select: async (info) => {
+            // Crear evento rápido
+            const titulo = prompt("Título del evento:");
+            if (!titulo) return;
+            const payload = {
+              titulo,
+              inicio: info.startStr,
+              fin: info.endStr,
+              salonId: null,
+            };
+            const r = await fetch('{{ url_for("evt.api_events_create") }}', {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (r.ok) calendar.refetchEvents();
+          },
+          eventDrop: async (info) => {
+            const payload = {
+              inicio: info.event.start.toISOString(),
+              fin: info.event.end
+                ? info.event.end.toISOString()
+                : info.event.start.toISOString(),
+            };
+            await fetch(
+              `{{ url_for("evt.api_events_update", evento_id=0) }}`.replace(
+                "0",
+                info.event.id
+              ),
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }
+            );
+          },
+          eventResize: async (info) => {
+            const payload = {
+              inicio: info.event.start.toISOString(),
+              fin: info.event.end.toISOString(),
+            };
+            await fetch(
+              `{{ url_for("evt.api_events_update", evento_id=0) }}`.replace(
+                "0",
+                info.event.id
+              ),
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }
+            );
+          },
+          eventClick: async (info) => {
+            const evId = info.event.id;
+            const accion = prompt(
+              "Acción: CONFIRMAR / CANCELAR / EDITAR TÍTULO",
+              "CONFIRMAR"
+            );
+            if (!accion) return;
+            if (accion.toUpperCase().startsWith("CONFIRM")) {
+              const r = await fetch(
+                `{{ url_for("evt.api_confirm", evento_id=0) }}`.replace(
+                  "0",
+                  evId
+                ),
+                { method: "POST" }
+              );
+              if (r.status === 409) {
+                const data = await r.json();
+                alert("Conflicto: " + (data.reasons || []).join("; "));
+              }
+              calendar.refetchEvents();
+            } else if (accion.toUpperCase().startsWith("CANCEL")) {
+              await fetch(
+                `{{ url_for("evt.api_events_delete", evento_id=0) }}`.replace(
+                  "0",
+                  evId
+                ),
+                { method: "DELETE" }
+              );
+              calendar.refetchEvents();
+            } else {
+              const nuevo = prompt("Nuevo título:", info.event.title);
+              if (nuevo) {
+                await fetch(
+                  `{{ url_for("evt.api_events_update", evento_id=0) }}`.replace(
+                    "0",
+                    evId
+                  ),
+                  {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ titulo: nuevo }),
+                  }
+                );
+                calendar.refetchEvents();
+              }
+            }
+          },
+        });
+        calendar.render();
+
+        document
+          .getElementById("btn-hoy")
+          .addEventListener("click", () => calendar.today());
+        document.getElementById("btn-nuevo").addEventListener("click", () => {
+          const ahora = new Date();
+          const dentro1h = new Date(ahora.getTime() + 60 * 60 * 1000);
+          calendar.addEvent({
+            title: "Nuevo evento",
+            start: ahora,
+            end: dentro1h,
+            allDay: false,
+          });
+        });
+        document.getElementById("btn-agenda").addEventListener("click", () => {
+          const d = new Date();
+          const iso = d.toISOString().slice(0, 10);
+          window.location = `{{ url_for("evt.agenda_pdf") }}?fecha=${iso}`;
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -890,6 +890,10 @@ def create_app() -> Flask:
     from blueprints.hrm import hrm_bp
     app.register_blueprint(hrm_bp)
 
+    # === Eventos (EVT) ===
+    from blueprints.evt import evt_bp
+    app.register_blueprint(evt_bp)
+    
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:
