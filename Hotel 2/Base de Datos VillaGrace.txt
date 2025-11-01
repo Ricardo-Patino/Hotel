@@ -1459,6 +1459,81 @@ SELECT e.Id, e.Titulo, e.Estado, e.Inicio, s.Nombre AS Salon
 FROM EvtEvento e LEFT JOIN EvtSalon s ON s.Id=e.Salon_Id
 ORDER BY e.Inicio DESC;
 
+/* ===============================================================
+   HU 1 de HRM — Empleados y expediente
+   =============================================================== */
+
+/* ============================================================
+   HRM-08-001 — Extensión de tabla Funcionario
+   Agrega campos laborales, bancarios y de control de estado
+   ============================================================ */
+
+ALTER TABLE Funcionario
+  ADD COLUMN Departamento         VARCHAR(80) NULL AFTER Puesto,
+  ADD COLUMN Fecha_Ingreso        DATE NOT NULL DEFAULT (CURDATE()) AFTER Fecha_Nacimiento,
+  ADD COLUMN Salario_Base_Mensual DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Fecha_Ingreso,
+  ADD COLUMN Estado_Empleado      ENUM('Activo','Inactivo','Suspendido') NOT NULL DEFAULT 'Activo' AFTER Salario_Base_Mensual,
+  ADD COLUMN Tipo_Contrato        ENUM('Tiempo completo','Medio tiempo','Servicios profesionales','Temporal') NOT NULL DEFAULT 'Tiempo completo' AFTER Estado_Empleado,
+  ADD COLUMN Cuenta_Bancaria      VARCHAR(60) NULL AFTER Tipo_Contrato,
+  ADD COLUMN Banco                VARCHAR(60) NULL AFTER Cuenta_Bancaria,
+  ADD COLUMN Fecha_mod_alta       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER Fecha_modificacion;
+
+-- Índices útiles para búsquedas
+ALTER TABLE Funcionario
+  ADD INDEX IX_Funcionario_Departamento (Departamento),
+  ADD INDEX IX_Funcionario_Estado (Estado_Empleado),
+  ADD INDEX IX_Funcionario_FechaIngreso (Fecha_Ingreso);
+
+CREATE TABLE FuncionarioHistorial (
+  Id_Historial        INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario  INT NOT NULL,
+  Fecha_Evento        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Tipo_Evento         ENUM(
+      'Ingreso',
+      'Cambio Puesto',
+      'Cambio Salario',
+      'Amonestacion',
+      'Reconocimiento',
+      'Vacaciones',
+      'Incapacidad',
+      'Salida'
+  ) NOT NULL,
+  Detalle             VARCHAR(500) NULL,
+  Valor_Anterior      VARCHAR(200) NULL,
+  Valor_Nuevo         VARCHAR(200) NULL,
+  Registrado_Por      INT NULL,              -- Codigo_Usuario que hizo el cambio
+  CONSTRAINT PK_FuncionarioHistorial PRIMARY KEY (Id_Historial),
+  CONSTRAINT FK_FuncHist_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  KEY IX_FuncHist_Funcionario (Codigo_Funcionario),
+  KEY IX_FuncHist_Tipo (Tipo_Evento),
+  KEY IX_FuncHist_Fecha (Fecha_Evento)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* ============================================================
+   HRM-08-002 — Extensión de tabla Funcionario
+   Agrega campos laborales, bancarios y de control de estado
+   ============================================================ */
+
+CREATE TABLE IF NOT EXISTS `Marcacion` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `Codigo_Funcionario` int NOT NULL,
+  `Fecha` date NOT NULL,
+  `Hora_Entrada` datetime DEFAULT NULL,
+  `Hora_Salida` datetime DEFAULT NULL,
+  `Horas_Regulares` decimal(6,2) DEFAULT NULL,
+  `Estado` enum('Abierta','Cerrada','Pendiente') NOT NULL DEFAULT 'Abierta',
+  `Observaciones` varchar(255) DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualiza` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id`),
+  KEY `idx_marcacion_func` (`Codigo_Funcionario`),
+  KEY `idx_marcacion_fecha` (`Fecha`),
+  KEY `idx_marcacion_estado` (`Estado`),
+  CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 /* ------------------------------------------------------------------------- */
 /* Verificaciones rápidas                                                    */

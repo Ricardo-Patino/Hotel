@@ -67,3 +67,27 @@ class FuncionarioHistorial(db.Model):
     Valor_Nuevo    = db.Column(db.String(200))
     Registrado_Por = db.Column(db.Integer)
 
+# --- Marcación de horas (entrada/salida) ---
+from datetime import datetime, date
+from sqlalchemy import func
+from extensions import db
+
+class Marcacion(db.Model):
+    __tablename__ = "Marcacion"
+
+    Id                 = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Codigo_Funcionario = db.Column(db.Integer, db.ForeignKey("Funcionario.Codigo_Funcionario"), nullable=False, index=True)
+
+    Fecha              = db.Column(db.Date, nullable=False, index=True)        # día de la marcación (zona local)
+    Hora_Entrada       = db.Column(db.DateTime, nullable=True)
+    Hora_Salida        = db.Column(db.DateTime, nullable=True)
+
+    Horas_Regulares    = db.Column(db.Numeric(6, 2), nullable=True)            # horas calculadas (decimal, 2)
+    Estado             = db.Column(db.Enum("Abierta", "Cerrada", "Pendiente"), nullable=False, default="Abierta", index=True)
+    Observaciones      = db.Column(db.String(255))
+
+    Fecha_Creacion     = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    Fecha_Actualiza    = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp(), server_onupdate=func.current_timestamp())
+
+    # rel opcional
+    Funcionario        = db.relationship("Funcionario", lazy="joined")

@@ -94,7 +94,7 @@
                 <th>Departamento</th>
                 <th class="text-end">Salario base</th>
                 <th>Estado</th>
-                <th style="width:180px" class="text-center">Acciones</th>
+                <th style="width:230px" class="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -119,14 +119,18 @@
                   {% endif %}
                 </td>
                 <td class="text-center">
-                  <!-- AQUÍ EL CAMBIO: va a la vista de detalle formal -->
+                  <!-- Ver detalle formal -->
                   <a class="btn btn-sm btn-outline-secondary" href="/hrm/empleados/detalle/{{ e.Codigo_Funcionario }}">Ver</a>
 
+                  <!-- Editar (modal) -->
                   <button
                     class="btn btn-sm btn-outline-theme"
                     onclick="openEdit('{{ e.Codigo_Funcionario }}','{{ e.Puesto|default('') }}','{{ e.Departamento|default('') }}','{{ e.Salario_Base_Mensual }}','{{ e.Nombre }} {{ e.Apellido }}')">
-                    Editar datos
+                    Editar
                   </button>
+
+                  <!-- Ir a HU-08-002 (simula login con ?func=ID) -->
+                  <a class="btn btn-sm btn-theme" href="/hrm/mis-horas?func={{ e.Codigo_Funcionario }}">Horas</a>
 
                   {% if e.Estado_Empleado == 'Activo' %}
                   <button class="btn btn-sm btn-outline-danger" onclick="desactivarEmpleado({{ e.Codigo_Funcionario }})">Baja</button>
@@ -219,7 +223,7 @@
   </div>
 </div>
 
-<!-- ========== MODAL: EDITAR SALARIO/PUESTO/DEP ========== -->
+<!-- ========== MODAL: EDITAR DATOS (Puesto/Depto/Salario) ========== -->
 <div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -331,13 +335,14 @@
         bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
         location.reload();
       }else{
-        alert('No se pudo actualizar: ' + (json.error || 'Error'));
+        alert('No se pudo actualizar: ' + (json.error || 'Error')); 
       }
     }catch(e){ console.error(e); alert('Error de red'); }
   }
 </script>
 </body>
 </html>
+
 
 
 
