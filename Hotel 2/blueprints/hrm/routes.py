@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, date, timedelta
 from flask import request, jsonify, render_template, session, redirect, url_for
-from sqlalchemy import func, and_
+from sqlalchemy import func, or_
 from extensions import db
 from . import hrm_bp
 
@@ -250,7 +250,7 @@ def actualizar_perfil(codigo_func):
     # Salario
     if "Salario_Base_Mensual" in payload and str(payload["Salario_Base_Mensual"]) != str(f.Salario_Base_Mensual):
         cambios.append(("Cambio Salario", "Ajuste salarial", str(f.Salario_Base_Mensual),
-                        str(payload["Salario_Base_Mensual"])))
+                        str(payload["Salario_Base_Mensual"])) )
         f.Salario_Base_Mensual = payload["Salario_Base_Mensual"]
 
     if not cambios:
@@ -365,16 +365,19 @@ def mis_horas_ui():
         .all()
     )
 
-    # Totales del mes
+    # Totales del mes (acepta Horas / Total_Horas / Horas_Regulares)
     total_horas = 0.0
     for m in marcas:
-        horas_val = None
-        if hasattr(m, "Horas") and m.Horas is not None:
-            horas_val = float(m.Horas)
-        elif hasattr(m, "Total_Horas") and m.Total_Horas is not None:
-            horas_val = float(m.Total_Horas)
-        if horas_val:
-            total_horas += horas_val
+        horas_val = (
+            getattr(m, "Horas", None)
+            or getattr(m, "Total_Horas", None)
+            or getattr(m, "Horas_Regulares", None)
+        )
+        if horas_val is not None:
+            try:
+                total_horas += float(horas_val)
+            except Exception:
+                pass
 
     return render_template(
         "mis_horas.html",
@@ -383,7 +386,7 @@ def mis_horas_ui():
         year=year,
         month=month,
         hoy=date.today(),
-        funcionario=Funcionario.query.get(fid)
+        empleado=Funcionario.query.get(fid)
     )
 
 
@@ -403,7 +406,6 @@ def marcar_entrada():
         .filter(
             Marcacion.Codigo_Funcionario == fid,
             Marcacion.Fecha == hoy,
-            # campo de salida nulo (soportar Hora_Salida o Salida)
             or_(
                 getattr(Marcacion, "Hora_Salida", None) == None,  # noqa: E711
                 getattr(Marcacion, "Salida", None) == None
@@ -422,6 +424,7 @@ def marcar_entrada():
     _set_if_attr(m, "Entrada", ahora)
     _set_if_attr(m, "Estado", "Pendiente")
     _set_if_attr(m, "Observacion", "Marcación de entrada")
+    _set_if_attr(m, "Observaciones", "Marcación de entrada")  # compat.
     _set_if_attr(m, "Registrado_Por", _registrado_por())
 
     db.session.add(m)
@@ -458,12 +461,7 @@ def marcar_salida():
         return jsonify({"ok": False, "error": "No hay marcación de entrada abierta hoy."}), 400
 
     # Obtener la hora de entrada (según el nombre que tenga tu modelo)
-    dt_in = None
-    if hasattr(m, "Hora_Entrada") and m.Hora_Entrada:
-        dt_in = m.Hora_Entrada
-    elif hasattr(m, "Entrada") and m.Entrada:
-        dt_in = m.Entrada
-
+    dt_in = getattr(m, "Hora_Entrada", None) or getattr(m, "Entrada", None)
     if not dt_in:
         return jsonify({"ok": False, "error": "La marcación no tiene hora de entrada válida."}), 400
 
@@ -473,8 +471,10 @@ def marcar_salida():
     _set_if_attr(m, "Salida", ahora)
     _set_if_attr(m, "Horas", horas)
     _set_if_attr(m, "Total_Horas", horas)
+    _set_if_attr(m, "Horas_Regulares", horas)  # compat. con esquema MySQL
     _set_if_attr(m, "Estado", "Pendiente")  # quedará para validación en HU-08-003
     _set_if_attr(m, "Observacion", "Marcación de salida")
+    _set_if_attr(m, "Observaciones", "Marcación de salida")
 
     db.session.commit()
     return jsonify({"ok": True, "horas": horas})
@@ -506,8 +506,13 @@ def mis_horas_listado_json():
 
     def _m_to_dict(m):
         entrada = getattr(m, "Hora_Entrada", None) or getattr(m, "Entrada", None)
-        salida = getattr(m, "Hora_Salida", None) or getattr(m, "Salida", None)
-        horas  = getattr(m, "Horas", None) or getattr(m, "Total_Horas", None)
+        salida  = getattr(m, "Hora_Salida", None)  or getattr(m, "Salida", None)
+        horas   = (
+            getattr(m, "Horas", None)
+            or getattr(m, "Total_Horas", None)
+            or getattr(m, "Horas_Regulares", None)
+        )
+        obs     = getattr(m, "Observacion", None) or getattr(m, "Observaciones", None)
 
         return {
             "Id": getattr(m, "Id", None),
@@ -516,9 +521,345 @@ def mis_horas_listado_json():
             "Salida":  salida.isoformat() if salida  else None,
             "Horas": float(horas) if horas is not None else None,
             "Estado": getattr(m, "Estado", None),
-            "Observacion": getattr(m, "Observacion", None),
+            "Observacion": obs,
         }
 
     return jsonify({"ok": True, "data": [_m_to_dict(m) for m in marcas]})
+
+
+# =============================================================================
+# ALIAS para compatibilidad con front antiguo (/mis-horas/entrada|salida)
+# =============================================================================
+@hrm_bp.route("/mis-horas/entrada", methods=["POST"])
+def _alias_mis_horas_entrada():
+    return marcar_entrada()
+
+@hrm_bp.route("/mis-horas/salida", methods=["POST"])
+def _alias_mis_horas_salida():
+    return marcar_salida()
+
+
+# =============================================================================
+# HU-08-003 — Validación / Corrección de horas por el jefe inmediato
+# =============================================================================
+def _get_dt(obj, name1, name2=None):
+    """Devuelve datetime de m.name1 o (si no existe/viene nulo) m.name2."""
+    v = getattr(obj, name1, None)
+    if (v is None) and name2:
+        v = getattr(obj, name2, None)
+    return v
+
+def _calc_and_set_hours(m):
+    """Recalcula las horas y las setea en los campos disponibles."""
+    dt_in = _get_dt(m, "Hora_Entrada", "Entrada")
+    dt_out = _get_dt(m, "Hora_Salida", "Salida")
+    if not dt_in or not dt_out:
+        return None
+    horas = _calc_hours(dt_in, dt_out)
+    for name in ("Horas", "Total_Horas", "Horas_Regulares"):
+        _set_if_attr(m, name, horas)
+    return horas
+
+def _es_jefe_y_departamento():
+    """Lee sesión y devuelve (es_jefe:bool, depto:str|None). Ajusta a tu manejo real de roles."""
+    rol = session.get("Rol") or session.get("rol")
+    dpt = session.get("Departamento") or session.get("departamento")
+    return (str(rol).lower() == "jefe", dpt)
+
+def _filtro_equipo_query():
+    """
+    Devuelve un query base de marcaciones 'del equipo' del jefe.
+    Reglas:
+      - Si el usuario es 'jefe' y tiene Departamento en sesión: filtra por ese departamento.
+      - Si viene ?dep=... usa ese dep.
+      - Si viene ?func=ID, filtra por ese funcionario.
+      - Si no, muestra TODO (útil para admin).
+    """
+    dep_qs = request.args.get("dep")
+    func_id = request.args.get("func", type=int)
+
+    es_jefe, dep_sesion = _es_jefe_y_departamento()
+    dep_final = dep_qs or (dep_sesion if es_jefe else None)
+
+    q = db.session.query(Marcacion, Funcionario).join(
+        Funcionario, Funcionario.Codigo_Funcionario == Marcacion.Codigo_Funcionario
+    )
+
+    if func_id:
+        q = q.filter(Marcacion.Codigo_Funcionario == func_id)
+    elif dep_final:
+        q = q.filter(Funcionario.Departamento == dep_final)
+
+    return q
+
+@hrm_bp.route("/val-horas", methods=["GET"])
+def validar_horas_ui():
+    """
+    UI del jefe para validar/corregir horas.
+    Parámetros:
+      - y (año), m (mes)
+      - dep (departamento), func (id), estado (Pendiente/Aprobado/Rechazado/todos)
+    """
+    year  = request.args.get("y", type=int) or datetime.today().year
+    month = request.args.get("m", type=int) or datetime.today().month
+    estado = request.args.get("estado", default="Pendiente")
+
+    start = date(year, month, 1)
+    end   = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+    q = _filtro_equipo_query().filter(
+        Marcacion.Fecha >= start,
+        Marcacion.Fecha < end
+    )
+
+    if estado.lower() != "todos":
+        q = q.filter((Marcacion.Estado == estado))
+
+    q = q.order_by(Marcacion.Fecha.desc(), Marcacion.Id.desc())
+    filas = q.all()
+
+    # Totales
+    total_pend = 0
+    total_horas = 0.0
+    for m, _f in filas:
+        if getattr(m, "Estado", None) == "Pendiente":
+            total_pend += 1
+        horas_val = (
+            getattr(m, "Horas", None)
+            or getattr(m, "Total_Horas", None)
+            or getattr(m, "Horas_Regulares", None)
+            or 0
+        )
+        try:
+            total_horas += float(horas_val)
+        except Exception:
+            pass
+
+    return render_template(
+        "validar_horas.html",
+        filas=filas,
+        year=year,
+        month=month,
+        estado=estado,
+        total_pend=total_pend,
+        total_horas=round(total_horas, 2)
+    )
+
+def _set_dt_field(obj, name, value_str):
+    """
+    Setea un campo datetime desde string ISO o 'YYYY-MM-DD HH:MM' en el atributo si existe.
+    Si value_str vacío/None, no toca nada.
+    """
+    if not value_str:
+        return
+    try:
+        # soporta 'YYYY-MM-DDTHH:MM' o 'YYYY-MM-DD HH:MM'
+        value_str = value_str.replace("T", " ")
+        dt = datetime.fromisoformat(value_str)
+    except Exception:
+        return
+    _set_if_attr(obj, name, dt)
+
+@hrm_bp.route("/marcaciones/<int:mid>/ajustar", methods=["PATCH"])
+def ajustar_marcacion(mid):
+    """
+    Ajusta entrada/salida/horas y deja estado en 'Pendiente' (para asegurar validación).
+    JSON esperado (todos opcionales):
+      {
+        "Entrada": "YYYY-MM-DD HH:MM",
+        "Salida":  "YYYY-MM-DD HH:MM",
+        "Horas": 7.5,
+        "Observacion": "texto opcional"
+      }
+    Si se envían Entrada/Salida, se recalcula Horas. Si además se manda Horas, esta prevalece.
+    """
+    payload = request.get_json(silent=True) or {}
+    m = Marcacion.query.get(mid)
+    if not m:
+        return jsonify({"ok": False, "error": "Marcación no encontrada"}), 404
+
+    # Entrada/Salida (compatibles con nombres dobles)
+    ent = payload.get("Entrada")
+    sal = payload.get("Salida")
+
+    if ent:
+        _set_dt_field(m, "Hora_Entrada", ent)
+        _set_dt_field(m, "Entrada", ent)
+    if sal:
+        _set_dt_field(m, "Hora_Salida", sal)
+        _set_dt_field(m, "Salida", sal)
+
+    horas_payload = payload.get("Horas")
+    if (ent or sal) and (horas_payload is None):
+        horas_calc = _calc_and_set_hours(m)
+    else:
+        horas_calc = None
+
+    if horas_payload is not None:
+        try:
+            horas_f = float(horas_payload)
+            for name in ("Horas", "Total_Horas", "Horas_Regulares"):
+                _set_if_attr(m, name, horas_f)
+            horas_calc = horas_f
+        except Exception:
+            pass
+
+    # Observación y estado
+    obs = payload.get("Observacion")
+    if obs is not None:
+        _set_if_attr(m, "Observacion", obs)
+        _set_if_attr(m, "Observaciones", obs)
+
+    _set_if_attr(m, "Estado", "Pendiente")  # vuelve a pendiente hasta que el jefe apruebe
+    _set_if_attr(m, "Validado_Por", None)   # por si tienes ese campo
+
+    db.session.commit()
+    return jsonify({"ok": True, "horas": horas_calc})
+
+@hrm_bp.route("/marcaciones/<int:mid>/ajustar-aprobar", methods=["PATCH"])
+def ajustar_y_aprobar(mid):
+    """
+    Ajusta entrada/salida/horas y APRUEBA en un solo paso.
+    JSON esperado (opcionales):
+      {
+        "Entrada": "YYYY-MM-DD HH:MM",
+        "Salida":  "YYYY-MM-DD HH:MM",
+        "Horas": 7.5,
+        "Observacion": "nota visible al colaborador"
+      }
+    """
+    payload = request.get_json(silent=True) or {}
+    m = Marcacion.query.get(mid)
+    if not m:
+        return jsonify({"ok": False, "error": "Marcación no encontrada"}), 404
+
+    # 1) Ajustes (misma lógica que /ajustar)
+    ent = payload.get("Entrada")
+    sal = payload.get("Salida")
+    if ent:
+        _set_dt_field(m, "Hora_Entrada", ent)
+        _set_dt_field(m, "Entrada", ent)
+    if sal:
+        _set_dt_field(m, "Hora_Salida", sal)
+        _set_dt_field(m, "Salida", sal)
+
+    horas_payload = payload.get("Horas")
+    if (ent or sal) and (horas_payload is None):
+        _calc_and_set_hours(m)
+
+    if horas_payload is not None:
+        try:
+            horas_f = float(horas_payload)
+            for name in ("Horas", "Total_Horas", "Horas_Regulares"):
+                _set_if_attr(m, name, horas_f)
+        except Exception:
+            pass
+
+    obs = payload.get("Observacion")
+    if obs is not None:
+        _set_if_attr(m, "Observacion", obs)
+        _set_if_attr(m, "Observaciones", obs)
+
+    # 2) Aprueba
+    _set_if_attr(m, "Estado", "Aprobado")
+    _set_if_attr(m, "Validado_Por", _registrado_por())
+
+    # 3) Auditoría liviana (opcional)
+    try:
+        db.session.add(FuncionarioHistorial(
+            Codigo_Funcionario = m.Codigo_Funcionario,
+            Fecha_Evento       = datetime.utcnow(),
+            Tipo_Evento        = "Ajuste horas",
+            Detalle            = f"Ajuste/aprobación de marcación #{getattr(m,'Id',None)}",
+            Valor_Anterior     = None,
+            Valor_Nuevo        = f"Horas={(getattr(m,'Horas',None) or getattr(m,'Total_Horas',None) or getattr(m,'Horas_Regulares',None))}; Obs={obs or ''}",
+            Registrado_Por     = _registrado_por()
+        ))
+    except Exception:
+        pass
+
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@hrm_bp.route("/marcaciones/<int:mid>/aprobar", methods=["PATCH"])
+def aprobar_marcacion(mid):
+    """Aprueba una marcación. Opcionalmente permite nota de validación."""
+    payload = request.get_json(silent=True) or {}
+    m = Marcacion.query.get(mid)
+    if not m:
+        return jsonify({"ok": False, "error": "Marcación no encontrada"}), 404
+
+    _set_if_attr(m, "Estado", "Aprobado")
+    obs = payload.get("Observacion")
+    if obs is not None:
+        _set_if_attr(m, "Observacion", obs)
+        _set_if_attr(m, "Observaciones", obs)
+    _set_if_attr(m, "Validado_Por", _registrado_por())
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@hrm_bp.route("/marcaciones/<int:mid>/rechazar", methods=["PATCH"])
+def rechazar_marcacion(mid):
+    """Rechaza una marcación. Requiere observación para feedback al colaborador."""
+    payload = request.get_json(silent=True) or {}
+    obs = payload.get("Observacion")
+    if not obs:
+        return jsonify({"ok": False, "error": "Observación requerida para rechazar"}), 400
+
+    m = Marcacion.query.get(mid)
+    if not m:
+        return jsonify({"ok": False, "error": "Marcación no encontrada"}), 404
+
+    _set_if_attr(m, "Estado", "Rechazado")
+    _set_if_attr(m, "Observacion", obs)
+    _set_if_attr(m, "Observaciones", obs)
+    _set_if_attr(m, "Validado_Por", _registrado_por())
+    db.session.commit()
+    return jsonify({"ok": True})
+
+@hrm_bp.route("/marcaciones/aprobar-lote", methods=["POST"])
+def aprobar_lote():
+    """
+    Aprueba en lote todas las marcaciones 'Pendiente' del filtro seleccionado.
+    JSON opcional:
+      {
+        "func": 123,         # si se quiere filtrar por funcionario
+        "dep": "Recepción",  # si se quiere filtrar por departamento
+        "y": 2025, "m": 11
+      }
+    Si no se envía JSON, usa los query params de /val-horas.
+    """
+    payload = request.get_json(silent=True) or {}
+    func_id = payload.get("func") or request.args.get("func", type=int)
+    dep     = payload.get("dep")  or request.args.get("dep")
+
+    year  = payload.get("y") or request.args.get("y", type=int) or datetime.today().year
+    month = payload.get("m") or request.args.get("m", type=int) or datetime.today().month
+
+    start = date(int(year), int(month), 1)
+    end   = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+
+    q = db.session.query(Marcacion).join(
+        Funcionario, Funcionario.Codigo_Funcionario == Marcacion.Codigo_Funcionario
+    ).filter(
+        Marcacion.Fecha >= start,
+        Marcacion.Fecha < end,
+        Marcacion.Estado == "Pendiente"
+    )
+
+    if func_id:
+        q = q.filter(Marcacion.Codigo_Funcionario == func_id)
+    if dep:
+        q = q.filter(Funcionario.Departamento == dep)
+
+    count = 0
+    val_por = _registrado_por()
+    for m in q.all():
+        _set_if_attr(m, "Estado", "Aprobado")
+        _set_if_attr(m, "Validado_Por", val_por)
+        count += 1
+
+    db.session.commit()
+    return jsonify({"ok": True, "aprobadas": count})
 
 
