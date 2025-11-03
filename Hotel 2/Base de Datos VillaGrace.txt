@@ -1532,7 +1532,115 @@ CREATE TABLE IF NOT EXISTS `Marcacion` (
   KEY `idx_marcacion_fecha` (`Fecha`),
   KEY `idx_marcacion_estado` (`Estado`),
   CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;CREATE TABLE IF NOT EXISTS `Marcacion` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `Codigo_Funcionario` int NOT NULL,
+  `Fecha` date NOT NULL,
+  `Hora_Entrada` datetime DEFAULT NULL,
+  `Hora_Salida` datetime DEFAULT NULL,
+  `Horas_Regulares` decimal(6,2) DEFAULT NULL,
+  `Estado` enum('Abierta','Cerrada','Pendiente') NOT NULL DEFAULT 'Abierta',
+  `Observaciones` varchar(255) DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualiza` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id`),
+  KEY `idx_marcacion_func` (`Codigo_Funcionario`),
+  KEY `idx_marcacion_fecha` (`Fecha`),
+  KEY `idx_marcacion_estado` (`Estado`),
+  CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Cambiá este esquema si no es el actual
+SET @schema := DATABASE();
+
+-- ¿Existe columna Horas?
+SELECT COUNT(*) INTO @c
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Horas';
+
+SET @sql := IF(@c=0,
+  'ALTER TABLE Marcacion ADD COLUMN Horas DECIMAL(10,2) NULL AFTER Hora_Salida;',
+  'SELECT "Horas ya existe";'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ¿Existe columna Total_Horas?
+SELECT COUNT(*) INTO @c
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Total_Horas';
+
+SET @sql := IF(@c=0,
+  'ALTER TABLE Marcacion ADD COLUMN Total_Horas DECIMAL(10,2) NULL AFTER Horas;',
+  'SELECT "Total_Horas ya existe";'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Relleno de horas
+UPDATE Marcacion
+SET Horas = ROUND(TIMESTAMPDIFF(SECOND, Hora_Entrada, Hora_Salida)/3600,2)
+WHERE Hora_Entrada IS NOT NULL AND Hora_Salida IS NOT NULL AND Horas IS NULL;
+
+ALTER TABLE Marcacion
+MODIFY Hora_Entrada DATETIME NULL,
+MODIFY Hora_Salida DATETIME NULL;
+
+UPDATE Marcacion
+SET Total_Horas = Horas
+WHERE Total_Horas IS NULL AND Horas IS NOT NULL;
+
+DESC Marcacion;
+
+-- Ajustar ENUM Estado (si ya es ENUM, MODIFY lo redefine)
+ALTER TABLE Marcacion
+  MODIFY Estado ENUM('Pendiente','Aprobado','Rechazado','Abierta','Cerrada')
+  NOT NULL DEFAULT 'Pendiente';
+
+-- Observacion
+SELECT COUNT(*) INTO @c
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Observacion';
+
+SET @sql := IF(@c=0,
+  'ALTER TABLE Marcacion ADD COLUMN Observacion VARCHAR(255) NULL AFTER Estado;',
+  'SELECT "Observacion ya existe";'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Copiar Observaciones -> Observacion SOLO si Observaciones existe
+SELECT COUNT(*) INTO @c
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Observaciones';
+
+SET @sql := IF(@c>0,
+  'UPDATE Marcacion SET Observacion = Observaciones
+    WHERE Observaciones IS NOT NULL AND (Observacion IS NULL OR Observacion="");',
+  'SELECT "Columna Observaciones no existe, se omite copia";'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 1) Incluir todos los estados que usa el front/backend
+ALTER TABLE Marcacion
+  MODIFY Estado ENUM('Pendiente','Aprobado','Rechazado','Abierta','Cerrada')
+  NOT NULL DEFAULT 'Pendiente';
+
+-- (opcional) si quieres normalizar estados heredados:
+-- UPDATE Marcacion SET Estado = 'Pendiente' WHERE Estado NOT IN ('Pendiente','Aprobado','Rechazado','Abierta','Cerrada');
+
+
+CREATE TABLE IF NOT EXISTS HoraExtra (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Marcacion_Id INT NOT NULL,
+    Codigo_Funcionario INT NOT NULL,
+    Fecha DATE NOT NULL,
+    Horas_Extras DECIMAL(6,2) NOT NULL,
+    Motivo VARCHAR(255),
+    Estado ENUM('Pendiente','Aprobado','Rechazado') DEFAULT 'Pendiente',
+    Validado_Por VARCHAR(100),
+    Fecha_Registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+    Fecha_Actualiza DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (Marcacion_Id) REFERENCES Marcacion(Id) ON DELETE CASCADE,
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario) ON DELETE CASCADE
+);
 
 
 /* ------------------------------------------------------------------------- */
@@ -1562,3 +1670,46 @@ DESC fin_cash_movement;
 DESC fin_payment;
 DESC Reserva;
 DESC fin_ledger;
+
+SELECT period_key, status, locked_at
+FROM fin_period_lock
+ORDER BY period_key;
+
+DESC fin_cash_movement;
+DESC fin_payment;
+DESC Reserva;
+DESC fin_ledger;
+
+INSERT INTO Marcacion (
+  Codigo_Funcionario, Fecha, Hora_Entrada, Hora_Salida,
+  Horas_Regulares, Estado, Observaciones
+)
+VALUES (
+  4,
+  '2025-11-01',
+  '2025-11-01 08:00:00',
+  '2025-11-01 17:00:00',
+  ROUND(TIMESTAMPDIFF(MINUTE, '2025-11-01 08:00:00', '2025-11-01 17:00:00')/60, 2),
+  'Pendiente',
+  'Carga de prueba HU-08-003'
+);
+
+-- Verifica qué quedó grabado
+SELECT Id, Codigo_Funcionario, Fecha, Hora_Entrada, Hora_Salida
+FROM Marcacion
+WHERE Codigo_Funcionario = 4
+ORDER BY Fecha DESC, Id DESC;
+
+-- Si ves Fecha 2025-10-31, pásala a 2025-11-01 (ajusta Id si aplica)
+UPDATE Marcacion
+SET Fecha = '2025-11-01'
+WHERE Codigo_Funcionario = 4
+  AND Fecha = '2025-10-31';
+
+
+SELECT Fecha, Hora_Entrada, Hora_Salida
+FROM Marcacion
+WHERE Codigo_Funcionario = 4
+  AND Fecha >= CURDATE() - INTERVAL 30 DAY
+ORDER BY Fecha DESC, Id DESC;
+

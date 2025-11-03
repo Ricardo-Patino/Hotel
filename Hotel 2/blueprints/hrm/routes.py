@@ -65,6 +65,83 @@ def _set_if_attr(obj, field, value):
         setattr(obj, field, value)
 
 
+def _horas_val(m) -> float | None:
+    """
+    Devuelve horas decimales para una marcación:
+    1) Horas
+    2) Total_Horas
+    3) Horas_Regulares
+    4) Calcula con Entrada/Salida si todo es None
+    """
+    h = (
+        getattr(m, "Horas", None)
+        or getattr(m, "Total_Horas", None)
+        or getattr(m, "Horas_Regulares", None)
+    )
+    if h is not None:
+        try:
+            return float(h)
+        except Exception:
+            return None
+
+    ent = getattr(m, "Hora_Entrada", None) or getattr(m, "Entrada", None)
+    sal = getattr(m, "Hora_Salida", None)  or getattr(m, "Salida", None)
+    if ent and sal:
+        try:
+            return round((sal - ent).total_seconds() / 3600.0, 2)
+        except Exception:
+            return None
+    return None
+
+
+def _estado_render(m) -> str:
+    """
+    Estado para la UI:
+      - 'Abierta' si hay Entrada y NO hay Salida.
+      - 'Cerrada' si hay Entrada y hay Salida.
+      - 'Pendiente' si no hay nada.
+    """
+    ent = getattr(m, "Hora_Entrada", None) or getattr(m, "Entrada", None)
+    sal = getattr(m, "Hora_Salida", None)  or getattr(m, "Salida", None)
+    if ent and not sal:
+        return "Abierta"
+    if ent and sal:
+        return "Cerrada"
+    return "Pendiente"
+
+
+def _get_periodo():
+    """
+    Devuelve (start:date, end:date_exclusive, label:str) según query params:
+      r = 'mes' | '30d' | 'custom'
+      start=YYYY-MM-DD  end=YYYY-MM-DD  (solo si r='custom')
+    Por defecto: '30d'
+    """
+    hoy = date.today()
+    r = request.args.get("r", default="30d")
+    if r == "mes":
+        start = hoy.replace(day=1)
+        end = (start.replace(day=28) + timedelta(days=4)).replace(day=1)  # 1° del mes siguiente (exclusivo)
+        label = "Mes actual"
+    elif r == "custom":
+        try:
+            s = request.args.get("start")
+            e = request.args.get("end")
+            start = datetime.fromisoformat(s).date() if s else hoy - timedelta(days=30)
+            # end exclusivo → sumamos 1 día a la fecha final inclusiva
+            end_inclusive = datetime.fromisoformat(e).date() if e else hoy
+            end = end_inclusive + timedelta(days=1)
+        except Exception:
+            start = hoy - timedelta(days=30)
+            end = hoy + timedelta(days=1)
+        label = "Personalizado"
+    else:  # "30d"
+        start = hoy - timedelta(days=30)
+        end = hoy + timedelta(days=1)
+        label = "Últimos 30 días"
+    return start, end, label
+
+
 # =============================================================================
 # API JSON: Empleados (CRUD + Perfil)
 # =============================================================================
@@ -127,8 +204,8 @@ def crear_empleado():
         Tipo_Contrato=payload.get("Tipo_Contrato", "Tiempo completo"),
         Cuenta_Bancaria=payload.get("Cuenta_Bancaria"),
         Banco=payload.get("Banco"),
-        Fecha_modificacion=datetime.utcnow(),
-        Fecha_mod_alta=datetime.utcnow(),
+        Fecha_modificacion=datetime.now(),
+        Fecha_mod_alta=datetime.now(),
     )
 
     db.session.add(nuevo)
@@ -136,7 +213,7 @@ def crear_empleado():
 
     hist = FuncionarioHistorial(
         Codigo_Funcionario=nuevo.Codigo_Funcionario,
-        Fecha_Evento=datetime.utcnow(),
+        Fecha_Evento=datetime.now(),
         Tipo_Evento="Ingreso",
         Detalle="Ingreso al hotel",
         Valor_Anterior=None,
@@ -181,15 +258,15 @@ def actualizar_empleado(codigo_func):
     f.Tipo_Contrato    = payload.get("Tipo_Contrato", f.Tipo_Contrato)
     f.Cuenta_Bancaria  = payload.get("Cuenta_Bancaria", f.Cuenta_Bancaria)
     f.Banco            = payload.get("Banco", f.Banco)
-    f.Fecha_modificacion = datetime.utcnow()
-    f.Fecha_mod_alta     = datetime.utcnow()
+    f.Fecha_modificacion = datetime.now()
+    f.Fecha_mod_alta     = datetime.now()
 
     db.session.flush()
 
     for tipo, detalle, val_ant, val_nuevo in cambios:
         db.session.add(FuncionarioHistorial(
             Codigo_Funcionario=f.Codigo_Funcionario,
-            Fecha_Evento=datetime.utcnow(),
+            Fecha_Evento=datetime.now(),
             Tipo_Evento=tipo,
             Detalle=detalle,
             Valor_Anterior=val_ant,
@@ -209,13 +286,13 @@ def desactivar_empleado(codigo_func):
 
     if f.Estado_Empleado != "Inactivo":
         f.Estado_Empleado = "Inactivo"
-        f.Fecha_modificacion = datetime.utcnow()
-        f.Fecha_mod_alta = datetime.utcnow()
+        f.Fecha_modificacion = datetime.now()
+        f.Fecha_mod_alta = datetime.now()
         db.session.flush()
 
         hist = FuncionarioHistorial(
             Codigo_Funcionario=f.Codigo_Funcionario,
-            Fecha_Evento=datetime.utcnow(),
+            Fecha_Evento=datetime.now(),
             Tipo_Evento="Salida",
             Detalle="Colaborador desactivado",
             Valor_Anterior=None,
@@ -256,15 +333,15 @@ def actualizar_perfil(codigo_func):
     if not cambios:
         return jsonify({"ok": True, "empleado": _funcionario_to_dict(f), "msg": "Sin cambios"})
 
-    f.Fecha_modificacion = datetime.utcnow()
-    f.Fecha_mod_alta = datetime.utcnow()
+    f.Fecha_modificacion = datetime.now()
+    f.Fecha_mod_alta = datetime.now()
     db.session.flush()
 
     reg_por = _registrado_por()
     for tipo, detalle, val_ant, val_nuevo in cambios:
         db.session.add(FuncionarioHistorial(
             Codigo_Funcionario=f.Codigo_Funcionario,
-            Fecha_Evento=datetime.utcnow(),
+            Fecha_Evento=datetime.now(),
             Tipo_Evento=tipo,
             Detalle=detalle,
             Valor_Anterior=val_ant,
@@ -340,19 +417,16 @@ def mis_horas_ui():
     """
     Panel del colaborador para ver/registrar sus horas.
     Parámetros opcionales:
-      - y (año), m (mes)
+      - func: forzar funcionario (testing)
+      - r: '30d' | 'mes' | 'custom'
+      - start=YYYY-MM-DD, end=YYYY-MM-DD  (si r='custom')
     """
     fid = _current_funcionario_id()
     if not fid:
-        # sin sesión/funcionario: redirige a colaboradores (o podrías ir a login)
         return redirect(url_for("hrm.empleados_ui"))
 
-    year = request.args.get("y", type=int) or datetime.today().year
-    month = request.args.get("m", type=int) or datetime.today().month
-
-    # Rango del mes
-    start = date(year, month, 1)
-    end = (start.replace(day=28) + timedelta(days=4)).replace(day=1)  # primer día del siguiente mes
+    start, end, _label = _get_periodo()
+    hoy_local = date.today()
 
     marcas = (
         Marcacion.query
@@ -365,28 +439,26 @@ def mis_horas_ui():
         .all()
     )
 
-    # Totales del mes (acepta Horas / Total_Horas / Horas_Regulares)
+    actual = next((m for m in marcas if getattr(m, "Fecha", None) == hoy_local), None)
+
     total_horas = 0.0
     for m in marcas:
-        horas_val = (
-            getattr(m, "Horas", None)
-            or getattr(m, "Total_Horas", None)
-            or getattr(m, "Horas_Regulares", None)
-        )
-        if horas_val is not None:
-            try:
-                total_horas += float(horas_val)
-            except Exception:
-                pass
+        hv = _horas_val(m)
+        if hv is not None:
+            total_horas += hv
 
     return render_template(
         "mis_horas.html",
-        marcas=marcas,
+        empleado=Funcionario.query.get(fid),
+        actual=actual,
+        items=marcas,
         total_horas=round(total_horas, 2),
-        year=year,
-        month=month,
-        hoy=date.today(),
-        empleado=Funcionario.query.get(fid)
+        horas_val=_horas_val,
+        estado_render=_estado_render,
+        # Para el selector:
+        rango_sel=request.args.get("r", "30d"),
+        start_sel=start,  # usados para precargar inputs
+        end_sel=(end - timedelta(days=1))  # fin inclusivo para UI
     )
 
 
@@ -397,23 +469,20 @@ def marcar_entrada():
     if not fid:
         return jsonify({"ok": False, "error": "No hay colaborador en sesión"}), 401
 
-    ahora = datetime.utcnow()
+    ahora = datetime.now()     # Hora local
     hoy = ahora.date()
 
     # ¿Ya hay una marcación abierta (sin salida) hoy?
     abierto = (
-        Marcacion.query
-        .filter(
-            Marcacion.Codigo_Funcionario == fid,
-            Marcacion.Fecha == hoy,
-            or_(
-                getattr(Marcacion, "Hora_Salida", None) == None,  # noqa: E711
-                getattr(Marcacion, "Salida", None) == None
-            )
-        )
-        .order_by(Marcacion.Id.desc())
-        .first()
+    Marcacion.query
+    .filter(
+        Marcacion.Codigo_Funcionario == fid,
+        Marcacion.Fecha == hoy,
+        Marcacion.Hora_Salida.is_(None)  # jornada aún sin salida
     )
+    .order_by(Marcacion.Id.desc())
+    .first()
+)
     if abierto:
         return jsonify({"ok": False, "error": "Ya existe una marcación abierta para hoy."}), 400
 
@@ -435,12 +504,12 @@ def marcar_entrada():
 
 @hrm_bp.route("/marcar/salida", methods=["POST"])
 def marcar_salida():
-    """Completa la marcación de hoy (pone Hora_Salida y calcula horas)."""
+    """Completa la marcación de hoy (pone Hora_Salida, calcula horas y registra horas extra)."""
     fid = _current_funcionario_id()
     if not fid:
         return jsonify({"ok": False, "error": "No hay colaborador en sesión"}), 401
 
-    ahora = datetime.utcnow()
+    ahora = datetime.now()
     hoy = ahora.date()
 
     # Buscar la última entrada abierta de hoy
@@ -449,49 +518,65 @@ def marcar_salida():
         .filter(
             Marcacion.Codigo_Funcionario == fid,
             Marcacion.Fecha == hoy,
-            or_(
-                getattr(Marcacion, "Hora_Salida", None) == None,  # noqa: E711
-                getattr(Marcacion, "Salida", None) == None
-            )
+            Marcacion.Hora_Salida.is_(None)  # jornada aún abierta
         )
         .order_by(Marcacion.Id.desc())
         .first()
     )
+
     if not m:
         return jsonify({"ok": False, "error": "No hay marcación de entrada abierta hoy."}), 400
 
-    # Obtener la hora de entrada (según el nombre que tenga tu modelo)
-    dt_in = getattr(m, "Hora_Entrada", None) or getattr(m, "Entrada", None)
+    # Validar hora de entrada
+    dt_in = getattr(m, "Hora_Entrada", None)
     if not dt_in:
         return jsonify({"ok": False, "error": "La marcación no tiene hora de entrada válida."}), 400
 
-    horas = _calc_hours(dt_in, ahora)
+    # Calcular horas totales (en decimales)
+    delta = (ahora - dt_in).total_seconds() / 3600
+    horas_trab = round(delta, 2)
 
-    _set_if_attr(m, "Hora_Salida", ahora)
-    _set_if_attr(m, "Salida", ahora)
-    _set_if_attr(m, "Horas", horas)
-    _set_if_attr(m, "Total_Horas", horas)
-    _set_if_attr(m, "Horas_Regulares", horas)  # compat. con esquema MySQL
-    _set_if_attr(m, "Estado", "Pendiente")  # quedará para validación en HU-08-003
-    _set_if_attr(m, "Observacion", "Marcación de salida")
-    _set_if_attr(m, "Observaciones", "Marcación de salida")
+    # Actualizar marcación
+    m.Hora_Salida = ahora
+    m.Horas = horas_trab
+    m.Total_Horas = horas_trab
+    m.Horas_Regulares = horas_trab
+    m.Estado = "Pendiente"
+    m.Observaciones = "Marcación de salida"
 
     db.session.commit()
-    return jsonify({"ok": True, "horas": horas})
+
+    # === HRM-08-004: Registrar horas extra si superan 8 ===
+    extras = 0
+    if horas_trab > 8:
+        extras = round(horas_trab - 8, 2)
+        nueva_extra = HoraExtra(
+            Marcacion_Id=m.Id,
+            Codigo_Funcionario=m.Codigo_Funcionario,
+            Fecha=m.Fecha,
+            Horas_Extras=extras,
+            Motivo="Jornada superior a 8 horas",
+            Estado="Pendiente",
+            Validado_Por=None
+        )
+        db.session.add(nueva_extra)
+        db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "horas_regulares": horas_trab,
+        "horas_extra": extras
+    })
 
 
 @hrm_bp.route("/mis-horas/listado", methods=["GET"])
 def mis_horas_listado_json():
-    """Listado JSON de marcaciones del mes actual para el colaborador."""
+    """Listado JSON de marcaciones del periodo actual para el colaborador."""
     fid = _current_funcionario_id()
     if not fid:
         return jsonify({"ok": False, "error": "No hay colaborador en sesión"}), 401
 
-    year = request.args.get("y", type=int) or datetime.today().year
-    month = request.args.get("m", type=int) or datetime.today().month
-
-    start = date(year, month, 1)
-    end = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+    start, end, _ = _get_periodo()
 
     marcas = (
         Marcacion.query
@@ -507,20 +592,14 @@ def mis_horas_listado_json():
     def _m_to_dict(m):
         entrada = getattr(m, "Hora_Entrada", None) or getattr(m, "Entrada", None)
         salida  = getattr(m, "Hora_Salida", None)  or getattr(m, "Salida", None)
-        horas   = (
-            getattr(m, "Horas", None)
-            or getattr(m, "Total_Horas", None)
-            or getattr(m, "Horas_Regulares", None)
-        )
         obs     = getattr(m, "Observacion", None) or getattr(m, "Observaciones", None)
-
         return {
             "Id": getattr(m, "Id", None),
             "Fecha": getattr(m, "Fecha", None).isoformat() if getattr(m, "Fecha", None) else None,
             "Entrada": entrada.isoformat() if entrada else None,
             "Salida":  salida.isoformat() if salida  else None,
-            "Horas": float(horas) if horas is not None else None,
-            "Estado": getattr(m, "Estado", None),
+            "Horas": _horas_val(m),
+            "Estado": _estado_render(m),
             "Observacion": obs,
         }
 
@@ -624,20 +703,14 @@ def validar_horas_ui():
     for m, _f in filas:
         if getattr(m, "Estado", None) == "Pendiente":
             total_pend += 1
-        horas_val = (
-            getattr(m, "Horas", None)
-            or getattr(m, "Total_Horas", None)
-            or getattr(m, "Horas_Regulares", None)
-            or 0
-        )
-        try:
-            total_horas += float(horas_val)
-        except Exception:
-            pass
+        hv = _horas_val(m)
+        if hv is not None:
+            total_horas += hv
 
     return render_template(
         "validar_horas.html",
         filas=filas,
+        horas_val=_horas_val,
         year=year,
         month=month,
         estado=estado,
@@ -653,7 +726,6 @@ def _set_dt_field(obj, name, value_str):
     if not value_str:
         return
     try:
-        # soporta 'YYYY-MM-DDTHH:MM' o 'YYYY-MM-DD HH:MM'
         value_str = value_str.replace("T", " ")
         dt = datetime.fromisoformat(value_str)
     except Exception:
@@ -710,8 +782,8 @@ def ajustar_marcacion(mid):
         _set_if_attr(m, "Observacion", obs)
         _set_if_attr(m, "Observaciones", obs)
 
-    _set_if_attr(m, "Estado", "Pendiente")  # vuelve a pendiente hasta que el jefe apruebe
-    _set_if_attr(m, "Validado_Por", None)   # por si tienes ese campo
+    _set_if_attr(m, "Estado", "Pendiente")
+    _set_if_attr(m, "Validado_Por", None)
 
     db.session.commit()
     return jsonify({"ok": True, "horas": horas_calc})
@@ -733,7 +805,6 @@ def ajustar_y_aprobar(mid):
     if not m:
         return jsonify({"ok": False, "error": "Marcación no encontrada"}), 404
 
-    # 1) Ajustes (misma lógica que /ajustar)
     ent = payload.get("Entrada")
     sal = payload.get("Salida")
     if ent:
@@ -760,15 +831,13 @@ def ajustar_y_aprobar(mid):
         _set_if_attr(m, "Observacion", obs)
         _set_if_attr(m, "Observaciones", obs)
 
-    # 2) Aprueba
     _set_if_attr(m, "Estado", "Aprobado")
     _set_if_attr(m, "Validado_Por", _registrado_por())
 
-    # 3) Auditoría liviana (opcional)
     try:
         db.session.add(FuncionarioHistorial(
             Codigo_Funcionario = m.Codigo_Funcionario,
-            Fecha_Evento       = datetime.utcnow(),
+            Fecha_Evento       = datetime.now(),
             Tipo_Evento        = "Ajuste horas",
             Detalle            = f"Ajuste/aprobación de marcación #{getattr(m,'Id',None)}",
             Valor_Anterior     = None,
@@ -783,7 +852,6 @@ def ajustar_y_aprobar(mid):
 
 @hrm_bp.route("/marcaciones/<int:mid>/aprobar", methods=["PATCH"])
 def aprobar_marcacion(mid):
-    """Aprueba una marcación. Opcionalmente permite nota de validación."""
     payload = request.get_json(silent=True) or {}
     m = Marcacion.query.get(mid)
     if not m:
@@ -800,7 +868,6 @@ def aprobar_marcacion(mid):
 
 @hrm_bp.route("/marcaciones/<int:mid>/rechazar", methods=["PATCH"])
 def rechazar_marcacion(mid):
-    """Rechaza una marcación. Requiere observación para feedback al colaborador."""
     payload = request.get_json(silent=True) or {}
     obs = payload.get("Observacion")
     if not obs:
@@ -823,11 +890,10 @@ def aprobar_lote():
     Aprueba en lote todas las marcaciones 'Pendiente' del filtro seleccionado.
     JSON opcional:
       {
-        "func": 123,         # si se quiere filtrar por funcionario
-        "dep": "Recepción",  # si se quiere filtrar por departamento
+        "func": 123,
+        "dep": "Recepción",
         "y": 2025, "m": 11
       }
-    Si no se envía JSON, usa los query params de /val-horas.
     """
     payload = request.get_json(silent=True) or {}
     func_id = payload.get("func") or request.args.get("func", type=int)
@@ -861,5 +927,4 @@ def aprobar_lote():
 
     db.session.commit()
     return jsonify({"ok": True, "aprobadas": count})
-
 

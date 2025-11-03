@@ -55,38 +55,96 @@
   <section class="section">
     <div class="container" data-aos="fade-up">
 
+      <!-- Estado y acciones -->
       <div class="card shadow-sm border-0 mb-4">
         <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
           <div>
             <div class="fw-semibold">Estado de hoy</div>
-            {% if actual and actual.Estado == 'Abierta' %}
-              <span class="badge-open"><i class="bi bi-circle-half"></i> Jornada abierta</span>
-              <div class="text-muted small">Entrada: {{ actual.Hora_Entrada.strftime('%H:%M') if actual.Hora_Entrada else '—' }}</div>
-            {% elif actual and actual.Estado == 'Cerrada' %}
-              <span class="badge-close"><i class="bi bi-check-circle"></i> Jornada cerrada</span>
-              <div class="text-muted small">
-                Entrada: {{ actual.Hora_Entrada.strftime('%H:%M') if actual.Hora_Entrada else '—' }} ·
-                Salida: {{ actual.Hora_Salida.strftime('%H:%M') if actual.Hora_Salida else '—' }} ·
-                Horas: {{ '%.2f'|format(actual.Horas_Regulares or 0) }}
-              </div>
+
+            {% if actual %}
+              {% set est_hoy = estado_render(actual) %}
+              {% if est_hoy == 'Abierta' %}
+                <span class="badge-open"><i class="bi bi-circle-half"></i> Jornada abierta</span>
+                <div class="text-muted small">
+                  Entrada: {{ actual.Hora_Entrada.strftime('%H:%M') if actual.Hora_Entrada else '—' }}
+                </div>
+              {% elif est_hoy == 'Cerrada' %}
+                <span class="badge-close"><i class="bi bi-check-circle"></i> Jornada cerrada</span>
+                <div class="text-muted small">
+                  Entrada: {{ actual.Hora_Entrada.strftime('%H:%M') if actual.Hora_Entrada else '—' }} ·
+                  Salida: {{ actual.Hora_Salida.strftime('%H:%M') if actual.Hora_Salida else '—' }} ·
+                  Horas: {{ '%.2f'|format(horas_val(actual) or 0) }}
+                </div>
+              {% else %}
+                <span class="chip">Sin marcación hoy</span>
+              {% endif %}
             {% else %}
               <span class="chip">Sin marcación hoy</span>
             {% endif %}
           </div>
 
           <div class="d-flex gap-2">
-            <button id="btnIn"  class="btn btn-theme"         {% if actual and actual.Estado=='Abierta' %}disabled{% elif actual and actual.Estado=='Cerrada' %}disabled{% endif %}>
+            {% set est_btn = estado_render(actual) if actual else 'Ninguno' %}
+            <button
+              id="btnIn"
+              class="btn btn-theme"
+              {% if est_btn in ['Abierta','Cerrada'] %}disabled{% endif %}>
               <i class="bi bi-box-arrow-in-right"></i> Fichar entrada
             </button>
-            <button id="btnOut" class="btn btn-outline-secondary" {% if not actual or (actual and actual.Estado!='Abierta') %}disabled{% endif %}>
+            <button
+              id="btnOut"
+              class="btn btn-outline-secondary"
+              {% if est_btn != 'Abierta' %}disabled{% endif %}>
               <i class="bi bi-box-arrow-left"></i> Fichar salida
             </button>
           </div>
         </div>
       </div>
 
+      <!-- Selector de rango -->
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+          <form class="row gy-2 gx-3 align-items-end" method="get" action="/hrm/mis-horas">
+            {% if request.args.get('func') %}
+              <input type="hidden" name="func" value="{{ request.args.get('func') }}">
+            {% endif %}
+
+            <div class="col-md-3">
+              <label class="form-label">Rango</label>
+              <select class="form-select" name="r" id="rangoSelect">
+                <option value="30d" {{ 'selected' if rango_sel=='30d' else '' }}>Últimos 30 días</option>
+                <option value="mes"  {{ 'selected' if rango_sel=='mes'  else '' }}>Mes actual</option>
+                <option value="custom" {{ 'selected' if rango_sel=='custom' else '' }}>Personalizado</option>
+              </select>
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">Desde</label>
+              <input type="date" class="form-control" name="start" id="startInput"
+                     value="{{ (start_sel|string) }}" >
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label">Hasta</label>
+              <input type="date" class="form-control" name="end" id="endInput"
+                     value="{{ (end_sel|string) }}" >
+            </div>
+
+            <div class="col-md-3">
+              <button type="submit" class="btn btn-theme w-100">
+                <i class="bi bi-funnel"></i> Aplicar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Tabla -->
       <div class="card shadow-sm border-0">
-        <div class="card-header"><h5 class="mb-0">Últimos 30 días</h5></div>
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Registros</h5>
+          <div class="text-muted small">Total horas: <strong>{{ '%.2f'|format(total_horas or 0) }}</strong></div>
+        </div>
         <div class="card-body p-0">
           <div class="table-responsive">
             <table class="table align-middle mb-0">
@@ -104,15 +162,16 @@
                   <tr><td colspan="5" class="text-center text-muted py-4">No hay registros.</td></tr>
                 {% else %}
                   {% for r in items %}
+                  {% set est = estado_render(r) %}
                   <tr>
                     <td>{{ r.Fecha.strftime('%d/%m/%Y') }}</td>
                     <td>{{ r.Hora_Entrada.strftime('%H:%M') if r.Hora_Entrada else '—' }}</td>
                     <td>{{ r.Hora_Salida.strftime('%H:%M') if r.Hora_Salida else '—' }}</td>
-                    <td class="text-end">{{ '%.2f'|format(r.Horas_Regulares or 0) }}</td>
+                    <td class="text-end">{{ '%.2f'|format(horas_val(r) or 0) }}</td>
                     <td>
-                      {% if r.Estado == 'Abierta' %}
+                      {% if est == 'Abierta' %}
                         <span class="badge-open">Abierta</span>
-                      {% elif r.Estado == 'Cerrada' %}
+                      {% elif est == 'Cerrada' %}
                         <span class="badge-close">Cerrada</span>
                       {% else %}
                         <span class="chip">Pendiente</span>
@@ -137,21 +196,35 @@
 
 <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script>
+  // Habilitar/Deshabilitar inputs de fecha según selección
+  function toggleCustomDates(){
+    const sel = document.getElementById('rangoSelect').value;
+    const s   = document.getElementById('startInput');
+    const e   = document.getElementById('endInput');
+    const isCustom = (sel === 'custom');
+    s.disabled = !isCustom;
+    e.disabled = !isCustom;
+  }
+  document.getElementById('rangoSelect')?.addEventListener('change', toggleCustomDates);
+  toggleCustomDates();
+
   async function postJSON(url, body){
     const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body || {})});
-    return { ok: r.ok, json: await r.json() };
+    let json = {};
+    try { json = await r.json(); } catch(e){}
+    return { ok: r.ok, json };
   }
 
   document.getElementById('btnIn')?.addEventListener('click', async ()=>{
     const {ok, json} = await postJSON('/hrm/mis-horas/entrada', {});
     if(ok && json.ok){ location.reload(); }
-    else{ alert(json.error || 'No se pudo registrar la entrada'); }
+    else{ alert((json && json.error) || 'No se pudo registrar la entrada'); }
   });
 
   document.getElementById('btnOut')?.addEventListener('click', async ()=>{
     const {ok, json} = await postJSON('/hrm/mis-horas/salida', {});
     if(ok && json.ok){ location.reload(); }
-    else{ alert(json.error || 'No se pudo registrar la salida'); }
+    else{ alert((json && json.error) || 'No se pudo registrar la salida'); }
   });
 </script>
 </body>
