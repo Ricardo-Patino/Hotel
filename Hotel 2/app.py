@@ -893,6 +893,10 @@ def create_app() -> Flask:
     # === Eventos (EVT) ===
     from blueprints.evt import evt_bp
     app.register_blueprint(evt_bp)
+
+    # === AREP (Analítica y Reportes) ===
+    from blueprints.arep import arep_bp
+    app.register_blueprint(arep_bp)
     
 
     # ------------------------- Helpers para GRR-01-003 -------------------------

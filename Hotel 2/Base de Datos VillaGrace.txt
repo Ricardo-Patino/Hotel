@@ -75,7 +75,7 @@ DROP TABLE IF EXISTS KPI_Stats;
 DROP TABLE IF EXISTS Audit_Log;
 DROP TABLE IF EXISTS Auditoria_Log;
 
-ET FOREIGN_KEY_CHECKS = 0;
+SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS EvtWorkOrder;
 DROP TABLE IF EXISTS EvtNotificacion;
 DROP TABLE IF EXISTS EvtEncuesta;
@@ -90,6 +90,10 @@ DROP TABLE IF EXISTS EvtRecurso;
 DROP TABLE IF EXISTS EvtSalon;
 SET FOREIGN_KEY_CHECKS = 1;
 
+DROP TABLE IF EXISTS ArepExportLog;
+DROP TABLE IF EXISTS ArepSatisfaccion;
+DROP TABLE IF EXISTS ArepAtencion;
+DROP TABLE IF EXISTS ArepViewConfig;
 SET FOREIGN_KEY_CHECKS = 1;
 
 /* ------------------------------------------------------------------------- */
@@ -330,7 +334,7 @@ CREATE TABLE ReservaEstancia (
   Codigo_Reserva     INT NOT NULL,
   Habitacion_Id      INT NOT NULL,
   Fecha_Desde        DATE NOT NULL,
-  Fecha_Hasta        DATE NOT NULL,  -- [Desde, Hasta)
+  Fecha_Hasta        DATE NOT NULL,  -- (Desde, Hasta)
   Origen             ENUM('Automatico','Manual','Reasignacion','Union','Division') NOT NULL DEFAULT 'Automatico',
   Decision_Id        INT NULL,
   Score_Total        DECIMAL(9,4) NULL,
@@ -886,14 +890,14 @@ ALTER TABLE fin_period_lock
    Ajustado al esquema Hotel VillaGrace (tabla Reserva)
    =============================================================== */
 
-/* 1️⃣ fin_cash_movement → agregar vínculos */
+/* 1️ fin_cash_movement → agregar vínculos */
 ALTER TABLE fin_cash_movement
   ADD COLUMN reserva_id INT NULL AFTER estado,
   ADD COLUMN ledger_entry_id INT NULL AFTER reserva_id,
   ADD INDEX idx_fin_cash_movement_reserva (reserva_id),
   ADD INDEX idx_fin_cash_movement_ledger (ledger_entry_id);
 
-/* 2️⃣ fin_payment → crear o asegurar columnas */
+/* 2️ fin_payment → crear o asegurar columnas */
 CREATE TABLE IF NOT EXISTS fin_payment (
     id_payment        INT AUTO_INCREMENT PRIMARY KEY,
     reserva_id        INT NOT NULL,
@@ -909,13 +913,13 @@ CREATE TABLE IF NOT EXISTS fin_payment (
     INDEX idx_fin_payment_reserva (reserva_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/* 3️⃣ Reserva → agregar columnas para totales y pagos */
+/* 3️ Reserva → agregar columnas para totales y pagos */
 ALTER TABLE Reserva
   ADD COLUMN Monto_Total_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total,
   ADD COLUMN Monto_Pagado_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total_Acumulado,
   ADD INDEX idx_reserva_balance (Monto_Total_Acumulado, Monto_Pagado_Acumulado);
 
-/* 4️⃣ Libro contable (fin_ledger) */
+/* 4️ Libro contable (fin_ledger) */
 CREATE TABLE IF NOT EXISTS fin_ledger (
     id_entry        INT AUTO_INCREMENT PRIMARY KEY,
     fecha           DATETIME NOT NULL DEFAULT NOW(),
@@ -1374,6 +1378,63 @@ VALUES ('ACME10','porcentaje',10,CURDATE(),DATE_ADD(CURDATE(),INTERVAL 30 DAY),1
 ON DUPLICATE KEY UPDATE Valor=VALUES(Valor), Valido_Desde=VALUES(Valido_Desde), Valido_Hasta=VALUES(Valido_Hasta), Max_Usos=VALUES(Max_Usos), Activo=VALUES(Activo);
 
 
+/* ===========================================================
+   SEEDS — Analítica y Reportes Administrativos (AREP)
+   =========================================================== */
+
+-- Preferencia de visualización por defecto (si no existe)
+INSERT INTO ArepViewConfig (Codigo_Usuario, Nombre_Reporte, Encabezado_JSON, Columnas_JSON, Filtros_JSON)
+SELECT
+  (SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1),
+  'Dashboard General',
+  JSON_OBJECT('titulo','Panel Ejecutivo','sub','Hotel Villa Grace','logo','/static/assets/img/favicon.png'),
+  JSON_ARRAY('mes','ocupacion','ingresos','servicios'),
+  JSON_OBJECT('fecha_desde', DATE_FORMAT(CURDATE()-INTERVAL 90 DAY, '%Y-%m-%d'),
+              'fecha_hasta', DATE_FORMAT(CURDATE(), '%Y-%m-%d'),
+              'tipo_cliente', 'TODOS',
+              'tipo_servicio','TODOS')
+WHERE NOT EXISTS (
+  SELECT 1 FROM ArepViewConfig
+  WHERE Nombre_Reporte='Dashboard General'
+    AND Codigo_Usuario=(SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1)
+);
+
+-- Muestras de tiempos de atención (si tienes funcionarios creados)
+INSERT INTO ArepAtencion (Codigo_Funcionario, Area, Inicio_Atencion, Fin_Atencion, Origen, Ref_Id)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='305410583' LIMIT 1),
+  'RECEPCION',
+  CONCAT(CURDATE(),' 08:15:00'),
+  CONCAT(CURDATE(),' 08:27:00'),
+  'Reserva','R-1001'
+WHERE NOT EXISTS (SELECT 1 FROM ArepAtencion WHERE Origen='Reserva' AND Ref_Id='R-1001');
+
+INSERT INTO ArepAtencion (Codigo_Funcionario, Area, Inicio_Atencion, Fin_Atencion, Origen, Ref_Id)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='107720872' LIMIT 1),
+  'MANTENIMIENTO',
+  CONCAT(CURDATE(),' 10:10:00'),
+  CONCAT(CURDATE(),' 10:55:00'),
+  'Ticket','MNT-2001'
+WHERE NOT EXISTS (SELECT 1 FROM ArepAtencion WHERE Origen='Ticket' AND Ref_Id='MNT-2001');
+
+-- Muestras de satisfacción (NPS)
+INSERT INTO ArepSatisfaccion (Codigo_Funcionario, Puntaje, Comentario, Fuente)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='105440693' LIMIT 1),
+  9, 'Servicio de limpieza impecable', 'POST_ESTANCIA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM ArepSatisfaccion WHERE Comentario='Servicio de limpieza impecable'
+);
+
+INSERT INTO ArepSatisfaccion (Codigo_Funcionario, Puntaje, Comentario, Fuente)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='305410583' LIMIT 1),
+  7, 'Check-in rápido pero estacionamiento lleno', 'POST_ESTANCIA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM ArepSatisfaccion WHERE Comentario='Check-in rápido pero estacionamiento lleno'
+);
+
 
 -- ==========================================
 -- Seeds de EVT – Gestión de Eventos y Actividades 
@@ -1459,9 +1520,6 @@ SELECT e.Id, e.Titulo, e.Estado, e.Inicio, s.Nombre AS Salon
 FROM EvtEvento e LEFT JOIN EvtSalon s ON s.Id=e.Salon_Id
 ORDER BY e.Inicio DESC;
 
-/* ===============================================================
-   HU 1 de HRM — Empleados y expediente
-   =============================================================== */
 
 /* ============================================================
    HRM-08-001 — Extensión de tabla Funcionario
@@ -1534,6 +1592,74 @@ CREATE TABLE IF NOT EXISTS `Marcacion` (
   CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+/* ===========================================================
+   Hotel Villa Grace — AREP (Analítica y Reportes)
+   =========================================================== */
+
+/* -----------------------------------------------------------
+   Preferencias / configuración de visualización por usuario
+   ----------------------------------------------------------- */
+CREATE TABLE ArepViewConfig (
+  Codigo_ArepConfig INT NOT NULL AUTO_INCREMENT,
+  Codigo_Usuario    INT NULL,                    -- FK a Usuario.Codigo_Usuario (si existe)
+  Nombre_Reporte    VARCHAR(120) NOT NULL,       -- p.ej. 'Dashboard General' / 'Ranking'
+  Encabezado_JSON   JSON NULL,                   -- {logo, titulo, sub, ...}
+  Columnas_JSON     JSON NULL,                   -- columnas visibles/orden
+  Filtros_JSON      JSON NULL,                   -- filtros persistidos
+  Fecha_Creacion    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepViewConfig PRIMARY KEY (Codigo_ArepConfig),
+  CONSTRAINT UQ_ArepViewConfig UNIQUE (Codigo_Usuario, Nombre_Reporte)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* -----------------------------------------------------------
+   Tiempos de atención (para SLAs y ranking de personal)
+   ----------------------------------------------------------- */
+CREATE TABLE ArepAtencion (
+  Codigo_ArepAtencion  INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario   INT NULL,                 -- FK a Funcionario.Codigo_Funcionario (si existe)
+  Area                 ENUM('RECEPCION','MANTENIMIENTO','COCINA','CONCIERGE','OTRA') NOT NULL DEFAULT 'RECEPCION',
+  Inicio_Atencion      DATETIME NOT NULL,
+  Fin_Atencion         DATETIME NOT NULL,
+  Duracion_Seg         INT AS (TIMESTAMPDIFF(SECOND, Inicio_Atencion, Fin_Atencion)) STORED,
+  Origen               VARCHAR(50) NULL,         -- p.ej. 'Reserva','Ticket','Evento'
+  Ref_Id               VARCHAR(50) NULL,         -- id de referencia a la entidad de origen
+  Fecha_Creacion       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepAtencion PRIMARY KEY (Codigo_ArepAtencion),
+  KEY IX_ArepAtencion_Func (Codigo_Funcionario),
+  KEY IX_ArepAtencion_Area (Area),
+  KEY IX_ArepAtencion_Fechas (Inicio_Atencion, Fin_Atencion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* -----------------------------------------------------------
+   Satisfacción (NPS / encuestas por empleado)
+   ----------------------------------------------------------- */
+CREATE TABLE ArepSatisfaccion (
+  Codigo_ArepSatisfaccion INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario      INT NULL,              -- FK a Funcionario.Codigo_Funcionario (si existe)
+  Puntaje                 TINYINT NOT NULL,      -- 0..10 (o 1..5; usamos 0..10 estilo NPS)
+  Comentario              TEXT NULL,
+  Fuente                  ENUM('POST_ESTANCIA','POS_EVENTO','OTRA') NOT NULL DEFAULT 'POST_ESTANCIA',
+  Fecha_Registro          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepSatisfaccion PRIMARY KEY (Codigo_ArepSatisfaccion),
+  KEY IX_ArepSat_Func (Codigo_Funcionario),
+  KEY IX_ArepSat_Fecha (Fecha_Registro)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* -----------------------------------------------------------
+   Log de exportaciones (PDF / XLSX)
+   ----------------------------------------------------------- */
+CREATE TABLE ArepExportLog (
+  Codigo_ArepExport  INT NOT NULL AUTO_INCREMENT,
+  Tipo               ENUM('PDF','XLSX') NOT NULL,
+  Nombre_Reporte     VARCHAR(120) NOT NULL,
+  Codigo_Usuario     INT NULL,
+  Filtros_JSON       JSON NULL,
+  Fecha_Export       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepExportLog PRIMARY KEY (Codigo_ArepExport),
+  KEY IX_ArepExport_Fecha (Fecha_Export)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 /* ------------------------------------------------------------------------- */
 /* Verificaciones rápidas                                                    */
@@ -1552,6 +1678,9 @@ SELECT * FROM InvMovimiento;
 SELECT * FROM KPI_Stats;
 SELECT * FROM Coupon;
 SELECT * FROM Waitlist;
+SELECT * FROM ArepViewConfig;
+SELECT Codigo_ArepAtencion, Area, Duracion_Seg FROM ArepAtencion ORDER BY Codigo_ArepAtencion DESC;
+SELECT Codigo_ArepSatisfaccion, Puntaje FROM ArepSatisfaccion ORDER BY Codigo_ArepSatisfaccion DESC;
 
 
 SELECT period_key, status, locked_at
