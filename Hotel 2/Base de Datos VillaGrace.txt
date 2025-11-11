@@ -1,4 +1,3 @@
-
 /* ============================================================================
    Hotel Villa Grace — Esquema MySQL 8.x (InnoDB, UTF8MB4)
    Script limpio para recrear la BD con seeds mínimos
@@ -540,7 +539,7 @@ CREATE TABLE fin_invoices (
   id_factura      INT NOT NULL AUTO_INCREMENT,
   numero          VARCHAR(50) NOT NULL,
   cliente_nombre  VARCHAR(120) NULL,
-  cliente_email  VARCHAR(120) NULL,
+  cliente_email   VARCHAR(120) NULL,
   moneda          VARCHAR(10)  NOT NULL DEFAULT 'CRC',
   monto_total     DECIMAL(12,2) NOT NULL,
   descripcion     TEXT NULL,
@@ -1211,6 +1210,100 @@ CREATE TABLE EvtWorkOrder (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+
+/* ============================================================
+   HRM-08-002 — Extensión de tabla Funcionario
+   Agrega campos laborales, bancarios y de control de estado
+   ============================================================ */
+
+CREATE TABLE IF NOT EXISTS `Marcacion` (
+  `Id` int NOT NULL AUTO_INCREMENT,
+  `Codigo_Funcionario` int NOT NULL,
+  `Fecha` date NOT NULL,
+  `Hora_Entrada` datetime DEFAULT NULL,
+  `Hora_Salida` datetime DEFAULT NULL,
+  `Horas_Regulares` decimal(6,2) DEFAULT NULL,
+  `Estado` enum('Abierta','Cerrada','Pendiente') NOT NULL DEFAULT 'Abierta',
+  `Observaciones` varchar(255) DEFAULT NULL,
+  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Fecha_Actualiza` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`Id`),
+  KEY `idx_marcacion_func` (`Codigo_Funcionario`),
+  KEY `idx_marcacion_fecha` (`Fecha`),
+  KEY `idx_marcacion_estado` (`Estado`),
+  CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+/* ===========================================================
+   Hotel Villa Grace — AREP (Analítica y Reportes)
+   =========================================================== */
+
+/* -----------------------------------------------------------
+   Preferencias / configuración de visualización por usuario
+   ----------------------------------------------------------- */
+CREATE TABLE ArepViewConfig (
+  Codigo_ArepConfig INT NOT NULL AUTO_INCREMENT,
+  Codigo_Usuario    INT NULL,                    -- FK a Usuario.Codigo_Usuario (si existe)
+  Nombre_Reporte    VARCHAR(120) NOT NULL,       -- p.ej. 'Dashboard General' / 'Ranking'
+  Encabezado_JSON   JSON NULL,                   -- {logo, titulo, sub, ...}
+  Columnas_JSON     JSON NULL,                   -- columnas visibles/orden
+  Filtros_JSON      JSON NULL,                   -- filtros persistidos
+  Fecha_Creacion    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepViewConfig PRIMARY KEY (Codigo_ArepConfig),
+  CONSTRAINT UQ_ArepViewConfig UNIQUE (Codigo_Usuario, Nombre_Reporte)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* -----------------------------------------------------------
+   Tiempos de atención (para SLAs y ranking de personal)
+   ----------------------------------------------------------- */
+CREATE TABLE ArepAtencion (
+  Codigo_ArepAtencion  INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario   INT NULL,                 -- FK a Funcionario.Codigo_Funcionario (si existe)
+  Area                 ENUM('RECEPCION','MANTENIMIENTO','COCINA','CONCIERGE','OTRA') NOT NULL DEFAULT 'RECEPCION',
+  Inicio_Atencion      DATETIME NOT NULL,
+  Fin_Atencion         DATETIME NOT NULL,
+  Duracion_Seg         INT AS (TIMESTAMPDIFF(SECOND, Inicio_Atencion, Fin_Atencion)) STORED,
+  Origen               VARCHAR(50) NULL,         -- p.ej. 'Reserva','Ticket','Evento'
+  Ref_Id               VARCHAR(50) NULL,         -- id de referencia a la entidad de origen
+  Fecha_Creacion       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepAtencion PRIMARY KEY (Codigo_ArepAtencion),
+  KEY IX_ArepAtencion_Func (Codigo_Funcionario),
+  KEY IX_ArepAtencion_Area (Area),
+  KEY IX_ArepAtencion_Fechas (Inicio_Atencion, Fin_Atencion)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* -----------------------------------------------------------
+   Satisfacción (NPS / encuestas por empleado)
+   ----------------------------------------------------------- */
+CREATE TABLE ArepSatisfaccion (
+  Codigo_ArepSatisfaccion INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario      INT NULL,              -- FK a Funcionario.Codigo_Funcionario (si existe)
+  Puntaje                 TINYINT NOT NULL,      -- 0..10 (o 1..5; usamos 0..10 estilo NPS)
+  Comentario              TEXT NULL,
+  Fuente                  ENUM('POST_ESTANCIA','POS_EVENTO','OTRA') NOT NULL DEFAULT 'POST_ESTANCIA',
+  Fecha_Registro          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepSatisfaccion PRIMARY KEY (Codigo_ArepSatisfaccion),
+  KEY IX_ArepSat_Func (Codigo_Funcionario),
+  KEY IX_ArepSat_Fecha (Fecha_Registro)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* -----------------------------------------------------------
+   Log de exportaciones (PDF / XLSX)
+   ----------------------------------------------------------- */
+CREATE TABLE ArepExportLog (
+  Codigo_ArepExport  INT NOT NULL AUTO_INCREMENT,
+  Tipo               ENUM('PDF','XLSX') NOT NULL,
+  Nombre_Reporte     VARCHAR(120) NOT NULL,
+  Codigo_Usuario     INT NULL,
+  Filtros_JSON       JSON NULL,
+  Fecha_Export       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ArepExportLog PRIMARY KEY (Codigo_ArepExport),
+  KEY IX_ArepExport_Fecha (Fecha_Export)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 /* ----------------------------------------------------------------------------------------------------------------- */
 /* --------------------------------------------------------------Notas:----------------------------------------------*/
 /* 1) EvtSalon.Nombre, EvtRecurso.Nombre y EvtPlantilla.Nombre deben ser UNIQUE para que ON DUPLICATE funcione.---- */
@@ -1219,7 +1312,6 @@ CREATE TABLE EvtWorkOrder (
 /*    -WHERE Nombre='Consola Audio 8ch' AND InvInsumo_Id IS NULL;-------------------------------------------------- */
 /* 3) El evento demo queda en BORRADOR para que pruebes moverlo en el calendario y luego CONFIRMAR desde la UI.----*/
 /* ----------------------------------------------------------------------------------------------------------------*/
-
 
 
 
@@ -1252,6 +1344,7 @@ INSERT INTO Funcionario (Cedula,Nombre,Apellido,Puesto,Fecha_Nacimiento) VALUES
  ('305410583','Juan','Jiménez','Recepcionista','1998-03-21'),
  ('107720872','María','Jimenez','Administrador','1991-04-11'),
  ('105440693','Ana','Coto','Limpieza','1993-02-22');
+
 
 -- Clientes
 INSERT INTO Cliente (Cedula,Nombre,Apellido,Telefono,Correo,Fecha_Nacimiento) VALUES
@@ -1521,165 +1614,6 @@ FROM EvtEvento e LEFT JOIN EvtSalon s ON s.Id=e.Salon_Id
 ORDER BY e.Inicio DESC;
 
 
-/* ============================================================
-   HRM-08-001 — Extensión de tabla Funcionario
-   Agrega campos laborales, bancarios y de control de estado
-   ============================================================ */
-
-ALTER TABLE Funcionario
-  ADD COLUMN Departamento         VARCHAR(80) NULL AFTER Puesto,
-  ADD COLUMN Fecha_Ingreso        DATE NOT NULL DEFAULT (CURDATE()) AFTER Fecha_Nacimiento,
-  ADD COLUMN Salario_Base_Mensual DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Fecha_Ingreso,
-  ADD COLUMN Estado_Empleado      ENUM('Activo','Inactivo','Suspendido') NOT NULL DEFAULT 'Activo' AFTER Salario_Base_Mensual,
-  ADD COLUMN Tipo_Contrato        ENUM('Tiempo completo','Medio tiempo','Servicios profesionales','Temporal') NOT NULL DEFAULT 'Tiempo completo' AFTER Estado_Empleado,
-  ADD COLUMN Cuenta_Bancaria      VARCHAR(60) NULL AFTER Tipo_Contrato,
-  ADD COLUMN Banco                VARCHAR(60) NULL AFTER Cuenta_Bancaria,
-  ADD COLUMN Fecha_mod_alta       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER Fecha_modificacion;
-
--- Índices útiles para búsquedas
-ALTER TABLE Funcionario
-  ADD INDEX IX_Funcionario_Departamento (Departamento),
-  ADD INDEX IX_Funcionario_Estado (Estado_Empleado),
-  ADD INDEX IX_Funcionario_FechaIngreso (Fecha_Ingreso);
-
-CREATE TABLE FuncionarioHistorial (
-  Id_Historial        INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario  INT NOT NULL,
-  Fecha_Evento        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Tipo_Evento         ENUM(
-      'Ingreso',
-      'Cambio Puesto',
-      'Cambio Salario',
-      'Amonestacion',
-      'Reconocimiento',
-      'Vacaciones',
-      'Incapacidad',
-      'Salida'
-  ) NOT NULL,
-  Detalle             VARCHAR(500) NULL,
-  Valor_Anterior      VARCHAR(200) NULL,
-  Valor_Nuevo         VARCHAR(200) NULL,
-  Registrado_Por      INT NULL,              -- Codigo_Usuario que hizo el cambio
-  CONSTRAINT PK_FuncionarioHistorial PRIMARY KEY (Id_Historial),
-  CONSTRAINT FK_FuncHist_Func
-    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
-    ON UPDATE CASCADE ON DELETE CASCADE,
-  KEY IX_FuncHist_Funcionario (Codigo_Funcionario),
-  KEY IX_FuncHist_Tipo (Tipo_Evento),
-  KEY IX_FuncHist_Fecha (Fecha_Evento)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-/* ============================================================
-   HRM-08-002 — Extensión de tabla Funcionario
-   Agrega campos laborales, bancarios y de control de estado
-   ============================================================ */
-
-CREATE TABLE IF NOT EXISTS `Marcacion` (
-  `Id` int NOT NULL AUTO_INCREMENT,
-  `Codigo_Funcionario` int NOT NULL,
-  `Fecha` date NOT NULL,
-  `Hora_Entrada` datetime DEFAULT NULL,
-  `Hora_Salida` datetime DEFAULT NULL,
-  `Horas_Regulares` decimal(6,2) DEFAULT NULL,
-  `Estado` enum('Abierta','Cerrada','Pendiente') NOT NULL DEFAULT 'Abierta',
-  `Observaciones` varchar(255) DEFAULT NULL,
-  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `Fecha_Actualiza` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`Id`),
-  KEY `idx_marcacion_func` (`Codigo_Funcionario`),
-  KEY `idx_marcacion_fecha` (`Fecha`),
-  KEY `idx_marcacion_estado` (`Estado`),
-  CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;CREATE TABLE IF NOT EXISTS `Marcacion` (
-  `Id` int NOT NULL AUTO_INCREMENT,
-  `Codigo_Funcionario` int NOT NULL,
-  `Fecha` date NOT NULL,
-  `Hora_Entrada` datetime DEFAULT NULL,
-  `Hora_Salida` datetime DEFAULT NULL,
-  `Horas_Regulares` decimal(6,2) DEFAULT NULL,
-  `Estado` enum('Abierta','Cerrada','Pendiente') NOT NULL DEFAULT 'Abierta',
-  `Observaciones` varchar(255) DEFAULT NULL,
-  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `Fecha_Actualiza` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`Id`),
-  KEY `idx_marcacion_func` (`Codigo_Funcionario`),
-  KEY `idx_marcacion_fecha` (`Fecha`),
-  KEY `idx_marcacion_estado` (`Estado`),
-  CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-/* ===========================================================
-   Hotel Villa Grace — AREP (Analítica y Reportes)
-   =========================================================== */
-
-/* -----------------------------------------------------------
-   Preferencias / configuración de visualización por usuario
-   ----------------------------------------------------------- */
-CREATE TABLE ArepViewConfig (
-  Codigo_ArepConfig INT NOT NULL AUTO_INCREMENT,
-  Codigo_Usuario    INT NULL,                    -- FK a Usuario.Codigo_Usuario (si existe)
-  Nombre_Reporte    VARCHAR(120) NOT NULL,       -- p.ej. 'Dashboard General' / 'Ranking'
-  Encabezado_JSON   JSON NULL,                   -- {logo, titulo, sub, ...}
-  Columnas_JSON     JSON NULL,                   -- columnas visibles/orden
-  Filtros_JSON      JSON NULL,                   -- filtros persistidos
-  Fecha_Creacion    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Fecha_Actualiza   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT PK_ArepViewConfig PRIMARY KEY (Codigo_ArepConfig),
-  CONSTRAINT UQ_ArepViewConfig UNIQUE (Codigo_Usuario, Nombre_Reporte)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-/* -----------------------------------------------------------
-   Tiempos de atención (para SLAs y ranking de personal)
-   ----------------------------------------------------------- */
-CREATE TABLE ArepAtencion (
-  Codigo_ArepAtencion  INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario   INT NULL,                 -- FK a Funcionario.Codigo_Funcionario (si existe)
-  Area                 ENUM('RECEPCION','MANTENIMIENTO','COCINA','CONCIERGE','OTRA') NOT NULL DEFAULT 'RECEPCION',
-  Inicio_Atencion      DATETIME NOT NULL,
-  Fin_Atencion         DATETIME NOT NULL,
-  Duracion_Seg         INT AS (TIMESTAMPDIFF(SECOND, Inicio_Atencion, Fin_Atencion)) STORED,
-  Origen               VARCHAR(50) NULL,         -- p.ej. 'Reserva','Ticket','Evento'
-  Ref_Id               VARCHAR(50) NULL,         -- id de referencia a la entidad de origen
-  Fecha_Creacion       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_ArepAtencion PRIMARY KEY (Codigo_ArepAtencion),
-  KEY IX_ArepAtencion_Func (Codigo_Funcionario),
-  KEY IX_ArepAtencion_Area (Area),
-  KEY IX_ArepAtencion_Fechas (Inicio_Atencion, Fin_Atencion)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-/* -----------------------------------------------------------
-   Satisfacción (NPS / encuestas por empleado)
-   ----------------------------------------------------------- */
-CREATE TABLE ArepSatisfaccion (
-  Codigo_ArepSatisfaccion INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario      INT NULL,              -- FK a Funcionario.Codigo_Funcionario (si existe)
-  Puntaje                 TINYINT NOT NULL,      -- 0..10 (o 1..5; usamos 0..10 estilo NPS)
-  Comentario              TEXT NULL,
-  Fuente                  ENUM('POST_ESTANCIA','POS_EVENTO','OTRA') NOT NULL DEFAULT 'POST_ESTANCIA',
-  Fecha_Registro          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_ArepSatisfaccion PRIMARY KEY (Codigo_ArepSatisfaccion),
-  KEY IX_ArepSat_Func (Codigo_Funcionario),
-  KEY IX_ArepSat_Fecha (Fecha_Registro)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-/* -----------------------------------------------------------
-   Log de exportaciones (PDF / XLSX)
-   ----------------------------------------------------------- */
-CREATE TABLE ArepExportLog (
-  Codigo_ArepExport  INT NOT NULL AUTO_INCREMENT,
-  Tipo               ENUM('PDF','XLSX') NOT NULL,
-  Nombre_Reporte     VARCHAR(120) NOT NULL,
-  Codigo_Usuario     INT NULL,
-  Filtros_JSON       JSON NULL,
-  Fecha_Export       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_ArepExportLog PRIMARY KEY (Codigo_ArepExport),
-  KEY IX_ArepExport_Fecha (Fecha_Export)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-
-
 /* ------------------------------------------------------------------------- */
 /* Verificaciones rápidas                                                    */
 /* ------------------------------------------------------------------------- */
@@ -1701,16 +1635,6 @@ SELECT * FROM ArepViewConfig;
 SELECT Codigo_ArepAtencion, Area, Duracion_Seg FROM ArepAtencion ORDER BY Codigo_ArepAtencion DESC;
 SELECT Codigo_ArepSatisfaccion, Puntaje FROM ArepSatisfaccion ORDER BY Codigo_ArepSatisfaccion DESC;
 
-
-SELECT period_key, status, locked_at
-FROM fin_period_lock
-ORDER BY period_key;
-
-DESC fin_cash_movement;
-DESC fin_payment;
-DESC Reserva;
-DESC fin_ledger;
-
 SELECT period_key, status, locked_at
 FROM fin_period_lock
 ORDER BY period_key;
@@ -1725,14 +1649,22 @@ INSERT INTO Marcacion (
   Horas_Regulares, Estado, Observaciones
 )
 VALUES (
-  4,
+  1,  -- Funcionario con Codigo_Funcionario = 1 (Juan)
   '2025-11-01',
   '2025-11-01 08:00:00',
   '2025-11-01 17:00:00',
-  ROUND(TIMESTAMPDIFF(MINUTE, '2025-11-01 08:00:00', '2025-11-01 17:00:00')/60, 2),
+  ROUND(
+    TIMESTAMPDIFF(
+      MINUTE,
+      '2025-11-01 08:00:00',
+      '2025-11-01 17:00:00'
+    ) / 60,
+    2
+  ),
   'Pendiente',
   'Carga de prueba HU-08-003'
 );
+
 
 -- Verifica qué quedó grabado
 SELECT Id, Codigo_Funcionario, Fecha, Hora_Entrada, Hora_Salida
@@ -1752,4 +1684,3 @@ FROM Marcacion
 WHERE Codigo_Funcionario = 4
   AND Fecha >= CURDATE() - INTERVAL 30 DAY
 ORDER BY Fecha DESC, Id DESC;
-
