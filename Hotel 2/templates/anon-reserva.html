@@ -23,9 +23,30 @@
       background:#e8f3ee;color:var(--vg);font-weight:700;margin-right:.5rem;
     }
     .small-help{ color:#6b7a89;font-size:.875rem; }
+    .room-card{ border:1px solid #e8ecf0; border-radius:14px; overflow:hidden; transition:box-shadow .2s, transform .05s; cursor:pointer; background:#fff;}
+    .room-card:hover{ box-shadow:0 8px 24px rgba(0,0,0,.08); }
+    .room-card.selected{ outline:3px solid #198754; transform: translateY(-1px); }
+    .room-img{ width:100%; height:140px; object-fit:cover; background:#f2f2f2; }
+    .badge-type{ background:#e8f3ee; color:var(--vg); }
+    .muted{ color:#6b7a89; }
+    .sticky-detail{ position: sticky; top: 1.25rem; }
   </style>
 </head>
-<body>
+
+{# ===== LÓGICA ROBUSTA DE VISIBILIDAD PARA RECEPCIONISTA ===== #}
+{# Evita UndefinedError si current_user no está disponible en el contexto #}
+{% set is_recepcionista = false %}
+{% if (current_user is defined) and (current_user.is_authenticated|default(false)) %}
+  {% set _rol_name = (current_user.rol|default(current_user.Rol, true)|default('', true)) %}
+  {% set _rol_id   = (current_user.rol_id|default(current_user.Rol_Id, true)|default(0, true)) %}
+  {% set is_recepcionista = (_rol_name|lower == 'recepcionista' or _rol_id in [2]) %}
+{% elif session is defined %}
+  {% set _rol_name = (session.get('Rol') or session.get('role') or '') %}
+  {% set _rol_id   = (session.get('Rol_Id') or session.get('role_id') or 0) %}
+  {% set is_recepcionista = (_rol_name|lower == 'recepcionista' or _rol_id in [2]) %}
+{% endif %}
+
+<body data-ops="{{ 1 if is_recepcionista else 0 }}">
   <div class="header-strip py-3">
     <div class="container d-flex align-items-center justify-content-between">
       <a class="text-white text-decoration-none fw-semibold" href="{{ url_for('index_html') }}">← Volver al inicio</a>
@@ -35,7 +56,7 @@
 
   <main class="container py-4 py-md-5">
     <div class="row justify-content-center">
-      <div class="col-lg-9 col-xl-8">
+      <div class="col-lg-10 col-xl-10">
         <div class="mb-4">
           <h1 class="h3 mb-1">Solicitud de reserva</h1>
           <p class="small-help mb-0">
@@ -49,11 +70,11 @@
           <div class="card-body">
             <div class="step mb-3 fw-semibold">Detalles de la estancia</div>
             <form id="formReserva" class="row g-3">
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
                 <label class="form-label">Llegada</label>
                 <input type="date" id="checkin" class="form-control" required>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-3">
                 <label class="form-label">Salida</label>
                 <input type="date" id="checkout" class="form-control" required>
               </div>
@@ -61,24 +82,93 @@
                 <label class="form-label">Huéspedes</label>
                 <input type="number" id="huespedes" min="1" value="1" class="form-control" required>
               </div>
-              <div class="col-6 col-md-2">
-                <label class="form-label">Tipo hab.</label>
-                <select id="tipo" class="form-select" required>
-                  <option value="">Selecciona</option>
-                  <option value="Doble">Doble</option>
-                  <option value="Triple">Triple</option>
-                  <option value="Familiar">Familiar</option>
-                  <option value="Económica">Económica</option>
+              <div class="col-6 col-md-4">
+                <label class="form-label">Tipo hab. (opcional)</label>
+                <select id="tipo" class="form-select">
+                  <option value="">Todas</option>
+                  <!-- se llena dinámicamente desde /grr/room-types -->
                 </select>
               </div>
-              <div class="col-12">
+
+              <div class="col-12 d-flex align-items-center">
                 <button type="button" id="btnCheck" class="btn btn-outline-success">
                   <i class="bi bi-search"></i> Verificar disponibilidad
                 </button>
-                <span id="availMsg" class="small-help ms-2"></span>
+                <span id="availMsg" class="small-help ms-3"></span>
               </div>
 
+              <input type="hidden" id="Codigo_Habitacion" value="">
               <hr class="mt-1 mb-0">
+
+              <div class="col-12 mt-3">
+                <div class="step mb-3 fw-semibold">Selecciona tu habitación</div>
+              </div>
+
+              <div class="col-12 col-lg-7">
+                <div id="results" class="row g-3"></div>
+                <div id="noResults" class="alert alert-warning d-none mt-2">No hay habitaciones disponibles para el rango indicado.</div>
+              </div>
+
+              <div class="col-12 col-lg-5">
+                <div class="sticky-detail">
+                  <div class="card">
+                    <div class="card-body">
+                      <div class="fw-semibold mb-2">Detalle de la habitación seleccionada</div>
+                      <div id="roomDetail" class="text-muted small">
+                        Selecciona una habitación de la lista para ver su imagen y especificaciones.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- === PASO DE PAGO === -->
+              <div class="col-12 mt-3">
+                <div class="step mb-3 fw-semibold">Pago</div>
+              </div>
+
+              <div class="col-12">
+                <div class="alert alert-info small" id="pay-hint">
+                  El pago se procesa para confirmar la reserva. Los datos de tarjeta no se almacenan.
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label">Método</label>
+                <select id="pay_method" class="form-select">
+                  <option value="tarjeta" selected>Tarjeta en línea</option>
+                </select>
+              </div>
+
+              <!-- Campos de tarjeta (se ocultan si se usa datáfono) -->
+              <div id="card-fields" class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Nombre en la tarjeta</label>
+                  <input type="text" id="card_name" class="form-control" maxlength="80" autocomplete="cc-name">
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Número de tarjeta</label>
+                  <input type="text" id="card_number" class="form-control" inputmode="numeric" autocomplete="cc-number" maxlength="19" placeholder="XXXX XXXX XXXX XXXX">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">Expira (MM/AA)</label>
+                  <input type="text" id="card_exp" class="form-control" inputmode="numeric" maxlength="5" placeholder="MM/AA" autocomplete="cc-exp">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label">CVV</label>
+                  <input type="password" id="card_cvv" class="form-control" inputmode="numeric" maxlength="4" placeholder="CVV" autocomplete="cc-csc">
+                </div>
+              </div>
+
+              {# Botón especial para Recepción: SOLO si is_recepcionista=True #}
+              {% if is_recepcionista %}
+              <div class="col-12 d-flex gap-2" id="ops-pay-actions" style="display:none">
+                <button type="button" class="btn btn-outline-secondary" id="btnDataphone">
+                  <i class="bi bi-credit-card-2-front"></i> Pagar con datáfono
+                </button>
+                <span class="small text-muted align-self-center">Confirma la reserva registrando pago presencial</span>
+              </div>
+              {% endif %}
 
               <div class="col-12 mt-3">
                 <div class="step mb-3 fw-semibold">Datos personales</div>
@@ -148,58 +238,273 @@
       const availBtn = document.getElementById('btnCheck');
       const availMsg = document.getElementById('availMsg');
       const submitBtn = document.getElementById('btnSubmit');
+      const results = document.getElementById('results');
+      const noResults = document.getElementById('noResults');
+      const tipoSel = document.getElementById('tipo');
+      const ciEl = document.getElementById('checkin');
+      const coEl = document.getElementById('checkout');
+      const paxEl = document.getElementById('huespedes');
+      const roomField = document.getElementById('Codigo_Habitacion');
+      const roomDetail = document.getElementById('roomDetail');
+      const isOps = (document.body.getAttribute('data-ops') === '1');
+
+      // Pago
+      const payMethod = document.getElementById('pay_method');
+      const cardFields = document.getElementById('card-fields');
+      const opsPayActions = document.getElementById('ops-pay-actions');
+      const btnDataphone = document.getElementById('btnDataphone');
+      let currentPayMethod = 'tarjeta';   // 'tarjeta' | 'datafono'
+      let payByDataphone = false;
+
+      function maskDigits(s){ return String(s||'').replace(/\D+/g,''); }
+      function last4(num){ const d = maskDigits(num); return d.slice(-4); }
+
+      function togglePayUI(){
+        if (currentPayMethod === 'tarjeta' && !payByDataphone){
+          cardFields.style.display = '';
+        } else {
+          cardFields.style.display = 'none';
+        }
+      }
 
       function msg(type, text){
         const el = document.createElement('div');
         el.className = 'alert alert-' + type;
-        el.textContent = text;
+        el.innerHTML = text;
         alerts.innerHTML = '';
         alerts.appendChild(el);
-        setTimeout(()=>{ el.remove(); }, 6000);
+        setTimeout(()=>{ el.remove(); }, 9000);
+      }
+
+      function currency(n){
+        const val = Number(n || 0);
+        return new Intl.NumberFormat('es-CR', {style:'currency', currency:'CRC', maximumFractionDigits:0}).format(val);
+      }
+
+      function renderRooms(list){
+        results.innerHTML = '';
+        roomField.value = '';
+        roomDetail.innerHTML = 'Selecciona una habitación de la lista para ver su imagen y especificaciones.';
+
+        if(!list || list.length === 0){
+          noResults.classList.remove('d-none');
+          return;
+        }
+        noResults.classList.add('d-none');
+
+        list.forEach(r => {
+          const col = document.createElement('div');
+          col.className = 'col-12 col-md-6';
+
+          const card = document.createElement('div');
+          card.className = 'room-card h-100';
+
+          const img = document.createElement('img');
+          img.className = 'room-img';
+          img.alt = r.name || r.tipo || 'Habitación';
+          img.src = r.img || "{{ url_for('static', filename='assets/img/no-image.png') }}";
+
+          const body = document.createElement('div');
+          body.className = 'p-3';
+
+          const head = document.createElement('div');
+          head.className = 'd-flex align-items-center justify-content-between';
+          head.innerHTML = `
+            <div class="fw-semibold">${r.name || ('Hab. #' + (r.Numero_Habitacion || r.code))}</div>
+            <span class="badge badge-type">${r.tipo || '—'}</span>
+          `;
+
+          const p1 = document.createElement('div');
+          p1.className = 'muted mt-1';
+          p1.textContent = r.desc || '';
+
+          const p2 = document.createElement('div');
+          p2.className = 'mt-2 small';
+          p2.innerHTML = `<i class="bi bi-people"></i> Capacidad: ${r.capacity} &nbsp; · &nbsp; <i class="bi bi-cash-coin"></i> ${currency(r.price)} /noche`;
+
+          const footer = document.createElement('div');
+          footer.className = 'd-flex mt-3';
+          const btnSel = document.createElement('button');
+          btnSel.type = 'button';
+          btnSel.className = 'btn btn-sm btn-success';
+          btnSel.innerHTML = '<i class="bi bi-check2-circle"></i> Seleccionar';
+          btnSel.addEventListener('click', () => {
+            [...document.querySelectorAll('.room-card')].forEach(x => x.classList.remove('selected'));
+            card.classList.add('selected');
+            roomField.value = r.code;
+            roomDetail.innerHTML = `
+              <img src="${r.img || "{{ url_for('static', filename='assets/img/no-image.png') }}"}" class="w-100 rounded mb-2" style="max-height:220px;object-fit:cover" alt="${r.name || ''}">
+              <div class="fw-semibold">${r.name || ('Hab. #' + (r.Numero_Habitacion || r.code))}</div>
+              <div class="small mb-2 text-muted">${r.tipo || ''}</div>
+              <ul class="small mb-0">
+                <li><strong>Capacidad:</strong> ${r.capacity}</li>
+                <li><strong>Tarifa base:</strong> ${currency(r.price)} / noche</li>
+                <li><strong>Descripción:</strong> ${r.desc || '—'}</li>
+              </ul>
+            `;
+          });
+
+          footer.appendChild(btnSel);
+          body.appendChild(head);
+          body.appendChild(p1);
+          body.appendChild(p2);
+          body.appendChild(footer);
+
+          card.appendChild(img);
+          card.appendChild(body);
+          col.appendChild(card);
+          results.appendChild(col);
+        });
+      }
+
+      async function loadTypes(){
+        try{
+          const res = await fetch('/grr/room-types');
+          const data = await res.json();
+          if(data.ok && Array.isArray(data.types)){
+            data.types.forEach(t => {
+              const opt = document.createElement('option');
+              opt.value = t;
+              opt.textContent = t;
+              tipoSel.appendChild(opt);
+            });
+          }
+        }catch{}
       }
 
       async function checkAvailability(){
-        const ci = document.getElementById('checkin').value;
-        const co = document.getElementById('checkout').value;
-        const guests = document.getElementById('huespedes').value || 1;
+        const ci = ciEl.value;
+        const co = coEl.value;
+        const guests = paxEl.value || 1;
+        const tipo = tipoSel.value;
 
         availMsg.textContent = 'Verificando...';
+        availMsg.className = 'small-help';
         try{
-          const res = await fetch(`/api/availability?checkin=${encodeURIComponent(ci)}&checkout=${encodeURIComponent(co)}&guests=${encodeURIComponent(guests)}&rooms=1`);
+          const u = new URL(location.origin + '/grr/availability');
+          u.searchParams.set('checkin', ci);
+          u.searchParams.set('checkout', co);
+          u.searchParams.set('guests', guests);
+          if(tipo) u.searchParams.set('tipo', tipo);
+
+          const res = await fetch(u);
           const data = await res.json();
-          availMsg.textContent = data.message || (data.available ? 'Disponibilidad confirmada' : 'Sin cupo');
-          availMsg.className = 'small-help ' + (data.available ? 'text-success' : 'text-danger');
-          return !!data.available;
+          const ok = !!data.ok;
+          const avail = !!data.available;
+
+          availMsg.textContent = data.message || (avail ? 'Disponibilidad confirmada' : 'Sin disponibilidad en el rango de fechas indicado');
+          availMsg.className = 'small-help ' + (avail ? 'text-success' : 'text-danger');
+
+          renderRooms(Array.isArray(data.rooms) ? data.rooms : []);
+          return (ok && avail);
         }catch(e){
           availMsg.textContent = 'No se pudo validar disponibilidad.';
           availMsg.className = 'small-help text-danger';
+          renderRooms([]);
           return false;
         }
+      }
+
+      // Mostrar acciones especiales solo si el servidor indicó recepcionista
+      if (isOps && opsPayActions) {
+        opsPayActions.style.display = '';
+      }
+
+      // Listeners de pago
+      if (payMethod) {
+        payMethod.addEventListener('change', ()=>{
+          currentPayMethod = payMethod.value;
+          payByDataphone = false;
+          togglePayUI();
+        });
+      }
+      if (btnDataphone){
+        btnDataphone.addEventListener('click', ()=>{
+          currentPayMethod = 'datafono';
+          payByDataphone = true;
+          togglePayUI();
+          msg('info', 'Pago con datáfono seleccionado. No se requieren datos de tarjeta.');
+        });
+      }
+      togglePayUI();
+
+      // Mejoras de input de tarjeta
+      const cardNumber = document.getElementById('card_number');
+      if (cardNumber){
+        cardNumber.addEventListener('input', (e)=>{
+          const digits = maskDigits(e.target.value).slice(0,16);
+          e.target.value = digits.replace(/(.{4})/g,'$1 ').trim();
+        });
+      }
+      const cardExp = document.getElementById('card_exp');
+      if (cardExp){
+        cardExp.addEventListener('input', (e)=>{
+          const digits = maskDigits(e.target.value).slice(0,4);
+          e.target.value = digits.replace(/(^\d{2})(\d{1,2})?/, (m,a,b)=> b? (a+'/'+b) : a);
+        });
       }
 
       availBtn.addEventListener('click', checkAvailability);
 
       f.addEventListener('submit', async (e)=>{
         e.preventDefault();
+
+        // Validaciones mínimas
+        if(!ciEl.value || !coEl.value){
+          msg('warning', 'Indica fechas de llegada y salida.');
+          return;
+        }
+        if(!document.getElementById('acepto').checked){
+          msg('warning', 'Debes aceptar los términos y condiciones.');
+          return;
+        }
+        if(!roomField.value){
+          msg('warning', 'Selecciona una habitación de la lista antes de continuar.');
+          return;
+        }
+
+        // Construir objeto de pago
+        const payment = {
+          method: (payByDataphone ? 'datafono' : 'tarjeta'),
+          card_name:  document.getElementById('card_name')?.value || null,
+          card_last4: last4(document.getElementById('card_number')?.value),
+          card_exp:   document.getElementById('card_exp')?.value || null,
+          has_cvv: !!(document.getElementById('card_cvv')?.value)
+        };
+
+        if (payment.method === 'tarjeta' && !payByDataphone){
+          if (!payment.card_last4 || payment.card_last4.length < 4){
+            msg('warning', 'Ingresa un número de tarjeta válido.');
+            return;
+          }
+        }
+
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
 
         const payload = {
-          checkin: document.getElementById('checkin').value,
-          checkout: document.getElementById('checkout').value,
-          huespedes: document.getElementById('huespedes').value,
-          tipo: document.getElementById('tipo').value,
+          checkin: ciEl.value,
+          checkout: coEl.value,
+          huespedes: paxEl.value,
+          tipo: tipoSel.value,
+          Codigo_Habitacion: roomField.value ? parseInt(roomField.value, 10) : null,
           nombre: document.getElementById('nombre').value,
           apellido: document.getElementById('apellido').value,
           correo: document.getElementById('correo').value,
           telefono: document.getElementById('telefono').value,
           doc_tipo: document.getElementById('doc_tipo').value,
           doc_numero: document.getElementById('doc_numero').value,
-          acepta: document.getElementById('acepto').checked ? 1 : 0
+          acepta: document.getElementById('acepto').checked ? 1 : 0,
+          payment: payment,
+          actor: (isOps ? 'ops' : 'cliente')
         };
 
+        const url = isOps
+          ? '/grr/reservas/estancia-sin-reserva'
+          : '/api/reservas/anon';
+
         try{
-          const res = await fetch('/api/reservas/anon', {
+          const res = await fetch(url, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify(payload),
@@ -207,10 +512,26 @@
           });
           const data = await res.json();
           if(!data.ok){
-            throw new Error(data.message || 'No se pudo crear la reserva.');
+            throw new Error(data.message || data.msg || data.error || 'No se pudo crear la reserva.');
           }
-          // redirigir a exito
-          location.href = data.redirect || (`/reserva-sin-sesion/exito?numero=${encodeURIComponent(data.numero)}`);
+
+          if (!isOps){
+            location.href = data.redirect || (`/reserva-sin-sesion/exito?numero=${encodeURIComponent(data.numero || data.id || '')}`);
+          } else {
+            alerts.innerHTML = `
+              <div class="alert alert-success">
+                <div class="fw-semibold mb-1">Reserva creada y confirmada.</div>
+                Número de reserva: <strong>${data.numero || data.id || '—'}</strong><br>
+                Se envió al correo del cliente el <em>comprobante de pago</em>, una <em>contraseña temporal</em> y el enlace para restablecerla.<br>
+                <div class="mt-2">Pídale que revise su correo (y spam) para acceder al <strong>Portal del huésped → Mis reservas</strong>.</div>
+              </div>
+            `;
+            f.reset();
+            results.innerHTML = '';
+            roomDetail.innerHTML = 'Selecciona una habitación de la lista para ver su imagen y especificaciones.';
+            availMsg.textContent = '';
+            payByDataphone = false; currentPayMethod = 'tarjeta'; togglePayUI();
+          }
         }catch(err){
           msg('danger', err.message || 'Error inesperado.');
         }finally{
@@ -218,6 +539,9 @@
           submitBtn.innerHTML = '<i class="bi bi-send"></i> Solicitar reserva';
         }
       });
+
+      // Carga inicial
+      loadTypes();
     })();
   </script>
 </body>

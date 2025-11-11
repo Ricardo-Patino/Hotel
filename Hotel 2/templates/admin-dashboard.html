@@ -1,276 +1,434 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administración – Tablero | Hotel Villa Grace</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administración – Tablero | Hotel Villa Grace</title>
 
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
+      rel="apple-touch-icon"
+    />
 
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
 
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-  <style>
-    .metric .label { font-size:.85rem; color:#6c757d }
-    .metric .value { font-size:1.75rem; font-weight:700 }
-    .skeleton { background:linear-gradient(90deg,#eee,#f5f5f5,#eee); background-size:200% 100%; animation:s 1.2s infinite; color:transparent }
-    @keyframes s { 0%{background-position:0 0} 100%{background-position:-200% 0} }
-  </style>
-</head>
-<body class="inner-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
-        <li class="dropdown"><a href="#" class="active"><span>Administración</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-          <ul>
-            <li><a class="active" href="{{ url_for('admin_dashboard_html') }}">Tablero</a></li>
-            <li><a href="admin-users.html">Usuarios y roles</a></li>
-            <li><a href="admin-hotel.html">Perfil del hotel</a></li>
-            <li><a href="admin-rooms.html">Habitaciones</a></li>
-            <li><a href="admin-rates.html">Tarifas y temporadas</a></li>
-            <li><a href="admin-taxes.html">Impuestos y cargos</a></li>
-            <li><a href="admin-channels.html">Canales / OTAs</a></li>
-            <li><a href="admin-audit.html">Bitácora</a></li>
-            <li class="nav-item"> <a class="nav-link" href="{{ url_for('evt.calendario_evt') }}">    <i class="bi bi-calendar3"></i> Eventos</a></li>
-          </ul>
-        </li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="admin-users.html">Nuevo usuario</a>
-  </div>
-</header>
-
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Administración</h1>
-      <p>Configuración del hotel, seguridad, tarifas e integraciones.</p>
-      <nav class="breadcrumbs"><ol><li><a href="{{ url_for('index_html') }}">Inicio</a></li><li class="current">Administración</li></ol></nav>
-    </div>
-  </div>
-
-  <section class="section">
-    <div class="container" data-aos="fade-up">
-      <div class="row g-4">
-        <!-- KPIs en vivo -->
-        <div class="col-6 col-lg-3">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-body metric">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <div class="label">Reservas HOY</div>
-                  <div id="kpiDayRes" class="value skeleton">—</div>
-                  <div id="kpiDayAmt" class="small text-muted skeleton">—</div>
-                </div>
-                <i class="bi bi-calendar-day fs-3 text-success"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-6 col-lg-3">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-body metric">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <div class="label">Semana (ISO)</div>
-                  <div id="kpiWeekRes" class="value skeleton">—</div>
-                  <div id="kpiWeekAmt" class="small text-muted skeleton">—</div>
-                </div>
-                <i class="bi bi-calendar-week fs-3 text-success"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-6 col-lg-3">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-body metric">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <div class="label">Mes</div>
-                  <div id="kpiMonthRes" class="value skeleton">—</div>
-                  <div id="kpiMonthAmt" class="small text-muted skeleton">—</div>
-                </div>
-                <i class="bi bi-calendar-month fs-3 text-success"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-6 col-lg-3">
-          <a class="text-decoration-none" href="admin-audit.html">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body metric">
-                <div class="d-flex justify-content-between">
-                  <div>
-                    <div class="label">Eventos de auditoría HOY</div>
-                    <div id="auditToday" class="value skeleton">—</div>
-                    <div class="small text-muted">Bitácora</div>
-                  </div>
-                  <i class="bi bi-clipboard-data fs-3 text-success"></i>
-                </div>
-              </div>
-            </div>
-          </a>
-        </div>
-
-        <!-- Tareas rápidas -->
-        <div class="col-lg-6">
-          <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-0"><h5 class="mb-0">Tareas rápidas</h5></div>
-            <div class="card-body">
-              <div class="row g-3">
-                <div class="col-sm-6"><a href="admin-rooms.html" class="btn btn-success w-100">Crear tipo de habitación</a></div>
-                <div class="col-sm-6"><a href="admin-rates.html" class="btn btn-success w-100">Nueva tarifa/temporada</a></div>
-                <div class="col-sm-6"><a href="admin-taxes.html" class="btn btn-success w-100">Configurar impuestos</a></div>
-                <div class="col-sm-6"><a href="admin-channels.html" class="btn btn-success w-100">Conectar canal</a></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Cambios recientes (dinámico) -->
-        <div class="col-lg-6">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">Cambios recientes</h5>
-              <a href="admin-audit.html" class="btn btn-outline-secondary btn-sm">Ver bitácora</a>
-            </div>
-            <div class="card-body p-0">
-              <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Fecha</th><th>Usuario</th><th>Acción</th><th>Detalle</th>
-                    </tr>
-                  </thead>
-                  <tbody id="auditTableBody">
-                    <tr><td colspan="4" class="p-4"><span class="skeleton">Cargando auditoría…</span></td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div> <!-- row -->
-    </div>
-  </section>
-</main>
-
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong></div></div>
-</footer>
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
-
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-
-<script>
-  (function () {
-    const nfMoney = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 2 });
-    const nfInt = new Intl.NumberFormat('es-CR', { maximumFractionDigits: 0 });
-
-    function setText(id, text) {
-      const el = document.getElementById(id);
-      if (el) {
-        el.textContent = text;
-        el.classList.remove('skeleton');
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/style.css') }}"
+      rel="stylesheet"
+    />
+    <style>
+      .metric .label {
+        font-size: 0.85rem;
+        color: #6c757d;
       }
-    }
+      .metric .value {
+        font-size: 1.75rem;
+        font-weight: 700;
+      }
+      .skeleton {
+        background: linear-gradient(90deg, #eee, #f5f5f5, #eee);
+        background-size: 200% 100%;
+        animation: s 1.2s infinite;
+        color: transparent;
+      }
+      @keyframes s {
+        0% {
+          background-position: 0 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+    </style>
+  </head>
+  <body class="inner-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div
+        class="container position-relative d-flex align-items-center justify-content-between"
+      >
+        <a
+          href="{{ url_for('index_html') }}"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+          ><h1 class="sitename">Hotel Villa Grace</h1></a
+        >
+        <nav id="navmenu" class="navmenu">
+          <ul>
+            <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+            <li class="dropdown">
+              <a href="#" class="active"
+                ><span>Administración</span>
+                <i class="bi bi-chevron-down toggle-dropdown"></i
+              ></a>
+              <ul>
+                <li>
+                  <a class="active" href="{{ url_for('admin_dashboard_html') }}"
+                    >Tablero</a
+                  >
+                </li>
+                <li><a href="admin-users.html">Usuarios y roles</a></li>
+                <li><a href="admin-hotel.html">Perfil del hotel</a></li>
+                <li><a href="admin-rooms.html">Habitaciones</a></li>
+                <li><a href="admin-rates.html">Tarifas y temporadas</a></li>
+                <li>
+                  <a href="admin-taxes.html">Impuestos y cargos</a>
+                </li>
+                <li><a href="admin-channels.html">Canales / OTAs</a></li>
+                <li><a href="/arep/admin-audit.html">Bitácora</a></li>
+                <li class="nav-item">
+                  <a
+                    class="nav-link"
+                    href="{{ url_for('evt.calendario_evt') }}"
+                  >
+                    <i class="bi bi-calendar3"></i> Eventos</a
+                  >
+                </li>
+              </ul>
+            </li>
+          </ul>
+          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+        </nav>
+        <a class="btn-getstarted d-none d-sm-block" href="admin-users.html"
+          >Nuevo usuario</a
+        >
+      </div>
+    </header>
 
-    function money(v) { return nfMoney.format(Number(v||0)); }
+    <main class="main">
+      <div
+        class="page-title dark-background"
+        data-aos="fade"
+        style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
+      >
+        <div class="container position-relative">
+          <h1>Administración</h1>
+          <p>Configuración del hotel, seguridad, tarifas e integraciones.</p>
+          <nav class="breadcrumbs">
+            <ol>
+              <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+              <li class="current">Administración</li>
+            </ol>
+          </nav>
+        </div>
+      </div>
 
-    // KPIs
-    fetch('/api/kpi/summary', { credentials: 'same-origin' })
-      .then(r => r.json())
-      .then(d => {
-        if (!d || !d.ok) throw new Error('No OK KPI');
-        const day = d.day || { reservas:0, monto:0 };
-        const week = d.week || { reservas:0, monto:0 };
-        const month = d.month || { reservas:0, monto:0 };
+      <section class="section">
+        <div class="container" data-aos="fade-up">
+          <div class="row g-4">
+            <!-- KPIs en vivo -->
+            <div class="col-6 col-lg-3">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body metric">
+                  <div class="d-flex justify-content-between">
+                    <div>
+                      <div class="label">Reservas HOY</div>
+                      <div id="kpiDayRes" class="value skeleton">—</div>
+                      <div id="kpiDayAmt" class="small text-muted skeleton">
+                        —
+                      </div>
+                    </div>
+                    <i class="bi bi-calendar-day fs-3 text-success"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        setText('kpiDayRes', nfInt.format(day.reservas||0));
-        setText('kpiDayAmt',  money(day.monto||0));
+            <div class="col-6 col-lg-3">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body metric">
+                  <div class="d-flex justify-content-between">
+                    <div>
+                      <div class="label">Semana (ISO)</div>
+                      <div id="kpiWeekRes" class="value skeleton">—</div>
+                      <div id="kpiWeekAmt" class="small text-muted skeleton">
+                        —
+                      </div>
+                    </div>
+                    <i class="bi bi-calendar-week fs-3 text-success"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        setText('kpiWeekRes', nfInt.format(week.reservas||0));
-        setText('kpiWeekAmt',  money(week.monto||0));
+            <div class="col-6 col-lg-3">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body metric">
+                  <div class="d-flex justify-content-between">
+                    <div>
+                      <div class="label">Mes</div>
+                      <div id="kpiMonthRes" class="value skeleton">—</div>
+                      <div id="kpiMonthAmt" class="small text-muted skeleton">
+                        —
+                      </div>
+                    </div>
+                    <i class="bi bi-calendar-month fs-3 text-success"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        setText('kpiMonthRes', nfInt.format(month.reservas||0));
-        setText('kpiMonthAmt',  money(month.monto||0));
-      })
-      .catch(() => {
-        setText('kpiDayRes', '0'); setText('kpiDayAmt', money(0));
-        setText('kpiWeekRes', '0'); setText('kpiWeekAmt', money(0));
-        setText('kpiMonthRes', '0'); setText('kpiMonthAmt', money(0));
-      });
+            <div class="col-6 col-lg-3">
+              <a class="text-decoration-none" href="/arep/admin-audit.html">
+                <div class="card shadow-sm border-0 h-100">
+                  <div class="card-body metric">
+                    <div class="d-flex justify-content-between">
+                      <div>
+                        <div class="label">Eventos de auditoría HOY</div>
+                        <div id="auditToday" class="value skeleton">—</div>
+                        <div class="small text-muted">
+                          Click para ver la Bitácora
+                        </div>
+                      </div>
+                      <i class="bi bi-clipboard-data fs-3 text-success"></i>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            </div>
 
-    // Auditoría
-    fetch('/api/audit/recent', { credentials: 'same-origin' })
-      .then(r => r.json())
-      .then(d => {
-        const tbody = document.getElementById('auditTableBody');
-        if (!tbody) return;
+            <!-- Tareas rápidas -->
+            <div class="col-lg-6">
+              <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-0">
+                  <h5 class="mb-0">Tareas rápidas</h5>
+                </div>
+                <div class="card-body">
+                  <div class="row g-3">
+                    <div class="col-sm-6">
+                      <a href="admin-rooms.html" class="btn btn-success w-100"
+                        >Crear tipo de habitación</a
+                      >
+                    </div>
+                    <div class="col-sm-6">
+                      <a href="admin-rates.html" class="btn btn-success w-100"
+                        >Nueva tarifa/temporada</a
+                      >
+                    </div>
+                    <div class="col-sm-6">
+                      <a href="admin-taxes.html" class="btn btn-success w-100"
+                        >Configurar impuestos</a
+                      >
+                    </div>
+                    <div class="col-sm-6">
+                      <a
+                        href="admin-channels.html"
+                        class="btn btn-success w-100"
+                        >Conectar canal</a
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-        if (!d || !d.ok) throw new Error('No OK AUDIT');
+            <!-- Cambios recientes (dinámico) -->
+            <div class="col-lg-6">
+              <div class="card shadow-sm border-0 h-100">
+                <div
+                  class="card-header bg-white border-0 d-flex justify-content-between align-items-center"
+                >
+                  <h5 class="mb-0">Cambios recientes</h5>
+                  <a
+                    href="/arep/admin-audit.html"
+                    class="btn btn-outline-secondary btn-sm"
+                    >Ver bitácora</a
+                  >
+                </div>
+                <div class="card-body p-0">
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Fecha</th>
+                          <th>Usuario</th>
+                          <th>Acción</th>
+                          <th>Detalle</th>
+                        </tr>
+                      </thead>
+                      <tbody id="auditTableBody">
+                        <tr>
+                          <td colspan="4" class="p-4">
+                            <span class="skeleton">Cargando auditoría…</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- row -->
+        </div>
+      </section>
+    </main>
 
-        const items = d.items || [];
-        // Conteo de hoy
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth()+1).padStart(2,'0');
-        const dd = String(today.getDate()).padStart(2,'0');
-        const ymd = `${yyyy}-${mm}-${dd}`;
-        const eventsToday = items.filter(x => (x.fecha||'').startsWith(ymd)).length;
-        setText('auditToday', nfInt.format(eventsToday));
+    <footer id="footer" class="footer position-relative dark-background">
+      <div class="copyright text-center">
+        <div class="container">
+          ©
+          <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong>
+        </div>
+      </div>
+    </footer>
+    <a
+      href="#"
+      id="scroll-top"
+      class="scroll-top d-flex align-items-center justify-content-center"
+      ><i class="bi bi-arrow-up-short"></i
+    ></a>
+    <div id="preloader"></div>
 
-        // Render tabla (máx 8)
-        const rows = items.slice(0, 8).map(it => {
-          const fecha = (it.fecha || '').replace('T',' ').slice(0,16);
-          const user = it.usuario || '-';
-          const accion = it.accion || '-';
-          let detalle = '-';
-          try {
-            if (it.detalles && typeof it.detalles === 'object') {
-              if (it.detalles.numero) detalle = `#${it.detalles.numero}`;
-              else if (it.detalles.reserva_id) detalle = `Reserva ${it.detalles.reserva_id}`;
-              else detalle = JSON.stringify(it.detalles);
-            } else if (typeof it.detalles === 'string') {
-              detalle = it.detalles;
-            }
-          } catch (e) {}
-          return `<tr>
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+    <script>
+      (function () {
+        const nfMoney = new Intl.NumberFormat("es-CR", {
+          style: "currency",
+          currency: "CRC",
+          maximumFractionDigits: 2,
+        });
+        const nfInt = new Intl.NumberFormat("es-CR", {
+          maximumFractionDigits: 0,
+        });
+
+        function setText(id, text) {
+          const el = document.getElementById(id);
+          if (el) {
+            el.textContent = text;
+            el.classList.remove("skeleton");
+          }
+        }
+
+        function money(v) {
+          return nfMoney.format(Number(v || 0));
+        }
+
+        // KPIs
+        fetch("/api/kpi/summary", { credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (!d || !d.ok) throw new Error("No OK KPI");
+            const day = d.day || { reservas: 0, monto: 0 };
+            const week = d.week || { reservas: 0, monto: 0 };
+            const month = d.month || { reservas: 0, monto: 0 };
+
+            setText("kpiDayRes", nfInt.format(day.reservas || 0));
+            setText("kpiDayAmt", money(day.monto || 0));
+
+            setText("kpiWeekRes", nfInt.format(week.reservas || 0));
+            setText("kpiWeekAmt", money(week.monto || 0));
+
+            setText("kpiMonthRes", nfInt.format(month.reservas || 0));
+            setText("kpiMonthAmt", money(month.monto || 0));
+          })
+          .catch(() => {
+            setText("kpiDayRes", "0");
+            setText("kpiDayAmt", money(0));
+            setText("kpiWeekRes", "0");
+            setText("kpiWeekAmt", money(0));
+            setText("kpiMonthRes", "0");
+            setText("kpiMonthAmt", money(0));
+          });
+
+        // Auditoría
+        fetch("/api/audit/recent", { credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((d) => {
+            const tbody = document.getElementById("auditTableBody");
+            if (!tbody) return;
+
+            if (!d || !d.ok) throw new Error("No OK AUDIT");
+
+            const items = d.items || [];
+            // Conteo de hoy
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, "0");
+            const dd = String(today.getDate()).padStart(2, "0");
+            const ymd = `${yyyy}-${mm}-${dd}`;
+            const eventsToday = items.filter((x) =>
+              (x.fecha || "").startsWith(ymd)
+            ).length;
+            setText("auditToday", nfInt.format(eventsToday));
+
+            // Render tabla (máx 8)
+            const rows = items
+              .slice(0, 8)
+              .map((it) => {
+                const fecha = (it.fecha || "").replace("T", " ").slice(0, 16);
+                const user = it.usuario || "-";
+                const accion = it.accion || "-";
+                let detalle = "-";
+                try {
+                  if (it.detalles && typeof it.detalles === "object") {
+                    if (it.detalles.numero) detalle = `#${it.detalles.numero}`;
+                    else if (it.detalles.reserva_id)
+                      detalle = `Reserva ${it.detalles.reserva_id}`;
+                    else detalle = JSON.stringify(it.detalles);
+                  } else if (typeof it.detalles === "string") {
+                    detalle = it.detalles;
+                  }
+                } catch (e) {}
+                return `<tr>
             <td>${fecha}</td>
             <td>${user}</td>
             <td>${accion}</td>
             <td class="text-truncate" style="max-width:260px" title="${detalle}">${detalle}</td>
           </tr>`;
-        }).join('');
+              })
+              .join("");
 
-        tbody.innerHTML = rows || '<tr><td colspan="4" class="p-4 text-muted">Sin eventos recientes.</td></tr>';
-      })
-      .catch(() => {
-        setText('auditToday', '0');
-        const tbody = document.getElementById('auditTableBody');
-        if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-muted">No fue posible cargar la bitácora.</td></tr>';
-      });
-  })();
-</script>
-</body>
+            tbody.innerHTML =
+              rows ||
+              '<tr><td colspan="4" class="p-4 text-muted">Sin eventos recientes.</td></tr>';
+          })
+          .catch(() => {
+            setText("auditToday", "0");
+            const tbody = document.getElementById("auditTableBody");
+            if (tbody)
+              tbody.innerHTML =
+                '<tr><td colspan="4" class="p-4 text-muted">No fue posible cargar la bitácora.</td></tr>';
+          });
+      })();
+    </script>
+  </body>
 </html>

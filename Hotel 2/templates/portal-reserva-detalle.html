@@ -27,22 +27,22 @@
     .badge-status.Confirmada{ background:#d1f7e3; color:#096d46; }
     .badge-status.Pendiente{ background:#fff4d6; color:#8a5b00; }
     .badge-status.Cancelada{ background:#ffe0e0; color:#9c1e1e; }
-    .btn-vg{ background:var(--vg-primary); border-color:var(--vg-primary); }
-    .btn-vg:hover{ background:var(--vg-primary-2); border-color:var(--vg-primary-2); }
+    .btn-vg{ background:var(--vg-primary); border-color:var(--vg-primary); color:#fff; }
+    .btn-vg:hover{ background:var(--vg-primary-2); border-color:var(--vg-primary-2); color:#fff; }
     .spinner-wrap{ display:none; }
     .money{ font-weight:700; color:var(--vg-primary); }
-    .section-title{
-      font-size:1.05rem; font-weight:700; color:#17212b;
-    }
+    .section-title{ font-size:1.05rem; font-weight:700; color:#17212b; }
     .form-hint{ font-size:.875rem; color:#6b7a89; }
+    .muted{ color:#6b7a89; font-size:.9rem; }
+    .table-sm td, .table-sm th{ padding:.35rem .5rem; }
+    .d-none{ display:none!important; }
+    .d-block{ display:block!important; }
   </style>
 </head>
 <body>
   <nav class="navbar navbar-expand-lg">
     <div class="container">
-      <a class="navbar-brand fw-semibold" href="/portal-reservas.html">
-        ← Mis reservas
-      </a>
+      <a class="navbar-brand fw-semibold" href="/portal/reservas">← Mis reservas</a>
       <div class="ms-auto">
         <a class="nav-link d-inline-block text-white-50" href="/logout">Cerrar sesión</a>
       </div>
@@ -53,7 +53,7 @@
     <div class="d-flex align-items-end justify-content-between flex-wrap gap-3 mb-3">
       <div>
         <h1 class="page-title mb-1" id="title">Detalle de la reserva</h1>
-        <div class="form-hint">Edita fechas u observaciones, descarga el comprobante o cancela la reserva.</div>
+        <div class="form-hint">Extiende la estadía, cambia huéspedes y paga solo el monto adicional.</div>
       </div>
       <div class="d-flex gap-2">
         <a id="btnComprobante" class="btn btn-outline-success" href="#" target="_blank" rel="noopener">
@@ -75,7 +75,7 @@
         <div class="card info-card">
           <div class="card-body">
             <div class="d-flex align-items-center justify-content-between">
-              <div class="section-title">Resumen</div>
+              <div class="section-title">Resumen actual</div>
               <span id="badgeEstado" class="badge badge-status">—</span>
             </div>
 
@@ -127,11 +127,12 @@
         </div>
       </div>
 
-      <!-- Edición -->
+      <!-- Edición + Cotización/Pago -->
       <div class="col-12 col-lg-6">
         <div class="card info-card">
           <div class="card-body">
             <div class="section-title">Editar</div>
+
             <form id="editForm" class="row gy-3 mt-1">
               <div class="col-12 col-md-6">
                 <label class="form-label">Check-in</label>
@@ -149,18 +150,59 @@
                 <label class="form-label">Observaciones</label>
                 <textarea id="inObs" class="form-control" rows="3" placeholder="Notas u observaciones"></textarea>
               </div>
-              <div class="col-12 d-flex gap-2">
-                <button class="btn btn-vg" type="submit">Guardar cambios</button>
-                <button id="btnCancel" class="btn btn-outline-danger" type="button">Cancelar reserva</button>
-                <a class="btn btn-outline-secondary ms-auto" href="/portal-reservas.html">Volver</a>
+
+              <div class="col-12">
+                <button class="btn btn-vg" type="submit" id="btnQuote">Cotizar cambios</button>
+                <a class="btn btn-outline-secondary ms-2" href="/portal/reservas">Volver</a>
               </div>
+              <div class="form-hint mt-2">La disponibilidad se valida sobre <strong>la misma habitación asignada</strong>.</div>
             </form>
-            <div class="form-hint mt-2">Los cambios de fechas validan disponibilidad antes de guardarse.</div>
+
+            <hr class="my-4">
+
+            <!-- Resumen de cotización -->
+            <div id="quoteWrap" class="d-none">
+              <div class="section-title mb-2">Resumen del cambio</div>
+              <table class="table table-sm">
+                <tbody id="quoteTotals"></tbody>
+              </table>
+              <div id="quoteMsg" class="muted"></div>
+            </div>
+
+            <!-- Pago (adaptado a apply-changes del backend) -->
+            <div id="payWrap" class="d-none mt-3">
+              <div class="section-title mb-2">Pago del monto adicional</div>
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Titular</label>
+                  <input id="cardHolder" class="form-control" placeholder="Nombre del titular">
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Marca</label>
+                  <select id="cardBrand" class="form-select">
+                    <option value="">—</option>
+                    <option>Visa</option>
+                    <option>Mastercard</option>
+                    <option>Amex</option>
+                  </select>
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label">Últimos 4</label>
+                  <input id="cardLast4" maxlength="4" class="form-control" inputmode="numeric" pattern="[0-9]{4}" placeholder="1234">
+                </div>
+                <div class="col-12 d-flex align-items-center gap-2">
+                  <button id="btnPayApply" class="btn btn-vg" type="button">Pagar y aplicar cambios</button>
+                  <span id="payHint" class="muted">Se cobrará únicamente el adicional.</span>
+                </div>
+              </div>
+              <div class="form-hint mt-2">* Demostración segura: no se almacenan tarjetas; se auditan únicamente los últimos 4.</div>
+            </div>
+
           </div>
         </div>
       </div>
-    </div>
 
+    </div>
   </main>
 
   <!-- Bootstrap JS -->
@@ -192,58 +234,75 @@
       const btnExportPdf = document.getElementById('btnExportPdf');
       const btnExportXls = document.getElementById('btnExportXls');
 
+      const quoteWrap = document.getElementById('quoteWrap');
+      const quoteTotals = document.getElementById('quoteTotals');
+      const quoteMsg = document.getElementById('quoteMsg');
+      const payWrap = document.getElementById('payWrap');
+
+      const cardHolder = document.getElementById('cardHolder');
+      const cardBrand  = document.getElementById('cardBrand');
+      const cardLast4  = document.getElementById('cardLast4');
+      const btnPayApply = document.getElementById('btnPayApply');
+
       function alertMsg(type, msg){
         const el = document.createElement('div');
         el.className = `alert alert-${type}`;
         el.textContent = msg;
         alerts.innerHTML = '';
         alerts.appendChild(el);
-        setTimeout(()=>{ el.remove(); }, 5000);
+        setTimeout(()=>{ el.remove(); }, 6000);
       }
 
       function fmtDate(s){ return s ? String(s).slice(0,10) : ''; }
-
+      function fmtMoney(n){
+        const v = Number(n || 0);
+        return '₡ ' + v.toLocaleString('es-CR',{minimumFractionDigits:2, maximumFractionDigits:2});
+      }
       function setEstadoBadge(estado){
         badgeEstado.textContent = estado || '—';
         badgeEstado.className = `badge badge-status ${estado||''}`;
+      }
+      function paxInt(){
+        const p = parseInt((inPax.value||'').toString().replace(/\D/g,''),10);
+        return isNaN(p) ? null : p;
       }
 
       if(!reservaId){
         alertMsg('warning', 'Falta el parámetro ?id en la URL.');
         document.querySelector('main').style.opacity = '.6';
-        throw new Error('missing id');
+        return;
       }
+
+      let lastQuote = null;
+      let currentReserva = null;
 
       async function load(){
         try{
           spinner.style.display = 'block';
           const res = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}`, {credentials:'same-origin'});
           const data = await res.json();
-          if(!data.ok){ throw new Error('No se encontró la reserva.'); }
+          if(!data.ok){ throw new Error(data.message || 'No se encontró la reserva.'); }
           const r = data.item || {};
+          currentReserva = r;
 
-          // Título / Estado / Básicos
           document.getElementById('title').textContent = `Reserva ${r.numero || ('VG-'+r.id)}`;
           setEstadoBadge(r.estado);
           valNumero.textContent = r.numero || ('VG-'+r.id);
-          valTotal.textContent = '₡ ' + Number(r.monto||0).toLocaleString('es-CR',{minimumFractionDigits:2,maximumFractionDigits:2});
+          valTotal.textContent = fmtMoney(r.monto||0);
           valCI.textContent = fmtDate(r.checkin);
           valCO.textContent = fmtDate(r.checkout);
           valPax.textContent = r.huespedes || '—';
           valCanal.textContent = r.canal || '—';
           valTipo.textContent = r.tipo || '—';
 
-          // Form edición
           inCI.value = fmtDate(r.checkin);
           inCO.value = fmtDate(r.checkout);
-          inPax.value = (r.huespedes||'').replace(/\D/g,'') || '';
+          inPax.value = (r.huespedes || 1);
           inObs.value = r.observaciones || '';
 
-          // Enlaces de exportación
           btnComprobante.href = `/api/reservas/${encodeURIComponent(r.id)}/comprobante`;
-          btnExportPdf.href = `/api/portal/reservas/${encodeURIComponent(r.id)}/export?format=pdf`;
-          btnExportXls.href = `/api/portal/reservas/${encodeURIComponent(r.id)}/export?format=xlsx`;
-
+          btnExportPdf.href   = `/api/portal/reservas/${encodeURIComponent(r.id)}/export?format=pdf`;
+          btnExportXls.href   = `/api/portal/reservas/${encodeURIComponent(r.id)}/export?format=xlsx`;
         }catch(err){
           console.error(err);
           alertMsg('danger', err.message || 'Error al cargar la reserva.');
@@ -252,57 +311,151 @@
         }
       }
 
-      // Guardar cambios
+      function renderQuote(qd){
+        // Soporta ambos esquemas: plano (backend actual) o anidado (fallback)
+        const nights      = qd.nights      ?? qd.pricing?.nights_new ?? qd.pricing?.nights ?? null;
+        const priceNight  = qd.price_night ?? qd.pricing?.price_night ?? null;
+        const totalOld    = qd.current_total ?? qd.pricing?.total_old ?? null;
+        const totalNew    = qd.new_total     ?? qd.pricing?.total_new ?? null;
+        const delta       = qd.delta         ?? qd.pricing?.delta     ?? 0;
+
+        const rows = [
+          ['Noches', nights ?? '—'],
+          ['Precio por noche', fmtMoney(priceNight||0)],
+          ['Total actual', fmtMoney(totalOld||0)],
+          ['Total nuevo', fmtMoney(totalNew||0)],
+          ['Adicional a pagar', `<span class="money">${fmtMoney(delta||0)}</span>`],
+        ];
+        quoteTotals.innerHTML = rows.map(([k,v])=>`<tr><th>${k}</th><td class="text-end">${v}</td></tr>`).join('');
+        quoteMsg.textContent = qd.message || (qd.available === false ? 'Sin disponibilidad.' : 'Disponible. Puedes aplicar los cambios.');
+
+        quoteWrap.classList.remove('d-none'); quoteWrap.classList.add('d-block');
+
+        if((Number(delta)||0) > 0){
+          payWrap.classList.remove('d-none'); payWrap.classList.add('d-block');
+        }else{
+          payWrap.classList.add('d-none'); payWrap.classList.remove('d-block');
+        }
+      }
+
+      async function quoteChanges(){
+        const payload = {
+          checkin: inCI.value || null,
+          checkout: inCO.value || null,
+          huespedes: paxInt()
+        };
+        const res = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}/quote-changes`, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          credentials:'same-origin',
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if(!res.ok || !data.ok){ throw new Error(data.message || 'No se pudo validar la cotización.'); }
+        if(data.available === false){ throw new Error(data.message || 'Sin disponibilidad.'); }
+
+        lastQuote = data;
+        renderQuote(data);
+        return data;
+      }
+
+      async function applyChanges(withPayment){
+        const base = {
+          checkin: inCI.value || null,
+          checkout: inCO.value || null,
+          huespedes: paxInt(),
+          observaciones: inObs.value || null,
+          apply: true
+        };
+
+        if(withPayment){
+          const l4 = (cardLast4.value||'').trim();
+          const hold = (cardHolder.value||'').trim();
+          const brand = (cardBrand.value||'').trim();
+          if(!hold || !/^\d{4}$/.test(l4)){
+            throw new Error('Completa los datos de pago (titular y últimos 4).');
+          }
+          base.payment = {
+            holder: hold,
+            card_last4: l4,
+            card_brand: brand || null
+          };
+        }
+
+        const res = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}/apply-changes`, {
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          credentials:'same-origin',
+          body: JSON.stringify(base)
+        });
+        const data = await res.json();
+
+        if(!res.ok || !data.ok){
+          if(data && data.error === 'payment_required'){
+            // Backend puede devolver amount_due
+            const due = (typeof data.amount_due!=='undefined') ? ` (${fmtMoney(data.amount_due)})` : '';
+            throw new Error(`Se requiere pago adicional${due}.`);
+          }
+          throw new Error(data.message || 'No se pudo aplicar los cambios.');
+        }
+        return data;
+      }
+
       document.getElementById('editForm').addEventListener('submit', async (e)=>{
         e.preventDefault();
         try{
-          const payload = {
-            checkin: inCI.value || null,
-            checkout: inCO.value || null,
-            huespedes: inPax.value ? String(inPax.value) : null,
-            observaciones: inObs.value || null
-          };
-          const res = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}`, {
-            method:'PUT',
-            headers:{'Content-Type':'application/json'},
-            credentials:'same-origin',
-            body: JSON.stringify(payload)
-          });
-          const data = await res.json();
-          if(!data.ok){
-            if(data.error === 'availability'){
-              throw new Error(data.message || 'No hay disponibilidad para las fechas seleccionadas.');
-            }
-            throw new Error('No se pudo guardar la reserva.');
+          const q = await quoteChanges();
+          const delta = Number(q.delta || 0);
+          if(delta <= 0){
+            const res = await applyChanges(false);
+            alertMsg('success','Cambios aplicados.');
+            const r = res.item || {};
+            setEstadoBadge(r.estado);
+            document.getElementById('title').textContent = `Reserva ${r.numero || ('VG-'+r.id)}`;
+            valNumero.textContent = r.numero || ('VG-'+r.id);
+            valCI.textContent = fmtDate(r.checkin);
+            valCO.textContent = fmtDate(r.checkout);
+            valPax.textContent = r.huespedes || '—';
+            valTotal.textContent = fmtMoney(r.monto||0);
+            payWrap.classList.add('d-none');
+          }else{
+            alertMsg('info','Se requiere pago del adicional. Completa los datos y confirma.');
           }
-          alertMsg('success','Cambios guardados.');
-          // refrescar resumen
-          const r = data.item;
+        }catch(err){
+          alertMsg('danger', err.message || 'Error en la cotización.');
+        }
+      });
+
+      btnPayApply.addEventListener('click', async ()=>{
+        try{
+          // Asegura cotización fresca
+          if(!lastQuote){ await quoteChanges(); }
+          if(!lastQuote || lastQuote.available === false){
+            throw new Error(lastQuote?.message || 'No hay disponibilidad.');
+          }
+          const res = await applyChanges(true);
+          alertMsg('success','Pago recibido y cambios aplicados.');
+          const r = res.item || {};
           setEstadoBadge(r.estado);
           document.getElementById('title').textContent = `Reserva ${r.numero || ('VG-'+r.id)}`;
           valNumero.textContent = r.numero || ('VG-'+r.id);
           valCI.textContent = fmtDate(r.checkin);
           valCO.textContent = fmtDate(r.checkout);
           valPax.textContent = r.huespedes || '—';
+          valTotal.textContent = fmtMoney(r.monto||0);
+          payWrap.classList.add('d-none');
+          lastQuote = null;
         }catch(err){
-          alertMsg('danger', err.message || 'Error al guardar.');
+          alertMsg('danger', err.message || 'Error al cobrar/aplicar cambios.');
         }
       });
 
-      // Cancelar
-      document.getElementById('btnCancel').addEventListener('click', async ()=>{
-        if(!confirm('¿Estás seguro de cancelar esta reserva?')) return;
-        try{
-          const resp = await fetch(`/api/portal/reservas/${encodeURIComponent(reservaId)}`, {
-            method:'DELETE', credentials:'same-origin'
-          });
-          const data = await resp.json();
-          if(!data.ok) throw new Error('No se pudo cancelar la reserva.');
-          alertMsg('success','Reserva cancelada.');
-          setEstadoBadge('Cancelada');
-        }catch(err){
-          alertMsg('danger', err.message || 'Error al cancelar.');
-        }
+      // Auto-cotizar al cambiar campos
+      [inCI,inCO,inPax].forEach(el=>{
+        el.addEventListener('change', async ()=>{
+          try{ await quoteChanges(); }catch(_){}
+        });
       });
 
       load();

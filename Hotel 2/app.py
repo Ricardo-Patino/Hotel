@@ -15,10 +15,18 @@ from pathlib import Path
 from typing import Optional
 from werkzeug.utils import secure_filename
 import reportlab  # noqa
+import re
 
+from functools import lru_cache
 from sqlalchemy import text, func, inspect
+from sqlalchemy import text as _text
 from sqlalchemy.exc import IntegrityError
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import check_password_hash, generate_password_hash
+from datetime import datetime, date
+from flask import session, render_template
+from models_sql import Usuario
+
 
 
 from flask import (
@@ -57,6 +65,9 @@ from services.grr.assignment import auto_assign_for_reserva, reassign_reserva, s
 from config import Config
 from extensions import db, migrate
 
+from extensions import db
+from models_sql import Habitacion
+
 from models.hrm import Funcionario, FuncionarioHistorial
 import models_sql
 
@@ -65,6 +76,10 @@ try:
     from models_sql import Reserva as ReservaModel  # si existiera
 except Exception:
     ReservaModel = None
+    
+    
+    
+
 
 # =========================
 # Constantes / Paths
@@ -159,6 +174,109 @@ def role_redirect_endpoint(role_name: str) -> str:
     return endpoint
 
 
+# ===== Helpers de validación/normalización (Registro) =====
+
+_JUNK_SEQ = {"0000","1111","2222","3333","4444","5555","6666","7777","8888","9999"}
+
+def _strip_accents(s: str) -> str:
+    try:
+        import unicodedata
+        return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+    except Exception:
+        return s
+
+def _is_repeated(s: str, min_len: int = 4) -> bool:
+    if not s: return False
+    if len(s) < min_len: return False
+    return all(ch == s[0] for ch in s)
+
+def _is_sequential_digits(s: str, min_len: int = 4) -> bool:
+    digs = ''.join(ch for ch in s if ch.isdigit())
+    if len(digs) < min_len: return False
+    asc = '0123456789'
+    desc = '9876543210'
+    return digs in asc or digs in desc
+
+def _validate_name(n: str) -> bool:
+    if not n: return False
+    n = n.strip()
+    if len(n) < 2: return False
+    base = _strip_accents(n).replace(" ", "")
+    if not base.isalpha(): return False
+    if _is_repeated(base): return False
+    return True
+
+def _normalize_cr_phone(raw: str) -> str | None:
+    if not raw: return None
+    s = (raw or '').strip().replace(' ', '')
+    if s.startswith('+506'): s = s[4:]
+    if s.startswith('506'):  s = s[3:]
+    digits = ''.join(ch for ch in s if ch.isdigit())
+    if len(digits) != 8: return None
+    if _is_repeated(digits) or _is_sequential_digits(digits): return None
+    return f'+506{digits}'
+
+def _is_valid_email(e: str) -> bool:
+    if not e: return False
+    e = e.strip().lower()
+    import re as _re
+    if not _re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$', e): return False
+    compact = ''.join(ch for ch in e if ch.isalnum())
+    if _is_repeated(compact): return False
+    return True
+
+def _normalize_document(raw: str) -> str | None:
+    """Acepta: cédula CR (9 dígitos, opcional guiones), DIMEX 11-12 dígitos, pasaporte 6-20 alfanum.
+       Devuelve normalizado (solo dígitos para cédula/DIMEX o el alfanum original para pasaporte)."""
+    if not raw: return None
+    v = (raw or '').strip()
+    import re as _re
+    if _re.search(r'[A-Za-z]', v):
+        # pasaporte
+        if _re.fullmatch(r'[A-Za-z0-9]{6,20}', v) and not _is_repeated(v):
+            return v.upper()
+        return None
+    digits = ''.join(ch for ch in v if ch.isdigit())
+    if len(digits) == 9 and not _is_repeated(digits) and not _is_sequential_digits(digits):
+        return digits  # cédula
+    if len(digits) in (11, 12) and not _is_repeated(digits) and not _is_sequential_digits(digits):
+        return digits  # DIMEX
+    # permitir formato 1-2345-6789 ya cubierto por 9 dígitos arriba
+    return None
+
+def _is_strong_password(p: str, email: str) -> bool:
+    if not p or len(p) < 8: return False
+    import re as _re
+    if not _re.search(r'[a-z]', p): return False
+    if not _re.search(r'[A-Z]', p): return False
+    if not _re.search(r'[0-9]', p): return False
+    if _is_repeated(p) or _is_sequential_digits(p): return False
+    user = (email or '').split('@')[0].lower()
+    if user and user in p.lower(): return False
+    return True
+
+def _parse_date(d):
+    if isinstance(d, datetime):
+        return d.date()
+    if isinstance(d, date):
+        return d
+    if not d:
+        return None
+    s = str(d)[:10]  # "YYYY-MM-DD"
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            pass
+    return None  # si no se pudo parsear
+
+def _nights(checkin, checkout):
+    ci = _parse_date(checkin)
+    co = _parse_date(checkout)
+    if not ci or not co:
+        return 0
+    return max((co - ci).days, 0)
+
 # =========================
 # Decoradores de acceso
 # =========================
@@ -169,15 +287,22 @@ def _user_role() -> str:
         return "Cliente"
 
 
+def _is_api_request() -> bool:
+    try:
+        return (request.path or "").startswith("/api/")
+    except Exception:
+        return False
+
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if not session.get("user_id"):
+            if _is_api_request():
+                return jsonify({"ok": False, "error": "unauthorized", "message": "No autenticado."}), 401
             flash("Inicia sesión para continuar.", "warning")
             return redirect(url_for("login_html", next=request.path))
         return fn(*args, **kwargs)
     return wrapper
-
 
 def role_required(*roles):
     roles_norm = {r.lower() for r in roles if r}
@@ -186,12 +311,15 @@ def role_required(*roles):
         @wraps(fn)
         def wrapper(*args, **kwargs):
             if not session.get("user_id"):
+                if _is_api_request():
+                    return jsonify({"ok": False, "error": "unauthorized", "message": "No autenticado."}), 401
                 flash("Inicia sesión para continuar.", "warning")
                 return redirect(url_for("login_html", next=request.path))
+
             current = _user_role().lower()
             if current not in roles_norm:
-                if request.path.startswith("/api/"):
-                    return jsonify({"ok": False, "error": "forbidden"}), 403
+                if _is_api_request():
+                    return jsonify({"ok": False, "error": "forbidden", "message": "No autorizado."}), 403
                 flash("No tienes permiso para acceder a esta sección.", "danger")
                 return redirect(url_for(role_redirect_endpoint(_user_role())))
             return fn(*args, **kwargs)
@@ -266,6 +394,139 @@ def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
 # =========================
 # Utilidades para reservas
 # =========================
+
+# === NUEVO: Helpers para edición de reserva (GRR-01-011) ===
+
+def _room_is_available_for(habitacion_id: int, ci: str, co: str, exclude_reserva_id: Optional[int] = None) -> tuple[bool, str]:
+    """
+    Valida que la MISMA habitación esté libre en [ci, co) excluyendo la propia reserva.
+    """
+    try:
+        cond_excl = ""
+        params = {"h": int(habitacion_id), "ci": ci, "co": co}
+        if exclude_reserva_id:
+            cond_excl = " AND r.Codigo_Reserva <> :rid "
+            params["rid"] = int(exclude_reserva_id)
+
+        row = db.session.execute(
+            text(f"""
+                SELECT 1
+                  FROM Reserva r
+                 WHERE r.Codigo_Habitacion = :h
+                   AND r.Estado IN ('Confirmada','Pendiente')
+                   AND DATE(r.Fecha_Entrada) < DATE(:co)
+                   AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                   {cond_excl}
+                 LIMIT 1
+            """), params
+        ).first()
+        return (row is None), ("" if row is None else "Solape con otra reserva.")
+    except Exception as e:
+        current_app.logger.warning(f"[room availability] {e}")
+        return False, "Error validando disponibilidad."
+
+def _get_room_info(hid: int) -> dict:
+    """
+    Devuelve info de habitación (precio, capacidad, tipo) con tolerancia a columnas faltantes.
+    """
+    try:
+        cols = db.session.execute(
+            text("""
+                SELECT COLUMN_NAME
+                  FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='Habitacion'
+            """)
+        ).mappings().all()
+        names = {c["COLUMN_NAME"] for c in cols}
+        cap_col = "Capacidad" if "Capacidad" in names else None
+        tipo_col = "Tipo" if "Tipo" in names else None
+
+        sel = ["Precio_Noche"]
+        if cap_col: sel.append(cap_col)
+        if tipo_col: sel.append(tipo_col)
+
+        row = db.session.execute(
+            text(f"""
+                SELECT {", ".join(sel)}
+                  FROM Habitacion
+                 WHERE Codigo_Habitacion = :h
+                 LIMIT 1
+            """),
+            {"h": int(hid)}
+        ).first()
+        if not row: return {"price": 0.0, "capacity": None, "tipo": None}
+
+        d = {"price": float(row[0] or 0.0)}
+        idx = 1
+        if cap_col:
+            try: d["capacity"] = int(row[idx] or 0)
+            except: d["capacity"] = None
+            idx += 1
+        else:
+            d["capacity"] = None
+        if tipo_col:
+            d["tipo"] = row[idx]
+        else:
+            d["tipo"] = None
+        return d
+    except Exception as e:
+        current_app.logger.warning(f"[room info] {e}")
+        return {"price": 0.0, "capacity": None, "tipo": None}
+
+def _calc_total(price_per_night: float, nights: int, guests: int,
+                iva_rate: float = DEFAULT_IVA, include_tax: bool = ROOM_TOTAL_INCLUDES_TAX) -> float:
+    """
+    Mantiene la misma lógica usada en el flujo anónimo: precio * noches * huéspedes (+ IVA si corresponde).
+    """
+    base = float(price_per_night or 0.0) * int(max(1, nights)) * int(max(1, guests))
+    total = base * (1.0 + float(iva_rate or 0.0)) if include_tax else base
+    return round(float(total), 2)
+
+def _create_recibo_pdf(reserva: dict, delta: float, pay_method: str = "tarjeta", reference: Optional[str] = None) -> Optional[Path]:
+    """
+    Genera un PDF simple de recibo por diferencia (delta > 0) y lo registra en Documento/ReservaDocumento si existen.
+    """
+    try:
+        numero = reserva.get("Numero") or reserva.get("Numero_Comprobante") or reserva.get("numero") or f"VG-{reserva.get('id')}"
+        rid = int(reserva.get("Codigo_Reserva") or reserva.get("id"))
+        fname = f"REC-{numero}.pdf"
+        out_path = RECIBOS_DIR / fname
+        lines = [
+            f"Recibo de pago por cambios de reserva",
+            f"Reserva:      {numero}",
+            f"Importe:      ₡ {float(delta):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            f"Método:       {pay_method}",
+            f"Referencia:   {reference or '-'}",
+        ]
+        _write_minimal_pdf(out_path, "Recibo — Hotel Villa Grace", lines)
+
+        # Registrar en tablas (si existen)
+        try:
+            ruta = f"/storage/recibos/{fname}"
+            res = db.session.execute(
+                text("""
+                    INSERT INTO Documento (Tipo, Ruta, MimeType, TamanoBytes)
+                    VALUES ('Recibo', :ruta, 'application/pdf', :sz)
+                """),
+                {"ruta": ruta, "sz": out_path.stat().st_size}
+            )
+            doc_id = res.lastrowid
+            db.session.execute(
+                text("""INSERT INTO ReservaDocumento (Codigo_Reserva, Documento_Id) VALUES (:r, :d)"""),
+                {"r": rid, "d": doc_id}
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(f"[RECIBO] No se pudo registrar documento: {e}")
+            db.session.rollback()
+
+        return out_path
+    except Exception as e:
+        current_app.logger.warning(f"[RECIBO] {e}")
+        return None
+
+
+
 def _current_user_email() -> Optional[str]:
     try:
         uid = session.get("user_id")
@@ -468,6 +729,112 @@ def _get_reserva_by_id(reserva_id: int):
         .first()
     )
     return row
+
+
+
+def es_recepcionista(usuario: Usuario | None) -> bool:
+    if not usuario:
+        return False
+    rol = (getattr(usuario, "Rol", None) or "").strip().lower()
+    if rol == "recepcionista":
+        return True
+    # Alternativas si usas Rol_Id u otra tabla de roles
+    rol_id = getattr(usuario, "Rol_Id", None)
+    if rol_id in (2, ):  # ajusta el ID real de Recepcionista
+        return True
+    return False
+
+# ==== Helpers específicos para Editar Reserva (cotizar / aplicar) ====
+
+def _room_is_free(room_id: int, ci: str, co: str, exclude_reserva_id: Optional[int] = None) -> bool:
+    """
+    La reserva editada debe conservar la MISMA habitación libre en [ci, co).
+    Evita solapes con Confirmada/Pendiente excluyendo la propia.
+    """
+    params = {"rid": int(room_id), "ci": ci, "co": co}
+    extra = ""
+    if exclude_reserva_id:
+        extra = "AND r.Codigo_Reserva <> :ex"
+        params["ex"] = int(exclude_reserva_id)
+
+    row = db.session.execute(text(f"""
+        SELECT 1
+          FROM Reserva r
+         WHERE r.Codigo_Habitacion = :rid
+           AND r.Estado IN ('Confirmada','Pendiente')
+           AND DATE(r.Fecha_Entrada) < DATE(:co)
+           AND DATE(r.Fecha_Salida)  > DATE(:ci)
+           {extra}
+         LIMIT 1
+    """), params).first()
+    return not bool(row)
+
+
+def _habitacion_info(room_id) -> dict | None:
+    """
+    Devuelve info flexible de la habitación sin asumir columnas opcionales.
+    Evita referenciar columnas inexistentes en el SELECT.
+    """
+    try:
+        row = db.session.execute(
+            text("SELECT * FROM Habitacion WHERE Codigo_Habitacion = :id LIMIT 1"),
+            {"id": room_id}
+        ).mappings().first()
+        if not row:
+            return None
+
+        def pick(*keys):
+            for k in keys:
+                if k in row and row[k] is not None:
+                    return row[k]
+            return None
+
+        # Precio por noche
+        price_raw = pick("Precio_Noche","precio_noche","Precio","Tarifa","tarifa","price")
+        from decimal import Decimal
+        try:
+            price = Decimal(str(price_raw)) if price_raw is not None else Decimal("0")
+        except Exception:
+            price = Decimal("0")
+
+        # Capacidad (si no existe, queda en None y se omite validación)
+        cap = pick("Capacidad","capacidad","Pax_Max","pax_max")
+        try:
+            capacity = int(cap) if cap is not None else None
+        except Exception:
+            capacity = None
+
+        tipo = pick("Tipo","tipo","Categoria","categoria")
+
+        return {
+            "price": price,
+            "capacity": capacity,
+            "tipo": tipo,
+            "raw": dict(row),
+        }
+    except Exception as e:
+        app.logger.error(f"[ROOM] _habitacion_info error: {e}", exc_info=True)
+        return {"price": 0, "capacity": None, "tipo": None}
+
+
+
+
+
+def _calc_total_with_policy(price_night: float, nights: int, pax: int) -> float:
+    """
+    Misma política que /api/reservas/anon: total = precio_noche * noches * pax * (1 + IVA)
+    """
+    iva = float(DEFAULT_IVA or 0.0)
+    nights = max(1, int(nights or 1))
+    pax = max(1, int(pax or 1))
+    base = float(price_night or 0.0) * nights * pax
+    return round(base * (1.0 + iva), 2)
+
+
+def _parse_ymd(s: str):
+    from datetime import datetime as _dt
+    return _dt.strptime(str(s)[:10], "%Y-%m-%d").date()
+
 
 
 def _reserva_belongs_to_email(reserva_id: int, email: str) -> bool:
@@ -893,6 +1260,10 @@ def create_app() -> Flask:
     # === Eventos (EVT) ===
     from blueprints.evt import evt_bp
     app.register_blueprint(evt_bp)
+
+    # === AREP (Analítica y Reportes) ===
+    from blueprints.arep import arep_bp
+    app.register_blueprint(arep_bp)
     
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
@@ -1193,6 +1564,12 @@ def create_app() -> Flask:
     @app.route("/reserva-sin-sesion/exito")
     def anon_reserva_exito_html():
         return render_template("anon-reserva-exito.html")
+    
+    @app.get("/reserva-sin-sesion")
+    def anon_reserva_page():
+        uid = session.get("user_id")
+        u = Usuario.query.filter_by(Codigo_Usuario=uid).first() if uid else None
+        return render_template("anon-reserva.html", is_recepcionista=es_recepcionista(u))
 
 
     # ---------------------- Portal / Ops / Admin (protegidas por rol) ------------
@@ -1494,7 +1871,7 @@ def create_app() -> Flask:
                   h.Codigo_Habitacion   AS id
                 FROM Habitacion h
                 WHERE 1=1
-                  AND h.Estado = 'Disponible'
+                  AND (h.Estado IS NULL OR h.Estado = 'Disponible')
                   {where_extra}
                   AND NOT EXISTS (
                         SELECT 1
@@ -2103,9 +2480,14 @@ def create_app() -> Flask:
         Crea una reserva pública (GRR-01-007) y asegura:
           - Cliente creado/actualizado con documento
           - Usuario con rol 'Cliente' creado o enlazado
-          - Inserción en Reserva incluyendo Codigo_Funcionario si la columna existe
+          - Inserción en Reserva incluyendo Codigo_Funcionario si la columna existe (y mensaje claro si no hay ninguno)
           - Número de comprobante único
           - Auditoría, KPI y correo de confirmación
+    
+        Importante:
+          - 'tipo' es OPCIONAL (coincide con templates/anon-reserva.html)
+          - La verificación de disponibilidad se alinea con /grr/availability:
+            solo excluye 'Mantenimiento' y solapes; no exige estado 'Disponible'.
         """
         p = request.get_json(silent=True) or {}
     
@@ -2113,33 +2495,35 @@ def create_app() -> Flask:
             return (p.get(k) or "").strip()
     
         # ---- Datos del formulario ----
-        checkin = req("checkin")
-        checkout = req("checkout")
-        tipo = req("tipo")
+        checkin    = req("checkin")
+        checkout   = req("checkout")
+        tipo       = req("tipo")  # OPCIONAL
+        nombre     = req("nombre")
+        apellido   = req("apellido")
+        correo     = (req("correo") or "").lower()
+        telefono   = req("telefono")
+        doc_tipo   = req("doc_tipo")
+        doc_numero = req("doc_numero")
+        acepta     = str(p.get("acepta") or "0") in ("1", "true", "True", "on", "sí", "si")
     
         try:
             huespedes = int(p.get("huespedes") or 1)
         except Exception:
             huespedes = 1
+        huespedes = max(1, huespedes)
     
-        nombre = req("nombre")
-        apellido = req("apellido")
-        correo = (req("correo") or "").lower()
-        telefono = req("telefono")
-        doc_tipo = req("doc_tipo")
-        doc_numero = req("doc_numero")
-        acepta = str(p.get("acepta") or "0") in ("1", "true", "True")
-    
-        # ---- Validación de campos obligatorios ----
-        if not (checkin and checkout and tipo and nombre and apellido and correo and telefono and doc_tipo and doc_numero and acepta):
+        # ---- Validaciones mínimas (tipo NO es obligatorio) ----
+        if not (checkin and checkout and nombre and apellido and correo and telefono and doc_tipo and doc_numero and acepta):
             return jsonify({"ok": False, "message": "Faltan campos obligatorios."}), 400
-        if huespedes <= 0:
-            return jsonify({"ok": False, "message": "La cantidad de huéspedes debe ser mayor a 0."}), 400
     
-        # ---- Validar disponibilidad sin sobreventa (incluye tipo/huéspedes) ----
-        ok, msg = _validate_no_overbooking(checkin, checkout, rooms=1, tipo=tipo, guests=huespedes)
-        if not ok:
-            return jsonify({"ok": False, "message": msg or "Sin disponibilidad para el rango."}), 400
+        # ---- Parseo de fechas ----
+        try:
+            ci_dt = datetime.strptime(checkin, "%Y-%m-%d").date()
+            co_dt = datetime.strptime(checkout, "%Y-%m-%d").date()
+            if (co_dt - ci_dt).days <= 0:
+                return jsonify({"ok": False, "message": "La fecha de salida debe ser posterior a la de llegada."}), 400
+        except Exception:
+            return jsonify({"ok": False, "message": "Fechas inválidas (YYYY-MM-DD)."}), 400
     
         # ---- Cliente (upsert por correo + documento) ----
         try:
@@ -2165,12 +2549,11 @@ def create_app() -> Flask:
         if not uid:
             return jsonify({"ok": False, "message": "No se pudo crear la cuenta del huésped."}), 500
     
-        # ---- Buscar una habitación LIBRE que cumpla con tipo/capacidad y rango ----
-        has_cap = _col_exists("Habitacion", "Capacidad")
+        # ---- Comprobaciones de columnas (capacidad / tipo / funcionario) ----
+        has_cap  = _col_exists("Habitacion", "Capacidad")
         has_tipo = _col_exists("Habitacion", "Tipo")
-        per_room_need = huespedes  # rooms=1 en este flujo
     
-        # (opcional) si el tipo no existe en catálogo, devolver mensaje claro
+        # Si viene tipo pero no existe en catálogo, mensaje claro
         if tipo and has_tipo:
             _type_exists = db.session.execute(
                 text("SELECT 1 FROM Habitacion WHERE Tipo = :t LIMIT 1"),
@@ -2179,31 +2562,37 @@ def create_app() -> Flask:
             if not _type_exists:
                 return jsonify({"ok": False, "message": f"No hay habitaciones de tipo '{tipo}' configuradas."}), 400
     
-        conds = []
+        # ---- Buscar una habitación LIBRE que cumpla con tipo/capacidad y rango ----
+        conds  = []
         params = {"ci": checkin, "co": checkout}
+    
         if tipo and has_tipo:
-            conds.append("h.Tipo = :t")
+            conds.append("h.Tipo = :t")  # colación UTF8MB4 normalmente es case-insensitive
             params["t"] = tipo
+    
         if has_cap:
-            conds.append("h.Capacidad >= :cap")
-            params["cap"] = int(per_room_need)
+            conds.append("COALESCE(h.Capacidad, 2) >= :cap")
+            params["cap"] = int(huespedes)
     
         where_extra = (" AND " + " AND ".join(conds)) if conds else ""
     
+        # Alineado con /grr/availability:
+        #  - NO exigimos 'Disponible' (el estado actual no bloquea reservas futuras)
+        #  - SÍ excluimos 'Mantenimiento'
+        #  - Excluimos reservas solapadas con Estado <> 'Cancelada'
         hab = db.session.execute(
             text(f"""
                 SELECT h.Codigo_Habitacion, h.Precio_Noche
                   FROM Habitacion h
-                WHERE 1=1
-                  AND h.Estado = 'Disponible'
-                  {where_extra}
-                  AND NOT EXISTS  (
-                        SELECT 1
-                          FROM Reserva r
-                         WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
-                           AND r.Estado IN ('Confirmada','Pendiente')
-                           AND DATE(r.Fecha_Entrada) < DATE(:co)
-                           AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                 WHERE (h.Estado IS NULL OR h.Estado <> 'Mantenimiento')
+                   {where_extra}
+                   AND NOT EXISTS (
+                         SELECT 1
+                           FROM Reserva r
+                          WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
+                            AND r.Estado <> 'Cancelada'
+                            AND DATE(r.Fecha_Entrada) < DATE(:co)
+                            AND DATE(r.Fecha_Salida)  > DATE(:ci)
                    )
                  ORDER BY h.Codigo_Habitacion
                  LIMIT 1
@@ -2217,49 +2606,84 @@ def create_app() -> Flask:
                 "message": "No hay habitaciones disponibles que cumplan los criterios para ese rango."
             }), 409
     
-        hab_id = int(hab["Codigo_Habitacion"])
+        hab_id  = int(hab["Codigo_Habitacion"])
         price_n = float(hab["Precio_Noche"] or 0.0)
     
-        # ---- Calcular noches y monto total ----
-        try:
-            ci_dt = datetime.strptime(checkin, "%Y-%m-%d").date()
-            co_dt = datetime.strptime(checkout, "%Y-%m-%d").date()
-            nights = max((co_dt - ci_dt).days, 1)
-        except Exception:
-            nights = 1
+        # ---- Calcular noches y monto total (server-side autoritativo) ----
+        nights = max((co_dt - ci_dt).days, 1)
+        # IVA configurable; fallback 13%
+        tax = None
+        for k in ("VAT_RATE", "TAX_RATE", "IVA", "IVA_RATE"):
+            if k in current_app.config:
+                try:
+                    tax = float(current_app.config.get(k))
+                    break
+                except Exception:
+                    pass
+        if tax is None:
+            tax = 0.13
     
-        monto_total = round(price_n * nights * max(1, huespedes) * 1.13, 2)
+        subtotal    = round(price_n * nights * huespedes, 2)
+        monto_total = round(subtotal * (1.0 + tax), 2)
     
         # ---- Observaciones (guardar doc y tel para check-in) ----
         obs = f"GRR-01-007 | Doc: {doc_tipo} {doc_numero} | Tel: {telefono}"
     
-        # ---- Insert dinámico en Reserva (incluye Codigo_Funcionario sólo si es válido) ----
-        try:
-            has_func_col = _col_exists("Reserva", "Codigo_Funcionario")
-        
-            # Intentar mapear usuario de sesión -> funcionario por Codigo_Usuario
-            func_id = None
-            if has_func_col:
+        # ---- Resolver Codigo_Funcionario si la columna existe ----
+        has_func_col = _col_exists("Reserva", "Codigo_Funcionario")
+        func_id = None
+        if has_func_col:
+            uid_sess = session.get("user_id")
+            try:
+                uid_sess = int(uid_sess) if uid_sess is not None else None
+            except Exception:
+                uid_sess = None
+    
+            if uid_sess:
                 try:
-                    uid = _to_int(session.get("user_id"))
-                    if uid:
-                        func_id = db.session.execute(
-                            text("SELECT Codigo_Funcionario FROM Funcionario WHERE Codigo_Usuario = :u LIMIT 1"),
-                            {"u": uid}
-                        ).scalar()
-                        func_id = _to_int(func_id)
+                    func_id = db.session.execute(
+                        text("SELECT Codigo_Funcionario FROM Funcionario WHERE Codigo_Usuario = :u LIMIT 1"),
+                        {"u": uid_sess}
+                    ).scalar()
+                    try:
+                        func_id = int(func_id) if func_id is not None else None
+                    except Exception:
+                        func_id = None
                 except Exception:
                     func_id = None
-        
+    
+            if func_id is None and not _col_nullable("Reserva", "Codigo_Funcionario"):
+                try:
+                    any_f = db.session.execute(
+                        text("SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario ASC LIMIT 1")
+                    ).scalar()
+                    func_id = int(any_f) if any_f is not None else None
+                except Exception:
+                    func_id = None
+    
+            if func_id is None and not _col_nullable("Reserva", "Codigo_Funcionario"):
+                return jsonify({
+                    "ok": False,
+                    "message": "No hay funcionarios creados y la columna Reserva.Codigo_Funcionario no admite NULL."
+                }), 409
+    
+        # ---- Insert dinámico en Reserva ----
+        try:
             cols = [
-                "Codigo_Cliente", "Codigo_Habitacion", "Fecha_Entrada", "Fecha_Salida",
-                "Canal", "Estado", "Huespedes", "Monto_Total", "Observaciones", "Fecha_Registro"
+                "Codigo_Cliente", "Codigo_Habitacion",
+                "Fecha_Entrada", "Fecha_Salida",
+                "Canal", "Estado",
+                "Huespedes", "Monto_Total",
+                "Observaciones", "Fecha_Registro"
             ]
             vals = [
-                ":c", ":h", ":ci", ":co",
-                "'Web'", "'Pendiente'", ":pax", ":m", ":obs", "NOW()"
+                ":c", ":h",
+                ":ci", ":co",
+                "'Web'", "'Pendiente'",
+                ":pax", ":m",
+                ":obs", "NOW()"
             ]
-            params = {
+            iparams = {
                 "c": int(cliente_id),
                 "h": int(hab_id),
                 "ci": checkin,
@@ -2268,36 +2692,19 @@ def create_app() -> Flask:
                 "m": float(monto_total),
                 "obs": obs
             }
-        
-            # Solo incluir la columna si tenemos un funcionario válido
-            if has_func_col and func_id:
+    
+            if has_func_col and func_id is not None:
                 cols.append("Codigo_Funcionario")
                 vals.append(":f")
-                params["f"] = func_id
-            elif has_func_col and not func_id:
-                # Si la columna NO permite NULL, intentamos usar algún funcionario existente (p. ej. “Web” o el primero)
-                if not _col_nullable("Reserva", "Codigo_Funcionario"):
-                    try:
-                        any_f = db.session.execute(
-                            text("SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario ASC LIMIT 1")
-                        ).scalar()
-                        if any_f:
-                            cols.append("Codigo_Funcionario")
-                            vals.append(":f")
-                            params["f"] = int(any_f)
-                        # Si no hay ninguno, dejamos fuera la columna y que falle arriba (mejor mensaje)
-                    except Exception:
-                        pass
-                # Si la columna permite NULL, simplemente no la incluimos
-        
+                iparams["f"] = int(func_id)
+    
             sql_insert = text(f"INSERT INTO Reserva ({', '.join(cols)}) VALUES ({', '.join(vals)})")
-            res = db.session.execute(sql_insert, params)
+            res = db.session.execute(sql_insert, iparams)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
             current_app.logger.exception("[ANON] Error insertando Reserva: %s", e)
             return jsonify({"ok": False, "message": "No se pudo registrar la reserva."}), 500
-        
     
         # ---- Obtener ID de la reserva recién creada ----
         try:
@@ -2331,7 +2738,7 @@ def create_app() -> Flask:
             current_app.logger.warning("[ANON] No se pudo asignar Numero_Comprobante: %s", e)
             numero = _make_unique_number(reserva_id, checkin)  # fallback in-memory
     
-        # ---- Auditoría + KPI (seguro por si after_request no corre) ----
+        # ---- Auditoría + KPI ----
         try:
             _audit_log(correo, "reserva.creada.publica",
                        {"Codigo_Reserva": reserva_id, "Numero": numero},
@@ -2339,7 +2746,7 @@ def create_app() -> Flask:
         except Exception:
             pass
         try:
-            _update_kpis(float(monto_total or 0), checkin)
+            _update_kpis(float(monto_total or 0.0), checkin)
         except Exception:
             pass
     
@@ -2355,6 +2762,8 @@ def create_app() -> Flask:
             "numero": numero,
             "redirect": url_for("anon_reserva_exito_html", numero=numero)
         }), 201
+    
+    
     
    
 
@@ -2756,18 +3165,21 @@ def create_app() -> Flask:
         return jsonify({"ok": True, "items": items})
 
 
-    @app.route("/api/portal/reservas/<int:reserva_id>", methods=["GET"])
+    @app.get("/api/portal/reservas/<int:reserva_id>")
     @role_required("Cliente")
     def api_portal_reserva_get(reserva_id: int):
-        if not session.get("user_id"):
-            return jsonify({"ok": False, "error": "auth_required"}), 401
         email = _current_user_email()
-        if not _reserva_belongs_to_email(reserva_id, email or ""):
-            return jsonify({"ok": False, "error": "forbidden"}), 403
-        r = _get_reserva_by_id(reserva_id)
-        if not r:
-            return jsonify({"ok": False, "error": "not_found"}), 404
-        return jsonify({"ok": True, "item": _reserva_to_dict(r)})
+        if not email:
+            return jsonify({"ok": False, "message": "No autenticado."}), 401
+
+        row = _get_reserva_by_id(reserva_id)
+        if not row:
+            return jsonify({"ok": False, "message": "Reserva no encontrada."}), 404
+
+        if not _reserva_belongs_to_email(reserva_id, email):
+            return jsonify({"ok": False, "message": "No autorizado."}), 403
+
+        return jsonify({"ok": True, "item": _reserva_to_dict(row)}), 200
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["PUT", "PATCH"])
     @role_required("Cliente")
@@ -2876,6 +3288,287 @@ def create_app() -> Flask:
 
         # Fallback: JSON (solo si alguien lo invoca explícitamente)
         return jsonify({"ok": True, "item": _reserva_to_dict(r)})
+    
+    
+    
+    
+    @app.post("/api/portal/reservas/<int:reserva_id>/quote-changes")
+    @role_required("Cliente")
+    def api_portal_reserva_quote(reserva_id: int):
+        email = _current_user_email()
+        if not email:
+            return jsonify({"ok": False, "message": "No autenticado."}), 401
+
+        r = _get_reserva_by_id(reserva_id)
+        if not r:
+            return jsonify({"ok": False, "message": "Reserva no encontrada."}), 404
+
+        if not _reserva_belongs_to_email(reserva_id, email):
+            return jsonify({"ok": False, "message": "No autorizado."}), 403
+
+        p = request.get_json(silent=True) or {}
+        new_ci = (p.get("checkin") or _normalize_date_like(r.get("Fecha_Entrada")) or "")[:10]
+        new_co = (p.get("checkout") or _normalize_date_like(r.get("Fecha_Salida")) or "")[:10]
+        try:
+            new_pax = int(p.get("huespedes") or r.get("Huespedes") or 1)
+        except Exception:
+            new_pax = 1
+
+        if not new_ci or not new_co:
+            return jsonify({"ok": False, "message": "Fechas inválidas."}), 400
+
+        rid_room = int(r["Codigo_Habitacion"])
+        nights = _nights(new_ci, new_co)
+        if nights <= 0:
+            return jsonify({"ok": True, "available": False, "message": "Rango de fechas no válido.", "nights": 0}), 200
+
+        # Misma habitación sin solapes
+        is_free, msg = _room_is_available_for(rid_room, new_ci, new_co, exclude_reserva_id=reserva_id)
+        if not is_free:
+            return jsonify({"ok": True, "available": False, "message": msg or "Sin disponibilidad."}), 200
+
+        # Precio/capacidad del cuarto
+        info = _get_room_info(rid_room)
+        price_n = float(info.get("price") or 0.0)
+
+        total_new = _calc_total(price_n, nights, new_pax, iva_rate=DEFAULT_IVA, include_tax=ROOM_TOTAL_INCLUDES_TAX)
+        total_old = float(r.get("Monto_Total") or 0.0)
+        delta = round(max(0.0, total_new - total_old), 2)
+
+        return jsonify({
+            "ok": True,
+            "available": True,
+            "nights": nights,
+            "price_night": price_n,
+            "current_total": total_old,
+            "new_total": total_new,
+            "delta": delta,
+            "message": "Disponible. Puedes aplicar los cambios."
+        }), 200
+    
+    
+    
+    
+        
+        
+        # === Cotización de cambios de reserva (Portal) — sin ORM, robusto ===
+    @app.post("/api/portal/reservas/<int:reserva_id>/quote-changes", endpoint="portal_reserva_quote_changes")
+    def portal_reserva_quote_changes(reserva_id: int):
+        """
+        Calcula la cotización de cambios para una reserva existente y devuelve:
+          - available / allowed
+          - nights, price_night
+          - current_total, new_total, delta (solo positivo para cobro)
+          - needs_payment
+          - pricing {...} (para UIs que esperan este bloque)
+        """
+        from decimal import Decimal
+        try:
+            email = _current_user_email()
+            if not email:
+                return jsonify(ok=False, message="No autenticado."), 401
+            if not _reserva_belongs_to_email(reserva_id, email):
+                return jsonify(ok=False, message="No autorizado."), 403
+    
+            # Carga robusta de la reserva (sin ORM)
+            r = _get_reserva_by_id(reserva_id)
+            if not r:
+                return jsonify(ok=False, message="Reserva no encontrada."), 404
+    
+            # Fechas/pax propuestos (o valores actuales)
+            body = request.get_json(silent=True) or {}
+            ci_new = _normalize_date_like(body.get("checkin")  or _get_first_attr(r, ["Fecha_Entrada","checkin","entrada"]))
+            co_new = _normalize_date_like(body.get("checkout") or _get_first_attr(r, ["Fecha_Salida","checkout","salida"]))
+            if not ci_new or not co_new:
+                return jsonify(ok=False, message="Fechas inválidas."), 400
+            if co_new <= ci_new:
+                return jsonify(ok=False, message="El checkout debe ser posterior al check-in."), 400
+    
+            pax_old = int(_get_first_attr(r, ["Huespedes","huespedes"]) or 1)
+            pax_new = int(body.get("huespedes") or pax_old)
+    
+            # Identificación de habitación
+            room_id = _get_first_attr(r, [
+                "Codigo_Habitacion","codigo_habitacion","Habitacion","habitacion_id","habitacion"
+            ])
+            if not room_id:
+                return jsonify(ok=False, message="La reserva no tiene habitación asociada."), 400
+    
+            # Info de habitación (precio, capacidad…)
+            info = _habitacion_info(room_id) or {}
+            # Asegura Decimal
+            price = info.get("price")
+            try:
+                price = Decimal(str(price)) if price is not None else Decimal("0")
+            except Exception:
+                price = Decimal("0")
+            capacity = info.get("capacity")  # puede ser None
+    
+            # Noches actual/nuevo
+            ci_old = _normalize_date_like(_get_first_attr(r, ["Fecha_Entrada","checkin","entrada"]))
+            co_old = _normalize_date_like(_get_first_attr(r, ["Fecha_Salida","checkout","salida"]))
+            nights_old = _nights(ci_old, co_old) or 0
+            nights_new = _nights(ci_new, co_new) or 0
+    
+            # Totales
+            current_total = _calc_total(price, nights_old, pax_old)
+            new_total     = _calc_total(price, nights_new, pax_new)
+    
+            # Disponibilidad de la misma habitación (excluye esta reserva)
+            overlap = db.session.execute(text("""
+                SELECT COUNT(1) AS c
+                FROM Reserva
+                WHERE Codigo_Habitacion = :room
+                  AND (Estado IS NULL OR Estado <> 'Cancelada')
+                  AND Codigo_Reserva <> :rid
+                  AND NOT ( :co <= Fecha_Entrada OR :ci >= Fecha_Salida )
+            """), {"room": room_id, "rid": reserva_id, "ci": ci_new, "co": co_new}).scalar() or 0
+            room_available = (overlap == 0)
+    
+            # Capacidad (si la tabla no tiene columna, capacity será None => se omite la validación)
+            capacity_ok = True if capacity is None else (int(pax_new) <= int(capacity))
+    
+            allowed = room_available and capacity_ok
+    
+            # Diferencial: solo positivo requiere pago
+            delta = new_total - current_total
+            delta_payable = delta if delta > 0 else Decimal("0")
+            needs_payment = (delta_payable > 0)
+    
+            # Mensaje amigable
+            if not capacity_ok:
+                msg = "Capacidad insuficiente para la cantidad de huéspedes."
+            elif not room_available:
+                msg = "La habitación asignada no está disponible para el nuevo rango."
+            else:
+                msg = "Disponible. Puedes aplicar los cambios."
+    
+            return jsonify({
+                "ok": True,
+                "available": room_available,
+                "allowed": allowed,
+                "room_available": room_available,
+                "capacity_ok": capacity_ok,
+                "message": msg,
+                "nights": nights_new,
+                "price_night": float(price),
+                "current_total": float(current_total),
+                "new_total": float(new_total),
+                "delta": float(delta_payable),
+                "needs_payment": bool(needs_payment),
+                # Bloque adicional para UIs que esperan estructura 'pricing'
+                "pricing": {
+                    "nights_old": nights_old,
+                    "nights_new": nights_new,
+                    "price_night": float(price),
+                    "total_old": float(current_total),
+                    "total_new": float(new_total),
+                    "delta": float(delta_payable),
+                }
+            }), 200
+    
+        except Exception as e:
+            app.logger.error(f"[QUOTE] Error cotizando reserva {reserva_id}: {e}", exc_info=True)
+            # Respondemos 200 con ok=false para que la UI muestre el mensaje sin romper
+            return jsonify(ok=False, message="No se pudo validar la cotización."), 200
+    
+    
+
+
+    @app.put("/api/portal/reservas/<int:reserva_id>/apply-changes")
+    @role_required("Cliente")
+    def api_portal_reserva_apply(reserva_id: int):
+        email = _current_user_email()
+        if not email:
+            return jsonify({"ok": False, "message": "No autenticado."}), 401
+
+        r = _get_reserva_by_id(reserva_id)
+        if not r:
+            return jsonify({"ok": False, "message": "Reserva no encontrada."}), 404
+
+        if not _reserva_belongs_to_email(reserva_id, email):
+            return jsonify({"ok": False, "message": "No autorizado."}), 403
+
+        p = request.get_json(silent=True) or {}
+        new_ci = (p.get("checkin") or _normalize_date_like(r.get("Fecha_Entrada")) or "")[:10]
+        new_co = (p.get("checkout") or _normalize_date_like(r.get("Fecha_Salida")) or "")[:10]
+        obs    = (p.get("observaciones") or r.get("Observaciones") or "").strip()
+        try:
+            new_pax = int(p.get("huespedes") or r.get("Huespedes") or 1)
+        except Exception:
+            new_pax = 1
+
+        if not new_ci or not new_co:
+            return jsonify({"ok": False, "message": "Fechas inválidas."}), 400
+
+        nights = _nights(new_ci, new_co)
+        if nights <= 0:
+            return jsonify({"ok": False, "message": "Rango de fechas no válido."}), 400
+
+        room_id = int(r["Codigo_Habitacion"])
+        ok_free, msg = _room_is_available_for(room_id, new_ci, new_co, exclude_reserva_id=reserva_id)
+        if not ok_free:
+            return jsonify({"ok": False, "message": msg or "Sin disponibilidad para ese rango."}), 409
+
+        # Recalcular monto nuevo
+        info = _get_room_info(room_id)
+        price_n = float(info.get("price") or 0.0)
+        total_new = _calc_total(price_n, nights, new_pax, iva_rate=DEFAULT_IVA, include_tax=ROOM_TOTAL_INCLUDES_TAX)
+        total_old = float(r.get("Monto_Total") or 0.0)
+        delta = round(max(0.0, total_new - total_old), 2)
+
+        # Si hay adicional y no vino pago -> avisar
+        payment = p.get("payment")
+        if delta > 0 and not payment:
+            return jsonify({"ok": False, "error": "payment_required", "amount_due": delta, "message": "Se requiere pago adicional."}), 402
+
+        # Simular registro de pago (solo auditar últimos 4 / marca)
+        if delta > 0 and payment:
+            try:
+                holder = (payment.get("holder") or "").strip()
+                last4  = (payment.get("card_last4") or "").strip()
+                brand  = (payment.get("card_brand") or "").strip() or None
+                if not holder or not last4 or not last4.isdigit() or len(last4) != 4:
+                    return jsonify({"ok": False, "message": "Datos de pago incompletos."}), 400
+
+                # Nota de auditoría en Observaciones
+                obs = (obs + f" | PAGO Δ: ₡{delta:.2f} ({brand or 'Tarjeta'}) ****{last4}").strip()
+
+                # (Opcional) crear PDF de recibo por diferencia
+                try:
+                    _create_recibo_pdf(dict(r), delta, pay_method=brand or "tarjeta", reference=f"****{last4}")
+                except Exception:
+                    pass
+            except Exception as e:
+                current_app.logger.warning(f"[PAY] Error parseando pago: {e}")
+                return jsonify({"ok": False, "message": "Error al validar el pago."}), 400
+
+        # Persistir cambios en Reserva
+        try:
+            db.session.execute(
+                text("""
+                    UPDATE Reserva
+                       SET Fecha_Entrada = :ci,
+                           Fecha_Salida  = :co,
+                           Huespedes     = :pax,
+                           Monto_Total   = :monto,
+                           Observaciones = :obs,
+                           Fecha_Registro = Fecha_Registro  -- conservación
+                     WHERE Codigo_Reserva = :rid
+                """),
+                {"ci": new_ci, "co": new_co, "pax": int(new_pax), "monto": float(total_new), "obs": obs, "rid": int(reserva_id)}
+            )
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception("[APPLY] Error actualizando reserva: %s", e)
+            return jsonify({"ok": False, "message": "No se pudo aplicar los cambios."}), 500
+
+        # Recargar y devolver
+        r2 = _get_reserva_by_id(reserva_id)
+        return jsonify({"ok": True, "item": _reserva_to_dict(r2)}), 200
+    
+    
     
     
     @app.post("/api/portal/reservas/<int:reserva_id>/send-confirmation")
@@ -3171,57 +3864,94 @@ def create_app() -> Flask:
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
-            full_name = (request.form.get("full_name") or "").strip()
-            national_id = (request.form.get("national_id") or "").strip()
-            email = (request.form.get("email") or "").strip().lower()
-            phone = (request.form.get("phone") or "").strip()
-            password = (request.form.get("password") or "").strip()
-            confirm = (request.form.get("confirm_password") or "").strip()
-
-            if not full_name or not email or not phone or not password:
-                flash("Por favor complete todos los campos obligatorios.", "warning")
+            # --- Entrada cruda ---
+            nombre     = (request.form.get("nombre") or "").strip()
+            apellidos  = (request.form.get("apellidos") or "").strip()
+            full_name  = (request.form.get("full_name") or "").strip()  # viene del mapeo JS
+            national_id_raw = (request.form.get("national_id") or request.form.get("cedula") or "").strip()
+            email      = (request.form.get("email") or "").strip().lower()
+            phone_raw  = (request.form.get("phone") or request.form.get("telefono") or "").strip()
+            password   = (request.form.get("password") or "").strip()
+            confirm    = (request.form.get("confirm_password") or "").strip()
+            terms_ok   = (request.form.get("terms") is not None)
+    
+            # --- Validaciones servidor (seguridad/consistencia) ---
+            # Nombres
+            if not (_validate_name(nombre) and _validate_name(apellidos)):
+                flash("Nombre y apellidos inválidos (solo letras y espacios, mínimo 2).", "warning")
                 return render_template("register.html")
+    
+            # Full name (construir si viene vacío)
+            if not full_name:
+                full_name = f"{nombre} {apellidos}".strip()
+    
+            # Email
+            if not _is_valid_email(email):
+                flash("Correo electrónico inválido.", "warning")
+                return render_template("register.html")
+    
+            # Teléfono CR normalizado a E.164
+            phone_norm = _normalize_cr_phone(phone_raw)
+            if not phone_norm:
+                flash("Teléfono inválido. Debe ser de Costa Rica (8 dígitos; opcional +506).", "warning")
+                return render_template("register.html")
+    
+            # Documento (opcional)
+            national_id = None
+            if national_id_raw:
+                national_id = _normalize_document(national_id_raw)
+                if not national_id:
+                    flash("Cédula/DIMEX/Pasaporte inválido.", "warning")
+                    return render_template("register.html")
+    
+            # Password
             if password != confirm:
                 flash("Las contraseñas no coinciden.", "warning")
                 return render_template("register.html")
-            if "@" not in email or "." not in email:
-                flash("Correo electrónico inválido.", "warning")
+            if not _is_strong_password(password, email):
+                flash("La contraseña es débil. Usa mínimo 8 caracteres con mayúsculas, minúsculas y números; evita secuencias o repetidos.", "warning")
                 return render_template("register.html")
-            if len(password) < 8:
-                flash("La contraseña debe tener al menos 8 caracteres.", "warning")
+    
+            # Términos
+            if not terms_ok:
+                flash("Debes aceptar los Términos y la Política de Privacidad.", "warning")
                 return render_template("register.html")
-
+    
+            # --- Unicidad ---
             if Usuario.query.filter(func.lower(Usuario.Correo) == email).first():
                 flash("El correo ya está registrado.", "danger")
                 return render_template("register.html")
-
+    
             if national_id:
+                # normalizamos comparación: Cedula_Pasaporte puede almacenar dígitos o alfanum.
                 if Usuario.query.filter_by(Cedula_Pasaporte=national_id).first():
                     flash("La cédula/pasaporte ya está registrada.", "danger")
                     return render_template("register.html")
-            else:
-                national_id = None
-
+    
+            # --- Rol cliente ---
             role = _get_role_by_name("Cliente")
             if not role:
                 _ensure_seed_roles()
                 role = _get_role_by_name("Cliente")
-
+    
+            # --- Crear usuario ---
             u = Usuario(
-                Nombre=full_name,
+                Nombre=full_name[:80],
                 Cedula_Pasaporte=national_id,
                 Correo=email,
-                Telefono=phone,
+                Telefono=phone_norm,  # guardamos en E.164
                 Rol_Id=role.Codigo_Rol if role else None,
                 Estado="Activo",
             )
             u.set_password(password)
             db.session.add(u)
-
+    
             try:
-                cliente_id = ensure_cliente_for_email(full_name, email, phone)
+                # Crear/asegurar Cliente consistente (reusa tu helper existente)
+                cliente_id = ensure_cliente_for_email(full_name, email, phone_norm)
                 if cliente_id:
                     u.Codigo_Cliente = cliente_id
+    
                 db.session.commit()
             except IntegrityError:
                 db.session.rollback()
@@ -3229,18 +3959,236 @@ def create_app() -> Flask:
                 return render_template("register.html")
             except Exception as e:
                 db.session.rollback()
-                flash("No se pudo completar el registro. Inténtalo de nuevo.", "danger")
                 current_app.logger.exception(f"[REGISTER] Error creando usuario: {e}")
+                flash("No se pudo completar el registro. Inténtalo de nuevo.", "danger")
                 return render_template("register.html")
-
+    
             flash("Registro exitoso. Ya puedes iniciar sesión.", "success")
             return redirect(url_for("login_html"))
-
+    
         return render_template("register.html")
+    
 
     @app.route("/register.html", methods=["GET", "POST"])
     def register_html():
         return register()
+    
+    
+        # ---------------------- Perfil del usuario (API) ----------------------
+    @app.get("/api/me")
+    @login_required
+    def api_me():
+        uid = session.get("user_id")
+        u = Usuario.query.filter_by(Codigo_Usuario=uid).first()
+        if not u:
+            return jsonify({"ok": False, "msg": "not_found"}), 404
+
+        # Nombre, Correo, Teléfono y Rol (como espera portal-perfil.html)
+        data = {
+            "Nombre":   getattr(u, "Nombre", "") or "",
+            "Correo":   getattr(u, "Correo", "") or "",
+            "Telefono": getattr(u, "Telefono", "") if hasattr(u, "Telefono") else "",
+            "Rol":      _get_role_name(u) or "Cliente",
+            "Cedula":   ""  # relleno abajo
+        }
+        
+        # Resolver documento preferentemente desde Usuario.Cedula_Pasaporte, si existe.
+        try:
+            doc_val = None
+            if _col_exists("Usuario", "Cedula_Pasaporte") and getattr(u, "Cedula_Pasaporte", None):
+                doc_val = u.Cedula_Pasaporte
+            elif getattr(u, "Codigo_Cliente", None):
+                drow = db.session.execute(
+                    text("SELECT Cedula FROM Cliente WHERE Codigo_Cliente=:cid LIMIT 1"),
+                    {"cid": u.Codigo_Cliente}
+                ).first()
+                if drow and drow[0] is not None:
+                    doc_val = str(drow[0])
+            if doc_val:
+                data["Cedula"] = str(doc_val)
+        except Exception:
+            pass
+        
+        return jsonify({"ok": True, "data": data})
+
+
+    @app.put("/api/me")
+    @login_required
+    def api_me_update():
+        p = request.get_json(silent=True) or {}
+        nombre   = (p.get("Nombre") or "").strip()
+        correo   = (p.get("Correo") or "").strip().lower()
+        telefono = (p.get("Telefono") or "").strip()
+        cedula   = (p.get("Cedula") or "").strip()
+    
+        if not nombre or not correo:
+            return jsonify({"ok": False, "msg": "Nombre y correo son obligatorios."}), 400
+    
+        uid = session.get("user_id")
+        u = Usuario.query.filter_by(Codigo_Usuario=uid).first()
+        if not u:
+            return jsonify({"ok": False, "msg": "not_found"}), 404
+    
+        # Correo único (case-insensitive) excluyendo mi propio id
+        dupe = (
+            Usuario.query
+            .filter(func.lower(Usuario.Correo) == correo, Usuario.Codigo_Usuario != uid)
+            .first()
+        )
+        if dupe:
+            return jsonify({"ok": False, "msg": "Ese correo ya está en uso."}), 409
+    
+        # === Validación de documento (opcional pero con formato sensato) ===
+        # Acepta: 1-2345-6789 | 9–12 dígitos | pasaporte alfanumérico 6–20
+        if cedula:
+            re_doc = re.compile(r"^(?:(?:[1-9]-\d{4}-\d{4})|\d{9,12}|[A-Za-z0-9]{6,20})$")
+            if not re_doc.match(cedula):
+                return jsonify({"ok": False, "msg": "Documento inválido. Usa 1-2345-6789, 9–12 dígitos o pasaporte (6–20)."}), 400
+    
+            # Unicidad en Usuario.Cedula_Pasaporte (si existe la columna)
+            try:
+                if _col_exists("Usuario", "Cedula_Pasaporte"):
+                    dupe_doc = (
+                        Usuario.query
+                        .filter(func.lower(Usuario.Cedula_Pasaporte) == cedula.lower(),
+                                Usuario.Codigo_Usuario != uid)
+                        .first()
+                    )
+                    if dupe_doc:
+                        return jsonify({"ok": False, "msg": "Ese número de documento ya está en uso."}), 409
+            except Exception:
+                pass
+    
+        try:
+            # === Actualizar Usuario ===
+            u.Nombre = nombre
+            u.Correo = correo
+            try:
+                if _col_exists("Usuario", "Telefono"):
+                    u.Telefono = telefono or getattr(u, "Telefono", None)
+            except Exception:
+                pass
+    
+            # Guardar cédula/pasaporte si la columna existe
+            try:
+                if _col_exists("Usuario", "Cedula_Pasaporte"):
+                    u.Cedula_Pasaporte = cedula or getattr(u, "Cedula_Pasaporte", None)
+            except Exception:
+                pass
+    
+            # === Sincronizar datos básicos en Cliente (si está vinculado) ===
+            try:
+                if getattr(u, "Codigo_Cliente", None):
+                    # separar nombre y apellido de "Nombre completo"
+                    partes = nombre.split(" ", 1)
+                    nom = partes[0][:50]
+                    ape = (partes[1] if len(partes) > 1 else "").strip()[:50]
+    
+                    # Para Cliente.Cedula solo almacenamos dígitos (0 si no hay)
+                    ced_digits = _try_int_digits(cedula) if cedula else None
+    
+                    params = {"n": nom, "a": ape, "t": (telefono or None), "e": correo, "cid": u.Codigo_Cliente}
+                    set_ced = ""
+                    if ced_digits is not None:
+                        set_ced = ", Cedula = :ced"
+                        params["ced"] = ced_digits
+    
+                    db.session.execute(
+                        text(f"""
+                            UPDATE Cliente
+                               SET Nombre   = :n,
+                                   Apellido = :a,
+                                   Telefono = COALESCE(:t, Telefono),
+                                   Correo   = :e
+                                   {set_ced}
+                             WHERE Codigo_Cliente = :cid
+                        """),
+                        params
+                    )
+            except Exception:
+                # no impedir guardado del perfil por esta sincronización
+                pass
+    
+            db.session.commit()
+            # refrescar nombre en sesión
+            session["user_name"] = u.Nombre
+            return jsonify({"ok": True})
+    
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception(f"[api/me] update failed: {e}")
+            return jsonify({"ok": False, "msg": "No se pudo actualizar el perfil."}), 500
+    
+
+    # === Perfil: cambio de contraseña ===
+    @app.route("/api/me/password", methods=["PUT", "POST"])
+    @login_required
+    def api_me_password():
+        try:
+            uid = session.get("user_id")
+            if not uid:
+                return jsonify({"ok": False, "msg": "No autenticado."}), 401
+    
+            u = Usuario.query.filter_by(Codigo_Usuario=uid).first()
+            if not u:
+                return jsonify({"ok": False, "msg": "Usuario no encontrado."}), 404
+    
+            p = request.get_json(silent=True) or {}
+    
+            # Acepta los nombres que manda portal-perfil.html
+            current = (p.get("current") or p.get("old") or p.get("password") or "").strip()
+            new_pw  = (p.get("new")     or p.get("new_password") or p.get("password_new") or "").strip()
+            confirm = (p.get("confirm") or p.get("password_confirm") or "").strip()
+    
+            # Validaciones
+            if not current or not new_pw or not confirm:
+                return jsonify({"ok": False, "msg": "Completa todos los campos."}), 400
+            if len(new_pw) < 8:
+                return jsonify({"ok": False, "msg": "La nueva contraseña debe tener al menos 8 caracteres."}), 400
+            if new_pw != confirm:
+                return jsonify({"ok": False, "msg": "La confirmación no coincide."}), 400
+            if new_pw == current:
+                return jsonify({"ok": False, "msg": "La nueva contraseña no puede ser igual a la actual."}), 400
+    
+            # Verificación de la contraseña actual (compatibilidad con hash o texto plano legado)
+            stored = getattr(u, "Contrasena", None)
+            is_ok = False
+            if stored:
+                try:
+                    is_ok = check_password_hash(stored, current)
+                except Exception:
+                    # Si lo guardado no es un hash (instalaciones viejas), compara directo
+                    is_ok = (stored == current)
+            else:
+                # Si por diseño existían usuarios sin contraseña previa, permite setear la primera
+                is_ok = True
+    
+            if not is_ok:
+                return jsonify({"ok": False, "msg": "La contraseña actual no es válida."}), 400
+    
+            # Hash de la nueva contraseña y persistencia
+            try:
+                new_hash = generate_password_hash(new_pw)
+            except Exception:
+                # Fallback improbable: guarda en claro (no recomendado), pero evita NULL
+                new_hash = new_pw
+    
+            u.Contrasena = new_hash
+            if hasattr(u, "Fecha_Modificacion"):
+                u.Fecha_Modificacion = datetime.utcnow()
+    
+            db.session.commit()
+            return jsonify({"ok": True, "msg": "Contraseña actualizada."})
+        except IntegrityError:
+            db.session.rollback()
+            return jsonify({"ok": False, "msg": "No se pudo cambiar la contraseña."}), 500
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception("[api/me/password] error: %s", e)
+            return jsonify({"ok": False, "msg": "No se pudo cambiar la contraseña."}), 500
+    
+
+    
 
     # ========= GRR-01-004 — MODELOS / HELPERS / RUTAS =============
     class GuestCheckin(db.Model):
@@ -3307,11 +4255,12 @@ def create_app() -> Flask:
     def _reservas_by_doc_when(doc_number: str, when_iso: Optional[str] = None):
         """
         Devuelve reservas cuya Cedula (Cliente) o Cedula_Pasaporte (Usuario vinculado)
-        coincide con 'doc_number' y donde 'when_iso' está entre Entrada y Salida (rango estancia).
-        Si when_iso es None, usa la fecha de HOY.
+        coincide con 'doc_number' y donde 'when_iso' está entre [Entrada, Salida).
+        Si when_iso es None, usa HOY.
         """
         doc = _normalize_docnum(doc_number)
         when = (when_iso or date.today().isoformat())
+    
         rows = db.session.execute(text("""
             SELECT
                 R.Codigo_Reserva           AS reserva_id,
@@ -3330,13 +4279,15 @@ def create_app() -> Flask:
             JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
             LEFT JOIN Usuario U ON U.Codigo_Cliente = C.Codigo_Cliente
             LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
-            WHERE DATE(R.Fecha_Entrada) <= DATE(:w)
-              AND DATE(:w) <= DATE(R.Fecha_Salida)
+            WHERE DATE(:w) >= DATE(R.Fecha_Entrada)
+              AND DATE(:w) <  DATE(R.Fecha_Salida)
               AND R.Estado IN ('Confirmada', 'Pendiente')
               AND ( C.Cedula = :doc OR U.Cedula_Pasaporte = :doc )
             ORDER BY R.Fecha_Entrada ASC, R.Codigo_Reserva ASC
         """), {"doc": doc, "w": when}).mappings().all()
+    
         return [dict(r) for r in rows]
+    
 
     # UI de recepción (simple)
     @app.route("/ops-checkin.html", methods=["GET"])
@@ -3352,29 +4303,118 @@ def create_app() -> Flask:
 
     # ------------ ENDPOINTS COMPATIBLES CON EL FRONT (ops/*) ----------------
 
+
+    @lru_cache(maxsize=1)
+    def _cliente_tiene_columna(col: str) -> bool:
+        try:
+            row = db.session.execute(_text("""
+                SELECT 1
+                  FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME   = 'Cliente'
+                   AND COLUMN_NAME  = :c
+                 LIMIT 1
+            """), {"c": col}).first()
+            return bool(row)
+        except Exception:
+            return False
+    
+    def _precio_noche_py(h) -> float:
+        for c in ("Precio_Noche", "Precio_Base", "Precio", "Tarifa_Base"):
+            if hasattr(h, c):
+                try:
+                    v = getattr(h, c)
+                    if v is not None:
+                        return float(v or 0)
+                except Exception:
+                    pass
+        return 0.0
+
     @app.get("/api/ops/checkin/search")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkin_search():
-        """
-        Front de recepción: busca reservas por documento.
-        Parámetros: ?doc=########  &when=YYYY-MM-DD (opcional, default: hoy)
-        """
-        doc = (request.args.get("doc") or "").strip()
-        when = (request.args.get("when") or date.today().isoformat()).strip()
+        doc  = (request.args.get("doc") or "").strip()
+        when = (request.args.get("when") or "").strip()
         if not doc:
-            return jsonify({"ok": False, "error": "doc_required"}), 400
-
-        rows = _reservas_by_doc_when(doc, when)
-        items = [{
-            "id": int(r["reserva_id"]),
-            "numero": r.get("numero") or _make_unique_number(int(r["reserva_id"]), str(r.get("checkin") or "")),
-            "huesped": f"{(r.get('nombre') or '').strip()} {(r.get('apellido') or '').strip()}".strip() or (r.get("cliente_email") or ""),
-            "checkin": str(r["checkin"])[:10],
-            "checkout": str(r["checkout"])[:10],
-            "habitacion": r.get("habitacion_num") or r.get("habitacion_id"),
-            "estado": r.get("estado") or "Confirmada",
-        } for r in rows]
-        return jsonify({"ok": True, "items": items})
+            return jsonify({"ok": False, "items": [], "msg": "doc requerido"}), 400
+    
+        when_date = None
+        if when:
+            try:
+                when_date = date.fromisoformat(when[:10])
+            except Exception:
+                return jsonify({"ok": False, "items": [], "msg": "when inválido (YYYY-MM-DD)"}), 400
+    
+        # --- CONDICIONES dinámicas según columnas reales ---
+        conds = [
+            "REPLACE(C.Cedula,'-','') = REPLACE(:doc,'-','')",
+            "LOWER(C.Correo) = LOWER(:doc)"
+        ]
+        if _cliente_tiene_columna("Pasaporte"):
+            conds.append("COALESCE(C.Pasaporte,'') = :doc")
+    
+        where_block = " OR ".join(conds)
+    
+        sql = f"""
+            SELECT
+                R.Codigo_Reserva        AS id,
+                R.Fecha_Entrada         AS checkin,
+                R.Fecha_Salida          AS checkout,
+                R.Estado                AS estado,
+                R.Codigo_Habitacion     AS Codigo_Habitacion,
+                C.Nombre                AS c_nombre,
+                COALESCE(C.Apellido,'') AS c_apellido,
+                H.Numero_Habitacion     AS Numero_Habitacion
+            FROM Reserva R
+            JOIN Cliente C         ON C.Codigo_Cliente = R.Codigo_Cliente
+            LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+            WHERE ({where_block})
+        """
+    
+        params = {"doc": doc}
+    
+        # Fecha opcional: si viene, filtra por rango conteniendo 'when'; si no, lista todas.
+        if when_date:
+            sql += " AND R.Fecha_Entrada <= :d AND R.Fecha_Salida > :d"
+            params["d"] = when_date
+    
+        sql += " ORDER BY R.Fecha_Entrada DESC LIMIT 200"
+    
+        rows = db.session.execute(_text(sql), params).mappings().all()
+    
+        items = []
+        for r in rows:
+            room_block = None
+            h = None
+            try:
+                if r["Codigo_Habitacion"]:
+                    h = Habitacion.query.get(int(r["Codigo_Habitacion"]))
+            except Exception:
+                h = None
+    
+            if h:
+                room_block = {
+                    "code": int(getattr(h, "Codigo_Habitacion")),
+                    "number": getattr(h, "Numero_Habitacion", None),
+                    "type": getattr(h, "Tipo", None) or "",
+                    "capacity": int(getattr(h, "Capacidad", None) or 0),
+                    "price": _precio_noche_py(h),
+                    "desc": getattr(h, "Descripcion", None) or "",
+                    "img": getattr(h, "Imagen_URL", None) or "",
+                }
+    
+            items.append({
+                "id": int(r["id"]),
+                "numero": f"VG-{int(r['id'])}",
+                "huesped": (f"{r['c_nombre']} {r['c_apellido']}".strip() or "—"),
+                "checkin": r["checkin"].isoformat() if r["checkin"] else None,
+                "checkout": r["checkout"].isoformat() if r["checkout"] else None,
+                "estado": r["estado"],
+                "habitacion": r["Numero_Habitacion"],
+                "room": room_block,  # <- detalles completos para la UI
+            })
+    
+        return jsonify({"ok": True, "items": items, "count": len(items)}), 200
 
     @app.post("/api/ops/checkin/complete")
     @role_required("Administrador", "Recepcionista")
@@ -4135,119 +5175,7 @@ def create_app() -> Flask:
         credit = db.Column(db.Numeric(14, 2), default=0, nullable=False)
         description = db.Column(db.String(255))
 
-    @app.post("/api/pos/ledger", endpoint="pos_ledger_post")
-    def api_pos_ledger():
-        api_key = request.headers.get("X-Api-Key") or request.headers.get("Authorization", "").replace("Bearer ", "")
-        expected = app.config.get("POS_API_KEY") or os.getenv("POS_API_KEY") or "dev-pos-key"
-        if not api_key or api_key != expected:
-            return jsonify({"ok": False, "error": "unauthorized"}), 401
-
-        payload = request.get_json(silent=True) or {}
-        external_id = (payload.get("external_id") or "").strip()
-        reserva_id = payload.get("reserva_id")
-        currency = (payload.get("currency") or "CRC").strip()[:10]
-        lines = payload.get("lines") or []
-        meta = payload.get("meta") or {}
-
-        if not external_id or not isinstance(lines, list) or not lines:
-            return jsonify({"ok": False, "error": "invalid_payload"}), 400
-
-        # Evitar duplicados por external_id
-        existing = db.session.query(FinLedgerTx).filter_by(external_id=external_id).first()
-        if existing:
-            return jsonify({"ok": True, "id_tx": existing.id_tx, "status": "already_posted"})
-
-        total_debit = sum(float(x.get("debit") or 0) for x in lines)
-        total_credit = sum(float(x.get("credit") or 0) for x in lines)
-        if round(total_debit - total_credit, 2) != 0.00:
-            return jsonify({
-                "ok": False,
-                "error": "unbalanced_entry",
-                "debit": total_debit,
-                "credit": total_credit
-            }), 422
-
-        total = max(total_debit, total_credit)
-
-        # Crear cabecera
-        tx = FinLedgerTx(
-            external_id=external_id,
-            source="POS",
-            reserva_id=int(reserva_id) if reserva_id else None,
-            currency=currency,
-            total=total,
-            status="posted",
-            meta=meta,
-        )
-        db.session.add(tx)
-        db.session.flush()
-
-        # Crear líneas
-        for idx, ln in enumerate(lines, start=1):
-            db.session.add(
-                FinLedgerLine(
-                    id_tx=tx.id_tx,
-                    line_no=int(ln.get("line_no") or idx),
-                    account=(ln.get("account") or "").strip()[:64] or "UNASSIGNED",
-                    debit=float(ln.get("debit") or 0),
-                    credit=float(ln.get("credit") or 0),
-                    description=(ln.get("description") or "")[:255] or None,
-                )
-            )
-
-        db.session.commit()
-
-        # Vincular efectos colaterales en la reserva (si se indicó)
-        try:
-            if tx.reserva_id:
-                _apply_pos_tx_to_reserva(int(tx.reserva_id), float(total), external_id)
-        except Exception as e:
-            current_app.logger.warning(f"[POS][LEDGER] post-apply error: {e}")
-
-        try:
-            _audit_log(None, "pos.ledger.posted", {
-                "id_tx": int(tx.id_tx),
-                "external_id": external_id,
-                "reserva_id": int(tx.reserva_id) if tx.reserva_id else None,
-                "total": float(total),
-                "currency": currency
-            })
-        except Exception:
-            pass
-
-        return jsonify({
-            "ok": True,
-            "id_tx": tx.id_tx,
-            "posted_debit": float(total_debit),
-            "posted_credit": float(total_credit),
-            "total": float(total),
-            "reserva_id": int(tx.reserva_id) if tx.reserva_id else None
-        })
-
-
-    def _apply_pos_tx_to_reserva(reserva_id: int, total: float, external_id: str):
-        try:
-            db.session.execute(
-                text(
-                    """
-                UPDATE Reserva
-                   SET Estado = CASE WHEN Estado='Pendiente' THEN 'Confirmada' ELSE Estado END,
-                       Canal  = 'POS'
-                 WHERE Codigo_Reserva = :rid
-                 LIMIT 1
-            """
-                ),
-                {"rid": reserva_id},
-            )
-            db.session.commit()
-        except Exception as e:
-            current_app.logger.warning(f"[POS][RESERVA] No se pudo actualizar R={reserva_id}: {e}")
-            db.session.rollback()
-
-        try:
-            _audit_log(None, "pos.tx.posted", {"reserva_id": reserva_id, "external_id": external_id, "total": float(total)})
-        except Exception:
-            pass
+    
 
     @app.post("/api/pos/ledger")
     def api_pos_ledger():
@@ -4813,10 +5741,14 @@ def create_app() -> Flask:
         FinInvoice  # type: ignore[name-defined]
     except NameError:
         from sqlalchemy import func
-
-            # ========= FIN-INV-01 — Gestión de Facturas ===========
+    
+        # ========= FIN-INV-01 — Gestión de Facturas ===========
         class FinInvoice(db.Model):
             __tablename__ = "fin_invoices"
+            __table_args__ = (
+                db.UniqueConstraint("numero", name="UQ_fin_invoices_numero"),  # nombre explícito de la unique
+            )
+    
             id_factura      = db.Column(db.Integer, primary_key=True)
             numero          = db.Column(db.String(20), unique=True, nullable=False)
             cliente_nombre  = db.Column(db.String(120))
@@ -4824,11 +5756,12 @@ def create_app() -> Flask:
             moneda          = db.Column(db.Enum("CRC", "USD", name="fin_invoice_moneda"), server_default="CRC")
             monto_total     = db.Column(db.Numeric(12, 2), nullable=False)
             descripcion     = db.Column(db.String(255))
-            archivo_path    = db.Column(db.String(255))  # <— ¡IMPORTANTE! columna correcta
+            archivo_path    = db.Column(db.String(255))  # nombre correcto que usas en JSON/UI
             id_reserva      = db.Column(db.Integer, index=True)
             id_usuario      = db.Column(db.Integer, index=True)
             fecha_emision   = db.Column(db.Date, server_default=func.current_date())
             estado          = db.Column(db.Enum("Emitida", "Anulada", name="fin_invoice_estado"), server_default="Emitida")
+    
     
 
     # ------------------------------------------------------------

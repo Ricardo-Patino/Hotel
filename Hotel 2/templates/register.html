@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
@@ -27,18 +26,22 @@
 
   <!-- Estilos del proyecto -->
   <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <!-- (Opcional) style.css propio del proyecto -->
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-</head>
 
+  <style>
+    .form-control.is-valid{background-image:none;border-color:#198754}
+    .form-control.is-invalid{background-image:none;border-color:#dc3545}
+    .valid-hint, .invalid-feedback{min-height:1.25rem}
+    .password-hints li{margin-left:1rem}
+    .form-check-input.is-invalid{border-color:#dc3545}
+  </style>
+</head>
 <body class="privacy-page">
 
   <!-- Header -->
   <header id="header" class="header d-flex align-items-center fixed-top">
     <div class="container position-relative d-flex align-items-center justify-content-between">
-
       <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <!-- <img src="{{ url_for('static', filename='assets/img/logo.webp') }}" alt="Hotel Villa Grace"> -->
         <h1 class="sitename">Hotel Villa Grace</h1>
       </a>
 
@@ -66,7 +69,6 @@
       </nav>
 
       <a class="btn-getstarted d-none d-sm-block" href="booking.html">Reservar ahora</a>
-
     </div>
   </header>
 
@@ -92,18 +94,18 @@
 
         <!-- Mensajes del servidor (flash) -->
         {% with msgs = get_flashed_messages(with_categories=true) %}
-          {% if msgs %}
-            <div class="row justify-content-center mb-3">
-              <div class="col-lg-7">
-                {% for cat, msg in msgs %}
-                  <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
-                    {{ msg }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-                  </div>
-                {% endfor %}
-              </div>
+        {% if msgs %}
+          <div class="row justify-content-center mb-3">
+            <div class="col-lg-7">
+              {% for cat, msg in msgs %}
+                <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+                  {{ msg }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                </div>
+              {% endfor %}
             </div>
-          {% endif %}
+          </div>
+        {% endif %}
         {% endwith %}
 
         <div class="row justify-content-center">
@@ -117,49 +119,75 @@
                   <p class="text-muted mb-0">Es rápido y gratuito.</p>
                 </div>
 
-                <!-- FORM: respeta tu UI, mapeo a backend con inputs ocultos -->
-                <form action="{{ url_for('register') }}" method="post" class="row g-3" id="registerForm">
+                <!-- FORM -->
+                <form action="{{ url_for('register') }}" method="post" class="row g-3" id="registerForm" novalidate>
                   <div class="col-md-6">
                     <label for="nombre" class="form-label">Nombre</label>
-                    <input type="text" id="nombre" name="nombre" class="form-control" required>
-                  </div>
-                  <div class="col-md-6">
-                    <label for="apellidos" class="form-label">Apellidos</label>
-                    <input type="text" id="apellidos" name="apellidos" class="form-control" required>
+                    <input type="text" id="nombre" name="nombre" class="form-control" autocomplete="given-name" required>
+                    <div class="valid-hint text-success small d-none">✓ Se ve bien</div>
+                    <div class="invalid-feedback small">Usa solo letras y espacios (2–50).</div>
                   </div>
 
-                  <!-- NUEVO: Cédula/Pasaporte para national_id -->
                   <div class="col-md-6">
-                    <label for="cedula" class="form-label">Cédula / Pasaporte</label>
-                    <input type="text" id="cedula" name="cedula" class="form-control" placeholder="1-2345-6789">
-                    <div class="form-text">Opcional; si lo ingresas debe ser único.</div>
+                    <label for="apellidos" class="form-label">Apellidos</label>
+                    <input type="text" id="apellidos" name="apellidos" class="form-control" autocomplete="family-name" required>
+                    <div class="valid-hint text-success small d-none">✓ Se ve bien</div>
+                    <div class="invalid-feedback small">Usa solo letras y espacios (2–50).</div>
+                  </div>
+
+                  <!-- Cédula/Pasaporte (requerido) -->
+                  <div class="col-md-6">
+                    <label for="cedula" class="form-label">Cédula / Pasaporte <span class="text-danger">*</span></label>
+                    <input type="text" id="cedula" name="cedula" class="form-control" placeholder="1-2345-6789" autocomplete="off" required>
+                    <div class="form-text">Formato CR (1-2345-6789 o 9 dígitos), DIMEX (11–12 dígitos) o pasaporte (6–12 alfanuméricos).</div>
+                    <div class="valid-hint text-success small d-none">✓ Documento válido</div>
+                    <div class="invalid-feedback small">Documento inválido o poco confiable (no use secuencias tipo 11111111).</div>
                   </div>
 
                   <div class="col-md-6">
                     <label for="email" class="form-label">Correo electrónico</label>
-                    <input type="email" id="email" name="email" class="form-control" placeholder="tucorreo@ejemplo.com" required>
+                    <input type="email" id="email" name="email" class="form-control" placeholder="tucorreo@ejemplo.com" autocomplete="email" required>
+                    <div class="valid-hint text-success small d-none">✓ Correo válido</div>
+                    <div class="invalid-feedback small">Ingresa un correo válido (ej. usuario@dominio.com).</div>
                   </div>
+
                   <div class="col-md-6">
                     <label for="telefono" class="form-label">Teléfono</label>
-                    <input type="tel" id="telefono" name="telefono" class="form-control" placeholder="+506 0000 0000" required>
+                    <input type="tel" id="telefono" name="telefono" class="form-control" placeholder="+506 0000 0000" autocomplete="tel" required>
+                    <div class="form-text">Solo dígitos y símbolo + (mín. 8, máx. 15).</div>
+                    <div class="valid-hint text-success small d-none">✓ Teléfono válido</div>
+                    <div class="invalid-feedback small">Número inválido o poco confiable.</div>
                   </div>
 
                   <div class="col-md-6">
                     <label for="password" class="form-label">Contraseña</label>
-                    <input type="password" id="password" name="password" class="form-control" minlength="8" required>
-                    <div class="form-text">Mínimo 8 caracteres.</div>
+                    <input type="password" id="password" name="password" class="form-control" autocomplete="new-password" minlength="8" required>
+                    <div class="form-text">Mínimo 8 caracteres, con mayúscula, minúscula y número.</div>
+                    <ul class="password-hints small mb-0">
+                      <li id="hLen">• ≥ 8 caracteres</li>
+                      <li id="hLow">• 1 minúscula (a-z)</li>
+                      <li id="hUp">• 1 mayúscula (A-Z)</li>
+                      <li id="hNum">• 1 número (0-9)</li>
+                    </ul>
+                    <div class="valid-hint text-success small d-none">✓ Contraseña fuerte</div>
+                    <div class="invalid-feedback small">No cumple los requisitos mínimos.</div>
                   </div>
+
                   <div class="col-md-6">
                     <label for="password2" class="form-label">Confirmar contraseña</label>
-                    <input type="password" id="password2" name="password2" class="form-control" minlength="8" required>
+                    <input type="password" id="password2" name="password2" class="form-control" autocomplete="new-password" minlength="8" required>
+                    <div class="valid-hint text-success small d-none">✓ Coincide</div>
+                    <div class="invalid-feedback small">Las contraseñas no coinciden.</div>
                   </div>
 
                   <div class="col-12">
                     <div class="form-check">
-                      <input class="form-check-input" type="checkbox" id="terms" required>
+                      <!-- CORRECCIÓN: agregar name y value -->
+                      <input class="form-check-input" type="checkbox" id="terms" name="terms" value="1" required>
                       <label class="form-check-label" for="terms">
                         Acepto los <a href="terms.html" target="_blank">Términos</a> y la <a href="privacy.html" target="_blank">Política de Privacidad</a>.
                       </label>
+                      <div class="invalid-feedback small">Debes aceptar los términos para continuar.</div>
                     </div>
                   </div>
 
@@ -168,9 +196,11 @@
                   <input type="hidden" name="national_id" id="national_id">
                   <input type="hidden" name="phone" id="phone">
                   <input type="hidden" name="confirm_password" id="confirm_password">
+                  <!-- A prueba de backend: 1/0 explícitos -->
+                  <input type="hidden" name="terms_accepted" id="terms_accepted" value="0">
 
                   <div class="col-12 d-grid">
-                    <button type="submit" class="btn btn-primary">Crear cuenta</button>
+                    <button type="submit" id="submitBtn" class="btn btn-primary" disabled>Crear cuenta</button>
                   </div>
 
                   <div class="col-12 text-center">
@@ -191,7 +221,6 @@
 
   <!-- Footer -->
   <footer id="footer" class="footer position-relative dark-background">
-
     <div class="footer-top">
       <div class="container">
         <div class="row gy-4">
@@ -273,42 +302,218 @@
   <!-- Main JS -->
   <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
-  <!-- Script pequeño para mapear campos al backend sin cambiar tu UI -->
+  <!-- Validaciones en vivo + mapeo backend -->
   <script>
     (function () {
-      const form = document.getElementById('registerForm');
-      if (!form) return;
+      const $ = (s) => document.querySelector(s);
+      const $$ = (s) => document.querySelectorAll(s);
 
+      const form = $('#registerForm');
+      const submitBtn = $('#submitBtn');
+
+      const fNombre   = $('#nombre');
+      const fApellidos= $('#apellidos');
+      const fCedula   = $('#cedula');
+      const fEmail    = $('#email');
+      const fTelefono = $('#telefono');
+      const fPass1    = $('#password');
+      const fPass2    = $('#password2');
+      const fTerms    = $('#terms');
+
+      const hLen = $('#hLen'), hLow = $('#hLow'), hUp = $('#hUp'), hNum = $('#hNum');
+
+      // Ocultos (mapeo a backend)
+      const hFullName = $('#full_name');
+      const hNatId    = $('#national_id');
+      const hPhone    = $('#phone');
+      const hConfirm  = $('#confirm_password');
+      const hTermsAcc = $('#terms_accepted');
+
+      // Helpers
+      const trimSpaces = (s) => (s || '').replace(/\s+/g, ' ').trim();
+      const onlyDigits = (s) => (s || '').replace(/\D+/g, '');
+      const onlyAlnum  = (s) => (s || '').replace(/[^A-Za-z0-9]/g, '');
+      const allSameChar= (s) => !!s && s.split('').every(ch => ch === s[0]);
+      const hasRun4    = (s) => /(.)\1{3,}/.test(s);
+      const isEmpty    = (s) => !s || !s.trim();
+
+      function setState(input, ok, showWhenEmpty=false){
+        const parent = input.closest('.col-md-6, .col-12') || input.parentElement;
+        const validHint = parent.querySelector('.valid-hint');
+        const invalidFb = parent.querySelector('.invalid-feedback');
+
+        if (isEmpty(input.value) && !showWhenEmpty && input.type !== 'checkbox') {
+          input.classList.remove('is-valid','is-invalid');
+          if (validHint) validHint.classList.add('d-none');
+          return;
+        }
+        if (ok) {
+          input.classList.add('is-valid'); input.classList.remove('is-invalid');
+          if (validHint) validHint.classList.remove('d-none');
+        } else {
+          input.classList.add('is-invalid'); input.classList.remove('is-valid');
+          if (validHint) validHint.classList.add('d-none');
+          if (invalidFb) invalidFb.classList.remove('d-none');
+        }
+      }
+
+      // Reglas
+      function validName(v){
+        v = trimSpaces(v);
+        if (v.length < 2 || v.length > 50) return false;
+        if (/[^A-Za-zÁÉÍÓÚáéíóúÑñüÜ\s'-]/.test(v)) return false;
+        if (hasRun4(v)) return false;
+        return true;
+      }
+
+      function validEmail(v){
+        v = (v || '').toLowerCase().trim();
+        const basic = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+        return basic.test(v);
+      }
+
+      function looksLikeGarbageDigits(s){
+        const d = onlyDigits(s);
+        if (d.length >= 4 && allSameChar(d)) return true;
+        return false;
+      }
+
+      function validNationalId(v){
+        v = (v || '').trim().toUpperCase();
+        if (!v) return false;
+        if (hasRun4(v)) return false;
+        if (looksLikeGarbageDigits(v)) return false;
+
+        const d = onlyDigits(v);
+        const al = onlyAlnum(v);
+
+        const cr1 = /^\d{9}$/.test(d);
+        const cr2 = /^\d{1}-\d{4}-\d{4}$/.test(v);
+        const dimex = /^\d{11,12}$/.test(d);
+        const passp = /^[A-Z0-9]{6,12}$/.test(al);
+
+        return cr1 || cr2 || dimex || passp;
+      }
+
+      function validPhone(v){
+        v = (v || '').trim();
+        const d = onlyDigits(v);
+        if (d.length < 8 || d.length > 15) return false;
+        if (allSameChar(d)) return false;
+        return true;
+      }
+
+      const weakPwds = new Set(['password','12345678','qwerty','qwerty123','abc12345','11111111','00000000']);
+      function validPassword(v){
+        if (!v || v.length < 8) return false;
+        if (weakPwds.has(v.toLowerCase())) return false;
+        const hasLower = /[a-z]/.test(v);
+        const hasUpper = /[A-Z]/.test(v);
+        const hasNum   = /\d/.test(v);
+        [hLen,hLow,hUp,hNum].forEach(el => el && el.classList.remove('text-success','fw-semibold'));
+        if (hLen && v.length >= 8) {hLen.classList.add('text-success','fw-semibold');}
+        if (hLow && hasLower)      {hLow.classList.add('text-success','fw-semibold');}
+        if (hUp && hasUpper)       {hUp.classList.add('text-success','fw-semibold');}
+        if (hNum && hasNum)        {hNum.classList.add('text-success','fw-semibold');}
+        return hasLower && hasUpper && hasNum;
+      }
+
+      function passwordsMatch(a,b){ return !!a && a === b; }
+
+      // Listeners en vivo
+      function hookLive(input, validator){
+        input.addEventListener('input', () => setState(input, validator(input.value)));
+        input.addEventListener('blur',  () => setState(input, validator(input.value)));
+      }
+
+      hookLive(fNombre,   validName);
+      hookLive(fApellidos,validName);
+      hookLive(fCedula,   validNationalId);
+      hookLive(fEmail,    validEmail);
+      hookLive(fTelefono, validPhone);
+      fPass1.addEventListener('input', () => {
+        const ok = validPassword(fPass1.value);
+        setState(fPass1, ok);
+        setState(fPass2, passwordsMatch(fPass1.value, fPass2.value));
+      });
+      fPass1.addEventListener('blur', () => setState(fPass1, validPassword(fPass1.value)));
+      fPass2.addEventListener('input', () => setState(fPass2, passwordsMatch(fPass1.value, fPass2.value)));
+      fPass2.addEventListener('blur',  () => setState(fPass2, passwordsMatch(fPass1.value, fPass2.value)));
+
+      // Checkbox de términos: reflejar en hidden y estado visual
+      function syncTerms(){
+        hTermsAcc.value = fTerms.checked ? '1' : '0';
+        if (!fTerms.checked) {
+          fTerms.classList.add('is-invalid');
+        } else {
+          fTerms.classList.remove('is-invalid');
+        }
+        updateSubmitState();
+      }
+      fTerms.addEventListener('change', syncTerms);
+
+      // Habilitar/Deshabilitar botón según validez global
+      function formIsValid(){
+        return (
+          validName(fNombre.value) &&
+          validName(fApellidos.value) &&
+          validNationalId(fCedula.value) &&
+          validEmail(fEmail.value) &&
+          validPhone(fTelefono.value) &&
+          validPassword(fPass1.value) &&
+          passwordsMatch(fPass1.value, fPass2.value) &&
+          fTerms.checked
+        );
+      }
+      function updateSubmitState(){
+        submitBtn.disabled = !formIsValid();
+      }
+      $$('#registerForm input').forEach(i => i.addEventListener('input', updateSubmitState));
+      updateSubmitState();
+      syncTerms();
+
+      // Submit
       form.addEventListener('submit', function (e) {
-        const nombre = document.getElementById('nombre')?.value?.trim() || '';
-        const apellidos = document.getElementById('apellidos')?.value?.trim() || '';
-        const fullName = (nombre + ' ' + apellidos).trim();
+        const checks = [
+          [fNombre, validName],
+          [fApellidos, validName],
+          [fCedula, validNationalId],
+          [fEmail, validEmail],
+          [fTelefono, validPhone],
+          [fPass1, validPassword],
+          [fPass2, (v)=>passwordsMatch(fPass1.value, v)],
+        ];
 
-        const telefono = document.getElementById('telefono')?.value?.trim() || '';
-        const cedula = document.getElementById('cedula')?.value?.trim() || '';
+        let firstInvalid = null;
+        checks.forEach(([inp, fn]) => {
+          const ok = fn(inp.value);
+          setState(inp, ok, /*showWhenEmpty*/true);
+          if (!ok && !firstInvalid) firstInvalid = inp;
+        });
 
-        const pass1 = document.getElementById('password')?.value || '';
-        const pass2 = document.getElementById('password2')?.value || '';
+        // términos (forzar estado y mapear)
+        if (!fTerms.checked) {
+          fTerms.classList.add('is-invalid');
+          if (!firstInvalid) firstInvalid = fTerms;
+        }
+        hTermsAcc.value = fTerms.checked ? '1' : '0';
 
-        // Validación rápida de contraseñas
-        if (pass1.length < 8) {
+        if (firstInvalid) {
           e.preventDefault();
-          alert('La contraseña debe tener al menos 8 caracteres.');
+          firstInvalid.focus({preventScroll:false});
           return false;
         }
-        if (pass1 !== pass2) {
-          e.preventDefault();
-          alert('Las contraseñas no coinciden.');
-          return false;
-        }
 
-        // Volcar a los inputs ocultos que el backend espera
-        document.getElementById('full_name').value = fullName;
-        document.getElementById('phone').value = telefono;
-        document.getElementById('national_id').value = cedula;
-        document.getElementById('confirm_password').value = pass2;
+        // Mapeo esperado por backend
+        const fullName = `${trimSpaces(fNombre.value)} ${trimSpaces(fApellidos.value)}`.trim();
+        $('#full_name').value        = fullName;
+        $('#national_id').value      = trimSpaces(fCedula.value).toUpperCase();
+        $('#phone').value            = trimSpaces(fTelefono.value);
+        $('#confirm_password').value = fPass2.value;
 
-        // Continúa submit normal
+        // Normalizar email a minúscula
+        fEmail.value = (fEmail.value || '').trim().toLowerCase();
+
         return true;
       });
     })();

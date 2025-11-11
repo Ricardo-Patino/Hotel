@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analítica y Reportes | Hotel Villa Grace</title>
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .page-title{color:#4b49ac}
+    .card{border-radius:1rem}
+  </style>
+</head>
+<body class="privacy-page">
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a href="/" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <!-- tu mismo menú; agrega el item a /arep/dashboard -->
+  </div>
+</header>
+
+<main id="main" class="main" style="margin-top:90px;">
+  <section class="section">
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="page-title mb-0">Analítica y Reportes (AREP)</h2>
+        <div class="btn-group">
+          <button id="btnExportXlsx" class="btn btn-outline-success"><i class="bi bi-file-earmark-excel"></i> XLSX</button>
+          <button id="btnExportPdf" class="btn btn-outline-danger"><i class="bi bi-filetype-pdf"></i> PDF</button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="card p-3 mb-4">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Desde</label>
+            <input type="date" class="form-control" id="f_desde">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Hasta</label>
+            <input type="date" class="form-control" id="f_hasta">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Tipo de cliente</label>
+            <select class="form-select" id="tipo_cliente">
+              <option value="TODOS">Todos</option>
+              <option value="TURISTA">Turista</option>
+              <option value="CORPORATIVO">Corporativo</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Tipo de servicio</label>
+            <select class="form-select" id="tipo_servicio">
+              <option value="TODOS">Todos</option>
+              <option value="Amenities">Amenities</option>
+              <option value="Cocina">Cocina</option>
+              <option value="Eventos">Eventos</option>
+            </select>
+          </div>
+          <div class="col-12 d-flex justify-content-end">
+            <button id="btnAplicar" class="btn btn-primary"><i class="bi bi-funnel"></i> Aplicar filtros</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráficas -->
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card p-3">
+            <h5 class="mb-2">Ingresos por mes</h5>
+            <canvas id="chartIngresos"></canvas>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card p-3">
+            <h5 class="mb-2">Ocupación (%)</h5>
+            <canvas id="chartOcupacion"></canvas>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card p-3">
+            <h5 class="mb-2">Top servicios utilizados</h5>
+            <canvas id="chartServicios"></canvas>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card p-3">
+            <h5 class="mb-2">Ranking de desempeño del personal</h5>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead><tr><th>Funcionario</th><th>NPS</th><th>Velocidad</th><th>Score</th></tr></thead>
+                <tbody id="tbRanking"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<script>
+let chIngresos, chOcup, chServ;
+
+function lineChart(ctx, labels, data, label){
+  return new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[{ label, data, tension:.3 }]},
+    options:{ responsive:true, plugins:{legend:{display:true}} }
+  });
+}
+function barChart(ctx, labels, data, label){
+  return new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ label, data }]},
+    options:{ responsive:true, plugins:{legend:{display:false}} }
+  });
+}
+
+async function cargar(){
+  const desde = document.getElementById('f_desde').value;
+  const hasta = document.getElementById('f_hasta').value;
+  const tipo_cliente = document.getElementById('tipo_cliente').value;
+  const tipo_servicio = document.getElementById('tipo_servicio').value;
+
+  const qs = new URLSearchParams({desde,hasta,tipo_cliente,tipo_servicio}).toString();
+  const r = await fetch(`{{ url_for('arep.api_metrics') }}?`+qs);
+  const j = await r.json();
+
+  // Ingresos
+  const l1 = j.ingresos_mes.map(x=>x.mes);
+  const d1 = j.ingresos_mes.map(x=>x.ingresos);
+  if(chIngresos) chIngresos.destroy();
+  chIngresos = lineChart(document.getElementById('chartIngresos'), l1, d1, 'Ingresos');
+
+  // Ocupación
+  const l2 = j.ocupacion.map(x=>x.mes);
+  const d2 = j.ocupacion.map(x=>x.ocupacion_pct);
+  if(chOcup) chOcup.destroy();
+  chOcup = lineChart(document.getElementById('chartOcupacion'), l2, d2, 'Ocupación %');
+
+  // Servicios
+  const l3 = j.servicios.map(x=>x.categoria);
+  const d3 = j.servicios.map(x=>x.movimientos);
+  if(chServ) chServ.destroy();
+  chServ = barChart(document.getElementById('chartServicios'), l3, d3, 'Movimientos');
+
+  // Ranking
+  document.getElementById('tbRanking').innerHTML =
+    j.ranking.map(r=>
+      `<tr><td>${r.funcionario||'-'}</td><td>${r.nps??0}</td><td>${r.score_velocidad??0}</td><td><strong>${r.score_final??0}</strong></td></tr>`
+    ).join('');
+}
+
+document.getElementById('btnAplicar').addEventListener('click', cargar);
+
+document.getElementById('btnExportXlsx').addEventListener('click', ()=>{
+  const qs = new URLSearchParams({
+    desde: document.getElementById('f_desde').value,
+    hasta: document.getElementById('f_hasta').value,
+    fmt: 'xlsx'
+  }).toString();
+  window.location = `{{ url_for('arep.export') }}?`+qs;
+});
+document.getElementById('btnExportPdf').addEventListener('click', ()=>{
+  const qs = new URLSearchParams({
+    desde: document.getElementById('f_desde').value,
+    hasta: document.getElementById('f_hasta').value,
+    fmt: 'pdf'
+  }).toString();
+  window.location = `{{ url_for('arep.export') }}?`+qs;
+});
+
+// inicializa fechas (últimos 90 días)
+window.addEventListener('DOMContentLoaded', ()=>{
+  const hoy = new Date(); const d = new Date(hoy); d.setDate(hoy.getDate()-90);
+  document.getElementById('f_hasta').value = hoy.toISOString().slice(0,10);
+  document.getElementById('f_desde').value = d.toISOString().slice(0,10);
+  cargar();
+});
+</script>
+</body>
+</html>

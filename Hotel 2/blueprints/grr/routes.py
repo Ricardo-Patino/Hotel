@@ -1,35 +1,36 @@
 # blueprints/grr/routes.py
-# Rutas HTTP para Gestión de Reservas (GRR-01-001)
-
 from __future__ import annotations
 
-from datetime import date
+import json, random, string, secrets
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, Tuple, List, Optional
 
 from flask import Blueprint, jsonify, request, session, current_app, render_template
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, and_, or_, text as _t
 
-from extensions import db
-from models_sql import (
-    Habitacion,
-    Reserva,
-    Usuario,
-)  # <- usamos Usuario para resolver el cliente
-from services.grr.reservation_service import ReservationService
+# Imports seguros para ejecución como paquete; con fallback en modo script
+try:
+    from ...extensions import db
+    from ...models_sql import Habitacion, Reserva, Usuario, MantenimientoSolicitud
+    from ...services.grr.reservation_service import ReservationService
+    from ...services.grr.housekeeping_sync import mark_room_to_cleaning
+except ImportError:
+    # Fallback si se ejecuta sin contexto de paquete (desarrollo)
+    import os, sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    from extensions import db
+    from models_sql import Habitacion, Reserva, Usuario, MantenimientoSolicitud
+    from services.grr.reservation_service import ReservationService
+    from services.grr.housekeeping_sync import mark_room_to_cleaning
 
-from flask import Blueprint, request, jsonify
-from sqlalchemy import text
-from extensions import db
+TAX_RATE = 0.13  # IVA
+VAT_RATE = Decimal("0.13")
+NRB_DISCOUNT = Decimal("0.10")
 
-grr_bp = Blueprint("grr", __name__)
-
-# --- Config de precios/impuestos ---
-TAX_RATE = 0.13  # IVA/Impuesto de hospedaje a aplicar al total
-
-
-# Se registra con: app.register_blueprint(grr_bp, url_prefix="/grr")
 grr_bp = Blueprint("grr", __name__)
 _res_service = ReservationService()
+
 
 
 # -------------------------- Utilidades comunes -------------------------------
@@ -380,6 +381,24 @@ def _set_if(obj, field: str, value):
     """Asigna sólo si el atributo existe en el modelo, para evitar AttributeError."""
     if hasattr(obj, field):
         setattr(obj, field, value)
+        
+ # --- Helper unificado para extraer el ID de la reserva desde cualquier forma de respuesta del Service
+def _extract_reserva_id(res: Dict[str, Any]) -> int:
+    """
+    Devuelve el identificador de reserva desde la respuesta del service, tolerando
+    distintas claves: 'id', 'Codigo_Reserva', 'reserva_id', 'numero', 'ReservaId'.
+    """
+    for k in ("id", "Codigo_Reserva", "reserva_id", "numero", "ReservaId", "Reserva_ID"):
+        v = res.get(k)
+        if v is None:
+            continue
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            continue
+    return 0
+       
+
 
 
 # ---------------------- Resolución de cliente desde la sesión -----------------
@@ -492,45 +511,61 @@ def ping():
 # --------------------------- Disponibilidad (v1) -----------------------------
 
 
+# --------------------------- Disponibilidad (v1) -----------------------------
+@grr_bp.get("/api/availability")   # <-- alias para compatibilidad con el front actual
 @grr_bp.get("/availability")
 @grr_bp.get("/disponibilidad")
 def disponibilidad():
     """
     Query:
-      ?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&adults=2&children=0
+      ?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&adults=2&children=0&guests=3&tipo=Doble
     Reglas:
       - Excluye habitaciones en 'Mantenimiento' si existe Habitacion.Estado
-      - Excluye habitaciones con reservas solapadas en el rango [checkin, checkout)
-        (fin-exclusivo): (Reserva.Entrada < checkout) AND (Reserva.Salida > checkin)
-      - Filtra por capacidad mínima si hay columna de capacidad.
+      - Excluye reservas solapadas en [checkin, checkout)
+      - Filtra por capacidad mínima y por tipo (si se envía).
+    Respuesta:
+      { ok, available, message, rooms:[...] , params:{...} }
     """
     try:
-        checkin = request.args.get("checkin")
-        checkout = request.args.get("checkout")
-        adults = int(request.args.get("adults", "2") or 2)
+        checkin  = request.args.get("checkin") or ""
+        checkout = request.args.get("checkout") or ""
+        adults   = int(request.args.get("adults", "0") or 0)
         children = int(request.args.get("children", "0") or 0)
-        total_pax = max(1, adults + children)
+        guests_q = request.args.get("guests")
+        tipo     = (request.args.get("tipo") or "").strip()
 
-        # Validación de fechas (suave)
+        # pax total: guests si viene; si no, adults+children; si nada => 1
+        total_pax = None
+        try:
+            total_pax = int(guests_q) if guests_q is not None else None
+        except Exception:
+            total_pax = None
+        total_pax = max(1, total_pax if total_pax is not None else (adults + children or 1))
+
+        # Validación suave de fechas
         try:
             ini = date.fromisoformat(checkin) if checkin else None
             fin = date.fromisoformat(checkout) if checkout else None
         except ValueError:
-            return jsonify({"ok": False, "msg": "Fechas inválidas (YYYY-MM-DD)"}), 400
+            return jsonify({"ok": False, "message": "Fechas inválidas (YYYY-MM-DD)"}), 400
 
         q = Habitacion.query
 
-        # Estado != 'Mantenimiento' (si existe)
+        # Estado != 'Mantenimiento'
         hab_estado = _attr(Habitacion, ["Estado"])
         if hab_estado is not None:
             q = q.filter(hab_estado != "Mantenimiento")
+
+        # Filtro por tipo (si viene y existe la columna)
+        if tipo and hasattr(Habitacion, "Tipo"):
+            q = q.filter(Habitacion.Tipo.ilike(tipo))
 
         # Capacidad >= pax (si existe)
         hab_cap = _attr(Habitacion, ["Capacidad", "Capacidad_Maxima", "Capacidad_Huespedes"])
         if hab_cap is not None:
             q = q.filter(func.coalesce(hab_cap, 2) >= int(total_pax))
 
-        # Excluir habitaciones con reservas solapadas
+        # Excluir solapadas
         if ini and fin:
             res_estado  = _attr(Reserva, ["Estado"])
             res_fini    = _attr(Reserva, ["Fecha_Entrada"])
@@ -538,19 +573,14 @@ def disponibilidad():
             res_cod_hab = _attr(Reserva, ["Codigo_Habitacion"])
 
             if res_fini is not None and res_ffin is not None and res_cod_hab is not None:
-                filters = [res_fini < fin, res_ffin > ini]  # solape [ini,fin)
-                # Ignorar canceladas si hay columna Estado
+                filters = [res_fini < fin, res_ffin > ini]
                 if res_estado is not None:
                     filters.append(res_estado != "Cancelada")
 
-                subq = (
-                    select(res_cod_hab)
-                    .where(*filters)
-                    .scalar_subquery()  # ✅ SQLAlchemy 2.x
-                )
+                subq = select(res_cod_hab).where(*filters).scalar_subquery()
                 q = q.filter(Habitacion.Codigo_Habitacion.notin_(subq))
 
-        # Orden estable: por número si existe, si no por código
+        # Orden
         if hasattr(Habitacion, "Numero_Habitacion"):
             q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
         else:
@@ -558,36 +588,113 @@ def disponibilidad():
 
         rooms = []
         for h in q.all():
-            rooms.append(
-                {
-                    # claves "amigables" que el front sabe leer
-                    "code": int(getattr(h, "Codigo_Habitacion")),
-                    "name": getattr(h, "Nombre", None) or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
-                    # compatibilidad con vistas antiguas:
-                    "Codigo_Habitacion": int(getattr(h, "Codigo_Habitacion")),
-                    "Numero_Habitacion": getattr(h, "Numero_Habitacion", None),
-                    "tipo": getattr(h, "Tipo", None) or "",
-                    "desc": getattr(h, "Descripcion", None) or (getattr(h, "Tipo", None) or ""),
-                    "capacity": int(getattr(h, "Capacidad", None) or 2),
-                    "price": _precio_noche(h),
-                    "img": getattr(h, "Imagen_URL", None) or "",
-                    "rateName": "Tarifa Flexible",
-                    "cancel": "Cancela gratis hasta 7 días antes.",
-                    "meal": "—",
-                }
-            )
+            rooms.append({
+                "code": int(getattr(h, "Codigo_Habitacion")),
+                "name": getattr(h, "Nombre", None) or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
+                "Codigo_Habitacion": int(getattr(h, "Codigo_Habitacion")),
+                "Numero_Habitacion": getattr(h, "Numero_Habitacion", None),
+                "tipo": getattr(h, "Tipo", None) or "",
+                "desc": getattr(h, "Descripcion", None) or (getattr(h, "Tipo", None) or ""),
+                "capacity": int(getattr(h, "Capacidad", None) or 2),
+                "price": _precio_noche(h),
+                "img": getattr(h, "Imagen_URL", None) or "",
+                "rateName": "Tarifa Flexible",
+                "cancel": "Cancela gratis hasta 7 días antes.",
+                "meal": "—",
+            })
+
+        available = len(rooms) > 0
+        message = "Disponibilidad confirmada" if available else "Sin disponibilidad en el rango de fechas indicado"
 
         return jsonify({
             "ok": True,
+            "available": available,
+            "message": message,
             "rooms": rooms,
-            "params": {"checkin": checkin, "checkout": checkout, "adults": adults, "children": children},
+            "params": {
+                "checkin": checkin,
+                "checkout": checkout,
+                "guests": total_pax,
+                "tipo": tipo or None
+            },
         }), 200
 
     except Exception as e:
-        # ⛑️ Devuelve 500 real para que el front NO lo confunda con "sin disponibilidad"
         if current_app:
             current_app.logger.exception(f"[GRR] disponibilidad error: {e}")
-        return jsonify({"ok": False, "msg": f"Error en disponibilidad: {e}"}), 500
+        return jsonify({"ok": False, "message": f"Error en disponibilidad: {e}"}), 500
+
+
+
+@grr_bp.get("/room-types")
+def grr_room_types():
+    """
+    Devuelve una lista única de tipos de habitación existentes (excluyendo null/'' y en uso).
+    """
+    try:
+        if not hasattr(Habitacion, "Tipo"):
+            return jsonify({"ok": True, "types": []})
+
+        rows = (
+            db.session.query(Habitacion.Tipo)
+            .filter(func.nullif(func.trim(Habitacion.Tipo), "") != None)
+            .group_by(Habitacion.Tipo)
+            .order_by(Habitacion.Tipo.asc())
+            .all()
+        )
+        types = [r[0] for r in rows]
+        return jsonify({"ok": True, "types": types}), 200
+    except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] room-types error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@grr_bp.get("/ops/checkin/reserva-por-cedula")
+def grr_checkin_por_cedula():
+    """
+    Query: ?cedula=########
+    Devuelve la última reserva vigente/reciente del cliente y la habitación asignada.
+    """
+    ced = (request.args.get("cedula") or "").strip()
+    if not ced:
+        return jsonify({"ok": False, "msg": "Debe indicar la cédula."}), 400
+
+    try:
+        row = db.session.execute(text("""
+            SELECT  R.Codigo_Reserva,
+                    R.Estado,
+                    R.Fecha_Entrada,
+                    R.Fecha_Salida,
+                    R.Codigo_Habitacion,
+                    H.Numero_Habitacion
+              FROM  Reserva R
+              JOIN  Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
+              LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+             WHERE  C.Cedula = :ced
+               AND  R.Estado IN ('Pendiente','Confirmada','CheckIn','EnCurso','Pagada')
+             ORDER BY R.Fecha_Entrada DESC
+             LIMIT 1
+        """), {"ced": ced}).mappings().first()
+
+        if not row:
+            return jsonify({"ok": False, "found": False, "msg": "No hay reservas vigentes para la cédula indicada."}), 200
+
+        data = {
+            "Codigo_Reserva": int(row["Codigo_Reserva"]),
+            "Estado": row["Estado"],
+            "Fecha_Entrada": str(row["Fecha_Entrada"]),
+            "Fecha_Salida": str(row["Fecha_Salida"]),
+            "Codigo_Habitacion": int(row["Codigo_Habitacion"]) if row["Codigo_Habitacion"] else None,
+            "Numero_Habitacion": row["Numero_Habitacion"],
+        }
+        return jsonify({"ok": True, "found": True, "reserva": data}), 200
+
+    except Exception as e:
+        if current_app:
+            current_app.logger.exception(f"[GRR] checkin-cedula error: {e}")
+        return jsonify({"ok": False, "msg": f"Error: {e}"}), 500
+
 
 
 
@@ -742,6 +849,236 @@ def crear_reserva():
 
 
 
+def _ensure_pago_table():
+    try:
+        db.session.execute(_t("""
+            CREATE TABLE IF NOT EXISTS Pago (
+              Id              INT AUTO_INCREMENT PRIMARY KEY,
+              Reserva_Id      INT NOT NULL,
+              Metodo          ENUM('tarjeta','datafono') NOT NULL,
+              Monto           DECIMAL(12,2) NOT NULL,
+              Ultimos4        VARCHAR(4) NULL,
+              Autorizacion    VARCHAR(32) NULL,
+              Estado          ENUM('Aprobado','Anulado') NOT NULL DEFAULT 'Aprobado',
+              Fecha_Creacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              INDEX IX_Pago_Reserva (Reserva_Id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+def _gen_auth_code():
+    return "AUTH-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
+def _record_payment(reserva_id: int, amount: float, method: str, last4: str | None) -> dict:
+    _ensure_pago_table()
+    auth = _gen_auth_code()
+    db.session.execute(_t("""
+        INSERT INTO Pago (Reserva_Id, Metodo, Monto, Ultimos4, Autorizacion, Estado)
+        VALUES (:r, :m, :mo, :u4, :au, 'Aprobado')
+    """), {"r": reserva_id, "m": method, "mo": amount, "u4": (last4 or None), "au": auth})
+    db.session.commit()
+    return {"ok": True, "auth": auth}
+
+def _ensure_reset_table():
+    """Crea la tabla de tokens de reseteo si no existe."""
+    try:
+        db.session.execute(_t("""
+            CREATE TABLE IF NOT EXISTS PasswordReset (
+              Id           INT AUTO_INCREMENT PRIMARY KEY,
+              Usuario_Id   INT NOT NULL,
+              Token        VARCHAR(128) NOT NULL,
+              Expira       DATETIME     NOT NULL,
+              Creado       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE KEY UK_PasswordReset_Token (Token),
+              INDEX IX_PasswordReset_User (Usuario_Id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+def _issue_reset_token(usuario_id: int) -> str | None:
+    try:
+        _ensure_reset_table()
+        token = "RT-" + secrets.token_urlsafe(32)
+        hours = int(current_app.config.get("RESET_TOKEN_HOURS", 24))
+        exp = datetime.utcnow() + timedelta(hours=hours)
+        db.session.execute(_t("""
+            INSERT INTO PasswordReset (Usuario_Id, Token, Expira)
+            VALUES (:u, :t, :e)
+        """), {"u": usuario_id, "t": token, "e": exp})
+        db.session.commit()
+        base = (current_app.config.get("PUBLIC_BASE_URL") or request.url_root).rstrip("/")
+        return f"{base}/reset-password?token={token}"
+    except Exception as e:
+        current_app.logger.warning(f"[RESET] {e}")
+        return None
+    
+def _ensure_user_and_reset(email: str, nombre: str) -> tuple[str | None, str | None]:
+    temp_pwd, reset_url = _maybe_create_user_with_temp_password(email, nombre)
+    if (not reset_url) and email:
+        try:
+            # Detectar columna de email e id reales para el lookup
+            cols = {
+                r[0] for r in db.session.execute(text("""
+                    SELECT COLUMN_NAME
+                      FROM INFORMATION_SCHEMA.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME   = 'Usuario'
+                """)).all()
+            }
+            email_col = next((c for c in ("Correo","Email","correo","email") if c in cols), None)
+            id_col    = next((c for c in ("Codigo_Usuario","Usuario_Id","ID_Usuario","Id","id") if c in cols), "Codigo_Usuario")
+            if email_col:
+                uid = db.session.execute(
+                    text(f"SELECT {id_col} FROM Usuario WHERE LOWER({email_col})=:e LIMIT 1"),
+                    {"e": (email or '').lower()}
+                ).scalar()
+                if uid:
+                    reset_url = _issue_reset_token(int(uid))
+        except Exception as e:
+            current_app.logger.warning(f"[RESET WRAP] {e}")
+    return temp_pwd, reset_url
+
+
+
+def _send_mail_simple(to_email: str, subject: str, body: str):
+    try:
+        host = current_app.config.get("MAIL_SERVER")
+        port = int(current_app.config.get("MAIL_PORT", 0) or 0)
+        user = current_app.config.get("MAIL_USERNAME"); pwd = current_app.config.get("MAIL_PASSWORD")
+        sender = current_app.config.get("MAIL_DEFAULT_SENDER") or user or "no-reply@hotel.local"
+        use_tls = bool(current_app.config.get("MAIL_USE_TLS", False))
+        use_ssl = bool(current_app.config.get("MAIL_USE_SSL", False))
+        if not (host and port and user and pwd):
+            current_app.logger.info(f"[MAIL MOCK]\nTo: {to_email}\nSubj: {subject}\n\n{body}")
+            return
+        from email.message import EmailMessage
+        import ssl, smtplib
+        msg = EmailMessage()
+        msg["Subject"] = subject; msg["From"] = sender; msg["To"] = to_email
+        msg.set_content(body)
+        if use_ssl:
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=ctx, timeout=30) as s:
+                s.login(user, pwd); s.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=30) as s:
+                if use_tls: s.starttls(context=ssl.create_default_context())
+                s.login(user, pwd); s.send_message(msg)
+    except Exception as e:
+        current_app.logger.warning(f"[MAIL] {e}")
+
+def _ensure_cliente_by_email(nombre: str, apellido: str, tel: str, email: str) -> int | None:
+    """Resuelve o crea Cliente por correo (alineado con patrones del archivo)."""
+    row = db.session.execute(text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"), {"e": (email or "").lower()}).first()
+    if row and row[0]:
+        return int(row[0])
+    # crear mínimo
+    db.session.execute(text("""
+        INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
+        VALUES (0, :n, :a, :t, :e, '1990-01-01')
+    """), {"n": (nombre or "Cliente").strip()[:50], "a": (apellido or "").strip()[:50], "t": (tel or "")[:20], "e": (email or "").lower()})
+    db.session.commit()
+    row2 = db.session.execute(text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"), {"e": (email or "").lower()}).first()
+    return int(row2[0]) if (row2 and row2[0]) else None
+
+def _maybe_create_user_with_temp_password(email: str, nombre: str) -> tuple[str | None, str | None]:
+    """
+    Garantiza un usuario por correo y devuelve (password_temporal, reset_url).
+    - Detecta dinámicamente columnas de Usuario: Correo/Email, Nombre/Nombre_Completo/FullName,
+      Contrasena/Password/Contrasena_Hash, etc.
+    - Si ya existe, no crea password temporal y emite reset_url.
+    - Si no hay columna de password, crea el usuario sin password y de todos modos emite reset_url.
+    """
+    try:
+        email_l = (email or "").strip().lower()
+        if not email_l:
+            return None, None
+
+        # Descubrir columnas reales de la tabla Usuario
+        cols = {
+            r[0] for r in db.session.execute(text("""
+                SELECT COLUMN_NAME
+                  FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME   = 'Usuario'
+            """)).all()
+        }
+
+        # Posibles nombres de columnas
+        id_candidates    = [c for c in ("Codigo_Usuario","Usuario_Id","ID_Usuario","Id","id") if c in cols]
+        email_candidates = [c for c in ("Correo","Email","correo","email") if c in cols]
+        name_candidates  = [c for c in ("Nombre","Nombre_Completo","FullName","NombreUsuario") if c in cols]
+        pass_candidates  = [c for c in ("Contrasena","Password","Contrasena_Hash","PassHash") if c in cols]
+
+        if not email_candidates:
+            # Sin columna de email no podemos garantizar unicidad; abortar sin error duro.
+            return None, None
+
+        id_col   = id_candidates[0]    if id_candidates    else "Codigo_Usuario"
+        email_col= email_candidates[0] if email_candidates else "Correo"
+        name_col = name_candidates[0]  if name_candidates  else None
+        pass_col = pass_candidates[0]  if pass_candidates  else None
+
+        # ¿Ya existe?
+        try:
+            uid = db.session.execute(
+                text(f"SELECT {id_col} FROM Usuario WHERE LOWER({email_col})=:e LIMIT 1"),
+                {"e": email_l}
+            ).scalar()
+        except Exception:
+            uid = None
+
+        if uid:
+            reset_url = _issue_reset_token(int(uid))
+            return None, reset_url
+
+        # Crear nuevo (password temporal sólo si existe columna de password)
+        temp = "".join(random.choices(string.ascii_letters + string.digits, k=10))
+
+        fields, params = [], {}
+        def add(col: str, val: Any):
+            fields.append(col); params[col] = val
+
+        add(email_col, email_l)
+        if name_col:
+            add(name_col, (nombre or "Invitado")[:80])
+        if pass_col:
+            add(pass_col, temp)
+
+        # Campos opcionales comunes, sólo si existen
+        if "Activo" in cols: add("Activo", 1)
+        if "Estado" in cols: add("Estado", "Activo")
+        if "Rol" in cols:    add("Rol", "Huesped")
+        if "Rol_Id" in cols: add("Rol_Id", 3)
+
+        # Ejecutar INSERT parametrizado
+        ph  = ", ".join(f":{f}" for f in fields)
+        sql = f"INSERT INTO Usuario ({', '.join(fields)}) VALUES ({ph})"
+        db.session.execute(text(sql), params)
+        db.session.commit()
+
+        # Releer ID para emitir token
+        uid = db.session.execute(
+            text(f"SELECT {id_col} FROM Usuario WHERE LOWER({email_col})=:e LIMIT 1"),
+            {"e": email_l}
+        ).scalar()
+
+        reset_url = _issue_reset_token(int(uid)) if uid else None
+        return (temp if pass_col else None), reset_url
+
+    except Exception as e:
+        if current_app:
+            current_app.logger.warning(f"[TEMP USER] {e}")
+        return None, None
+
+
+
+    
+    
 
 @grr_bp.get("/reservas")
 def listar_reservas():
@@ -820,6 +1157,318 @@ def eliminar_reserva(reserva_id: int):
             current_app.logger.exception(f"[GRR] eliminar_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
 
+
+
+@grr_bp.post("/reservas/estancia-sin-reserva")
+def grr_crear_estancia_sin_reserva():
+    """
+    Recepción (ops): crea SIEMPRE Confirmada y registra el pago.
+    Body JSON esperado: los mismos campos de anon-reserva + {
+        payment:{ method:'tarjeta'|'datafono', card_last4?, card_name?, card_exp? },
+        actor:'ops'
+    }
+    """
+    p = request.get_json(silent=True) or {}
+
+    # Normalizar fechas
+    ci = p.get("Fecha_Entrada") or p.get("checkin")
+    co = p.get("Fecha_Salida")  or p.get("checkout")
+    if not (ci and co):
+        return jsonify({"ok": False, "msg": "Fechas requeridas."}), 400
+
+    # Resolver/crear cliente por correo
+    email    = (p.get("correo") or "").strip().lower()
+    nombre   = (p.get("nombre") or "").strip()
+    apellido = (p.get("apellido") or "").strip()
+    tel      = (p.get("telefono") or "").strip()
+    if not email:
+        return jsonify({"ok": False, "msg": "Correo del huésped requerido."}), 400
+
+    cli_id = _ensure_cliente_by_email(nombre, apellido, tel, email)
+    if not cli_id:
+        return jsonify({"ok": False, "msg": "No fue posible registrar el cliente."}), 500
+
+    # Mapear a payload del service
+    payload = {
+        "Codigo_Cliente": cli_id,
+        "Codigo_Habitacion": p.get("Codigo_Habitacion"),
+        "Fecha_Entrada": ci,
+        "Fecha_Salida": co,
+        "Huespedes": int(p.get("huespedes") or p.get("Huespedes") or 1),
+        "Canal": "WalkIn",
+        "Fuente": "Recepcion",
+        "Tarifa": (p.get("rateCode") or p.get("Tarifa") or "flex"),
+        "Estado": "Confirmada"  # Confirmada (operación en recepción)
+    }
+
+    # Requisito operativo: debe venir una habitación seleccionada
+    if not payload.get("Codigo_Habitacion"):
+        return jsonify({"ok": False, "msg": "Debe seleccionar una habitación disponible."}), 400
+
+    # >>>>>>>>>>>>> NUEVO: resolver Codigo_Funcionario si la columna existe <<<<<<<<<<<<<
+    col_ex, fid, ferr = _resolve_funcionario_id(p)  # respeta si el front lo envía y mapea desde la sesión
+    if col_ex:
+        if fid is not None:
+            payload["Codigo_Funcionario"] = int(fid)
+        elif ferr:  # la columna no admite NULL y no hay funcionario utilizable
+            return jsonify({"ok": False, "msg": ferr}), 400
+    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    # Cálculo autoritativo de totales
+    calc_in = {
+        "Fecha_Entrada": ci,
+        "Fecha_Salida": co,
+        "Huespedes": payload["Huespedes"],
+        "Codigo_Habitacion": payload.get("Codigo_Habitacion"),
+        "Tarifa_Codigo": payload["Tarifa"],
+        "tipo": p.get("tipo"),
+        "Precio_Noche": p.get("Precio_Noche"),  # opcional desde UI
+    }
+    try:
+        tot = _calc_totales(calc_in)
+    except Exception as e:
+        return jsonify({"ok": False, "msg": f"Fechas inválidas: {e}"}), 400
+
+    payload["Monto_Total"] = float(tot["total"])
+
+    # Crear reserva con el service
+    res = _res_service.create(payload)
+    if not res.get("ok"):
+        code = 409 if res.get("code") == "conflict" else 400
+        err = res.get("msg") or res.get("message") or res.get("error") or "No se pudo crear la reserva."
+        resto = {k: v for k, v in res.items() if k not in ("ok", "msg", "message", "error")}
+        return jsonify({"ok": False, "msg": err, **resto}), code
+
+    reserva_id = _extract_reserva_id(res)
+    if not reserva_id:
+        return jsonify({
+            "ok": False,
+            "msg": "Reserva creada por el service pero sin identificador en la respuesta.",
+            "raw": res
+        }), 500
+
+    # Registrar pago
+    pay = p.get("payment") or {}
+    method = ("datafono" if str(pay.get("method", "")).lower() == "datafono" else "tarjeta")
+    last4  = (pay.get("card_last4") or None)
+    try:
+        _record_payment(reserva_id, float(tot["total"]), method, last4)
+    except Exception as e:
+        current_app.logger.warning(f"[PAGO] No se pudo registrar: {e}")
+
+    # Asegurar estado Confirmada
+    try:
+        db.session.execute(text("""
+            UPDATE Reserva
+               SET Estado='Confirmada',
+                   Monto_Total=:m
+             WHERE Codigo_Reserva=:r
+        """), {"m": float(tot["total"]), "r": reserva_id})
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.warning(f"[CONFIRMAR] {e}")
+
+    # Usuario/app: crear usuario (si no existe) y emitir link de reseteo
+    full_name = f"{nombre} {apellido}".strip()
+    temp_pwd, reset_url = _ensure_user_and_reset(email, full_name)
+
+    monto_str = f"₡ {float(tot['total']):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    metodo_pago = "Datáfono (presencial)" if method == "datafono" else f"Tarjeta terminada en {(last4 or '****')}"
+
+    body = (
+        f"Hola {nombre},\n\n"
+        f"Tu reserva #{reserva_id} ha sido CONFIRMADA.\n"
+        f"Rango: {tot['checkin']} → {tot['checkout']} · Huéspedes: {tot['huespedes']} · Noches: {tot['noches']}\n"
+        f"Método de pago: {metodo_pago}\n"
+        f"Monto total (con impuestos): {monto_str}\n\n"
+    )
+    extra = []
+    if temp_pwd:
+        extra.append("Se creó una cuenta para ti en el Portal del Huésped.")
+        extra.append(f"Contraseña temporal: {temp_pwd}")
+    if reset_url:
+        extra.append(f"Enlace para restablecer tu contraseña: {reset_url}")
+    if extra:
+        body += "\n".join(extra) + "\n\n"
+    body += "Gracias por reservar en Hotel Villa Grace."
+
+    try:
+        _send_mail_simple(email, "Confirmación y comprobante de pago — Hotel Villa Grace", body)
+    except Exception as e:
+        current_app.logger.warning(f"[MAIL CONF] {e}")
+
+    # Auditoría KPI
+    try:
+        _update_kpis(float(tot["total"]), str(tot["checkin"]), noches=int(tot["noches"]))
+        _audit_log(_current_user_email(), "reserva.walkin_confirm", {
+            "reserva": reserva_id,
+            "monto": float(tot["total"]),
+            "metodo": method
+        }, str(reserva_id))
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "id": reserva_id,
+        "numero": reserva_id,
+        "monto": float(tot["total"]),
+        "estado": "Confirmada",
+        "message": "Reserva creada y confirmada (Recepción)."
+    }), 201
+
+
+    
+    
+    
+    
+@grr_bp.post("/api/reservas/anon")
+def api_reservas_anon():
+    """
+    Crea reserva confirmada para cliente sin sesión:
+    - Resuelve/crea Cliente por correo
+    - Calcula totales (backend autoritativo)
+    - Registra pago (tarjeta, last4)
+    - Crea usuario (si no existe) y emite reset
+    - Envía correo con comprobante + temp password + reset link
+    - Devuelve redirect a página de éxito
+    """
+    p = request.get_json(silent=True) or {}
+
+    # Validaciones mínimas
+    ci = (p.get("checkin") or p.get("Fecha_Entrada") or "").strip()
+    co = (p.get("checkout") or p.get("Fecha_Salida") or "").strip()
+    email    = (p.get("correo") or p.get("email") or "").strip().lower()
+    nombre   = (p.get("nombre") or "").strip()
+    apellido = (p.get("apellido") or "").strip()
+    tel      = (p.get("telefono") or "").strip()
+    if not (ci and co and email and nombre):
+        return jsonify({"ok": False, "msg": "Datos incompletos (fechas, nombre y correo)."}), 400
+
+    # Resolver/crear Cliente
+    cli_id = _ensure_cliente_by_email(nombre, apellido, tel, email)
+    if not cli_id:
+        return jsonify({"ok": False, "msg": "No fue posible registrar el cliente."}), 500
+    
+    # Requisito operativo: no permitir reservas anónimas sin habitación
+    if not (p.get("Codigo_Habitacion")):
+        return jsonify({"ok": False, "msg": "Debe seleccionar una habitación disponible."}), 400
+
+
+    # Totales autoritativos
+    calc_in = {
+        "Fecha_Entrada": ci,
+        "Fecha_Salida":  co,
+        "Huespedes": int(p.get("huespedes") or p.get("Huespedes") or 1),
+        "Codigo_Habitacion": p.get("Codigo_Habitacion"),
+        "Tarifa_Codigo": (p.get("rateCode") or p.get("Tarifa") or "flex"),
+        "tipo": p.get("tipo"),
+        "Precio_Noche": p.get("Precio_Noche"),  # opcional desde UI
+    }
+    try:
+        tot = _calc_totales(calc_in)
+    except Exception as e:
+        return jsonify({"ok": False, "msg": f"Fechas inválidas: {e}"}), 400
+
+    # Crear reserva confirmada
+    payload = {
+        "Codigo_Cliente":    cli_id,
+        "Codigo_Habitacion": p.get("Codigo_Habitacion"),
+        "Fecha_Entrada":     ci,
+        "Fecha_Salida":      co,
+        "Huespedes":         int(tot["huespedes"]),
+        "Tarifa":            tot["rate_code"],  # 'flex' | 'nrb'
+        "Canal":             "Web",
+        "Fuente":            "Portal",
+        "Estado":            "Confirmada",
+        "Monto_Total":       float(tot["total"]),
+    }
+    
+    col_ex, fid, ferr = _resolve_funcionario_id(p)
+    if col_ex:
+        if fid is not None:
+            payload["Codigo_Funcionario"] = int(fid)
+        elif ferr:
+            return jsonify({"ok": False, "msg": ferr}), 400    
+    
+    
+    # Crear reserva con el service
+    res = _res_service.create(payload)
+    if not res.get("ok"):
+        code = 409 if res.get("code") == "conflict" else 400
+        err = res.get("msg") or res.get("message") or res.get("error") or "No se pudo crear la reserva."
+        resto = {k: v for k, v in res.items() if k not in ("ok", "msg", "message", "error")}
+        return jsonify({"ok": False, "msg": err, **resto}), code
+    
+    # Soportar 'reserva_id' (lo que realmente te está devolviendo el Service)
+    reserva_id = _extract_reserva_id(res)
+    if not reserva_id:
+        return jsonify({
+            "ok": False,
+            "msg": "Reserva creada por el service pero sin identificador en la respuesta.",
+            "raw": res
+        }), 500
+    
+
+    # Registrar pago online (tarjeta)
+    pay = p.get("payment") or {}
+    last4 = (pay.get("card_last4") or None)
+    try:
+        _record_payment(reserva_id, float(tot["total"]), "tarjeta", last4)
+    except Exception as e:
+        current_app.logger.warning(f"[PAGO ANON] {e}")
+
+    # Persistir coherencia
+    try:
+        db.session.execute(_t("""
+            UPDATE Reserva
+               SET Estado='Confirmada',
+                   Monto_Total=:m
+             WHERE Codigo_Reserva=:r
+        """), {"m": float(tot["total"]), "r": reserva_id})
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.warning(f"[CONFIRMAR ANON] {e}")
+
+    # Usuario + token reset
+    full_name = f"{nombre} {apellido}".strip()
+    temp_pwd, reset_url = _ensure_user_and_reset(email, full_name)
+
+    # Correo
+    monto_str = f"₡ {float(tot['total']):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    metodo_pago = f"Tarjeta terminada en {(last4 or '****')}"
+    body = (
+        f"Hola {nombre},\n\n"
+        f"Tu reserva #{reserva_id} ha sido CONFIRMADA.\n"
+        f"Rango: {tot['checkin']} → {tot['checkout']} · Huéspedes: {tot['huespedes']} · Noches: {tot['noches']}\n"
+        f"Método de pago: {metodo_pago}\n"
+        f"Monto total (con impuestos): {monto_str}\n\n"
+    )
+    extra = []
+    if temp_pwd:
+        extra.append("Se creó una cuenta para ti en el Portal del Huésped.")
+        extra.append(f"Contraseña temporal: {temp_pwd}")
+    if reset_url:
+        extra.append(f"Enlace para restablecer tu contraseña: {reset_url}")
+    if extra:
+        body += "\n".join(extra) + "\n\n"
+    body += "Gracias por reservar en Hotel Villa Grace."
+
+    try:
+        _send_mail_simple(email, "Confirmación y comprobante de pago — Hotel Villa Grace", body)
+    except Exception as e:
+        current_app.logger.warning(f"[MAIL CONF ANON] {e}")
+
+    # KPI + auditoría (noches del periodo)
+    try:
+        _update_kpis(float(tot["total"]), str(tot["checkin"]), noches=int(tot["noches"]))
+        _audit_log(email, "reserva.anon_confirm", {"reserva": reserva_id, "monto": float(tot["total"]), "metodo": "tarjeta"}, str(reserva_id))
+    except Exception:
+        pass
+
+    # URL de éxito (ajusta si tienes una ruta distinta)
+    redirect_url = f"/reserva-sin-sesion/exito?numero={reserva_id}"
+    return jsonify({"ok": True, "id": reserva_id, "numero": reserva_id, "monto": float(tot["total"]), "estado": "Confirmada", "redirect": redirect_url}), 201
 
 # ---------------------- Errores locales del blueprint ------------------------
 
@@ -900,7 +1549,7 @@ def api_rooms_status():
                 "estado": estado,
             }
         )
-    return jsonify(rooms)
+    return jsonify({"ok": True, "items": rooms})
 #Aqui quedaría
 
 # 👇 usa la función consolidada del service

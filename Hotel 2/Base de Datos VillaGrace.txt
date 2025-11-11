@@ -75,7 +75,7 @@ DROP TABLE IF EXISTS KPI_Stats;
 DROP TABLE IF EXISTS Audit_Log;
 DROP TABLE IF EXISTS Auditoria_Log;
 
-ET FOREIGN_KEY_CHECKS = 0;
+SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS EvtWorkOrder;
 DROP TABLE IF EXISTS EvtNotificacion;
 DROP TABLE IF EXISTS EvtEncuesta;
@@ -90,6 +90,10 @@ DROP TABLE IF EXISTS EvtRecurso;
 DROP TABLE IF EXISTS EvtSalon;
 SET FOREIGN_KEY_CHECKS = 1;
 
+DROP TABLE IF EXISTS ArepExportLog;
+DROP TABLE IF EXISTS ArepSatisfaccion;
+DROP TABLE IF EXISTS ArepAtencion;
+DROP TABLE IF EXISTS ArepViewConfig;
 SET FOREIGN_KEY_CHECKS = 1;
 
 /* ------------------------------------------------------------------------- */
@@ -330,7 +334,7 @@ CREATE TABLE ReservaEstancia (
   Codigo_Reserva     INT NOT NULL,
   Habitacion_Id      INT NOT NULL,
   Fecha_Desde        DATE NOT NULL,
-  Fecha_Hasta        DATE NOT NULL,  -- [Desde, Hasta)
+  Fecha_Hasta        DATE NOT NULL,  -- (Desde, Hasta)
   Origen             ENUM('Automatico','Manual','Reasignacion','Union','Division') NOT NULL DEFAULT 'Automatico',
   Decision_Id        INT NULL,
   Score_Total        DECIMAL(9,4) NULL,
@@ -886,14 +890,14 @@ ALTER TABLE fin_period_lock
    Ajustado al esquema Hotel VillaGrace (tabla Reserva)
    =============================================================== */
 
-/* 1️⃣ fin_cash_movement → agregar vínculos */
+/* 1️ fin_cash_movement → agregar vínculos */
 ALTER TABLE fin_cash_movement
   ADD COLUMN reserva_id INT NULL AFTER estado,
   ADD COLUMN ledger_entry_id INT NULL AFTER reserva_id,
   ADD INDEX idx_fin_cash_movement_reserva (reserva_id),
   ADD INDEX idx_fin_cash_movement_ledger (ledger_entry_id);
 
-/* 2️⃣ fin_payment → crear o asegurar columnas */
+/* 2️ fin_payment → crear o asegurar columnas */
 CREATE TABLE IF NOT EXISTS fin_payment (
     id_payment        INT AUTO_INCREMENT PRIMARY KEY,
     reserva_id        INT NOT NULL,
@@ -909,13 +913,13 @@ CREATE TABLE IF NOT EXISTS fin_payment (
     INDEX idx_fin_payment_reserva (reserva_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-/* 3️⃣ Reserva → agregar columnas para totales y pagos */
+/* 3️ Reserva → agregar columnas para totales y pagos */
 ALTER TABLE Reserva
   ADD COLUMN Monto_Total_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total,
   ADD COLUMN Monto_Pagado_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total_Acumulado,
   ADD INDEX idx_reserva_balance (Monto_Total_Acumulado, Monto_Pagado_Acumulado);
 
-/* 4️⃣ Libro contable (fin_ledger) */
+/* 4️ Libro contable (fin_ledger) */
 CREATE TABLE IF NOT EXISTS fin_ledger (
     id_entry        INT AUTO_INCREMENT PRIMARY KEY,
     fecha           DATETIME NOT NULL DEFAULT NOW(),
@@ -1374,6 +1378,63 @@ VALUES ('ACME10','porcentaje',10,CURDATE(),DATE_ADD(CURDATE(),INTERVAL 30 DAY),1
 ON DUPLICATE KEY UPDATE Valor=VALUES(Valor), Valido_Desde=VALUES(Valido_Desde), Valido_Hasta=VALUES(Valido_Hasta), Max_Usos=VALUES(Max_Usos), Activo=VALUES(Activo);
 
 
+/* ===========================================================
+   SEEDS — Analítica y Reportes Administrativos (AREP)
+   =========================================================== */
+
+-- Preferencia de visualización por defecto (si no existe)
+INSERT INTO ArepViewConfig (Codigo_Usuario, Nombre_Reporte, Encabezado_JSON, Columnas_JSON, Filtros_JSON)
+SELECT
+  (SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1),
+  'Dashboard General',
+  JSON_OBJECT('titulo','Panel Ejecutivo','sub','Hotel Villa Grace','logo','/static/assets/img/favicon.png'),
+  JSON_ARRAY('mes','ocupacion','ingresos','servicios'),
+  JSON_OBJECT('fecha_desde', DATE_FORMAT(CURDATE()-INTERVAL 90 DAY, '%Y-%m-%d'),
+              'fecha_hasta', DATE_FORMAT(CURDATE(), '%Y-%m-%d'),
+              'tipo_cliente', 'TODOS',
+              'tipo_servicio','TODOS')
+WHERE NOT EXISTS (
+  SELECT 1 FROM ArepViewConfig
+  WHERE Nombre_Reporte='Dashboard General'
+    AND Codigo_Usuario=(SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1)
+);
+
+-- Muestras de tiempos de atención (si tienes funcionarios creados)
+INSERT INTO ArepAtencion (Codigo_Funcionario, Area, Inicio_Atencion, Fin_Atencion, Origen, Ref_Id)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='305410583' LIMIT 1),
+  'RECEPCION',
+  CONCAT(CURDATE(),' 08:15:00'),
+  CONCAT(CURDATE(),' 08:27:00'),
+  'Reserva','R-1001'
+WHERE NOT EXISTS (SELECT 1 FROM ArepAtencion WHERE Origen='Reserva' AND Ref_Id='R-1001');
+
+INSERT INTO ArepAtencion (Codigo_Funcionario, Area, Inicio_Atencion, Fin_Atencion, Origen, Ref_Id)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='107720872' LIMIT 1),
+  'MANTENIMIENTO',
+  CONCAT(CURDATE(),' 10:10:00'),
+  CONCAT(CURDATE(),' 10:55:00'),
+  'Ticket','MNT-2001'
+WHERE NOT EXISTS (SELECT 1 FROM ArepAtencion WHERE Origen='Ticket' AND Ref_Id='MNT-2001');
+
+-- Muestras de satisfacción (NPS)
+INSERT INTO ArepSatisfaccion (Codigo_Funcionario, Puntaje, Comentario, Fuente)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='105440693' LIMIT 1),
+  9, 'Servicio de limpieza impecable', 'POST_ESTANCIA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM ArepSatisfaccion WHERE Comentario='Servicio de limpieza impecable'
+);
+
+INSERT INTO ArepSatisfaccion (Codigo_Funcionario, Puntaje, Comentario, Fuente)
+SELECT
+  (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='305410583' LIMIT 1),
+  7, 'Check-in rápido pero estacionamiento lleno', 'POST_ESTANCIA'
+WHERE NOT EXISTS (
+  SELECT 1 FROM ArepSatisfaccion WHERE Comentario='Check-in rápido pero estacionamiento lleno'
+);
+
 
 -- ==========================================
 -- Seeds de EVT – Gestión de Eventos y Actividades 
@@ -1459,9 +1520,6 @@ SELECT e.Id, e.Titulo, e.Estado, e.Inicio, s.Nombre AS Salon
 FROM EvtEvento e LEFT JOIN EvtSalon s ON s.Id=e.Salon_Id
 ORDER BY e.Inicio DESC;
 
-/* ===============================================================
-   HU 1 de HRM — Empleados y expediente
-   =============================================================== */
 
 /* ============================================================
    HRM-08-001 — Extensión de tabla Funcionario
@@ -1550,98 +1608,6 @@ CREATE TABLE IF NOT EXISTS `Marcacion` (
   CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Cambiá este esquema si no es el actual
-SET @schema := DATABASE();
-
--- ¿Existe columna Horas?
-SELECT COUNT(*) INTO @c
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Horas';
-
-SET @sql := IF(@c=0,
-  'ALTER TABLE Marcacion ADD COLUMN Horas DECIMAL(10,2) NULL AFTER Hora_Salida;',
-  'SELECT "Horas ya existe";'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
--- ¿Existe columna Total_Horas?
-SELECT COUNT(*) INTO @c
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Total_Horas';
-
-SET @sql := IF(@c=0,
-  'ALTER TABLE Marcacion ADD COLUMN Total_Horas DECIMAL(10,2) NULL AFTER Horas;',
-  'SELECT "Total_Horas ya existe";'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
--- Relleno de horas
-UPDATE Marcacion
-SET Horas = ROUND(TIMESTAMPDIFF(SECOND, Hora_Entrada, Hora_Salida)/3600,2)
-WHERE Hora_Entrada IS NOT NULL AND Hora_Salida IS NOT NULL AND Horas IS NULL;
-
-ALTER TABLE Marcacion
-MODIFY Hora_Entrada DATETIME NULL,
-MODIFY Hora_Salida DATETIME NULL;
-
-UPDATE Marcacion
-SET Total_Horas = Horas
-WHERE Total_Horas IS NULL AND Horas IS NOT NULL;
-
-DESC Marcacion;
-
--- Ajustar ENUM Estado (si ya es ENUM, MODIFY lo redefine)
-ALTER TABLE Marcacion
-  MODIFY Estado ENUM('Pendiente','Aprobado','Rechazado','Abierta','Cerrada')
-  NOT NULL DEFAULT 'Pendiente';
-
--- Observacion
-SELECT COUNT(*) INTO @c
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Observacion';
-
-SET @sql := IF(@c=0,
-  'ALTER TABLE Marcacion ADD COLUMN Observacion VARCHAR(255) NULL AFTER Estado;',
-  'SELECT "Observacion ya existe";'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
--- Copiar Observaciones -> Observacion SOLO si Observaciones existe
-SELECT COUNT(*) INTO @c
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA=@schema AND TABLE_NAME='Marcacion' AND COLUMN_NAME='Observaciones';
-
-SET @sql := IF(@c>0,
-  'UPDATE Marcacion SET Observacion = Observaciones
-    WHERE Observaciones IS NOT NULL AND (Observacion IS NULL OR Observacion="");',
-  'SELECT "Columna Observaciones no existe, se omite copia";'
-);
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
--- 1) Incluir todos los estados que usa el front/backend
-ALTER TABLE Marcacion
-  MODIFY Estado ENUM('Pendiente','Aprobado','Rechazado','Abierta','Cerrada')
-  NOT NULL DEFAULT 'Pendiente';
-
--- (opcional) si quieres normalizar estados heredados:
--- UPDATE Marcacion SET Estado = 'Pendiente' WHERE Estado NOT IN ('Pendiente','Aprobado','Rechazado','Abierta','Cerrada');
-
-
-CREATE TABLE IF NOT EXISTS HoraExtra (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    Marcacion_Id INT NOT NULL,
-    Codigo_Funcionario INT NOT NULL,
-    Fecha DATE NOT NULL,
-    Horas_Extras DECIMAL(6,2) NOT NULL,
-    Motivo VARCHAR(255),
-    Estado ENUM('Pendiente','Aprobado','Rechazado') DEFAULT 'Pendiente',
-    Validado_Por VARCHAR(100),
-    Fecha_Registro DATETIME DEFAULT CURRENT_TIMESTAMP,
-    Fecha_Actualiza DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (Marcacion_Id) REFERENCES Marcacion(Id) ON DELETE CASCADE,
-    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario) ON DELETE CASCADE
-);
-
 
 /* ------------------------------------------------------------------------- */
 /* Verificaciones rápidas                                                    */
@@ -1660,6 +1626,9 @@ SELECT * FROM InvMovimiento;
 SELECT * FROM KPI_Stats;
 SELECT * FROM Coupon;
 SELECT * FROM Waitlist;
+SELECT * FROM ArepViewConfig;
+SELECT Codigo_ArepAtencion, Area, Duracion_Seg FROM ArepAtencion ORDER BY Codigo_ArepAtencion DESC;
+SELECT Codigo_ArepSatisfaccion, Puntaje FROM ArepSatisfaccion ORDER BY Codigo_ArepSatisfaccion DESC;
 
 
 SELECT period_key, status, locked_at
