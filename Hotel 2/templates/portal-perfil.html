@@ -14,6 +14,9 @@
   <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <style>
+    .btn-outline{border:1px solid #ced4da}
+  </style>
 </head>
 <body class="privacy-page">
 <header id="header" class="header d-flex align-items-center fixed-top">
@@ -30,7 +33,6 @@
       </ul>
       <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
     </nav>
-    <!-- usar tu ruta real de logout -->
     <a class="btn-getstarted d-none d-sm-block" href="{{ url_for('logout') }}">Cerrar sesión</a>
   </div>
 </header>
@@ -63,15 +65,35 @@
               <form id="formProfile" class="row g-3" novalidate>
                 <div class="col-md-12">
                   <label class="form-label">Nombre completo</label>
-                  <input id="fNombre" class="form-control" required minlength="2" placeholder="Tu nombre">
+                  <input id="fNombre" class="form-control"
+                         required minlength="2" maxlength="80"
+                         pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'’\- ]{2,80}$"
+                         title="Solo letras y espacios (2–80)"
+                         placeholder="Tu nombre">
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Correo</label>
-                  <input id="fCorreo" type="email" class="form-control" required placeholder="tucorreo@dominio.com">
+                  <input id="fCorreo" type="email" class="form-control"
+                         required maxlength="120"
+                         placeholder="tucorreo@dominio.com">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Cédula o pasaporte</label>
+                  <input id="fCedula"
+                         class="form-control"
+                         inputmode="text"
+                         maxlength="20"
+                         placeholder="1-2345-6789, 0123456789 o A1234567"
+                         pattern="^(?:(?:[1-9]-\d{4}-\d{4})|\d{9,12}|[A-Za-z0-9]{6,20})$"
+                         title="Usa 1-2345-6789, 9–12 dígitos sin guiones, o pasaporte alfanumérico (6–20)">
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Teléfono</label>
-                  <input id="fTelefono" class="form-control" placeholder="+506 0000 0000">
+                  <input id="fTelefono" class="form-control"
+                         inputmode="tel" maxlength="20"
+                         placeholder="+506 8888 8888"
+                         pattern="^(?:\+?506)?\s?\d{4}\s?\d{4}$"
+                         title="Formato CR: 8888 8888 o +506 8888 8888">
                 </div>
 
                 <div class="col-12 small text-muted">
@@ -115,7 +137,7 @@
           </div>
         </div>
 
-        <!-- Columna lateral (puedes mantenerla como en tu mockup) -->
+        <!-- Columna lateral -->
         <div class="col-lg-5">
           <div class="card shadow-sm border-0 mb-3">
             <div class="card-body">
@@ -169,76 +191,197 @@
   const $ = s => document.querySelector(s);
   const alertBox = $("#alertBox");
 
+  // Validadores front (coinciden con pattern HTML)
+  const RE_NAME   = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'’\- ]{2,80}$/;
+  const RE_PHONE  = /^(?:\+?506)?\s?\d{4}\s?\d{4}$/;
+  const RE_DOC    = /^(?:(?:[1-9]-\d{4}-\d{4})|\d{9,12}|[A-Za-z0-9]{6,20})$/;
+  
+
+  // ========= SOLUCIÓN 404 =========
+  // Muchos despliegues colocan las APIs bajo un prefijo (p.ej. /portal/api/*).
+  // En lugar de hardcodear "/api/*", calculamos el "base" del módulo actual
+  // y probamos primero rutas relativas como "../api/me". Si esa no existe,
+  // caemos a "/api/me". Así evitamos el 404 que estabas recibiendo.
+  function computeApiCandidates() {
+    const path = window.location.pathname.replace(/\/+$/, "");       // sin trailing slash
+    const base = path.substring(0, path.lastIndexOf("/")) || "";     // p.ej. "/portal"
+    const rel = base ? `${base}/api` : "/api";                        // p.ej. "/portal/api" o "/api"
+
+    // Candidatos ordenados: relativo al módulo primero, luego raíz
+    return {
+      me:          [ `${rel}/me`, `/api/me` ],
+      password:    [ `${rel}/me/password`, `/api/me/password` ]
+    };
+  }
+
+  // -------- Utilidades UI ----------
   function showAlert(kind, msg){
     alertBox.className = "alert alert-" + kind;
     alertBox.textContent = msg;
     alertBox.classList.remove("d-none");
-    // ocultar a los 4s
-    setTimeout(()=>alertBox.classList.add("d-none"), 4000);
+    setTimeout(()=>alertBox.classList.add("d-none"), 6000);
+  }
+  function startBtn(btn){
+    if(!btn) return;
+    btn.disabled = true; btn.dataset._txt = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+  }
+  function stopBtn(btn){
+    if(!btn) return;
+    btn.disabled = false; if(btn.dataset._txt) btn.innerHTML = btn.dataset._txt;
   }
 
+  // -------- Fetch defensivo + resolución de endpoint ----------
+  async function tryFetchJSON(url, opts){
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: { "Accept":"application/json", "X-Requested-With":"XMLHttpRequest", ...(opts && opts.headers || {}) },
+      ...opts
+    });
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (!res.ok) {
+      const body = ct.includes("application/json") ? JSON.stringify(await res.json()) : (await res.text());
+      let hint = "";
+      if (res.status === 401) hint = " (no autenticado)";
+      if (res.status === 403) hint = " (prohibido)";
+      if (res.status === 404) hint = " (endpoint no encontrado)";
+      if (res.status >= 500) hint = " (error del servidor)";
+      throw new Error(`Error ${res.status}${hint}. Respuesta: ${String(body).slice(0,180)}`);
+    }
+    if (ct.includes("application/json")) return res.json();
+    const text = await res.text();
+    throw new Error(`La respuesta no es JSON. Primeros bytes: ${text.slice(0,180)}`);
+  }
+
+  async function fetchJSONWithCandidates(candidates, opts){
+    // Guarda en memoria el endpoint resuelto para siguientes llamadas
+    const cacheKey = "hvga.endpoint." + candidates.join("|");
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) return tryFetchJSON(cached, opts);
+
+    // Prueba en orden para evitar 404
+    for (const u of candidates){
+      try{
+        const json = await tryFetchJSON(u, opts && opts.method ? opts : undefined);
+        sessionStorage.setItem(cacheKey, u);
+        return json;
+      }catch(e){
+        // solo seguimos probando si fue 404; otros errores sí se propagan
+        if (!String(e.message).includes("endpoint no encontrado")) throw e;
+      }
+    }
+    throw new Error("No se encontró un endpoint válido para esta acción.");
+  }
+
+  // --------- Carga de datos del perfil ----------
   async function loadMe(){
     try{
-      const res = await fetch("/api/me", { headers: { "Accept":"application/json" }});
-      const json = await res.json();
+      const c = computeApiCandidates();
+      const json = await fetchJSONWithCandidates(c.me);
       if(!json.ok) throw new Error(json.msg || "No se pudieron cargar tus datos.");
       const d = json.data || {};
-      $("#fNombre").value   = d.Nombre   || "";
-      $("#fCorreo").value   = d.Correo   || "";
-      $("#fTelefono").value = d.Telefono || "";
+      $("#fNombre").value    = d.Nombre   || "";
+      $("#fCorreo").value    = d.Correo   || "";
+      $("#fCedula").value    = d.Cedula   || "";
+      $("#fTelefono").value  = d.Telefono || "";
       $("#fRol").textContent = d.Rol || "Cliente";
     }catch(e){
       showAlert("danger", e.message);
     }
   }
 
-  // Guardar perfil
+  // --------- Guardar perfil ----------
   $("#formProfile").addEventListener("submit", async (ev)=>{
     ev.preventDefault();
+    const btn = ev.submitter;
     const payload = {
-      Nombre:  $("#fNombre").value.trim(),
-      Correo:  $("#fCorreo").value.trim(),
-      Telefono:$("#fTelefono").value.trim()
+      Nombre:   $("#fNombre").value.trim(),
+      Correo:   $("#fCorreo").value.trim().toLowerCase(),
+      Telefono: $("#fTelefono").value.trim(),
+      Cedula:   $("#fCedula").value.trim()
     };
+    
+    // Validación HTML5 y reforzada por regex
+    const form = ev.currentTarget;
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    
+    if (!RE_NAME.test(payload.Nombre)) {
+      showAlert("warning","El nombre debe tener solo letras y espacios (2–80).");
+      $("#fNombre").focus(); return;
+    }
+    if (payload.Telefono && !RE_PHONE.test(payload.Telefono)) {
+      showAlert("warning","Teléfono inválido. Usa 8888 8888 o +506 8888 8888.");
+      $("#fTelefono").focus(); return;
+    }
+    if (payload.Cedula && !RE_DOC.test(payload.Cedula)) {
+      showAlert("warning","Documento inválido. Usa 1-2345-6789, 9–12 dígitos o pasaporte (6–20).");
+      $("#fCedula").focus(); return;
+    }
+
+    if (!payload.Nombre || !payload.Correo){
+      showAlert("warning","Nombre y correo son obligatorios.");
+      return;
+    }
     try{
-      const res = await fetch("/api/me", {
+      startBtn(btn);
+      const c = computeApiCandidates();
+      const json = await fetchJSONWithCandidates(c.me, {
         method: "PUT",
-        headers: {"Content-Type":"application/json"},
+        headers: { "Content-Type":"application/json" },
         body: JSON.stringify(payload)
       });
-      const json = await res.json();
       if(!json.ok) throw new Error(json.msg || "No se pudo actualizar el perfil.");
       showAlert("success", "Perfil actualizado correctamente.");
     }catch(e){
       showAlert("danger", e.message);
+    }finally{
+      stopBtn(btn);
     }
   });
 
+  // --------- Deshacer cambios ----------
   $("#btnReset").addEventListener("click", loadMe);
 
-  // Cambiar contraseña
+  // --------- Cambiar contraseña ----------
   $("#formPwd").addEventListener("submit", async (ev)=>{
     ev.preventDefault();
+    const btn = ev.submitter;
     const payload = {
       current: $("#pwdCurrent").value,
       new:     $("#pwdNew").value,
       confirm: $("#pwdConfirm").value
     };
+    if (!payload.current || !payload.new || !payload.confirm){
+      showAlert("warning","Completa todos los campos de contraseña.");
+      return;
+    }
+    if (payload.new.length < 8){
+      showAlert("warning","La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (payload.new !== payload.confirm){
+      showAlert("warning","La confirmación no coincide.");
+      return;
+    }
     try{
-      const res = await fetch("/api/me/password", {
+      startBtn(btn);
+      const c = computeApiCandidates();
+      const json = await fetchJSONWithCandidates(c.password, {
         method: "PUT",
-        headers: {"Content-Type":"application/json"},
+        headers: { "Content-Type":"application/json" },
         body: JSON.stringify(payload)
       });
-      const json = await res.json();
       if(!json.ok) throw new Error(json.msg || "No se pudo cambiar la contraseña.");
       $("#pwdCurrent").value = $("#pwdNew").value = $("#pwdConfirm").value = "";
       showAlert("success", "Contraseña actualizada.");
     }catch(e){
       showAlert("danger", e.message);
+    }finally{
+      stopBtn(btn);
     }
   });
 
+  // Inicial
   loadMe();
 })();
 </script>

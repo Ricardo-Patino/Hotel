@@ -279,7 +279,20 @@
           <td><strong>${it.numero || ('VG-' + it.id)}</strong></td>
           <td>${it.huesped || '—'}</td>
           <td>${fmtDate(it.checkin)} → ${fmtDate(it.checkout)}</td>
-          <td>${it.habitacion || '—'}</td>
+          <td>
+            <div><strong>${it.room?.number ?? it.habitacion ?? '—'}</strong></div>
+            ${it.room ? `
+              <div class="small text-muted">
+                ${[
+                  it.room.type || null,
+                  (it.room.capacity ? (it.room.capacity + ' pax') : null),
+                  (Number.isFinite(+it.room.price) ? ('₡' + Number(it.room.price).toFixed(2) + '/noche') : null)
+                ].filter(Boolean).join(' · ')}
+              </div>
+              ${it.room.desc ? `<div class="small soft">${it.room.desc}</div>` : ``}
+              ${it.room.img ? `<div class="mt-1"><img src="${it.room.img}" alt="Foto hab." style="max-height:56px;border-radius:6px"></div>` : ``}
+            ` : ``}
+          </td>
           <td><span class="badge ${String(it.estado||'').toLowerCase()==='confirmada'?'text-bg-success':'text-bg-secondary'}">${it.estado || '—'}</span></td>
           <td class="text-end">
             <button class="btn btn-sm btn-outline-primary btn-select" data-id="${it.id}"><i class="bi bi-check2-circle me-1"></i> Seleccionar</button>
