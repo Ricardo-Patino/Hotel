@@ -38,3 +38,20 @@ Hotel 2/blueprints/grr/__pycache__/routes.cpython-313.pyc
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Python artifacts
+*.pyc
+__pycache__/
+
+# Entornos
+.venv/
+venv/
+
+# Config local
+.env
+Hotel 2/.env
+
+# Salidas PDF (comprobantes/recibos)
+Hotel 2/booking/*.pdf
+Hotel 2/storage/comprobantes/*.pdf
+Hotel 2/storage/recibos/*.pdf
