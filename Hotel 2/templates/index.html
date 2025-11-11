@@ -177,34 +177,70 @@
 
                 <!-- ============ SOLO ADMIN ============ -->
                 {% if session.get('user_role') == 'Administrador' %}
-                <li>
-                  <a href="{{ url_for('admin_dashboard_html') }}">Administración</a>
-                </li>
-                <li class="dropdown">
-                  <a href="#"
-                    ><span>Inventario (Admin)</span>
-                    <i class="bi bi-chevron-right" aria-hidden="true"></i
-                  ></a>
-                  <ul>
-                    <li>
-                      <a href="{{ url_for('inv.categorias_list') }}">
-                        <i class="bi bi-tags me-1" aria-hidden="true"></i>
-                        Categorías de insumos
-                      </a>
-                    </li>
-                    <li>
-                      <a href="{{ url_for('inv.categorias_new') }}">
-                        <i
-                          class="bi bi-plus-square me-1"
-                          aria-hidden="true"
-                        ></i>
-                        Nueva categoría
-                      </a>
-                    </li>
-                  </ul>
-                </li>
+                  <!-- Admin general -->
+                  <li>
+                    <a href="{{ url_for('admin_dashboard_html') }}">Administración</a>
+                  </li>
+
+                  <!-- Finanzas -->
+                  <li class="dropdown">
+                    <a href="#">
+                      <span>Finanzas</span>
+                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    </a>
+                    <ul>
+                      <li>
+                        <a href="{{ url_for('fin_reports.ui_reports') }}">Reportes financieros</a>
+                      </li>
+                      <li>
+                        <a href="{{ url_for('fin_invoices_html') }}">Facturas (fin-invoices)</a>
+                      </li>
+                      <li>
+                        <a href="{{ url_for('fin_cash.ui') }}">Caja / arqueos</a>
+                      </li>
+                      <li>
+                        <a href="{{ url_for('fin_periods.ui_periods') }}">Periodos / cierres</a>
+                      </li>
+                    </ul>
+                  </li>
+
+                  <!-- Recursos Humanos -->
+                  <li class="dropdown">
+                    <a href="#">
+                      <span>Recursos humanos</span>
+                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    </a>
+                    <ul>
+                      <li><a href="{{ url_for('hrm.empleados_ui') }}">Empleados</a></li>
+                      <li><a href="{{ url_for('hrm.mis_horas_ui') }}">Mis horas</a></li>
+                      <li><a href="{{ url_for('hrm.validar_horas_ui') }}">Validar horas</a></li>
+                    </ul>
+                  </li>
+
+                  <!-- Inventario (Admin) -->
+                  <li class="dropdown">
+                    <a href="#">
+                      <span>Inventario (Admin)</span>
+                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    </a>
+                    <ul>
+                      <li>
+                        <a href="{{ url_for('inv.categorias_list') }}">
+                          <i class="bi bi-tags me-1" aria-hidden="true"></i>
+                          Categorías de insumos
+                        </a>
+                      </li>
+                      <li>
+                        <a href="{{ url_for('inv.categorias_new') }}">
+                          <i class="bi bi-plus-square me-1" aria-hidden="true"></i>
+                          Nueva categoría
+                        </a>
+                      </li>
+                    </ul>
+                  </li>
                 {% endif %}
                 <!-- =================================== -->
+
 
                 <!-- Alertas Inventario (Admin + Recepcionista) -->
                 {% if session.get('user_id') and session.get('user_role') in
