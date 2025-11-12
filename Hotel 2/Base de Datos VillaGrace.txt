@@ -95,6 +95,26 @@ DROP TABLE IF EXISTS ArepAtencion;
 DROP TABLE IF EXISTS ArepViewConfig;
 SET FOREIGN_KEY_CHECKS = 1;
 
+
+/* ===========================================================
+   HRM — Módulo de Recursos Humanos
+   =========================================================== */
+
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS HRM_PaymentRecord;
+DROP TABLE IF EXISTS HRM_PayrollDetail;
+DROP TABLE IF EXISTS HRM_Payroll;
+DROP TABLE IF EXISTS HRM_PayrollPeriod;
+DROP TABLE IF EXISTS HRM_BankAccount;
+DROP TABLE IF EXISTS HRM_Incapacity;
+DROP TABLE IF EXISTS HRM_VoluntaryDed;
+DROP TABLE IF EXISTS HRM_Warning;
+DROP TABLE IF EXISTS HRM_VacationRequest;
+DROP TABLE IF EXISTS HRM_Absence;
+DROP TABLE IF EXISTS HRM_ConfigSocial;
+SET FOREIGN_KEY_CHECKS = 1;
+
+
 /* ------------------------------------------------------------------------- */
 /* Tablas base                                                               */
 /* ------------------------------------------------------------------------- */
@@ -1458,12 +1478,263 @@ ALTER TABLE SAC_Solicitud
 /* 3) El evento demo queda en BORRADOR para que pruebes moverlo en el calendario y luego CONFIRMAR desde la UI.----*/
 /* ----------------------------------------------------------------------------------------------------------------*/
 
+/* ===========================================================
+   HRM — 03-Módulo de Recursos Humanos
+   MySQL 8.x • InnoDB • utf8mb4
+   Cumple HU: HRM-08-005..013
+   =========================================================== */
+
+/* -------------------------------------------
+   Configuración de cargas sociales / legales
+   ------------------------------------------- */
+CREATE TABLE HRM_ConfigSocial (
+  Id                INT NOT NULL AUTO_INCREMENT,
+  Vigente_Desde     DATE NOT NULL,
+  CCSS_Pct          DECIMAL(6,3) NOT NULL DEFAULT 10.670,  -- % colaborador
+  IVM_Pct           DECIMAL(6,3) NOT NULL DEFAULT 2.670,   -- % colaborador
+  BP_Pct            DECIMAL(6,3) NOT NULL DEFAULT 1.000,   -- Banco Popular (colaborador)
+  Renta_Pct         DECIMAL(6,3) NOT NULL DEFAULT 10.000,  -- simplificado
+  Activa            TINYINT(1) NOT NULL DEFAULT 1,
+  CONSTRAINT PK_HRM_ConfigSocial PRIMARY KEY (Id),
+  KEY IX_HRM_ConfigSocial_Vigente (Vigente_Desde)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Ausencias sin goce (por día u horas)
+   ------------------------------------------- */
+CREATE TABLE HRM_Absence (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Tipo               ENUM('SIN_GOCE') NOT NULL DEFAULT 'SIN_GOCE',
+  Fecha              DATE NOT NULL,
+  Horas              DECIMAL(5,2) NULL,  -- si es parcial
+  Motivo             VARCHAR(255) NULL,
+  Registrado_Por     INT NULL,
+  Registrado_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Absence PRIMARY KEY (Id),
+  KEY IX_HRM_Abs_Func (Codigo_Funcionario, Fecha),
+  CONSTRAINT FK_HRM_Abs_Func FOREIGN KEY (Codigo_Funcionario)
+    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Vacaciones (flujo aprobación)
+   ------------------------------------------- */
+CREATE TABLE HRM_VacationRequest (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Fecha_Desde        DATE NOT NULL,
+  Fecha_Hasta        DATE NOT NULL,
+  Dias               DECIMAL(5,2) NOT NULL,
+  Estado             ENUM('PENDIENTE','APROBADA','RECHAZADA') NOT NULL DEFAULT 'PENDIENTE',
+  Comentario         VARCHAR(255) NULL,
+  Aprobado_Por       INT NULL,
+  Aprobado_En        DATETIME NULL,
+  Creado_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Vac PRIMARY KEY (Id),
+  KEY IX_HRM_Vac_Func (Codigo_Funcionario),
+  KEY IX_HRM_Vac_Estado (Estado),
+  CONSTRAINT FK_HRM_Vac_Func FOREIGN KEY (Codigo_Funcionario)
+    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Amonestaciones (flujo y notificación)
+   ------------------------------------------- */
+CREATE TABLE HRM_Warning (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Severidad          ENUM('LEVE','MEDIA','GRAVE') NOT NULL DEFAULT 'LEVE',
+  Motivo             VARCHAR(500) NOT NULL,
+  Estado             ENUM('REGISTRADA','NOTIFICADA','ANULADA') NOT NULL DEFAULT 'REGISTRADA',
+  Registrada_Por     INT NULL,
+  Registrada_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Notificada_En      DATETIME NULL,
+  CONSTRAINT PK_HRM_Warn PRIMARY KEY (Id),
+  KEY IX_HRM_Warn_Func (Codigo_Funcionario),
+  KEY IX_HRM_Warn_Estado (Estado),
+  CONSTRAINT FK_HRM_Warn_Func FOREIGN KEY (Codigo_Funcionario)
+    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Deducciones voluntarias
+   ------------------------------------------- */
+CREATE TABLE HRM_VoluntaryDed (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Tipo               ENUM('PENSION_ALIMENTARIA','PRESTAMO','OTRA') NOT NULL,
+  Monto_Fijo         DECIMAL(12,2) NULL,
+  Porcentaje         DECIMAL(6,3) NULL, -- sobre salario bruto quincenal
+  Activa             TINYINT(1) NOT NULL DEFAULT 1,
+  Observacion        VARCHAR(255) NULL,
+  Creada_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Vol PRIMARY KEY (Id),
+  KEY IX_HRM_Vol_Func (Codigo_Funcionario),
+  CONSTRAINT FK_HRM_Vol_Func FOREIGN KEY (Codigo_Funcionario)
+    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Incapacidades (CCSS / INS)
+   ------------------------------------------- */
+CREATE TABLE HRM_Incapacity (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Fuente             ENUM('CCSS','INS') NOT NULL,
+  Porcentaje_Rebajo  DECIMAL(6,3) NOT NULL, -- % a rebajar del salario en periodo afectado
+  Fecha_Desde        DATE NOT NULL,
+  Fecha_Hasta        DATE NOT NULL,
+  Comprobante        VARCHAR(120) NULL,
+  Observacion        VARCHAR(255) NULL,
+  Registrada_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Inc PRIMARY KEY (Id),
+  KEY IX_HRM_Inc_Func (Codigo_Funcionario),
+  KEY IX_HRM_Inc_Rango (Fecha_Desde, Fecha_Hasta),
+  CONSTRAINT FK_HRM_Inc_Func FOREIGN KEY (Codigo_Funcionario)
+    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Cuentas bancarias (histórico)
+   ------------------------------------------- */
+CREATE TABLE HRM_BankAccount (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Banco              VARCHAR(60) NOT NULL,
+  IBAN               VARCHAR(40) NOT NULL,
+  Predeterminada     TINYINT(1) NOT NULL DEFAULT 1,
+  Activa             TINYINT(1) NOT NULL DEFAULT 1,
+  Creada_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Bank PRIMARY KEY (Id),
+  UNIQUE KEY UQ_HRM_Bank_Unique (Codigo_Funcionario, IBAN),
+  KEY IX_HRM_Bank_Func (Codigo_Funcionario),
+  CONSTRAINT FK_HRM_Bank_Func FOREIGN KEY (Codigo_Funcionario)
+    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Periodos de nómina (quincenal)
+   ------------------------------------------- */
+CREATE TABLE HRM_PayrollPeriod (
+  Id          INT NOT NULL AUTO_INCREMENT,
+  Periodo_Key CHAR(7) NOT NULL,      -- p.ej. 2025-11
+  Quincena    ENUM('Q1','Q2') NOT NULL,
+  Fecha_Desde DATE NOT NULL,
+  Fecha_Hasta DATE NOT NULL,
+  Estado      ENUM('ABIERTO','CALCULADO','PAGADO','CERRADO') NOT NULL DEFAULT 'ABIERTO',
+  Creado_En   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Period PRIMARY KEY (Id),
+  UNIQUE KEY UQ_HRM_Period (Periodo_Key, Quincena)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Nómina por colaborador (cabecera)
+   ------------------------------------------- */
+CREATE TABLE HRM_Payroll (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Period_Id          INT NOT NULL,
+  Codigo_Funcionario INT NOT NULL,
+  Salario_Base_Mensual DECIMAL(12,2) NOT NULL,
+  Bruto_Quincena     DECIMAL(12,2) NOT NULL,
+  Rebajo_Ausencias   DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Rebajo_Incap       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_CCSS     DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_IVM      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_BP       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_Renta    DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_Vol      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Neto_Pagar         DECIMAL(12,2) NOT NULL,
+  PDF_Path           VARCHAR(255) NULL,
+  Email_Enviado      TINYINT(1) NOT NULL DEFAULT 0,
+  Generado_En        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Payroll PRIMARY KEY (Id),
+  UNIQUE KEY UQ_HRM_Payroll (Period_Id, Codigo_Funcionario),
+  KEY IX_HRM_Payroll_Period (Period_Id),
+  CONSTRAINT FK_HRM_Payroll_Period FOREIGN KEY (Period_Id)
+    REFERENCES HRM_PayrollPeriod(Id) ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_HRM_Payroll_Func FOREIGN KEY (Codigo_Funcionario)
+    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Detalle de deducciones / rubros
+   ------------------------------------------- */
+CREATE TABLE HRM_PayrollDetail (
+  Id          INT NOT NULL AUTO_INCREMENT,
+  Payroll_Id  INT NOT NULL,
+  Tipo        ENUM('AUSENCIA','INCAPACIDAD','VOLUNTARIA','LEGAL','OTRA') NOT NULL,
+  Clave       VARCHAR(60) NOT NULL,
+  Monto       DECIMAL(12,2) NOT NULL,
+  CONSTRAINT PK_HRM_PayDet PRIMARY KEY (Id),
+  KEY IX_HRM_PayDet_Pay (Payroll_Id),
+  CONSTRAINT FK_HRM_PayDet_Pay FOREIGN KEY (Payroll_Id)
+    REFERENCES HRM_Payroll(Id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+/* -------------------------------------------
+   Registro de pagos (depósito/comprobante)
+   ------------------------------------------- */
+CREATE TABLE HRM_PaymentRecord (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Payroll_Id       INT NOT NULL,
+  Fecha_Pago       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Comprobante      VARCHAR(80)  NULL,
+  Banco            VARCHAR(60)  NULL,
+  Cuenta_Destino   VARCHAR(40)  NULL,
+  Emitido_Por      INT NULL,
+  CONSTRAINT PK_HRM_PayRec PRIMARY KEY (Id),
+  KEY IX_HRM_PayRec_Pay (Payroll_Id),
+  CONSTRAINT FK_HRM_PayRec_Pay FOREIGN KEY (Payroll_Id)
+    REFERENCES HRM_Payroll(Id) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 
 /* ------------------------------------------------------------------------- */
 /* Seeds                                                                     */
 /* ------------------------------------------------------------------------- */
+
+
+--HRM_ConfigSocial
+INSERT INTO HRM_ConfigSocial (Vigente_Desde, CCSS_Pct, IVM_Pct, BP_Pct, Renta_Pct, Activa)
+VALUES (DATE_FORMAT(CURDATE(),'%Y-01-01'), 10.670, 2.670, 1.000, 10.000, 1)
+ON DUPLICATE KEY UPDATE CCSS_Pct=VALUES(CCSS_Pct), IVM_Pct=VALUES(IVM_Pct), BP_Pct=VALUES(BP_Pct), Renta_Pct=VALUES(Renta_Pct), Activa=VALUES(Activa);
+
+-- Banco de ejemplo para el funcionario 1 (ajusta si no existe)
+INSERT INTO HRM_BankAccount (Codigo_Funcionario, Banco, IBAN, Predeterminada, Activa)
+SELECT 1, 'BNCR', 'CR05010200000000000001', 1, 1
+WHERE NOT EXISTS (SELECT 1 FROM HRM_BankAccount WHERE Codigo_Funcionario=1);
+
+-- Deducción voluntaria demo
+INSERT INTO HRM_VoluntaryDed (Codigo_Funcionario, Tipo, Monto_Fijo, Porcentaje, Activa, Observacion)
+SELECT 1, 'PRESTAMO', 15000.00, NULL, 1, 'Préstamo personal'
+WHERE NOT EXISTS (SELECT 1 FROM HRM_VoluntaryDed WHERE Codigo_Funcionario=1 AND Tipo='PRESTAMO');
+
+-- Ausencia sin goce demo (2 horas hoy)
+INSERT INTO HRM_Absence (Codigo_Funcionario, Fecha, Horas, Motivo, Registrado_Por)
+SELECT 1, CURDATE(), 2.00, 'Gestión personal', 1
+WHERE NOT EXISTS (SELECT 1 FROM HRM_Absence WHERE Codigo_Funcionario=1 AND Fecha=CURDATE());
+
+-- Vacaciones pendiente/aprobada
+INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado)
+SELECT 2, CURDATE()+INTERVAL 7 DAY, CURDATE()+INTERVAL 10 DAY, 3.00, 'PENDIENTE'
+WHERE NOT EXISTS (SELECT 1 FROM HRM_VacationRequest WHERE Codigo_Funcionario=2 AND Estado='PENDIENTE');
+
+INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado, Aprobado_Por, Aprobado_En)
+SELECT 3, CURDATE()-INTERVAL 15 DAY, CURDATE()-INTERVAL 12 DAY, 3.00, 'APROBADA', 1, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM HRM_VacationRequest WHERE Codigo_Funcionario=3 AND Estado='APROBADA');
+
+-- Amonestación demo
+INSERT INTO HRM_Warning (Codigo_Funcionario, Severidad, Motivo)
+SELECT 1, 'LEVE', 'Uso inapropiado del uniforme'
+WHERE NOT EXISTS (SELECT 1 FROM HRM_Warning WHERE Codigo_Funcionario=1);
+
+-- Incapacidad demo 50% rebajo en esta quincena
+INSERT INTO HRM_Incapacity (Codigo_Funcionario, Fuente, Porcentaje_Rebajo, Fecha_Desde, Fecha_Hasta, Observacion)
+SELECT 1, 'CCSS', 50.000, CURDATE()-INTERVAL 3 DAY, CURDATE(), 'Resfrío'
+WHERE NOT EXISTS (SELECT 1 FROM HRM_Incapacity WHERE Codigo_Funcionario=1 AND Fecha_Desde=CURDATE()-INTERVAL 3 DAY);
+
 
 -- Habitaciones
 INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado) VALUES

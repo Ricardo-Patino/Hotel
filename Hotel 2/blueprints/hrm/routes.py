@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 from datetime import datetime, date, timedelta
-from flask import request, jsonify, render_template, session, redirect, url_for
-from sqlalchemy import func, or_
+from io import BytesIO
+from flask import request, jsonify, render_template, session, redirect, url_for, render_template, request, jsonify, send_file
+from sqlalchemy import func, or_, text
 from extensions import db
 from . import hrm_bp
+from models import HoraExtra
 
 # Modelos principales HRM
 from models import Funcionario, FuncionarioHistorial
@@ -928,3 +930,310 @@ def aprobar_lote():
     db.session.commit()
     return jsonify({"ok": True, "aprobadas": count})
 
+def q(sql, **params):
+    return db.session.execute(text(sql), params).mappings().all()
+def exec_(sql, **params):
+    db.session.execute(text(sql), params); db.session.commit()
+
+    # ================= HRM-UI =================
+
+@hrm_bp.get("/dashboard")
+def dashboard():
+    # mini-resumen para tarjetas
+    resumen = q("""
+        SELECT 
+          (SELECT COUNT(*) FROM Funcionario WHERE Estado_Empleado='Activo') AS activos,
+          (SELECT COUNT(*) FROM HRM_VacationRequest WHERE Estado='PENDIENTE') AS vac_pend,
+          (SELECT COUNT(*) FROM HRM_Warning WHERE Estado='REGISTRADA') AS amon_pend,
+          (SELECT COUNT(*) FROM HRM_Absence WHERE Fecha=CURDATE()) AS aus_hoy
+    """)[0]
+    periodos = q("SELECT * FROM HRM_PayrollPeriod ORDER BY Fecha_Desde DESC LIMIT 6")
+    return render_template("hrm-dashboard.html", resumen=resumen, periodos=periodos)
+
+# =============== HRM-08-005 ===============
+@hrm_bp.post("/absences")
+def add_absence():
+    payload = request.get_json(silent=True) or {}
+    exec_("""
+      INSERT INTO HRM_Absence (Codigo_Funcionario, Fecha, Horas, Motivo, Registrado_Por)
+      VALUES (:f,:fe,:h,:m,:u)
+    """, f=payload["func"], fe=payload["fecha"], h=payload.get("horas"), m=payload.get("motivo"), u=payload.get("user_id"))
+    return jsonify({"ok": True})
+
+# =============== HRM-08-006 ===============
+@hrm_bp.post("/vacations")
+def create_vacation():
+    p = request.get_json(silent=True) or {}
+    exec_("""
+      INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado, Comentario)
+      VALUES (:f,:d,:h,:dias,'PENDIENTE',:c)
+    """, f=p["func"], d=p["desde"], h=p["hasta"], dias=p["dias"], c=p.get("comentario"))
+    return jsonify({"ok": True})
+
+@hrm_bp.post("/vacations/<int:vac_id>/approve")
+def approve_vacation(vac_id):
+    # aprueba y notifica por email vía SAC_Outbox
+    vac = q("SELECT v.*, f.Nombre, f.Apellido FROM HRM_VacationRequest v JOIN Funcionario f ON f.Codigo_Funcionario=v.Codigo_Funcionario WHERE v.Id=:id", id=vac_id)[0]
+    exec_("""UPDATE HRM_VacationRequest SET Estado='APROBADA', Aprobado_Por=:u, Aprobado_En=NOW() WHERE Id=:id""", u=1, id=vac_id)
+    # usa SAC_Outbox para notificar (si hay email en Usuario vinculado o en otra tabla; aquí ejemplo simple)
+    exec_("""
+      INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
+      VALUES ('email', :para, 'Vacaciones aprobadas', 
+        :cuerpo, 'PENDIENTE', NOW(), 'HRM_Vacation', :id)
+    """, para='recepcion@hotel.test',
+         cuerpo=f"Estimado/a {vac['Nombre']} {vac['Apellido']}, su solicitud de vacaciones del {vac['Fecha_Desde']} al {vac['Fecha_Hasta']} ha sido APROBADA.",
+         id=vac_id)
+    return jsonify({"ok": True})
+
+@hrm_bp.post("/vacations/<int:vac_id>/reject")
+def reject_vacation(vac_id):
+    p = request.get_json(silent=True) or {}
+    exec_("""UPDATE HRM_VacationRequest SET Estado='RECHAZADA', Aprobado_Por=:u, Aprobado_En=NOW(), Comentario=:c WHERE Id=:id""",
+          u=1, c=p.get("comentario",""), id=vac_id)
+    exec_("""
+      INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
+      VALUES ('email', :para, 'Vacaciones rechazadas', 
+        :cuerpo, 'PENDIENTE', NOW(), 'HRM_Vacation', :id)
+    """, para='recepcion@hotel.test',
+         cuerpo=f"Su solicitud de vacaciones fue RECHAZADA. Motivo: {p.get('comentario','')}", id=vac_id)
+    return jsonify({"ok": True})
+
+@hrm_bp.post("/warnings")
+def create_warning():
+    p = request.get_json(silent=True) or {}
+    # registrar
+    exec_("""
+      INSERT INTO HRM_Warning (Codigo_Funcionario, Severidad, Motivo, Estado, Registrada_Por)
+      VALUES (:f,:s,:m,'REGISTRADA',:u)
+    """, f=p["func"], s=p.get("sev","LEVE"), m=p["motivo"], u=p.get("user_id"))
+    # notificar
+    func = q("SELECT Nombre, Apellido FROM Funcionario WHERE Codigo_Funcionario=:f", f=p["func"])[0]
+    exec_("""
+      INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad)
+      VALUES ('email','recepcion@hotel.test','Amonestación registrada',
+        :cuerpo,'PENDIENTE',NOW(),'HRM_Warning')
+    """, cuerpo=f"Se registró una amonestación ({p.get('sev','LEVE')}) para {func['Nombre']} {func['Apellido']}: {p['motivo']}")
+    return jsonify({"ok": True})
+
+# =============== HRM-08-007 ===============
+@hrm_bp.post("/config/social")
+def save_social():
+    p = request.get_json(silent=True) or {}
+    exec_("""
+      INSERT INTO HRM_ConfigSocial (Vigente_Desde, CCSS_Pct, IVM_Pct, BP_Pct, Renta_Pct, Activa)
+      VALUES (:v, :ccss, :ivm, :bp, :renta, 1)
+      ON DUPLICATE KEY UPDATE CCSS_Pct=:ccss, IVM_Pct=:ivm, BP_Pct=:bp, Renta_Pct=:renta, Activa=1
+    """, v=p.get("vigente_desde", str(date.today().replace(day=1))),
+         ccss=p.get("ccss",10.67), ivm=p.get("ivm",2.67), bp=p.get("bp",1.0), renta=p.get("renta",10.0))
+    return jsonify({"ok": True})
+
+# =============== HRM-08-008 ===============
+@hrm_bp.post("/voluntary")
+def add_voluntary():
+    p = request.get_json(silent=True) or {}
+    exec_("""
+      INSERT INTO HRM_VoluntaryDed (Codigo_Funcionario, Tipo, Monto_Fijo, Porcentaje, Activa, Observacion)
+      VALUES (:f,:t,:m,:p,1,:o)
+    """, f=p["func"], t=p["tipo"], m=p.get("monto"), p=p.get("porcentaje"), o=p.get("obs"))
+    return jsonify({"ok": True})
+
+# =============== HRM-08-009 ===============
+@hrm_bp.post("/incapacity")
+def add_incapacity():
+    p = request.get_json(silent=True) or {}
+    exec_("""
+      INSERT INTO HRM_Incapacity (Codigo_Funcionario, Fuente, Porcentaje_Rebajo, Fecha_Desde, Fecha_Hasta, Comprobante, Observacion)
+      VALUES (:f,:fuente,:pct,:d,:h,:c,:o)
+    """, f=p["func"], fuente=p["fuente"], pct=p["porcentaje"], d=p["desde"], h=p["hasta"], c=p.get("comp"), o=p.get("obs"))
+    return jsonify({"ok": True})
+
+# =============== HRM-08-010 ===============
+@hrm_bp.post("/bank")
+def add_bank():
+    p = request.get_json(silent=True) or {}
+    if p.get("predeterminada"):
+        # desactiva otras predeterminadas del colaborador
+        exec_("UPDATE HRM_BankAccount SET Predeterminada=0 WHERE Codigo_Funcionario=:f", f=p["func"])
+    exec_("""
+      INSERT INTO HRM_BankAccount (Codigo_Funcionario, Banco, IBAN, Predeterminada, Activa)
+      VALUES (:f,:b,:i, :pre, 1)
+    """, f=p["func"], b=p["banco"], i=p["iban"], pre=1 if p.get("predeterminada") else 0)
+    return jsonify({"ok": True})
+
+# =============== HRM-08-011/012 ===============
+@hrm_bp.get("/payroll")
+def payroll_home():
+    periods = q("SELECT * FROM HRM_PayrollPeriod ORDER BY Fecha_Desde DESC")
+    return render_template("hrm-payroll.html", periods=periods)
+
+@hrm_bp.post("/payroll/period")
+def create_period():
+    p = request.get_json(silent=True) or {}
+    exec_("""
+      INSERT INTO HRM_PayrollPeriod (Periodo_Key, Quincena, Fecha_Desde, Fecha_Hasta, Estado)
+      VALUES (:pk, :q, :d, :h, 'ABIERTO')
+      ON DUPLICATE KEY UPDATE Fecha_Desde=:d, Fecha_Hasta=:h
+    """, pk=p["periodo_key"], q=p["quincena"], d=p["desde"], h=p["hasta"])
+    return jsonify({"ok": True})
+
+@hrm_bp.post("/payroll/generate")
+def payroll_generate():
+    p = request.get_json(silent=True) or {}
+    period = q("SELECT * FROM HRM_PayrollPeriod WHERE Id=:id", id=p["period_id"])[0]
+    # Config social vigente (la última activa por fecha)
+    cfg = q("""
+      SELECT * FROM HRM_ConfigSocial WHERE Activa=1 AND Vigente_Desde<=:h
+      ORDER BY Vigente_Desde DESC LIMIT 1
+    """, h=period["Fecha_Hasta"])[0]
+    funcs = q("SELECT * FROM Funcionario WHERE Estado_Empleado='Activo'")
+    for f in funcs:
+        base = float(f["Salario_Base_Mensual"] or 0)
+        bruto_q = round(base/2.0, 2)
+
+        # Ausencias dentro del periodo -> rebajo: diario = base/30, hora = diario/8
+        aus = q("""
+          SELECT IFNULL(SUM(CASE WHEN a.Horas IS NULL OR a.Horas=0 THEN 1 ELSE 0 END),0) AS dias,
+                 IFNULL(SUM(CASE WHEN a.Horas IS NOT NULL AND a.Horas>0 THEN a.Horas ELSE 0 END),0) AS horas
+          FROM HRM_Absence a
+          WHERE a.Codigo_Funcionario=:f AND a.Fecha BETWEEN :d AND :h
+        """, f=f["Codigo_Funcionario"], d=period["Fecha_Desde"], h=period["Fecha_Hasta"])[0]
+        diario = base/30.0
+        por_hora = diario/8.0
+        reb_aus = round(aus["dias"]*diario + aus["horas"]*por_hora, 2)
+
+        # Incapacidades -> rebajo porcentaje sobre días dentro del periodo (aprox mensual / 30)
+        inc = q("""
+          SELECT IFNULL(SUM(DATEDIFF(LEAST(:h, Fecha_Hasta), GREATEST(:d, Fecha_Desde))+1),0) AS dias,
+                 IFNULL(MAX(Porcentaje_Rebajo),0) AS pct
+          FROM HRM_Incapacity
+          WHERE Codigo_Funcionario=:f AND Fecha_Hasta>=:d AND Fecha_Desde<=:h
+        """, f=f["Codigo_Funcionario"], d=period["Fecha_Desde"], h=period["Fecha_Hasta"])[0]
+        reb_inc = round((inc["dias"] or 0) * diario * (float(inc["pct"] or 0)/100.0), 2)
+
+        # Cargas sociales (colaborador)
+        ccss = round(bruto_q * float(cfg["CCSS_Pct"])/100.0, 2)
+        ivm  = round(bruto_q * float(cfg["IVM_Pct"])/100.0, 2)
+        bp   = round(bruto_q * float(cfg["BP_Pct"])/100.0, 2)
+
+        # Renta (simplificada)
+        renta = round(bruto_q * float(cfg["Renta_Pct"])/100.0, 2)
+
+        # Deducciones voluntarias
+        vol = q("SELECT * FROM HRM_VoluntaryDed WHERE Codigo_Funcionario=:f AND Activa=1", f=f["Codigo_Funcionario"])
+        vol_total = 0.0
+        for d in vol:
+            if d["Monto_Fijo"]:
+                vol_total += float(d["Monto_Fijo"])
+            elif d["Porcentaje"]:
+                vol_total += bruto_q * float(d["Porcentaje"])/100.0
+        vol_total = round(vol_total, 2)
+
+        neto = max(0.0, round(bruto_q - reb_aus - reb_inc - ccss - ivm - bp - renta - vol_total, 2))
+
+        # UPSERT header
+        exec_("""
+          INSERT INTO HRM_Payroll (Period_Id, Codigo_Funcionario, Salario_Base_Mensual, Bruto_Quincena,
+                                   Rebajo_Ausencias, Rebajo_Incap, Deduccion_CCSS, Deduccion_IVM,
+                                   Deduccion_BP, Deduccion_Renta, Deduccion_Vol, Neto_Pagar)
+          VALUES (:pid,:f,:base,:b,:ra,:ri,:cc,:ivm,:bp,:r,:vol,:net)
+          ON DUPLICATE KEY UPDATE Salario_Base_Mensual=:base, Bruto_Quincena=:b,
+              Rebajo_Ausencias=:ra, Rebajo_Incap=:ri, Deduccion_CCSS=:cc, Deduccion_IVM=:ivm,
+              Deduccion_BP=:bp, Deduccion_Renta=:r, Deduccion_Vol=:vol, Neto_Pagar=:net
+        """, pid=period["Id"], f=f["Codigo_Funcionario"], base=base, b=bruto_q,
+             ra=reb_aus, ri=reb_inc, cc=ccss, ivm=ivm, bp=bp, r=renta, vol=vol_total, net=neto)
+
+    exec_("UPDATE HRM_PayrollPeriod SET Estado='CALCULADO' WHERE Id=:id", id=period["Id"])
+    return jsonify({"ok": True})
+
+@hrm_bp.get("/payroll/<int:pay_id>/pdf")
+def payroll_pdf(pay_id):
+    row = q("""
+      SELECT p.*, f.Nombre, f.Apellido, f.Cedula, f.Departamento
+      FROM HRM_Payroll p JOIN Funcionario f ON f.Codigo_Funcionario=p.Codigo_Funcionario
+      WHERE p.Id=:id
+    """, id=pay_id)[0]
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    W,H = A4; y = H-2*cm
+    c.setFont("Helvetica-Bold",14); c.drawString(2*cm,y,"Comprobante de Pago — Hotel Villa Grace"); y-=0.8*cm
+    c.setFont("Helvetica",10)
+    c.drawString(2*cm,y,f"Funcionario: {row['Nombre']} {row['Apellido']}  |  Cédula: {row['Cedula']}  |  Depto: {row.get('Departamento','-')}"); y-=0.5*cm
+    c.drawString(2*cm,y,f"Periodo: {row['Period_Id']}  |  Generado: {row['Generado_En']}"); y-=0.8*cm
+    def line(t,v): 
+        nonlocal y; c.drawString(2*cm,y,t); c.drawRightString(W-2*cm,y,f"{v:,.2f}"); y-=0.4*cm
+    c.setFont("Helvetica-Bold",11); c.drawString(2*cm,y,"Resumen"); y-=0.5*cm
+    c.setFont("Helvetica",10)
+    line("Salario base mensual", row["Salario_Base_Mensual"])
+    line("Bruto quincena", row["Bruto_Quincena"])
+    line("Rebajo ausencias", -row["Rebajo_Ausencias"])
+    line("Rebajo incapacidades", -row["Rebajo_Incap"])
+    line("Deducción CCSS", -row["Deduccion_CCSS"])
+    line("Deducción IVM", -row["Deduccion_IVM"])
+    line("Deducción BP", -row["Deduccion_BP"])
+    line("Deducción Renta", -row["Deduccion_Renta"])
+    line("Deducciones voluntarias", -row["Deduccion_Vol"])
+    c.setFont("Helvetica-Bold",12); line("NETO A PAGAR", row["Neto_Pagar"])
+    c.showPage(); c.save(); buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name=f"payslip_{pay_id}.pdf", mimetype="application/pdf")
+
+@hrm_bp.post("/payroll/<int:pay_id>/send")
+def payroll_send(pay_id):
+    # inserta en SAC_Outbox para que tu proceso de correo lo despache
+    row = q("""
+      SELECT p.Id, f.Nombre, f.Apellido
+      FROM HRM_Payroll p JOIN Funcionario f ON f.Codigo_Funcionario=p.Codigo_Funcionario
+      WHERE p.Id=:id
+    """, id=pay_id)[0]
+    exec_("""
+      INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
+      VALUES ('email','recepcion@hotel.test','Comprobante de pago',
+        :cuerpo,'PENDIENTE',NOW(),'HRM_Payroll',:id)
+    """, cuerpo=f"Estimado/a {row['Nombre']} {row['Apellido']}, adjuntaremos su comprobante de pago. (Ruta /hrm/payroll/{pay_id}/pdf)", id=pay_id)
+    exec_("UPDATE HRM_Payroll SET Email_Enviado=1 WHERE Id=:id", id=pay_id)
+    return jsonify({"ok": True})
+
+@hrm_bp.post("/payroll/<int:pay_id>/pago")
+def payroll_pago(pay_id):
+    p = request.get_json(silent=True) or {}
+    exec_("""
+      INSERT INTO HRM_PaymentRecord (Payroll_Id, Fecha_Pago, Comprobante, Banco, Cuenta_Destino, Emitido_Por)
+      VALUES (:id, NOW(), :comp, :ban, :cta, :usr)
+    """, id=pay_id, comp=p.get("comprobante"), ban=p.get("banco"), cta=p.get("cuenta"), usr=p.get("user_id"))
+    exec_("UPDATE HRM_PayrollPeriod SET Estado='PAGADO' WHERE Id=(SELECT Period_Id FROM HRM_Payroll WHERE Id=:id)", id=pay_id)
+    return jsonify({"ok": True})
+
+# =============== HRM-08-013 ===============
+@hrm_bp.post("/aguinaldo/generate")
+def aguinaldo_generate():
+    p = request.get_json(silent=True) or {}
+    anio = int(p.get("anio", date.today().year))
+    # suma de BRUTO por colaborador últimos 12 meses / 12
+    data = q("""
+      SELECT Codigo_Funcionario, ROUND(SUM(Bruto_Quincena)/2.0,2) AS promedio_mensual
+      FROM HRM_Payroll
+      WHERE Generado_En >= DATE_SUB(CONCAT(:anio,'-12-01'), INTERVAL 12 MONTH)
+        AND Generado_En <  CONCAT(:anio,'-12-01')
+      GROUP BY Codigo_Funcionario
+    """, anio=anio)
+    # Creamos un periodo especial "AGUINALDO"
+    exec_("""
+      INSERT INTO HRM_PayrollPeriod (Periodo_Key, Quincena, Fecha_Desde, Fecha_Hasta, Estado)
+      VALUES (:pk,'Q2', :d, :h, 'CALCULADO')
+      ON DUPLICATE KEY UPDATE Estado='CALCULADO'
+    """, pk=f"{anio}-AG", d=f"{anio}-12-01", h=f"{anio}-12-31")
+    per = q("SELECT Id FROM HRM_PayrollPeriod WHERE Periodo_Key=:pk", pk=f"{anio}-AG")[0]
+    for r in data:
+        base = q("SELECT Salario_Base_Mensual FROM Funcionario WHERE Codigo_Funcionario=:f", f=r["Codigo_Funcionario"])
+        base = float(base[0]["Salario_Base_Mensual"]) if base else 0.0
+        bruto = float(r["promedio_mensual"])
+        exec_("""
+          INSERT INTO HRM_Payroll (Period_Id, Codigo_Funcionario, Salario_Base_Mensual, Bruto_Quincena,
+                                   Rebajo_Ausencias, Rebajo_Incap, Deduccion_CCSS, Deduccion_IVM,
+                                   Deduccion_BP, Deduccion_Renta, Deduccion_Vol, Neto_Pagar)
+          VALUES (:pid,:f,:base,:b,0,0,0,0,0,0,0,:b)
+          ON DUPLICATE KEY UPDATE Bruto_Quincena=:b, Neto_Pagar=:b
+        """, pid=per["Id"], f=r["Codigo_Funcionario"], base=base, b=bruto)
+    return jsonify({"ok": True})

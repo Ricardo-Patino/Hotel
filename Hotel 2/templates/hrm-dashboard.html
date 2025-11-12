@@ -1,0 +1,207 @@
+{% set title = "RRHH | Hotel Villa Grace" %} <!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{ title }}</title>
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/style.css') }}"
+      rel="stylesheet"
+    />
+    <style>
+      .card {
+        border-radius: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="header" class="header fixed-top">
+      <div class="container d-flex align-items-center justify-content-between">
+        <a href="/" class="logo d-flex align-items-center me-auto me-xl-0"
+          ><h1 class="sitename">Hotel Villa Grace</h1></a
+        >
+        <!-- tu menú global -->
+      </div>
+    </header>
+
+    <main class="main" style="margin-top: 90px">
+      <div class="container">
+        <h2 class="mb-3" style="color: #4b49ac">Recursos Humanos</h2>
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="card p-3">
+              <small>Colaboradores activos</small>
+              <h3>{{ resumen.activos }}</h3>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3">
+              <small>Vacaciones pendientes</small>
+              <h3>{{ resumen.vac_pend }}</h3>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3">
+              <small>Amonestaciones sin notificar</small>
+              <h3>{{ resumen.amon_pend }}</h3>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card p-3">
+              <small>Ausencias hoy</small>
+              <h3>{{ resumen.aus_hoy }}</h3>
+            </div>
+          </div>
+        </div>
+
+        <!-- Forms rápidos -->
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="card p-3">
+              <h5 class="mb-3">Registrar ausencia sin goce</h5>
+              <div class="row g-2">
+                <div class="col-6">
+                  <input
+                    id="abs_func"
+                    class="form-control"
+                    placeholder="Código funcionario"
+                  />
+                </div>
+                <div class="col-6">
+                  <input id="abs_fecha" type="date" class="form-control" />
+                </div>
+                <div class="col-6">
+                  <input
+                    id="abs_horas"
+                    type="number"
+                    step="0.25"
+                    class="form-control"
+                    placeholder="Horas (opcional)"
+                  />
+                </div>
+                <div class="col-6">
+                  <input
+                    id="abs_motivo"
+                    class="form-control"
+                    placeholder="Motivo"
+                  />
+                </div>
+                <div class="col-12 text-end">
+                  <button class="btn btn-primary" id="btnAbs">
+                    <i class="bi bi-dash-circle"></i> Registrar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card p-3">
+              <h5 class="mb-3">Nueva amonestación</h5>
+              <div class="row g-2">
+                <div class="col-4">
+                  <input
+                    id="w_func"
+                    class="form-control"
+                    placeholder="Código funcionario"
+                  />
+                </div>
+                <div class="col-4">
+                  <select id="w_sev" class="form-select">
+                    <option>LEVE</option>
+                    <option>MEDIA</option>
+                    <option>GRAVE</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <input
+                    id="w_motivo"
+                    class="form-control"
+                    placeholder="Motivo"
+                  />
+                </div>
+                <div class="col-12 text-end">
+                  <button class="btn btn-outline-danger" id="btnWarn">
+                    <i class="bi bi-exclamation-triangle"></i> Registrar y
+                    notificar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-4" />
+        <h5 class="mb-3">Últimos periodos de nómina</h5>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Periodo</th>
+                <th>Quincena</th>
+                <th>Desde</th>
+                <th>Hasta</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in periodos %}
+              <tr>
+                <td>{{ p.Periodo_Key }}</td>
+                <td>{{ p.Quincena }}</td>
+                <td>{{ p.Fecha_Desde }}</td>
+                <td>{{ p.Fecha_Hasta }}</td>
+                <td>{{ p.Estado }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      document.getElementById("btnAbs").onclick = async () => {
+        const body = {
+          func: parseInt(document.getElementById("abs_func").value),
+          fecha: document.getElementById("abs_fecha").value,
+          horas: parseFloat(document.getElementById("abs_horas").value || 0),
+          motivo: document.getElementById("abs_motivo").value,
+          user_id: 1,
+        };
+        await fetch('{{ url_for("hrm.add_absence") }}', {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        alert("Ausencia registrada");
+      };
+      document.getElementById("btnWarn").onclick = async () => {
+        const body = {
+          func: parseInt(document.getElementById("w_func").value),
+          sev: document.getElementById("w_sev").value,
+          motivo: document.getElementById("w_motivo").value,
+          user_id: 1,
+        };
+        await fetch('{{ url_for("hrm.create_warning") }}', {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        alert("Amonestación registrada y notificada");
+      };
+    </script>
+  </body>
+</html>
