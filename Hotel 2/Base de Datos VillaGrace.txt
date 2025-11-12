@@ -1696,7 +1696,7 @@ CREATE TABLE HRM_PaymentRecord (
 /* ------------------------------------------------------------------------- */
 
 
---HRM_ConfigSocial
+-- HRM_ConfigSocial
 INSERT INTO HRM_ConfigSocial (Vigente_Desde, CCSS_Pct, IVM_Pct, BP_Pct, Renta_Pct, Activa)
 VALUES (DATE_FORMAT(CURDATE(),'%Y-01-01'), 10.670, 2.670, 1.000, 10.000, 1)
 ON DUPLICATE KEY UPDATE CCSS_Pct=VALUES(CCSS_Pct), IVM_Pct=VALUES(IVM_Pct), BP_Pct=VALUES(BP_Pct), Renta_Pct=VALUES(Renta_Pct), Activa=VALUES(Activa);
