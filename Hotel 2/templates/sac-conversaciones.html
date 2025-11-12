@@ -1,0 +1,43 @@
+{% extends "sac/_layout.html" %}
+{% block title %}Conversaciones | Hotel Villa Grace{% endblock %}
+{% block page_h1 %}Conversaciones Chat{% endblock %}
+{% block crumb %}SAC · Conversaciones{% endblock %}
+{% block content %}
+<section class="section" data-aos="fade-up">
+  <div class="container">
+    <div class="vg-card p-3">
+      <div class="d-flex gap-2 align-items-center mb-3">
+        <input id="q" class="form-control" style="max-width:360px" placeholder="Buscar por nombre/correo/teléfono">
+        <select id="days" class="form-select" style="max-width:140px">
+          <option value="7">7 días</option>
+          <option value="30" selected>30 días</option>
+          <option value="90">90 días</option>
+        </select>
+        <button id="btn" class="btn btn-outline-primary">Buscar</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead><tr><th>Fecha</th><th>Cliente</th><th>Canal</th><th>Último mensaje</th><th>Estado</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+async function load(){
+  const q = document.getElementById('q').value || '';
+  const d = document.getElementById('days').value || '30';
+  const url = `/sac/conversaciones/data?days=${encodeURIComponent(d)}${q?('&q='+encodeURIComponent(q)):""}`;
+  const res = await fetch(url); const j = await res.json();
+  const tb = document.getElementById('rows'); tb.innerHTML='';
+  (j.items||[]).forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.Fecha}</td><td>${r.Cliente}</td><td>${r.Canal}</td><td>${r.Asunto||''}</td><td>${r.Estado}</td>`;
+    tb.appendChild(tr);
+  });
+}
+document.getElementById('btn').onclick = load;
+load();
+</script>
+{% endblock %}

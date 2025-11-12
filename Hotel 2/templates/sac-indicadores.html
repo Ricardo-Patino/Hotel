@@ -1,0 +1,99 @@
+<!-- templates/sac-indicadores.html -->
+{% extends "sac/_layout.html" %}
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="vg-card p-3 text-center">
+        <div class="small text-muted">Tickets recibidos</div>
+        <div id="kpi-tickets" class="display-6 fw-bold">--</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="vg-card p-3 text-center">
+        <div class="small text-muted">Tickets atendidos</div>
+        <div id="kpi-atendidas" class="display-6 fw-bold">--</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="vg-card p-3 text-center">
+        <div class="small text-muted">NPS promedio</div>
+        <div id="kpi-nps" class="display-6 fw-bold">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="vg-card p-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <strong>Flujo de notificaciones (últimos)</strong>
+      <button id="btn-refresh" class="btn btn-sm btn-outline-primary">Actualizar</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-striped mb-0">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Canal</th>
+            <th>Estado</th>
+            <th>Entidad</th>
+            <th>Ref</th>
+          </tr>
+        </thead>
+        <tbody id="flujo-body">
+          <tr><td colspan="5" class="text-muted">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(async function(){
+  async function loadKPIs(){
+    try {
+      const r = await fetch('/sac/indicadores/kpis');
+      const js = await r.json();
+      if(js && js.ok){
+        document.getElementById('kpi-tickets').textContent   = js.tickets ?? '--';
+        document.getElementById('kpi-atendidas').textContent = js.atendidas ?? '--';
+        document.getElementById('kpi-nps').textContent       = (js.nps ?? '--');
+      }
+    } catch(e){}
+  }
+
+  async function loadFlujo(){
+    const tbody = document.getElementById('flujo-body');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Cargando…</td></tr>`;
+    try {
+      const r = await fetch('/sac/indicadores/flujo');
+      const js = await r.json();
+      if(!js || !js.ok){ tbody.innerHTML = `<tr><td colspan="5">Error al cargar</td></tr>`; return; }
+      const items = js.items || [];
+      if(items.length === 0){
+        tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Sin registros</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = items.map(it => `
+        <tr>
+          <td>${it.Fecha || '-'}</td>
+          <td>${it.Canal || '-'}</td>
+          <td>${it.Estado || '-'}</td>
+          <td>${it.Ref_Entidad || '-'}</td>
+          <td>${it.Ref_Id || '-'}</td>
+        </tr>`).join('');
+    } catch(e){
+      tbody.innerHTML = `<tr><td colspan="5">Error al cargar</td></tr>`;
+    }
+  }
+
+  document.getElementById('btn-refresh').addEventListener('click', ()=>{ loadKPIs(); loadFlujo(); });
+  await loadKPIs();
+  await loadFlujo();
+
+  // auto-refresh suave
+  setInterval(()=>{ loadKPIs(); loadFlujo(); }, 30000);
+})();
+</script>
+{% endblock %}

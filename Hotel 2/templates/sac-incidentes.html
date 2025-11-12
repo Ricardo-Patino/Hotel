@@ -1,0 +1,99 @@
+{% extends "sac/_layout.html" %}
+{% block title %}Incidentes | Hotel Villa Grace{% endblock %}
+{% block page_h1 %}Incidentes / Comentarios{% endblock %}
+{% block crumb %}SAC · Incidentes{% endblock %}
+{% block content %}
+<section class="section" data-aos="fade-up">
+  <div class="container">
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="vg-card p-3">
+          <h5 class="mb-3">Registrar incidente</h5>
+          <form id="fInc">
+            <div class="mb-2">
+              <label class="form-label">Código Reserva (opcional)</label>
+              <input name="Codigo_Reserva" type="number" class="form-control" placeholder="Ej. 1024">
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Código Cliente (opcional)</label>
+              <input name="Codigo_Cliente" type="number" class="form-control" placeholder="Ej. 5">
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <label class="form-label">Tipo</label>
+                <select name="Tipo" class="form-select">
+                  <option>INCIDENTE</option>
+                  <option>COMENTARIO</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="form-label">Severidad</label>
+                <select name="Severidad" class="form-select">
+                  <option>MEDIA</option><option>BAJA</option><option>ALTA</option><option>CRITICA</option>
+                </select>
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Título</label>
+              <input name="Titulo" class="form-control" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Detalle</label>
+              <textarea name="Detalle" rows="4" class="form-control"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary" type="submit">Guardar</button>
+              <span id="msg" class="small text-muted"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="vg-card p-3">
+          <h5 class="mb-3">Últimos registros</h5>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr><th>Id</th><th>Cliente</th><th>Reserva</th><th>Título</th><th>Tipo</th><th>Severidad</th><th>Estado</th><th>Fecha</th></tr>
+              </thead>
+              <tbody id="rows"><tr><td colspan="8">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+async function load() {
+  const res = await fetch('/sac/incidentes/data');
+  const j = await res.json();
+  const tb = document.getElementById('rows'); tb.innerHTML='';
+  (j.items||[]).forEach(x=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${x.Id}</td>
+      <td>${x.Codigo_Cliente??''}</td>
+      <td>${x.Codigo_Reserva??''}</td>
+      <td>${x.Titulo||''}</td>
+      <td>${x.Tipo||''}</td>
+      <td>${x.Severidad||''}</td>
+      <td>${x.Estado||''}</td>
+      <td>${x.Fecha||''}</td>`;
+    tb.appendChild(tr);
+  });
+}
+document.getElementById('fInc').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(e.currentTarget);
+  const res = await fetch('/sac/incidentes', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(Object.fromEntries(fd.entries()))
+  });
+  const out = await res.json();
+  document.getElementById('msg').textContent = out.ok ? 'Guardado (#'+out.id+').' : 'Error';
+  if(out.ok){ e.currentTarget.reset(); load(); }
+});
+load();
+</script>
+{% endblock %}

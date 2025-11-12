@@ -1,0 +1,49 @@
+{% extends "sac/_layout.html" %}
+{% block title %}Preferencias | Hotel Villa Grace{% endblock %}
+{% block page_h1 %}Preferencias de notificación{% endblock %}
+{% block crumb %}SAC · Preferencias{% endblock %}
+{% block content %}
+<section class="section" data-aos="fade-up">
+  <div class="container">
+    <div class="vg-card p-4 p-md-5">
+      <form id="frm" class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Canal preferido</label>
+          <select name="Canal" class="form-select">
+            <option value="email" {{ 'selected' if (pref and pref.Canal=='email') else '' }}>Email</option>
+            <option value="sms" {{ 'selected' if (pref and pref.Canal=='sms') else '' }}>SMS</option>
+            <option value="ambos" {{ 'selected' if (pref and pref.Canal=='ambos') else '' }}>Ambos</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Email</label>
+          <input name="Email" type="email" class="form-control" value="{{ pref.Email if pref else '' }}" placeholder="tu@correo.com">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Teléfono</label>
+          <input name="Telefono" type="text" class="form-control" value="{{ pref.Telefono if pref else '' }}" placeholder="+506 8888 8888">
+        </div>
+        <div class="col-12 small text-muted">
+          Horarios: check-in {{ checkin_ini }}–{{ checkin_fin }}, check-out hasta {{ checkout }}.
+        </div>
+        <div class="col-12 d-flex gap-2">
+          <button class="btn btn-primary" type="submit">Guardar</button>
+          <span id="msg" class="small text-muted"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+<script>
+document.getElementById('frm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(e.currentTarget);
+  const res = await fetch('/sac/preferencias', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(Object.fromEntries(fd.entries()))
+  });
+  const out = await res.json();
+  document.getElementById('msg').textContent = out.ok ? 'Guardado.' : ('Error: '+(out.error||''));  
+});
+</script>
+{% endblock %}

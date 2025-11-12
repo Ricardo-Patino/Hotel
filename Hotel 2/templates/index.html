@@ -78,365 +78,179 @@
 
   <body class="index-page">
     <header id="header" class="header d-flex align-items-center fixed-top">
-      <div
-        class="container position-relative d-flex align-items-center justify-content-between"
-      >
+      <div class="container position-relative d-flex align-items-center justify-content-between">
+    
         <!-- Logo -->
-        <a
-          href="{{ url_for('index_html') }}"
-          class="logo d-flex align-items-center me-auto me-xl-0"
-          aria-label="Hotel Villa Grace - Inicio"
-        >
-          <svg
-            viewBox="0 0 32 32"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-          >
+        <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0" aria-label="Hotel Villa Grace - Inicio">
+          <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <g>
-              <path
-                d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z"
-                style="fill: #f2ebe2"
-              ></path>
-              <path
-                d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897Z"
-                style="fill: #917a5a"
-              ></path>
+              <path d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z" style="fill:#f2ebe2"></path>
+              <path d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897Z" style="fill:#917a5a"></path>
             </g>
           </svg>
           <h1 class="sitename">Hotel Villa Grace</h1>
         </a>
-
+    
         <!-- NAV -->
         <nav id="navmenu" class="navmenu">
           <ul>
-            <!-- Principales -->
-            <li>
-              <a href="{{ url_for('index_html') }}" class="active">Inicio</a>
-            </li>
-            <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
+            <!-- Público principal (prioridad alta) -->
+            <li><a href="{{ url_for('index_html') }}" class="active">Inicio</a></li>
             <li><a href="{{ url_for('rooms_html') }}">Habitaciones</a></li>
             <li><a href="amenities.html">Servicios</a></li>
             <li><a href="location.html">Ubicación</a></li>
-
-            <!-- Dropdown Páginas -->
+    
+            <!-- Contenido secundario agrupado -->
             <li class="dropdown">
-              <a href="#">
-                <span>Páginas</span>
-                <i
-                  class="bi bi-chevron-down toggle-dropdown"
-                  aria-hidden="true"
-                ></i>
-              </a>
+              <a href="#"><span>Más</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
               <ul>
-                <!-- Sitio público -->
+                <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
                 <li><a href="room-details.html">Detalle de habitación</a></li>
                 <li><a href="restaurant.html">Restaurante</a></li>
                 <li><a href="offers.html">Ofertas</a></li>
                 <li><a href="events.html">Eventos</a></li>
                 <li><a href="gallery.html">Galería</a></li>
-
-                <!-- Reservas (front) -->
-                <li>
-                  <a href="{{ url_for('booking_search') }}"
-                    >Reservas – Buscar</a
-                  >
-                </li>
-
-                <!-- Portal huésped -->
-                {% if session.get('user_role') == 'Cliente' %}
-                <li>
-                  <a href="{{ url_for('portal_dashboard_html') }}"
-                    >Portal del huésped</a
-                  >
-                </li>
-                {% endif %}
-
-                <!-- Operaciones -->
-                {% if session.get('user_role') in
-                ['Administrador','Recepcionista'] %}
-                <li>
-                  <a href="{{ url_for('ops_dashboard_html') }}">Operaciones</a>
-                </li>
-                {% endif %}
-
-                <!-- Inventario (Admin + Recepcionista)
-                {% if session.get('user_role') in
-                ['Administrador','Recepcionista'] %}
-                <li>
-                  <a href="{{ url_for('inv.insumos_list') }}"
-                    >Inventario – Insumos</a
-                  >
-                </li>
-                <li>
-                  <a href="{{ url_for('inv.insumo_new') }}"
-                    >Inventario – Nuevo insumo</a
-                  >
-                </li>
-                {% endif %}
-                 -->
-
-                <!-- ============ SOLO ADMIN ============ -->
-                {% if session.get('user_role') == 'Administrador' %}
-                  <!-- Admin general -->
-                  <li>
-                    <a href="{{ url_for('admin_dashboard_html') }}">Administración</a>
-                  </li>
-
-                  <!-- Finanzas -->
-                  <li class="dropdown">
-                    <a href="#">
-                      <span>Finanzas</span>
-                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                    </a>
-                    <ul>
-                      <li>
-                        <a href="{{ url_for('fin_reports.ui_reports') }}">Reportes financieros</a>
-                      </li>
-                      <li>
-                        <a href="{{ url_for('fin_invoices_html') }}">Facturas (fin-invoices)</a>
-                      </li>
-                      <li>
-                        <a href="{{ url_for('fin_cash.ui') }}">Caja / arqueos</a>
-                      </li>
-                      <li>
-                        <a href="{{ url_for('fin_periods.ui_periods') }}">Periodos / cierres</a>
-                      </li>
-                    </ul>
-                  </li>
-
-                  <!-- Recursos Humanos -->
-                  <li class="dropdown">
-                    <a href="#">
-                      <span>Recursos humanos</span>
-                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                    </a>
-                    <ul>
-                      <li><a href="{{ url_for('hrm.empleados_ui') }}">Empleados</a></li>
-                      <li><a href="{{ url_for('hrm.mis_horas_ui') }}">Mis horas</a></li>
-                      <li><a href="{{ url_for('hrm.validar_horas_ui') }}">Validar horas</a></li>
-                    </ul>
-                  </li>
-
-                  <!-- Inventario (Admin) -->
-                  <li class="dropdown">
-                    <a href="#">
-                      <span>Inventario (Admin)</span>
-                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                    </a>
-                    <ul>
-                      <li>
-                        <a href="{{ url_for('inv.categorias_list') }}">
-                          <i class="bi bi-tags me-1" aria-hidden="true"></i>
-                          Categorías de insumos
-                        </a>
-                      </li>
-                      <li>
-                        <a href="{{ url_for('inv.categorias_new') }}">
-                          <i class="bi bi-plus-square me-1" aria-hidden="true"></i>
-                          Nueva categoría
-                        </a>
-                      </li>
-                    </ul>
-                  </li>
-                {% endif %}
-                <!-- =================================== -->
-
-
-                <!-- Alertas Inventario (Admin + Recepcionista) -->
-                {% if session.get('user_id') and session.get('user_role') in
-                ['Administrador','Recepcionista'] %}
-                <li class="dropdown">
-                  <a href="#" aria-label="Alertas de inventario">
-                    <i class="bi bi-bell me-1" aria-hidden="true"></i>
-                    <span>Alertas</span>
-                    <span
-                      id="inv-alert-badge"
-                      class="badge bg-danger ms-1 d-none"
-                      >0</span
-                    >
-                    <i
-                      class="bi bi-chevron-down toggle-dropdown"
-                      aria-hidden="true"
-                    ></i>
-                  </a>
-                  <ul style="min-width: 320px">
-                    <li class="px-3 py-2">
-                      <div id="inv-alert-list" class="small text-muted">
-                        Cargando alertas...
-                      </div>
-                      <div class="mt-2">
-                        <a
-                          class="btn btn-sm btn-outline-primary w-100"
-                          href="{{ url_for('inv.insumos_list') }}"
-                        >
-                          Ver inventario
-                        </a>
-                      </div>
-                    </li>
-                  </ul>
-                </li>
-                {% endif %}
-
-                <!-- Legales -->
+                <li><a href="{{ url_for('booking_search') }}">Reservas – Buscar</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a href="{{ url_for('contact_html') }}">Contacto</a></li>
                 <li><a href="terms.html">Términos</a></li>
                 <li><a href="privacy.html">Privacidad</a></li>
-                <li><a href="404.html">404</a></li>
-                <li><a href="starter-page.html">Página base</a></li>
               </ul>
             </li>
-
-            <li><a href="{{ url_for('contact_html') }}">Contacto</a></li>
-
+    
+            <!-- Atención (SAC) -->
+            <li class="dropdown">
+              <a href="#"><span>Atención</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+              <ul>
+                <li><a href="{{ url_for('sac.faq_html') }}">FAQ y horarios</a></li>
+                {% if session.get('user_role') == 'Cliente' %}
+                  <li><a href="{{ url_for('sac.preferencias_html') }}">Preferencias de notificación</a></li>
+                  <li><a href="{{ url_for('sac.solicitud_nueva_html') }}">Solicitudes especiales</a></li>
+                {% endif %}
+                {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a href="{{ url_for('sac.panel_solicitudes') }}">Panel de solicitudes</a></li>
+                  <li><a href="{{ url_for('sac.incidentes_html') }}">Incidentes / comentarios</a></li>
+                  <li><a href="{{ url_for('sac.conversaciones_html') }}">Historial de conversaciones</a></li>
+                {% endif %}
+                {% if session.get('user_role') == 'Administrador' %}
+                  <li><a href="{{ url_for('sac.indicadores_html') }}">Indicadores</a></li>
+                {% endif %}
+              </ul>
+            </li>
+    
+            <!-- Gestión (solo staff) -->
+            {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
+            <li class="dropdown">
+              <a href="#"><span>Gestión</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+              <ul>
+                <li><a href="{{ url_for('ops_dashboard_html') }}">Panel de Operaciones</a></li>
+    
+                <li class="dropdown">
+                  <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                  <ul>
+                    <li><a href="{{ url_for('fin_reports.ui_reports') }}">Reportes</a></li>
+                    <li><a href="{{ url_for('fin_invoices_html') }}">Facturas</a></li>
+                    <li><a href="{{ url_for('fin_cash.ui') }}">Caja / arqueos</a></li>
+                    <li><a href="{{ url_for('fin_periods.ui_periods') }}">Periodos / cierres</a></li>
+                  </ul>
+                </li>
+    
+                <li class="dropdown">
+                  <a href="#"><span>RR. HH.</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                  <ul>
+                    <li><a href="{{ url_for('hrm.empleados_ui') }}">Empleados</a></li>
+                    <li><a href="{{ url_for('hrm.mis_horas_ui') }}">Mis horas</a></li>
+                    <li><a href="{{ url_for('hrm.validar_horas_ui') }}">Validar horas</a></li>
+                  </ul>
+                </li>
+    
+                <li class="dropdown">
+                  <a href="#"><span>Inventario</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                  <ul>
+                    <li><a href="{{ url_for('inv.insumos_list') }}">Insumos</a></li>
+                    <li><a href="{{ url_for('inv.insumo_new') }}">Nuevo insumo</a></li>
+                    <li><a href="{{ url_for('inv.categorias_list') }}">Categorías</a></li>
+                    <li><a href="{{ url_for('inv.categorias_new') }}">Nueva categoría</a></li>
+                  </ul>
+                </li>
+    
+                {% if session.get('user_role') == 'Administrador' %}
+                  <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+                {% endif %}
+              </ul>
+            </li>
+            {% endif %}
+    
             <!-- Idioma -->
             <li class="dropdown">
-              <a href="#es" aria-label="Cambiar idioma">
-                <svg
-                  class="icon"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    clip-rule="evenodd"
-                    d="M4 0H6V2H10V4H8.86807C8.57073 5.66996 7.78574 7.17117 6.6656 8.35112C7.46567 8.73941 8.35737 8.96842 9.29948 8.99697L10.2735 6H12.7265L15.9765 16H13.8735L13.2235 14H9.77647L9.12647 16H7.0235L8.66176 10.9592C7.32639 10.8285 6.08165 10.3888 4.99999 9.71246C3.69496 10.5284 2.15255 11 0.5 11H0V9H0.5C1.5161 9 2.47775 8.76685 3.33437 8.35112C2.68381 7.66582 2.14629 6.87215 1.75171 6H4.02179C4.30023 6.43491 4.62904 6.83446 4.99999 7.19044C5.88743 6.33881 6.53369 5.23777 6.82607 4H0V2H4V0ZM12.5735 12L11.5 8.69688L10.4265 12H12.5735Z"
-                    fill="currentColor"
-                  ></path>
-                </svg>
-                <span>Español</span>
-                <i
-                  class="bi bi-chevron-down toggle-dropdown"
-                  aria-hidden="true"
-                ></i>
-              </a>
+              <a href="#" aria-label="Cambiar idioma"><span>Español</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
               <ul>
                 <li><a href="#en">English</a></li>
                 <li><a href="#fr">Français</a></li>
               </ul>
             </li>
-
-            <!-- Perfil / Cuenta -->
+    
+            <!-- Cuenta -->
             {% if session.get('user_id') %}
-            <li class="dropdown">
-              <a href="{{ url_for('portal_perfil_html') }}" aria-label="Perfil">
-                <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-                <span>{{ session.get('user_name', 'Perfil') }}</span>
-                <i
-                  class="bi bi-chevron-down toggle-dropdown"
-                  aria-hidden="true"
-                ></i>
-              </a>
-              <ul>
-                <li>
-                  <a href="{{ url_for('portal_dashboard_html') }}">Portal</a>
-                </li>
-                <li>
-                  <a href="{{ url_for('portal_reservas_html') }}"
-                    >Mis reservas</a
-                  >
-                </li>
-                <li>
-                  <a href="{{ url_for('portal_perfil_html') }}">Perfil</a>
-                </li>
-                <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
-              </ul>
-            </li>
+              <li class="dropdown">
+                <a href="{{ url_for('portal_perfil_html') }}" aria-label="Perfil">
+                  <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+                  <span>{{ session.get('user_name', 'Mi cuenta') }}</span>
+                  <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
+                </a>
+                <ul>
+                  <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
+                  <li><a href="{{ url_for('portal_reservas_html') }}">Mis reservas</a></li>
+                  <li><a href="{{ url_for('portal_perfil_html') }}">Perfil</a></li>
+                  <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
+                </ul>
+              </li>
             {% else %}
-            <li class="dropdown">
-              <a href="#" aria-label="Cuenta">
-                <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
-                <span>Cuenta</span>
-                <i
-                  class="bi bi-chevron-down toggle-dropdown"
-                  aria-hidden="true"
-                ></i>
-              </a>
-              <ul>
-                <li>
-                  <a href="{{ url_for('login_html') }}">Iniciar sesión</a>
-                </li>
-                <li><a href="{{ url_for('register') }}">Crear cuenta</a></li>
-                <li>
-                  <a href="{{ url_for('forgot_password') }}"
-                    >¿Olvidaste tu contraseña?</a
-                  >
-                </li>
-              </ul>
-            </li>
+              <li class="dropdown">
+                <a href="#" aria-label="Cuenta">
+                  <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+                  <span>Cuenta</span>
+                  <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
+                </a>
+                <ul>
+                  <li><a href="{{ url_for('login_html') }}">Iniciar sesión</a></li>
+                  <li><a href="{{ url_for('register') }}">Crear cuenta</a></li>
+                  <li><a href="{{ url_for('forgot_password') }}">¿Olvidaste tu contraseña?</a></li>
+                </ul>
+              </li>
             {% endif %}
           </ul>
-
-          <i
-            class="mobile-nav-toggle d-xl-none bi bi-list"
-            aria-label="Abrir menú"
-          ></i>
+    
+          <i class="mobile-nav-toggle d-xl-none bi bi-list" aria-label="Abrir menú"></i>
         </nav>
-
-        <!-- Botón Reservar -->
-        <a
-          class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4"
-          href="{{ url_for('booking_search') }}"
-        >
-          Reservar
-        </a>
+    
+        <!-- CTA -->
+        <a class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4" href="{{ url_for('booking_search') }}">Reservar</a>
       </div>
-
-      <!-- JS de alertas de inventario (si tienes el endpoint inv.alertas_stock) -->
-      <script>
-        (function () {
-          const badge = document.getElementById("inv-alert-badge");
-          const list = document.getElementById("inv-alert-list");
-          if (!badge || !list) return;
-
-          async function refreshAlerts() {
-            try {
-              const res = await fetch('{{ url_for("inv.alertas_stock") }}');
-              if (!res.ok) throw new Error("HTTP " + res.status);
-              const data = await res.json();
-              const n = data.count || 0;
-
-              if (n > 0) {
-                badge.textContent = n;
-                badge.classList.remove("d-none");
-              } else {
-                badge.classList.add("d-none");
-              }
-
-              if (n === 0) {
-                list.innerHTML =
-                  '<span class="text-success">Sin alertas de stock.</span>';
-              } else {
-                list.innerHTML = (data.items || [])
-                  .map(
-                    (x) => `
-              <div class="d-flex align-items-center py-1">
-                <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
-                <div class="flex-grow-1">
-                  <div><strong>${
-                    x.Nombre
-                  }</strong> <small class="text-muted">(${
-                      x.Unidad || ""
-                    })</small></div>
-                  <div class="small">Actual: ${
-                    x.Stock_Actual
-                  } &nbsp; • &nbsp; Mín.: ${x.Stock_Minimo}</div>
-                </div>
-              </div>`
-                  )
-                  .join("");
-              }
-            } catch (err) {
-              list.innerHTML =
-                '<span class="text-danger">No se pudieron obtener las alertas.</span>';
-            }
-          }
-
-          refreshAlerts();
-          setInterval(refreshAlerts, 60000);
-        })();
-      </script>
     </header>
+    
+
+    <style>
+      /* Compactar separación de ítems y evitar saltos de línea */
+      .header .navmenu > ul > li { margin: 0 8px; }
+      .header .navmenu a { white-space: nowrap; }
+    
+      /* Anchos de dropdowns: cómodos para leer, sin ocupar demasiado */
+      .header .navmenu .dropdown > ul { width: 260px; }
+      .header .navmenu .dropdown .dropdown > ul { left: 100%; top: 0; width: 240px; }
+    
+      /* Botón Reservar más discreto pero visible */
+      .header .btn-getstarted { padding: 8px 16px; border-radius: 999px; }
+    
+      /* Opcional: reduce el tamaño del título para dar aire al header */
+      .header .sitename { font-size: 1.4rem; line-height: 1; margin-left: .5rem; }
+      @media (max-width: 1199.98px){
+        .header .navmenu > ul > li { margin: 0 6px; }
+      }
+    </style>
+
+
 
     <main class="main">
       <!-- Hotel Hero Section -->
@@ -2190,5 +2004,8 @@
         setInterval(refreshAlerts, 60000);
       })();
     </script>
+
+    {% include "partials/sac-widget.html" %}
+    <script src="{{ url_for('static', filename='assets/js/sac-widget.js') }}"></script>
   </body>
 </html>

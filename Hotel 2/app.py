@@ -46,6 +46,7 @@ from flask import (
 
 
 
+
 # ---------------------------------------------------------------------------
 # Bootstrap de ruta para imports absolutos (extensions, config, blueprints)
 # ---------------------------------------------------------------------------
@@ -1265,6 +1266,11 @@ def create_app() -> Flask:
     from blueprints.arep import arep_bp
     app.register_blueprint(arep_bp)
     
+    # === SAC (Atención al Cliente y Comunicación) ===
+    from blueprints.sac import sac_bp
+    app.register_blueprint(sac_bp)
+
+    
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:
@@ -2421,56 +2427,120 @@ def create_app() -> Flask:
         return numero
     
     
-    def _notify_reserva_success(reserva_id: int) -> None:
+    # --- Notificación de confirmación de reserva (respeta preferencias SAC) ---
+    def _notify_reserva_success(rid: int) -> None:
         """
-        Orquesta la notificación:
-          - Asegura número único.
-          - Genera/asegura comprobante PDF.
-          - Envía email (con PDF adjunto) y SMS si hay teléfono y provider configurado.
+        Envía confirmación de reserva respetando preferencias (email/sms/ambos).
+        Camino principal: NotificationService.send_reserva_confirmation(rid)
+        Fallback: route_and_queue() con datos mínimos del cliente.
         """
-        r = _get_reserva_by_id(reserva_id)
-        if not r:
+        try:
+            from services.grr.notification_service import NotificationService
+            ns = NotificationService()
+            res = ns.send_reserva_confirmation(int(rid))
+            current_app.logger.info(f"[GRR-01-009] Notificación procesada R={rid} -> {res}")
             return
-    
-        # 1) Asegurar número
-        numero = _ensure_reserva_numero(reserva_id, _normalize_date_like(r.get("Fecha_Entrada")))
-    
-        # 2) Asegurar comprobante PDF
-        pdf_path = COMPROBANTES_DIR / f"{numero}.pdf"
-        if not pdf_path.exists():
-            try:
-                pdf_path = _create_comprobante_pdf(dict(r))
-            except Exception as e:
-                current_app.logger.warning(f"[GRR-01-009] No se pudo generar comprobante: {e}")
-                pdf_path = None
-    
-        # 3) Contacto
-        contacto = _get_reserva_contacto(reserva_id)
-        email_to = contacto.get("email")
-        phone_to = contacto.get("phone")
-    
-        # 4) Email
-        try:
-            _send_reserva_confirmation_email(email_to, dict(r), pdf_path=pdf_path if pdf_path and pdf_path.exists() else None)
+        except AttributeError:
+            # Si la versión no tiene send_reserva_confirmation, caemos al fallback
+            pass
         except Exception as e:
-            current_app.logger.warning(f"[GRR-01-009] Error enviando email: {e}")
+            current_app.logger.warning(f"[GRR-01-009] Camino principal falló R={rid}: {e}")
     
-        # 5) SMS (opcional)
+        # ---------- Fallback seguro (sin h.Nombre) ----------
+        cid = None
+        email_fb = None
+        tel_fb = None
+        hab = None
+        f_in = None
+        f_out = None
+    
+        # Cliente (correo/teléfono)
         try:
-            if phone_to:
-                ci = _normalize_date_like(r.get("Fecha_Entrada")) or ""
-                co = _normalize_date_like(r.get("Fecha_Salida")) or ""
-                sms_text = f"Hotel Villa Grace: Reserva {numero} confirmada. Check-in {ci}, Check-out {co}."
-                _send_sms(phone_to, sms_text)
+            row = db.session.execute(
+                text("""
+                    SELECT 
+                        r.Codigo_Cliente   AS cid,
+                        c.Correo           AS email_fb,
+                        c.Telefono         AS tel_fb
+                    FROM Reserva r
+                    LEFT JOIN Cliente c ON c.Codigo_Cliente = r.Codigo_Cliente
+                    WHERE r.Codigo_Reserva = :rid
+                    LIMIT 1
+                """),
+                {"rid": int(rid)}
+            ).mappings().first()
+            if row:
+                cid = row.get("cid")
+                email_fb = (row.get("email_fb") or None)
+                tel_fb   = (row.get("tel_fb") or None)
         except Exception as e:
-            current_app.logger.info(f"[GRR-01-009] SMS omitido: {e}")
+            current_app.logger.warning(f"[GRR-01-009] Fallback: no se pudo leer Cliente para R={rid}: {e}")
     
-        # 6) Auditoría
+        # Detalles mínimos de reserva (NUNCA h.Nombre)
         try:
-            _audit_log(_current_user_email(), "reserva.confirmacion_enviada",
-                       {"Codigo_Reserva": reserva_id, "Numero": numero})
+            rdet = db.session.execute(
+                text("""
+                    SELECT 
+                        h.Numero_Habitacion AS habitacion,
+                        r.Fecha_Entrada     AS f_in,
+                        r.Fecha_Salida      AS f_out
+                    FROM Reserva r
+                    LEFT JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion
+                    WHERE r.Codigo_Reserva = :rid
+                    LIMIT 1
+                """),
+                {"rid": int(rid)}
+            ).mappings().first()
+            if rdet:
+                hab  = rdet.get("habitacion")
+                f_in = rdet.get("f_in")
+                f_out= rdet.get("f_out")
+        except Exception as e:
+            current_app.logger.warning(f"[GRR-01-009] Fallback: no se pudo leer detalles R={rid}: {e}")
+    
+        # Horarios desde SAC_Config (si existen)
+        checkin_ini  = "12:00"; checkin_fin = "00:00"; checkout = "12:00"
+        try:
+            cfgs = db.session.execute(
+                text("SELECT Clave, Valor FROM SAC_Config WHERE Clave IN ('checkin_inicio','checkin_fin','checkout_limite')")
+            ).mappings().all()
+            kv = {r["Clave"]: (r["Valor"] or "") for r in cfgs}
+            checkin_ini = kv.get("checkin_inicio", checkin_ini)
+            checkin_fin = kv.get("checkin_fin", checkin_fin)
+            checkout    = kv.get("checkout_limite", checkout)
         except Exception:
             pass
+    
+        subject = f"Confirmación de reserva #{rid} – Hotel Villa Grace"
+        body = "\n".join([x for x in [
+            "¡Gracias por reservar en Hotel Villa Grace!",
+            f"Nº de reserva: #{rid}",
+            (f"Habitación: {hab}" if hab else None),
+            (f"Entrada: {f_in}  (check-in {checkin_ini}–{checkin_fin})" if f_in else None),
+            (f"Salida:  {f_out} (check-out hasta {checkout})" if f_out else None),
+            "Si necesitas ayuda, responde a este mensaje."
+        ] if x])
+    
+        try:
+            from services.grr.notification_service import NotificationService
+            ns = NotificationService()
+            res = ns.route_and_queue(
+                codigo_cliente=(int(cid) if cid else None),
+                asunto=subject,
+                cuerpo=body,
+                email_fallback=email_fb,
+                tel_fallback=tel_fb,
+                ref_tipo="Reserva",
+                ref_id=str(rid),
+            )
+            current_app.logger.info(f"[GRR-01-009] Notificación (fallback) R={rid} -> {res}")
+        except Exception as e2:
+            current_app.logger.warning(f"[GRR-01-009] Notificación omitida R={rid}: {e2}")
+
+    
+    
+    
+    
 
 
     

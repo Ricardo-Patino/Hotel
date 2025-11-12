@@ -23,6 +23,9 @@ from extensions import db
 from models_sql import Reserva
 from services.grr.housekeeping_sync import on_checkout_transition
 
+from services.grr.notification_service import NotificationService
+from extensions import db
+
 
 # ========= Fallbacks opcionales (no bloqueantes) =========
 class _AuditServiceFallback:

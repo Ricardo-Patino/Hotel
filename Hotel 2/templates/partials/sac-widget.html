@@ -1,0 +1,180 @@
+<!-- templates/partials/sac-widget.html -->
+<style>
+  :root { --sac-panel-height: min(72vh, 620px); }
+
+  /* --- Botón flotante --- */
+  .sac-floating { position: fixed; right: 16px; bottom: 16px; z-index: 1050; }
+  .sac-fab {
+    width: 56px; height: 56px; border-radius: 28px; border: none;
+    background: #0d6efd; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2);
+    font-size: 20px; display: grid; place-items: center;
+  }
+
+  /* --- Panel principal (altura fija) --- */
+  .sac-panel {
+    position: fixed; right: 16px; bottom: 84px; width: 360px; max-width: calc(100vw - 32px);
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.18);
+    display: flex; flex-direction: column;
+    height: var(--sac-panel-height);                 /* 💡 altura fija del componente */
+    max-height: var(--sac-panel-height);
+  }
+  .sac-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-bottom: 1px solid #e5e7eb; flex: 0 0 auto;
+  }
+
+  /* --- Cuerpo: columna flex. El min-height:0 es CLAVE --- */
+  .sac-panel-body {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 12px; flex: 1 1 auto; min-height: 0;     /* 💡 permite que el hijo con scroll no empuje */
+  }
+
+  /* --- Historial: ÚNICO que scrollea --- */
+  .sac-chatlog {
+    flex: 1 1 0; min-height: 0;                       /* 💡 evita crecimiento infinito */
+    overflow-y: auto; overscroll-behavior: contain;
+    border: 1px solid #eee; border-radius: 10px; padding: 10px; background: #fafafa;
+    scrollbar-gutter: stable both-edges;
+  }
+  .sac-msg { padding: 6px 10px; margin-bottom: 8px; border-radius: 12px; max-width: 88%; }
+  .sac-bot  { background: #f1f1f1; color: #111; }
+  .sac-user { background: #e7f1ff; color: #0b3d91; margin-left: auto; }
+
+  /* --- Chips, input y acciones: fijos (no scrollean) --- */
+  .sac-chipbar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+    overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: 4px 2px 0 2px; }
+  .sac-chipbar::-webkit-scrollbar { height: 8px; }
+  .sac-chip { border: 1px solid #d0d7de; padding: 6px 10px; border-radius: 999px;
+    background: #fff; cursor: pointer; user-select: none; font-size: .92rem; flex: 0 0 auto; }
+  .sac-chip:hover { background: #f6f8fa; }
+
+  .sac-inputrow { flex: 0 0 auto; }
+  .sac-actions  { flex: 0 0 auto; display: grid; gap: 8px; }
+
+  /* Scrollbar visual del historial */
+  .sac-chatlog::-webkit-scrollbar { width: 10px; }
+  .sac-chatlog::-webkit-scrollbar-thumb { background: #c9ced6; border-radius: 10px; }
+  .sac-chatlog::-webkit-scrollbar-track { background: #f1f3f5; border-radius: 10px; }
+
+  @media (max-width: 480px) {
+    .sac-panel { right: 8px; bottom: 76px; width: calc(100vw - 16px); height: min(76vh, 640px); }
+  }
+</style>
+
+<div class="sac-floating">
+  <button id="sac-fab" class="sac-fab" aria-label="Asistente">💬</button>
+
+  <div id="sac-panel" class="sac-panel d-none" role="dialog" aria-modal="true" aria-label="Asistente Villa Grace">
+    <div class="sac-panel-header">
+      <strong>Asistente Villa Grace</strong>
+      <button id="sac-close" class="btn btn-sm btn-light" aria-label="Cerrar">✕</button>
+    </div>
+
+    <div class="sac-panel-body">
+      <!-- HISTORIAL (scrollea) -->
+      <div id="sac-log" class="sac-chatlog" aria-live="polite">
+        <div class="sac-msg sac-bot">¡Hola! ¿En qué puedo ayudarle hoy?</div>
+      </div>
+
+      <!-- SUGERENCIAS (fijas) -->
+      <div id="sac-chips" class="sac-chipbar">
+        <button class="sac-chip" data-q="Horarios de check-in/out">Horarios de check-in/out</button>
+        <button class="sac-chip" data-q="Servicios del hotel">Servicios del hotel</button>
+      </div>
+
+      <!-- INPUT (fijo) -->
+      <div class="sac-inputrow">
+        <div class="input-group">
+          <input id="sac-input" class="form-control" placeholder="Escriba su pregunta…" />
+          <button id="sac-send" class="btn btn-primary">Enviar</button>
+        </div>
+      </div>
+
+      <!-- ACCIONES (fijas) -->
+      <div class="sac-actions">
+        <button id="sac-escalar" class="btn btn-outline-danger w-100">Hablar con un agente</button>
+        <a class="btn btn-outline-secondary w-100" href="/sac/faq" target="_blank" rel="noopener">FAQ y horarios</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const panel   = document.getElementById('sac-panel');
+  const fab     = document.getElementById('sac-fab');
+  const closeBt = document.getElementById('sac-close');
+  const log     = document.getElementById('sac-log');
+  const chips   = document.getElementById('sac-chips');
+  const input   = document.getElementById('sac-input');
+  const sendBt  = document.getElementById('sac-send');
+  const escalar = document.getElementById('sac-escalar');
+
+  // SID estable para vincular conversación
+  let sid = localStorage.getItem('sac_sid');
+  if(!sid){ sid = 'sid-' + Math.random().toString(36).slice(2) + Date.now(); localStorage.setItem('sac_sid', sid); }
+
+  function openPanel(){
+    panel.classList.remove('d-none');
+    fab.style.display = 'none';         // 💡 ocultar FAB para que no tape botones
+    input.focus();
+  }
+  function closePanel(){
+    panel.classList.add('d-none');
+    fab.style.display = 'grid';
+  }
+
+  function addMsg(role, text){
+    const div = document.createElement('div');
+    div.className = 'sac-msg ' + (role === 'user' ? 'sac-user' : 'sac-bot');
+    div.textContent = text || '';
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;   // siempre al final
+  }
+
+  async function ask(q){
+    if(!q || !q.trim()) return;
+    addMsg('user', q.trim());
+    input.value = '';
+    try{
+      const r  = await fetch('/sac/chat/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-Id': sid },
+        body: JSON.stringify({ q })
+      });
+      const js = await r.json();
+      addMsg('bot', js && js.a ? js.a : 'Gracias, lo estamos procesando.');
+      if(js && Array.isArray(js.suggestions)){
+        chips.innerHTML = js.suggestions.map(s => `<button class="sac-chip" data-q="${s}">${s}</button>`).join('');
+      }
+    }catch(e){
+      addMsg('bot','No fue posible responder en este momento.');
+    }
+  }
+
+  async function escalarHumano(){
+    try{
+      await fetch('/sac/chat/escalar', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ session_id: sid, texto: 'Cliente solicita atención humana desde el widget.' })
+      });
+      addMsg('bot','Gracias. Un agente humano se pondrá en contacto pronto.');
+    }catch(e){
+      addMsg('bot','No se pudo escalar la solicitud en este momento.');
+    }
+  }
+
+  // Eventos
+  fab.addEventListener('click', openPanel);
+  closeBt.addEventListener('click', closePanel);
+  sendBt.addEventListener('click', () => ask(input.value));
+  input.addEventListener('keydown', (ev) => { if(ev.key === 'Enter') ask(input.value); });
+  escalar.addEventListener('click', escalarHumano);
+  chips.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.sac-chip'); if(!btn) return;
+    ask(btn.getAttribute('data-q') || btn.textContent);
+  });
+})();
+</script>

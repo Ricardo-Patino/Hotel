@@ -261,7 +261,7 @@ CREATE TABLE Waitlist (
 CREATE TABLE Coupon (
   Codigo        VARCHAR(40) PRIMARY KEY,
   Tipo          ENUM('porcentaje','monto','corporativo') NOT NULL,
-  Valor         DECIMAL(12,2) NOT NULL,    -- % o monto (según Tipo)
+  Valor         DECIMAL(12,2) NOT NULL,
   Valido_Desde  DATE NULL,
   Valido_Hasta  DATE NULL,
   Max_Usos      INT NULL,
@@ -310,7 +310,7 @@ CREATE TABLE InvInsumo (
   Id               INT NOT NULL AUTO_INCREMENT,
   Categoria_Id     INT NOT NULL,
   Nombre           VARCHAR(120) NOT NULL,
-  Unidad           VARCHAR(20)  NOT NULL, -- 'un', 'kg', 'g', 'lt', 'ml', 'paq', 'caja', etc.
+  Unidad           VARCHAR(20)  NOT NULL,
   Stock_Actual     DECIMAL(12,3) NOT NULL DEFAULT 0,
   Stock_Minimo     DECIMAL(12,3) NOT NULL DEFAULT 0,
   Activo           TINYINT(1)   NOT NULL DEFAULT 1,
@@ -333,7 +333,7 @@ CREATE TABLE ReservaEstancia (
   Codigo_Reserva     INT NOT NULL,
   Habitacion_Id      INT NOT NULL,
   Fecha_Desde        DATE NOT NULL,
-  Fecha_Hasta        DATE NOT NULL,  -- (Desde, Hasta)
+  Fecha_Hasta        DATE NOT NULL,
   Origen             ENUM('Automatico','Manual','Reasignacion','Union','Division') NOT NULL DEFAULT 'Automatico',
   Decision_Id        INT NULL,
   Score_Total        DECIMAL(9,4) NULL,
@@ -737,7 +737,7 @@ LEFT JOIN (
 /* ------------------------------------------------------------------------- */
 CREATE TABLE IF NOT EXISTS fin_period_lock (
   id_lock        INT AUTO_INCREMENT PRIMARY KEY,
-  period_key     CHAR(7) NOT NULL,              -- 'YYYY-MM'
+  period_key     CHAR(7) NOT NULL,
   period_start   DATE     NOT NULL,
   period_end     DATE     NOT NULL,
   status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
@@ -975,7 +975,7 @@ CREATE TABLE FuncionarioHistorial (
   Detalle             VARCHAR(500) NULL,
   Valor_Anterior      VARCHAR(200) NULL,
   Valor_Nuevo         VARCHAR(200) NULL,
-  Registrado_Por      INT NULL,              -- Codigo_Usuario que hizo el cambio
+  Registrado_Por      INT NULL,
   CONSTRAINT PK_FuncionarioHistorial PRIMARY KEY (Id_Historial),
   CONSTRAINT FK_FuncHist_Func
     FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
@@ -1053,7 +1053,7 @@ CREATE TABLE EvtEvento (
   Organizador         VARCHAR(120) NULL,
   Notas               TEXT NULL,
   Salon_Id            INT NULL,
-  ReservaEstancia_Id  INT NULL,   -- vínculo con estancia del huésped
+  ReservaEstancia_Id  INT NULL,
   Plantilla_Id        INT NULL,
   Fecha_Creacion      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1160,7 +1160,7 @@ CREATE TABLE EvtCosto (
 CREATE TABLE EvtEncuesta (
   Id         INT NOT NULL AUTO_INCREMENT,
   Evento_Id  INT NOT NULL,
-  NPS        INT NULL,              -- 0..10
+  NPS        INT NULL,
   Comentario TEXT NULL,
   Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT PK_EvtEncuesta PRIMARY KEY (Id),
@@ -1244,11 +1244,11 @@ CREATE TABLE IF NOT EXISTS `Marcacion` (
    ----------------------------------------------------------- */
 CREATE TABLE ArepViewConfig (
   Codigo_ArepConfig INT NOT NULL AUTO_INCREMENT,
-  Codigo_Usuario    INT NULL,                    -- FK a Usuario.Codigo_Usuario (si existe)
-  Nombre_Reporte    VARCHAR(120) NOT NULL,       -- p.ej. 'Dashboard General' / 'Ranking'
-  Encabezado_JSON   JSON NULL,                   -- {logo, titulo, sub, ...}
-  Columnas_JSON     JSON NULL,                   -- columnas visibles/orden
-  Filtros_JSON      JSON NULL,                   -- filtros persistidos
+  Codigo_Usuario    INT NULL,
+  Nombre_Reporte    VARCHAR(120) NOT NULL,
+  Encabezado_JSON   JSON NULL,
+  Columnas_JSON     JSON NULL,
+  Filtros_JSON      JSON NULL,
   Fecha_Creacion    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Actualiza   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_ArepViewConfig PRIMARY KEY (Codigo_ArepConfig),
@@ -1260,13 +1260,13 @@ CREATE TABLE ArepViewConfig (
    ----------------------------------------------------------- */
 CREATE TABLE ArepAtencion (
   Codigo_ArepAtencion  INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario   INT NULL,                 -- FK a Funcionario.Codigo_Funcionario (si existe)
+  Codigo_Funcionario   INT NULL,
   Area                 ENUM('RECEPCION','MANTENIMIENTO','COCINA','CONCIERGE','OTRA') NOT NULL DEFAULT 'RECEPCION',
   Inicio_Atencion      DATETIME NOT NULL,
   Fin_Atencion         DATETIME NOT NULL,
   Duracion_Seg         INT AS (TIMESTAMPDIFF(SECOND, Inicio_Atencion, Fin_Atencion)) STORED,
-  Origen               VARCHAR(50) NULL,         -- p.ej. 'Reserva','Ticket','Evento'
-  Ref_Id               VARCHAR(50) NULL,         -- id de referencia a la entidad de origen
+  Origen               VARCHAR(50) NULL,
+  Ref_Id               VARCHAR(50) NULL,
   Fecha_Creacion       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT PK_ArepAtencion PRIMARY KEY (Codigo_ArepAtencion),
   KEY IX_ArepAtencion_Func (Codigo_Funcionario),
@@ -1279,8 +1279,8 @@ CREATE TABLE ArepAtencion (
    ----------------------------------------------------------- */
 CREATE TABLE ArepSatisfaccion (
   Codigo_ArepSatisfaccion INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario      INT NULL,              -- FK a Funcionario.Codigo_Funcionario (si existe)
-  Puntaje                 TINYINT NOT NULL,      -- 0..10 (o 1..5; usamos 0..10 estilo NPS)
+  Codigo_Funcionario      INT NULL,
+  Puntaje                 TINYINT NOT NULL,
   Comentario              TEXT NULL,
   Fuente                  ENUM('POST_ESTANCIA','POS_EVENTO','OTRA') NOT NULL DEFAULT 'POST_ESTANCIA',
   Fecha_Registro          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1304,6 +1304,151 @@ CREATE TABLE ArepExportLog (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+
+
+-- ====================== SAC — Tablas básicas ======================
+CREATE TABLE IF NOT EXISTS SAC_Config (
+  Clave VARCHAR(60) PRIMARY KEY,
+  Valor VARCHAR(240) NOT NULL,
+  Actualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_NotifPref (
+  Codigo_Cliente INT PRIMARY KEY,
+  Canal ENUM('email','sms','ambos') NOT NULL DEFAULT 'email',
+  Email VARCHAR(120), Telefono VARCHAR(25),
+  Verif_Email TINYINT(1) NOT NULL DEFAULT 0,
+  Verif_SMS   TINYINT(1) NOT NULL DEFAULT 0,
+  Actualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_Outbox (
+  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Canal ENUM('email','sms') NOT NULL,
+  Para  VARCHAR(180) NOT NULL,
+  Asunto VARCHAR(160), Cuerpo TEXT,
+  Estado ENUM('PENDIENTE','ENVIADO','ERROR') NOT NULL DEFAULT 'PENDIENTE',
+  ErrorMsg VARCHAR(240),
+  Programado_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Enviado_At DATETIME NULL,
+  Ref_Entidad VARCHAR(40), Ref_Id VARCHAR(40),
+  Meta_JSON JSON NULL,
+  KEY IX_Outbox_Estado (Estado, Programado_At)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_Solicitud (
+  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Codigo_Reserva INT NOT NULL,
+  Codigo_Cliente INT NULL,
+  Clave VARCHAR(60) NOT NULL,
+  Valor VARCHAR(240) NULL,
+  Estado ENUM('NUEVA','VISTA','ATENDIDA','RECHAZADA') NOT NULL DEFAULT 'NUEVA',
+  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_SAC_Solicitud_Reserva (Codigo_Reserva),
+  KEY IX_SAC_Solicitud_Estado (Estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_Conversation (
+  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Codigo_Cliente INT NULL,
+  Session_Id VARCHAR(64) NULL,
+  Abierta TINYINT(1) NOT NULL DEFAULT 1,
+  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY IX_SAC_Conv_Session (Session_Id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_ConversationMsg (
+  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Conv_Id INT NOT NULL,
+  Rol ENUM('user','bot','agente') NOT NULL,
+  Texto TEXT NOT NULL,
+  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_SAC_ConvMsg_Conv (Conv_Id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_Incident (
+  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Codigo_Reserva INT NULL,
+  Codigo_Cliente INT NULL,
+  Tipo ENUM('INCIDENTE','COMENTARIO') NOT NULL DEFAULT 'INCIDENTE',
+  Severidad ENUM('BAJA','MEDIA','ALTA','CRITICA') NOT NULL DEFAULT 'MEDIA',
+  Titulo VARCHAR(160) NOT NULL,
+  Detalle TEXT NULL,
+  Estado ENUM('ABIERTA','EN_PROCESO','CERRADA') NOT NULL DEFAULT 'ABIERTA',
+  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_SAC_Incident_Reserva (Codigo_Reserva), KEY IX_SAC_Incident_Estado (Estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_Feedback (
+  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Codigo_Reserva INT NOT NULL,
+  NPS TINYINT NULL,
+  Comentario TEXT NULL,
+  Registrada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_SAC_Feedback_Reserva (Codigo_Reserva)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO SAC_Config (Clave, Valor) VALUES
+('checkin_inicio','12:00'),
+('checkin_fin','00:00'),
+('checkout_limite','12:00'),
+('contacto_recepcion_email','recepcion@hotel.test')
+ON DUPLICATE KEY UPDATE Valor=VALUES(Valor);
+
+-- (Opcional) disparador: al crear reserva, agendar recordatorios 48h/24h por canal preferido (si existe)
+DELIMITER $$
+CREATE TRIGGER trg_sac_reserva_after_ins
+AFTER INSERT ON Reserva FOR EACH ROW
+BEGIN
+  DECLARE cli_email VARCHAR(120);
+  DECLARE cli_tel   VARCHAR(25);
+  DECLARE canal     VARCHAR(10);
+
+  SELECT c.Correo, c.Telefono INTO cli_email, cli_tel
+  FROM Cliente c WHERE c.Codigo_Cliente = NEW.Codigo_Cliente LIMIT 1;
+
+  SELECT COALESCE(p.Canal,'email') INTO canal
+  FROM SAC_NotifPref p WHERE p.Codigo_Cliente = NEW.Codigo_Cliente LIMIT 1;
+
+  IF canal IN ('email','ambos') AND cli_email IS NOT NULL THEN
+    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
+    VALUES ('email', cli_email, 'Recordatorio de reserva',
+            CONCAT('Su reserva ', COALESCE(NEW.Numero_Comprobante,''), ' se acerca. ',
+                   'Check-in desde ', (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1), 
+                   '. Check-out hasta ', (SELECT Valor FROM SAC_Config WHERE Clave='checkout_limite' LIMIT 1), '.'),
+            'PENDIENTE', DATE_SUB(NEW.Fecha_Entrada, INTERVAL 48 HOUR),'Reserva', NEW.Codigo_Reserva);
+    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
+    VALUES ('email', cli_email, 'Recordatorio de reserva',
+            CONCAT('Le esperamos mañana. Check-in desde ',
+                   (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1), '.'),
+            'PENDIENTE', DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),'Reserva', NEW.Codigo_Reserva);
+  END IF;
+
+  IF canal IN ('sms','ambos') AND cli_tel IS NOT NULL THEN
+    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
+    VALUES ('sms', cli_tel, NULL,
+            CONCAT('Villa Grace: su reserva ', COALESCE(NEW.Numero_Comprobante,''), 
+                   '. Check-in ', (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1)),
+            'PENDIENTE', DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),'Reserva', NEW.Codigo_Reserva);
+  END IF;
+END$$
+DELIMITER ;
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+/* --------------------------------------------------------------Alters:----------------------------------------------*/
+
+ALTER TABLE SAC_Solicitud
+  MODIFY Codigo_Reserva INT NULL;
+
+-- Alinear estados con el endpoint PUT /sac/solicitudes/<id> (admite EN_PROCESO)
+ALTER TABLE SAC_Solicitud
+  MODIFY Estado ENUM('NUEVA','VISTA','EN_PROCESO','ATENDIDA','RECHAZADA') NOT NULL DEFAULT 'NUEVA';
+
+
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+/* --------------------------------------------------------------Notas:----------------------------------------------*/
 /* ----------------------------------------------------------------------------------------------------------------- */
 /* --------------------------------------------------------------Notas:----------------------------------------------*/
 /* 1) EvtSalon.Nombre, EvtRecurso.Nombre y EvtPlantilla.Nombre deben ser UNIQUE para que ON DUPLICATE funcione.---- */
@@ -1339,12 +1484,12 @@ INSERT INTO Rol (Nombre, Descripcion, Estado) VALUES
  ('Cliente','Rol Cliente','Activo')
 ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion), Estado = VALUES(Estado);
 
--- Funcionarios
+-- Funcionarios  (AJUSTE ÚNICO: se añade un 4.º registro para garantizar Codigo_Funcionario=4)
 INSERT INTO Funcionario (Cedula,Nombre,Apellido,Puesto,Fecha_Nacimiento) VALUES
  ('305410583','Juan','Jiménez','Recepcionista','1998-03-21'),
  ('107720872','María','Jimenez','Administrador','1991-04-11'),
- ('105440693','Ana','Coto','Limpieza','1993-02-22');
-
+ ('105440693','Ana','Coto','Limpieza','1993-02-22'),
+ ('209990001','Carlos','Arce','Seguridad','1985-07-15');
 
 -- Clientes
 INSERT INTO Cliente (Cedula,Nombre,Apellido,Telefono,Correo,Fecha_Nacimiento) VALUES
@@ -1421,7 +1566,7 @@ VALUES
  ('Capacidad suficiente',     20, 1.5, 1, JSON_OBJECT('campo','Capacidad','operador','>=','valor','(pax)')),
  ('Evitar mantenimiento',     30, 3.0, 1, JSON_OBJECT('campo','Estado','operador','neq','valor','Mantenimiento'));
 
--- Reservas demo (asegura IDs de habitaciones 1..4)
+-- Reservas demo
 INSERT INTO Reserva (
   Codigo_Cliente, Codigo_Habitacion, Habitacion_Id, Codigo_Funcionario,
   Fecha_Entrada, Fecha_Salida, Monto_Total, Estado, Canal, Numero_Comprobante,
@@ -1475,7 +1620,7 @@ ON DUPLICATE KEY UPDATE Valor=VALUES(Valor), Valido_Desde=VALUES(Valido_Desde), 
    SEEDS — Analítica y Reportes Administrativos (AREP)
    =========================================================== */
 
--- Preferencia de visualización por defecto (si no existe)
+-- Preferencia de visualización por defecto
 INSERT INTO ArepViewConfig (Codigo_Usuario, Nombre_Reporte, Encabezado_JSON, Columnas_JSON, Filtros_JSON)
 SELECT
   (SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1),
@@ -1492,7 +1637,7 @@ WHERE NOT EXISTS (
     AND Codigo_Usuario=(SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1)
 );
 
--- Muestras de tiempos de atención (si tienes funcionarios creados)
+-- Muestras de tiempos de atención
 INSERT INTO ArepAtencion (Codigo_Funcionario, Area, Inicio_Atencion, Fin_Atencion, Origen, Ref_Id)
 SELECT
   (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='305410583' LIMIT 1),
@@ -1544,7 +1689,7 @@ ON DUPLICATE KEY UPDATE
   Activo    = VALUES(Activo),
   ColorHex  = VALUES(ColorHex);
 
--- Recursos A/V y mobiliario
+-- Recursos
 INSERT INTO EvtRecurso (Nombre, Tipo, InvInsumo_Id, Activo) VALUES
  ('Proyector Epson',      'AV',         NULL, 1),
  ('Consola Audio 8ch',    'AV',         NULL, 1),
@@ -1555,7 +1700,7 @@ ON DUPLICATE KEY UPDATE
   InvInsumo_Id = VALUES(InvInsumo_Id),
   Activo       = VALUES(Activo);
 
--- Plantillas típicas
+-- Plantillas
 INSERT INTO EvtPlantilla (Nombre, Descripcion, Duracion_Min) VALUES
  ('Boda',        'Ceremonia + recepción básica',        240),
  ('Congreso',    'Ponencias, paneles y coffee break',   480),
@@ -1564,7 +1709,7 @@ ON DUPLICATE KEY UPDATE
   Descripcion  = VALUES(Descripcion),
   Duracion_Min = VALUES(Duracion_Min);
 
--- Evento de demostración (solo si no existe en la fecha actual)
+-- Evento demo
 INSERT INTO EvtEvento (Titulo, Estado, Inicio, Fin, TZ, Organizador, Notas, Salon_Id)
 SELECT
   'Demo: Visita de inspección',
@@ -1580,7 +1725,7 @@ WHERE NOT EXISTS (
   WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE()
 );
 
--- Recursos del evento de demostración (se agregan solo si no existen)
+-- Recursos del evento demo
 INSERT INTO EvtEventoRecurso (Evento_Id, Recurso_Id, Cantidad)
 SELECT
   (SELECT Id FROM EvtEvento WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE() LIMIT 1),
@@ -1649,7 +1794,7 @@ INSERT INTO Marcacion (
   Horas_Regulares, Estado, Observaciones
 )
 VALUES (
-  1,  -- Funcionario con Codigo_Funcionario = 1 (Juan)
+  1,
   '2025-11-01',
   '2025-11-01 08:00:00',
   '2025-11-01 17:00:00',
@@ -1665,19 +1810,16 @@ VALUES (
   'Carga de prueba HU-08-003'
 );
 
-
--- Verifica qué quedó grabado
+-- Verifica qué quedó grabado (si usaste otro funcionario, ajusta el WHERE)
 SELECT Id, Codigo_Funcionario, Fecha, Hora_Entrada, Hora_Salida
 FROM Marcacion
 WHERE Codigo_Funcionario = 4
 ORDER BY Fecha DESC, Id DESC;
 
--- Si ves Fecha 2025-10-31, pásala a 2025-11-01 (ajusta Id si aplica)
 UPDATE Marcacion
 SET Fecha = '2025-11-01'
 WHERE Codigo_Funcionario = 4
   AND Fecha = '2025-10-31';
-
 
 SELECT Fecha, Hora_Entrada, Hora_Salida
 FROM Marcacion

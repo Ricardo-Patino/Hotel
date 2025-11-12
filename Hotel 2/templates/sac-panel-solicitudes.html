@@ -1,0 +1,64 @@
+{% extends "sac/_layout.html" %}
+{% block title %}Panel de solicitudes | Hotel Villa Grace{% endblock %}
+{% block page_h1 %}Solicitudes de huéspedes{% endblock %}
+{% block crumb %}SAC · Panel{% endblock %}
+{% block content %}
+<section class="section" data-aos="fade-up">
+  <div class="container">
+    <div class="vg-card p-3 p-md-4">
+      <div class="d-flex gap-2 align-items-center mb-3">
+        <select id="fEstado" class="form-select" style="max-width:240px">
+          <option value="">— Todas —</option>
+          <option value="NUEVA">NUEVA</option>
+          <option value="EN_PROCESO">EN_PROCESO</option>
+          <option value="ATENDIDA">ATENDIDA</option>
+          <option value="RECHAZADA">RECHAZADA</option>
+        </select>
+        <button id="btnReload" class="btn btn-outline-primary">Actualizar</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>Id</th>
+              <th>Cliente</th>
+              <th>Detalle</th>
+              <th>Reserva</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+async function load(){
+  const est = document.getElementById('fEstado').value || '';
+  const url = '/sac/solicitudes' + (est ? ('?estado='+encodeURIComponent(est)) : '');
+  const res = await fetch(url);
+  const j = await res.json();
+  const tbody = document.getElementById('rows'); tbody.innerHTML='';
+  (j.items||[]).forEach(it=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${it.Id}</td>
+      <td>${it.Cliente||'-'}</td>
+      <td>${it.Detalle||'-'}</td>
+      <td>${it.Codigo_Reserva||''}</td>
+      <td>
+        <span class="badge text-bg-${it.Estado==='ATENDIDA'?'success':(it.Estado==='EN_PROCESO'?'warning':'secondary')}">
+          ${it.Estado}
+        </span>
+      </td>
+      <td>${it.Fecha_modificacion||''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+document.getElementById('btnReload').onclick = load;
+document.getElementById('fEstado').onchange = load;
+load();
+</script>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "sac/_layout.html" %}
+{% block title %}Nueva solicitud | Hotel Villa Grace{% endblock %}
+{% block page_h1 %}Nueva solicitud{% endblock %}
+{% block crumb %}SAC · Solicitudes{% endblock %}
+{% block content %}
+<section class="section" data-aos="fade-up">
+  <div class="container">
+    <div class="vg-card p-4 p-md-5">
+      <form id="frm" class="row g-3">
+        <div class="col-12">
+          <label class="form-label">¿Sobre una reserva en específico? (opcional)</label>
+          <select name="Codigo_Reserva" id="Codigo_Reserva" class="form-select">
+            <option value="">— Sin reserva específica —</option>
+            {% for r in reservas %}
+              <option value="{{ r.Codigo_Reserva }}">
+                #{{ r.Codigo_Reserva }} • {{ r.Fecha_Entrada }} → {{ r.Fecha_Salida }} • Hab {{ r.Habitacion }} ({{ r.Estado }})
+              </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Se listan sólo tus reservas.</div>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Tipo</label>
+          <select name="Clave" class="form-select" required>
+            <option value="consulta">Consulta</option>
+            <option value="incidente">Incidente</option>
+            <option value="facturacion">Facturación</option>
+            <option value="otra" selected>Otro</option>
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Detalle</label>
+          <textarea name="Valor" class="form-control" rows="4" placeholder="Cuéntenos su consulta o solicitud…" required></textarea>
+        </div>
+
+        <div class="col-12 d-flex gap-2">
+          <button class="btn btn-primary" type="submit">Enviar</button>
+          <span id="msg" class="small text-muted"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+<script>
+document.getElementById('frm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(e.currentTarget);
+  const res = await fetch('/sac/solicitudes', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(Object.fromEntries(fd.entries()))
+  });
+  const out = await res.json();
+  document.getElementById('msg').textContent = out.ok ? 'Enviado. Gracias.' : ('Error: '+(out.error||''));  
+  if(out.ok){ e.currentTarget.reset(); }
+});
+</script>
+{% endblock %}

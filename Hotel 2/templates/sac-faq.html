@@ -1,0 +1,24 @@
+{% extends "sac/_layout.html" %}
+{% block title %}FAQ | Hotel Villa Grace{% endblock %}
+{% block page_h1 %}Preguntas frecuentes{% endblock %}
+{% block crumb %}SAC · FAQ{% endblock %}
+{% block content %}
+<section class="section" data-aos="fade-up">
+  <div class="container">
+    <div class="vg-card p-4">
+      <h5>Horarios</h5>
+      <ul>
+        <li>Check-in: {{ checkin_ini }}–{{ checkin_fin }}</li>
+        <li>Check-out: hasta {{ checkout }}</li>
+      </ul>
+      <h5 class="mt-3">Servicios</h5>
+      <ul>
+        <li>Restaurante y bar</li>
+        <li>Piscina 8:00–21:00</li>
+        <li>Wi-Fi gratis, parqueo gratuito</li>
+      </ul>
+      <a class="btn btn-outline-primary" href="/sac/solicitudes/nueva">Enviar una solicitud</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
