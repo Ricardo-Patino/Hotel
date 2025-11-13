@@ -7,7 +7,7 @@ from flask import request, jsonify, render_template, session, redirect, url_for,
 from sqlalchemy import func, or_, text
 from extensions import db
 from . import hrm_bp
-from models import HoraExtra
+#from models import HoraExtra
 
 # Modelos principales HRM
 from models import Funcionario, FuncionarioHistorial

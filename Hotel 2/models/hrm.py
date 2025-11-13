@@ -1,4 +1,4 @@
-from . import db
+from extensions import db
 from sqlalchemy import Integer, String, Date, DateTime, Numeric, Boolean, Text
 
 # ------------------------------------------------------------------
