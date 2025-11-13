@@ -1703,38 +1703,122 @@ ON DUPLICATE KEY UPDATE CCSS_Pct=VALUES(CCSS_Pct), IVM_Pct=VALUES(IVM_Pct), BP_P
 
 -- Banco de ejemplo para el funcionario 1 (ajusta si no existe)
 INSERT INTO HRM_BankAccount (Codigo_Funcionario, Banco, IBAN, Predeterminada, Activa)
-SELECT 1, 'BNCR', 'CR05010200000000000001', 1, 1
-WHERE NOT EXISTS (SELECT 1 FROM HRM_BankAccount WHERE Codigo_Funcionario=1);
+SELECT f.Codigo_Funcionario, 'BNCR', 'CR05010200000000000001', 1, 1
+FROM Funcionario f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM HRM_BankAccount ba
+    WHERE ba.Codigo_Funcionario = f.Codigo_Funcionario
+)
+ORDER BY f.Codigo_Funcionario
+LIMIT 1;
 
 -- Deducción voluntaria demo
 INSERT INTO HRM_VoluntaryDed (Codigo_Funcionario, Tipo, Monto_Fijo, Porcentaje, Activa, Observacion)
-SELECT 1, 'PRESTAMO', 15000.00, NULL, 1, 'Préstamo personal'
-WHERE NOT EXISTS (SELECT 1 FROM HRM_VoluntaryDed WHERE Codigo_Funcionario=1 AND Tipo='PRESTAMO');
+SELECT f.Codigo_Funcionario, 'PRESTAMO', 15000.00, NULL, 1, 'Préstamo personal'
+FROM Funcionario f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM HRM_VoluntaryDed vd
+    WHERE vd.Codigo_Funcionario = f.Codigo_Funcionario
+      AND vd.Tipo = 'PRESTAMO'
+)
+ORDER BY f.Codigo_Funcionario
+LIMIT 1;
 
--- Ausencia sin goce demo (2 horas hoy)
+-- Ausencia sin goce demo (2 horas hoy) usando el PRIMER funcionario que exista
 INSERT INTO HRM_Absence (Codigo_Funcionario, Fecha, Horas, Motivo, Registrado_Por)
-SELECT 1, CURDATE(), 2.00, 'Gestión personal', 1
-WHERE NOT EXISTS (SELECT 1 FROM HRM_Absence WHERE Codigo_Funcionario=1 AND Fecha=CURDATE());
+SELECT f.Codigo_Funcionario, CURDATE(), 2.00, 'Gestión personal', 1
+FROM (
+    SELECT Codigo_Funcionario
+    FROM Funcionario
+    ORDER BY Codigo_Funcionario
+    LIMIT 1
+) AS f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM HRM_Absence a
+    WHERE a.Codigo_Funcionario = f.Codigo_Funcionario
+      AND a.Fecha = CURDATE()
+);
 
--- Vacaciones pendiente/aprobada
+-- Vacaciones PENDIENTE usando el SEGUNDO funcionario (si existe)
 INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado)
-SELECT 2, CURDATE()+INTERVAL 7 DAY, CURDATE()+INTERVAL 10 DAY, 3.00, 'PENDIENTE'
-WHERE NOT EXISTS (SELECT 1 FROM HRM_VacationRequest WHERE Codigo_Funcionario=2 AND Estado='PENDIENTE');
+SELECT f.Codigo_Funcionario,
+       CURDATE() + INTERVAL 7 DAY,
+       CURDATE() + INTERVAL 10 DAY,
+       3.00,
+       'PENDIENTE'
+FROM (
+    SELECT Codigo_Funcionario
+    FROM Funcionario
+    ORDER BY Codigo_Funcionario
+    LIMIT 1 OFFSET 1    -- segundo funcionario
+) AS f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM HRM_VacationRequest v
+    WHERE v.Codigo_Funcionario = f.Codigo_Funcionario
+      AND v.Estado = 'PENDIENTE'
+);
 
+-- Vacaciones APROBADA demo usando el TERCER funcionario (si existe)
 INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado, Aprobado_Por, Aprobado_En)
-SELECT 3, CURDATE()-INTERVAL 15 DAY, CURDATE()-INTERVAL 12 DAY, 3.00, 'APROBADA', 1, NOW()
-WHERE NOT EXISTS (SELECT 1 FROM HRM_VacationRequest WHERE Codigo_Funcionario=3 AND Estado='APROBADA');
+SELECT f.Codigo_Funcionario,
+       CURDATE() - INTERVAL 15 DAY,
+       CURDATE() - INTERVAL 12 DAY,
+       3.00,
+       'APROBADA',
+       1,
+       NOW()
+FROM (
+    SELECT Codigo_Funcionario
+    FROM Funcionario
+    ORDER BY Codigo_Funcionario
+    LIMIT 1 OFFSET 2    -- tercer funcionario
+) AS f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM HRM_VacationRequest v
+    WHERE v.Codigo_Funcionario = f.Codigo_Funcionario
+      AND v.Estado = 'APROBADA'
+);
 
--- Amonestación demo
+-- Amonestación demo usando el PRIMER funcionario
 INSERT INTO HRM_Warning (Codigo_Funcionario, Severidad, Motivo)
-SELECT 1, 'LEVE', 'Uso inapropiado del uniforme'
-WHERE NOT EXISTS (SELECT 1 FROM HRM_Warning WHERE Codigo_Funcionario=1);
+SELECT f.Codigo_Funcionario, 'LEVE', 'Uso inapropiado del uniforme'
+FROM (
+    SELECT Codigo_Funcionario
+    FROM Funcionario
+    ORDER BY Codigo_Funcionario
+    LIMIT 1
+) AS f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM HRM_Warning w
+    WHERE w.Codigo_Funcionario = f.Codigo_Funcionario
+);
 
--- Incapacidad demo 50% rebajo en esta quincena
+-- Incapacidad demo 50% rebajo en esta quincena usando el PRIMER funcionario
 INSERT INTO HRM_Incapacity (Codigo_Funcionario, Fuente, Porcentaje_Rebajo, Fecha_Desde, Fecha_Hasta, Observacion)
-SELECT 1, 'CCSS', 50.000, CURDATE()-INTERVAL 3 DAY, CURDATE(), 'Resfrío'
-WHERE NOT EXISTS (SELECT 1 FROM HRM_Incapacity WHERE Codigo_Funcionario=1 AND Fecha_Desde=CURDATE()-INTERVAL 3 DAY);
-
+SELECT f.Codigo_Funcionario,
+       'CCSS',
+       50.000,
+       CURDATE() - INTERVAL 3 DAY,
+       CURDATE(),
+       'Resfrío'
+FROM (
+    SELECT Codigo_Funcionario
+    FROM Funcionario
+    ORDER BY Codigo_Funcionario
+    LIMIT 1
+) AS f
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM HRM_Incapacity i
+    WHERE i.Codigo_Funcionario = f.Codigo_Funcionario
+      AND i.Fecha_Desde = CURDATE() - INTERVAL 3 DAY
+);
 
 -- Habitaciones
 INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado) VALUES
