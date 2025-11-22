@@ -26,7 +26,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime, date
 from flask import session, render_template
 from models_sql import Usuario
-
+from blueprints.fin_kpi import fin_kpi_bp
 
 
 from flask import (
@@ -1221,7 +1221,11 @@ def create_app() -> Flask:
         except Exception:
             pass
 
-    
+    # Blueprints ya existentes:
+    app.register_blueprint(pos_bp)
+
+    # Blueprint de registro de KPIs contables:
+    app.register_blueprint(fin_kpi_bp)
     
     # Blueprint de cierres mensuales
     from blueprints.fin_periods import fin_periods_bp

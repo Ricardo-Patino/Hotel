@@ -1,137 +1,388 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Finanzas – Tablero | Hotel Villa Grace</title>
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"><link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"><link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-</head>
-<body class="inner-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="index.html">Inicio</a></li>
-        <li><a href="rooms.html">Habitaciones</a></li>
-        <li><a href="booking-search.html">Reservar</a></li>
-        <li><a href="contact.html">Contacto</a></li>
-        <li class="dropdown"><a href="#" class="active"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Finanzas – Tablero | Hotel Villa Grace</title>
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
+      rel="apple-touch-icon"
+    />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/css/style.css') }}"
+      rel="stylesheet"
+    />
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Ajusta la URL solo si cambiaste el url_prefix del blueprint
+        const url = "{{ url_for('fin_kpi.kpi_contabilidad_overview') }}";
+
+        fetch(url)
+          .then((resp) => resp.json())
+          .then((data) => {
+            if (!data.ok) {
+              console.error("Error al cargar KPIs contables:", data);
+              return;
+            }
+
+            const fmtCRC = (valor) => {
+              return new Intl.NumberFormat("es-CR", {
+                style: "currency",
+                currency: "CRC",
+                maximumFractionDigits: 0,
+              }).format(valor || 0);
+            };
+
+            const setText = (id, value) => {
+              const el = document.getElementById(id);
+              if (el) el.textContent = value;
+            };
+
+            // ================================
+            // Caja (fin_cash_movement)
+            // ================================
+            setText("kpi-cash-ingresos-hoy", fmtCRC(data.cash.ingresos));
+            setText("kpi-cash-egresos-hoy", fmtCRC(data.cash.egresos));
+            setText("kpi-cash-neto-hoy", fmtCRC(data.cash.neto));
+            setText("kpi-cash-pos-hoy", fmtCRC(data.cash.ingresos_pos));
+            setText("kpi-cash-pos-tx-hoy", data.cash.tx_pos);
+
+            // ================================
+            // Libro mayor (fin_ledger_tx)
+            // ================================
+            setText(
+              "kpi-ledger-total-posted-hoy",
+              fmtCRC(data.ledger.total_posted)
+            );
+            setText("kpi-ledger-tx-count-hoy", data.ledger.tx_count);
+
+            // Si luego quieres graficar ledger_por_cuenta o cash_por_metodo,
+            // puedes usar data.ledger_por_cuenta y data.cash_por_metodo aquí.
+          })
+          .catch((err) => {
+            console.error("Error de red al cargar KPIs contables:", err);
+          });
+      });
+    </script>
+  </head>
+  <body class="inner-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div
+        class="container position-relative d-flex align-items-center justify-content-between"
+      >
+        <a
+          href="index.html"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+          ><h1 class="sitename">Hotel Villa Grace</h1></a
+        >
+        <nav id="navmenu" class="navmenu">
           <ul>
-            <li><a href="fin-dashboard.html" class="active">Tablero</a></li>
-            <li><a href="fin-payments.html">Cobros y folios</a></li>
-            <li><a href="fin-invoices.html">Facturas</a></li>
-            <li><a href="fin-close.html">Cierre de caja</a></li>
+            <li><a href="index.html">Inicio</a></li>
+            <li><a href="rooms.html">Habitaciones</a></li>
+            <li><a href="booking-search.html">Reservar</a></li>
+            <li><a href="contact.html">Contacto</a></li>
+            <li class="dropdown">
+              <a href="#" class="active"
+                ><span>Finanzas</span>
+                <i class="bi bi-chevron-down toggle-dropdown"></i
+              ></a>
+              <ul>
+                <li><a href="fin-dashboard.html" class="active">Tablero</a></li>
+                <li><a href="fin-payments.html">Cobros y folios</a></li>
+                <li><a href="fin-invoices.html">Facturas</a></li>
+                <li><a href="fin-close.html">Cierre de caja</a></li>
+              </ul>
+            </li>
           </ul>
-        </li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="fin-payments.html">Registrar pago</a>
-  </div>
-</header>
-
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Finanzas</h1>
-      <p>Visión general de ingresos, cobros y facturación.</p>
-      <nav class="breadcrumbs"><ol><li><a href="index.html">Inicio</a></li><li class="current">Finanzas</li></ol></nav>
-    </div>
-  </div>
-
-  <section class="section">
-    <div class="container" data-aos="fade-up">
-      <div class="row g-4">
-        <!-- KPIs -->
-        <div class="col-6 col-lg-3">
-          <div class="card shadow-sm border-0 h-100"><div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-              <div><div class="text-muted small">Ingresos hoy</div><div class="fs-4 fw-bold">$ 6,240</div></div>
-              <i class="bi bi-cash-coin text-success fs-3"></i>
-            </div>
-          </div></div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card shadow-sm border-0 h-100"><div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-              <div><div class="text-muted small">Cobros pendientes</div><div class="fs-4 fw-bold">$ 1,180</div></div>
-              <i class="bi bi-exclamation-circle text-success fs-3"></i>
-            </div>
-          </div></div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card shadow-sm border-0 h-100"><div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-              <div><div class="text-muted small">Facturas emitidas</div><div class="fs-4 fw-bold">12</div></div>
-              <i class="bi bi-receipt text-success fs-3"></i>
-            </div>
-          </div></div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card shadow-sm border-0 h-100"><div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-              <div><div class="text-muted small">Último cierre</div><div class="fs-6 fw-bold">Ayer · 23:58</div></div>
-              <i class="bi bi-lock text-success fs-3"></i>
-            </div>
-          </div></div>
-        </div>
-
-        <div class="col-lg-7">
-          <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">Movimientos recientes</h5>
-              <a href="fin-payments.html" class="btn btn-success btn-sm">Ver folios</a>
-            </div>
-            <div class="card-body p-0">
-              <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                  <thead><tr><th>Hora</th><th>Folio</th><th>Huésped</th><th>Tipo</th><th class="text-end">Monto</th></tr></thead>
-                  <tbody>
-                    <tr><td>10:25</td><td>F-98214</td><td>María Gómez</td><td>Pago (Tarjeta)</td><td class="text-end">$ 210</td></tr>
-                    <tr><td>10:40</td><td>F-98215</td><td>Alex Ruiz</td><td>Cargo (Restaurante)</td><td class="text-end">$ 36</td></tr>
-                    <tr><td>11:05</td><td>F-98216</td><td>Lin Chen</td><td>Pago (Efectivo)</td><td class="text-end">$ 50</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-lg-5">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">Resumen por método</h5>
-              <a href="fin-close.html" class="btn btn-success btn-sm">Ir a cierre</a>
-            </div>
-            <div class="card-body">
-              <div class="vstack gap-3">
-                <div class="d-flex justify-content-between border rounded-3 p-3"><span>Tarjeta</span><strong>$ 4,380</strong></div>
-                <div class="d-flex justify-content-between border rounded-3 p-3"><span>Efectivo</span><strong>$ 1,120</strong></div>
-                <div class="d-flex justify-content-between border rounded-3 p-3"><span>Transferencia</span><strong>$ 740</strong></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+        </nav>
+        <a class="btn-getstarted d-none d-sm-block" href="fin-payments.html"
+          >Registrar pago</a
+        >
       </div>
-    </div>
-  </section>
-</main>
+    </header>
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong></div></div>
-</footer>
+    <main class="main">
+      <div
+        class="page-title dark-background"
+        data-aos="fade"
+        style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
+        >
+        <div class="container position-relative">
+          <h1>Finanzas</h1>
+          <p>Visión general de ingresos, cobros y facturación.</p>
+          <nav class="breadcrumbs">
+            <ol>
+              <li><a href="index.html">Inicio</a></li>
+              <li class="current">Finanzas</li>
+            </ol>
+          </nav>
+        </div>
+      </div>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script><script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
+      <section class="section">
+        <div class="container" data-aos="fade-up">
+          <div class="row g-4">
+            <!-- KPIs -->
+            <div class="col-6 col-lg-3">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <div
+                    class="d-flex justify-content-between align-items-center"
+                  >
+                    <div>
+                      <div class="text-muted small">Ingresos hoy</div>
+                      <div class="fs-4 fw-bold">$ 6,240</div>
+                    </div>
+                    <i class="bi bi-cash-coin text-success fs-3"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <div
+                    class="d-flex justify-content-between align-items-center"
+                  >
+                    <div>
+                      <div class="text-muted small">Cobros pendientes</div>
+                      <div class="fs-4 fw-bold">$ 1,180</div>
+                    </div>
+                    <i class="bi bi-exclamation-circle text-success fs-3"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <div
+                    class="d-flex justify-content-between align-items-center"
+                  >
+                    <div>
+                      <div class="text-muted small">Facturas emitidas</div>
+                      <div class="fs-4 fw-bold">12</div>
+                    </div>
+                    <i class="bi bi-receipt text-success fs-3"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <div
+                    class="d-flex justify-content-between align-items-center"
+                  >
+                    <div>
+                      <div class="text-muted small">Último cierre</div>
+                      <div class="fs-6 fw-bold">Ayer · 23:58</div>
+                    </div>
+                    <i class="bi bi-lock text-success fs-3"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-7">
+              <div class="card shadow-sm border-0">
+                <div
+                  class="card-header bg-white border-0 d-flex justify-content-between align-items-center"
+                >
+                  <h5 class="mb-0">Movimientos recientes</h5>
+                  <a href="fin-payments.html" class="btn btn-success btn-sm"
+                    >Ver folios</a
+                  >
+                </div>
+                <div class="card-body p-0">
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Hora</th>
+                          <th>Folio</th>
+                          <th>Huésped</th>
+                          <th>Tipo</th>
+                          <th class="text-end">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>10:25</td>
+                          <td>F-98214</td>
+                          <td>María Gómez</td>
+                          <td>Pago (Tarjeta)</td>
+                          <td class="text-end">$ 210</td>
+                        </tr>
+                        <tr>
+                          <td>10:40</td>
+                          <td>F-98215</td>
+                          <td>Alex Ruiz</td>
+                          <td>Cargo (Restaurante)</td>
+                          <td class="text-end">$ 36</td>
+                        </tr>
+                        <tr>
+                          <td>11:05</td>
+                          <td>F-98216</td>
+                          <td>Lin Chen</td>
+                          <td>Pago (Efectivo)</td>
+                          <td class="text-end">$ 50</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-5">
+              <div class="card shadow-sm border-0 h-100">
+                <div
+                  class="card-header bg-white border-0 d-flex justify-content-between align-items-center"
+                >
+                  <h5 class="mb-0">Resumen por método</h5>
+                  <a href="fin-close.html" class="btn btn-success btn-sm"
+                    >Ir a cierre</a
+                  >
+                </div>
+                <div class="card-body">
+                  <div class="vstack gap-3">
+                    <div
+                      class="d-flex justify-content-between border rounded-3 p-3"
+                    >
+                      <span>Tarjeta</span><strong>$ 4,380</strong>
+                    </div>
+                    <div
+                      class="d-flex justify-content-between border rounded-3 p-3"
+                    >
+                      <span>Efectivo</span><strong>$ 1,120</strong>
+                    </div>
+                    <div
+                      class="d-flex justify-content-between border rounded-3 p-3"
+                    >
+                      <span>Transferencia</span><strong>$ 740</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-primary text-white">
+              <div class="card-body">
+                <h6 class="card-title mb-1">Ingresos de Caja (hoy)</h6>
+                <h3 class="mb-0" id="kpi-cash-ingresos-hoy">₡0</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-danger text-white">
+              <div class="card-body">
+                <h6 class="card-title mb-1">Egresos de Caja (hoy)</h6>
+                <h3 class="mb-0" id="kpi-cash-egresos-hoy">₡0</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-success text-white">
+              <div class="card-body">
+                <h6 class="card-title mb-1">Neto de Caja (hoy)</h6>
+                <h3 class="mb-0" id="kpi-cash-neto-hoy">₡0</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <div class="card kpi-card bg-gradient-info text-white">
+              <div class="card-body">
+                <h6 class="card-title mb-1">Ingresos POS (hoy)</h6>
+                <h3 class="mb-0" id="kpi-cash-pos-hoy">₡0</h3>
+                <small class="d-block mt-1">
+                  Transacciones POS: <span id="kpi-cash-pos-tx-hoy">0</span>
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ledger -->
+        <div class="row mt-4">
+          <div class="col-md-4">
+            <div class="card kpi-card bg-gradient-dark text-white">
+              <div class="card-body">
+                <h6 class="card-title mb-1">Total Asentado en Mayor (hoy)</h6>
+                <h3 class="mb-0" id="kpi-ledger-total-posted-hoy">₡0</h3>
+                <small class="d-block mt-1">
+                  Transacciones: <span id="kpi-ledger-tx-count-hoy">0</span>
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="footer" class="footer position-relative dark-background">
+      <div class="copyright text-center">
+        <div class="container">
+          © <strong><span>Hotel Villa Grace</span></strong>
+        </div>
+      </div>
+    </footer>
+
+    <a
+      href="#"
+      id="scroll-top"
+      class="scroll-top d-flex align-items-center justify-content-center"
+      ><i class="bi bi-arrow-up-short"></i
+    ></a>
+    <div id="preloader"></div>
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  </body>
 </html>
