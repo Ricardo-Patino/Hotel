@@ -56,3 +56,4 @@ Hotel 2/booking/*.pdf
 Hotel 2/storage/comprobantes/*.pdf
 Hotel 2/storage/recibos/*.pdf
 !Hotel 2/.env
+Hotel 2.zip
