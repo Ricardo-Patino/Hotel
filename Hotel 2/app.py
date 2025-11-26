@@ -28,6 +28,10 @@ from flask import session, render_template
 from models_sql import Usuario
 from blueprints.fin_kpi import fin_kpi_bp
 
+from blueprints.pos import pos_bp
+from blueprints.fin_kpi import fin_kpi_bp
+from blueprints.fin_periods import fin_periods_bp
+
 
 from flask import (
     Flask,
@@ -1206,10 +1210,8 @@ def _create_reservas_csv(items: list[dict], filename: str) -> Path:
 def create_app() -> Flask:
     app = Flask(
         __name__,
-        template_folder=str(BASE_DIR / "templates"),
-        static_folder=str(BASE_DIR / "static"),
     )
-    
+
     app.config.from_object(Config)
 
     db.init_app(app)
@@ -1221,8 +1223,7 @@ def create_app() -> Flask:
         except Exception:
             pass
 
-    # Blueprints ya existentes:
-    app.register_blueprint(pos_bp)
+
 
     # Blueprint de registro de KPIs contables:
     app.register_blueprint(fin_kpi_bp)
@@ -1255,7 +1256,6 @@ def create_app() -> Flask:
     app.register_blueprint(mnt_bp)     # <-- REGISTRA (después de inv_bp / admin_bp)
 
     # === Punto de Venta (POS) ===
-    from blueprints.pos import pos_bp
     app.register_blueprint(pos_bp)
 
     #Bluprint de HRM
