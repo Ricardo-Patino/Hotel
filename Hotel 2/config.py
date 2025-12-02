@@ -1,5 +1,6 @@
 import os
 from urllib.parse import quote_plus
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 try:
@@ -10,6 +11,11 @@ except Exception:
 
 
 class Config:
+    
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
+    UPLOAD_FOLDER_CLIENTES = UPLOAD_FOLDER_CLIENTES
     
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret")
     MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
@@ -22,6 +28,10 @@ class Config:
 
     
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+    UPLOAD_FOLDER_CLIENTES = UPLOAD_FOLDER_CLIENTES
+
+    UPLOAD_FOLDER_CLIENTES = os.path.join(BASE_DIR, 'uploads', 'clientes')
+    ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
 
    
     DB_USER_RAW = os.environ.get("DB_USER", "root")
@@ -38,6 +48,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = (
         f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
         "?charset=utf8mb4"
+        
     )
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False

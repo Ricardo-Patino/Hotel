@@ -3,6 +3,7 @@
    Script limpio para recrear la BD con seeds mínimos
    Incluye GRR-01-002 (KPIs/Auditoría), GRR-01-003 (Auto-asignación) y
    GRR-01-014..017 (Waitlist, Cupones/Ajustes, No-Show, Early/Late)
+   ACE-01-001..009 (Historial, Bloqueos, Documentos, Duplicados, vCard, Fidelización)
    ============================================================================ */
 
 SET sql_mode = 'STRICT_ALL_TABLES';
@@ -2102,6 +2103,211 @@ WHERE NOT EXISTS (
   WHERE Evento_Id = (SELECT Id FROM EvtEvento WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE() LIMIT 1)
     AND Recurso_Id = (SELECT Id FROM EvtRecurso WHERE Nombre='Sillas plegables' LIMIT 1)
 );
+
+
+/* ============================================================
+   ACE — Administración de Clientes y Expedientes
+   ============================================================ */
+
+-- ---------- Soportes para documentos por cliente ----------
+CREATE TABLE IF NOT EXISTS ClienteDocumento (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Codigo_Cliente   INT NOT NULL,
+  Documento_Id     INT NOT NULL,
+  Tipo             ENUM('ID','FACTURA','COMPROBANTE','OTRO') NOT NULL DEFAULT 'OTRO',
+  Min_Rol          ENUM('Cliente','Recepcionista','Administrador') NOT NULL DEFAULT 'Cliente',
+  Visible          TINYINT(1) NOT NULL DEFAULT 1,
+  Fecha_Creacion   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ClienteDocumento PRIMARY KEY (Id),
+  CONSTRAINT FK_ClienteDocumento_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_ClienteDocumento_Documento
+    FOREIGN KEY (Documento_Id) REFERENCES Documento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  KEY IX_ClienteDocumento_Cliente (Codigo_Cliente),
+  KEY IX_ClienteDocumento_Rol (Min_Rol),
+  KEY IX_ClienteDocumento_Tipo (Tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------- Unicidad para duplicados (ACE-01-007) ----------
+-- (si ya existen duplicados en tu data real, corrígelos antes)
+ALTER TABLE Cliente
+  ADD UNIQUE KEY UQ_Cliente_Cedula (Cedula),
+  ADD UNIQUE KEY UQ_Cliente_Correo (Correo);
+
+-- ---------- Fidelización / Huésped frecuente (ACE-01-009) ----------
+ALTER TABLE Cliente
+  ADD COLUMN Nivel           ENUM('Ninguno','Silver','Gold','VIP') NOT NULL DEFAULT 'Ninguno' AFTER Fecha_modificacion,
+  ADD COLUMN Puntos          INT NOT NULL DEFAULT 0 AFTER Nivel,
+  ADD COLUMN Descuento_Porc  DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER Puntos;
+
+CREATE TABLE IF NOT EXISTS ClienteLoyaltyMov (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Codigo_Cliente   INT NOT NULL,
+  Codigo_Reserva   INT NOT NULL,
+  Puntos           INT NOT NULL,
+  Monto_Base       DECIMAL(12,2) NOT NULL,
+  Noches           INT NOT NULL,
+  Creado_En        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  UNIQUE KEY UQ_LoyaltyMov_Reserva (Codigo_Reserva),
+  KEY IX_LoyaltyMov_Cliente (Codigo_Cliente),
+  CONSTRAINT FK_LoyaltyMov_Cliente FOREIGN KEY (Codigo_Cliente)
+    REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_LoyaltyMov_Reserva FOREIGN KEY (Codigo_Reserva)
+    REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP FUNCTION IF EXISTS loyalty_level;
+DELIMITER $$
+CREATE FUNCTION loyalty_level(p INT)
+RETURNS VARCHAR(10)
+DETERMINISTIC
+BEGIN
+  RETURN (CASE
+    WHEN p >= 700 THEN 'VIP'
+    WHEN p >= 300 THEN 'Gold'
+    WHEN p >= 100 THEN 'Silver'
+    ELSE 'Ninguno'
+  END);
+END$$
+DELIMITER ;
+
+-- Al acreditar puntos sólo una vez por reserva completada
+DROP TRIGGER IF EXISTS trg_reserva_loyalty_after_upd;
+DELIMITER $$
+CREATE TRIGGER trg_reserva_loyalty_after_upd
+AFTER UPDATE ON Reserva
+FOR EACH ROW
+BEGIN
+  DECLARE v_noches INT;
+  DECLARE v_pts    INT;
+
+  IF NEW.Estado='Confirmada'
+     AND NEW.Fecha_Salida <= CURDATE()
+     AND NOT EXISTS (SELECT 1 FROM ClienteLoyaltyMov WHERE Codigo_Reserva = NEW.Codigo_Reserva) THEN
+
+    SET v_noches = GREATEST(DATEDIFF(NEW.Fecha_Salida, NEW.Fecha_Entrada), 0);
+    SET v_pts    = v_noches + ROUND(NEW.Monto_Total / 1000);  -- regla simple: noches + ₡/1000
+
+    INSERT INTO ClienteLoyaltyMov (Codigo_Cliente, Codigo_Reserva, Puntos, Monto_Base, Noches)
+    VALUES (NEW.Codigo_Cliente, NEW.Codigo_Reserva, v_pts, NEW.Monto_Total, v_noches);
+
+    UPDATE Cliente
+      SET Puntos = Puntos + v_pts,
+          Nivel  = loyalty_level(Puntos + v_pts),
+          Descuento_Porc = CASE
+            WHEN (Puntos + v_pts) >= 700 THEN 15.00
+            WHEN (Puntos + v_pts) >= 300 THEN 7.50
+            WHEN (Puntos + v_pts) >= 100 THEN 3.00
+            ELSE 0.00
+          END
+      WHERE Codigo_Cliente = NEW.Codigo_Cliente;
+  END IF;
+END$$
+DELIMITER ;
+
+-- ---------- Vistas de historial (ACE-01-001 y 003) ----------
+CREATE OR REPLACE VIEW v_hist_reservas AS
+SELECT
+  r.Codigo_Reserva,
+  r.Estado,
+  r.Fecha_Entrada, r.Fecha_Salida,
+  r.Monto_Total, r.Monto_Pagado, r.Monto_Total_Acumulado, r.Monto_Pagado_Acumulado,
+  r.Numero_Comprobante, r.Canal, r.Fuente, r.Observaciones,
+  c.Codigo_Cliente, c.Cedula, c.Correo, CONCAT(c.Nombre,' ',c.Apellido) AS Cliente,
+  h.Numero_Habitacion, h.Tipo AS Tipo_Habitacion
+FROM Reserva r
+JOIN Cliente c    ON c.Codigo_Cliente = r.Codigo_Cliente
+JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion;
+
+CREATE OR REPLACE VIEW v_hist_pagos AS
+SELECT
+  'RECIBO' AS origen, fr.id_receipt AS id_origen,
+  fr.creado_en AS fecha,
+  fr.reserva_id AS Codigo_Reserva,
+  fr.metodo, fr.currency AS moneda, fr.monto, fr.numero AS ref,
+  fr.estado
+FROM fin_receipts fr
+UNION ALL
+SELECT
+  'LEDGER' AS origen, t.id_tx AS id_origen,
+  t.created_at AS fecha,
+  t.reserva_id AS Codigo_Reserva,
+  COALESCE(JSON_UNQUOTE(JSON_EXTRACT(t.meta,'$.metodo')),'POS') AS metodo,
+  t.currency, t.total, t.external_id AS ref,
+  t.status AS estado
+FROM fin_ledger_tx t;
+
+-- ---------- Bloqueos de edición (ACE-01-002 y 004) ----------
+-- Reserva histórica = Fecha_Salida pasada -> no UPDATE / no DELETE
+DROP TRIGGER IF EXISTS trg_reserva_block_upd;
+DELIMITER $$
+CREATE TRIGGER trg_reserva_block_upd
+BEFORE UPDATE ON Reserva
+FOR EACH ROW
+BEGIN
+  IF OLD.Fecha_Salida < CURDATE() THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-002: Reserva en historial, no editable';
+  END IF;
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_reserva_block_del;
+DELIMITER $$
+CREATE TRIGGER trg_reserva_block_del
+BEFORE DELETE ON Reserva
+FOR EACH ROW
+BEGIN
+  IF OLD.Fecha_Salida < CURDATE() THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-002: Reserva en historial, no eliminable';
+  END IF;
+END$$
+DELIMITER ;
+
+-- Pagos: hacer inmutables (se corrige con nuevos movimientos, no editando el original)
+DROP TRIGGER IF EXISTS trg_fin_receipts_block_upd;
+DELIMITER $$
+CREATE TRIGGER trg_fin_receipts_block_upd
+BEFORE UPDATE ON fin_receipts
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Recibo es histórico, no editable';
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_fin_receipts_block_del;
+DELIMITER $$
+CREATE TRIGGER trg_fin_receipts_block_del
+BEFORE DELETE ON fin_receipts
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Recibo es histórico, no eliminable';
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_fin_ledger_tx_block_upd;
+DELIMITER $$
+CREATE TRIGGER trg_fin_ledger_tx_block_upd
+BEFORE UPDATE ON fin_ledger_tx
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Tx contable es histórica, no editable';
+END$$
+DELIMITER ;
+
+DROP TRIGGER IF EXISTS trg_fin_ledger_tx_block_del;
+DELIMITER $$
+CREATE TRIGGER trg_fin_ledger_tx_block_del
+BEFORE DELETE ON fin_ledger_tx
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Tx contable es histórica, no eliminable';
+END$$
+DELIMITER ;
 
 /* -------------------------------------------
    Verificaciones EVT (opcional)

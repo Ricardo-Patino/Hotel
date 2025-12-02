@@ -1287,6 +1287,10 @@ def create_app() -> Flask:
     from blueprints.fin_recurring import fin_recurring_bp
     app.register_blueprint(fin_recurring_bp)
 
+    # ============ACE=============
+    from blueprints.ace import ace_bp
+    app.register_blueprint(ace_bp, url_prefix='/ace')
+
     
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
@@ -5817,6 +5821,14 @@ def create_app() -> Flask:
         bd_after = _checkout_breakdown(int(reserva_id), estancia_id=estancia_id) or bd_before
         return jsonify({"ok": True, "reserva_id": int(reserva_id), "receipt": receipt, "breakdown": bd_after})
     
+    
+    
+    
+    # Configuración de carpetas de uploads ACE
+    os.makedirs(app.config.get('UPLOAD_FOLDER_CLIENTES'), exist_ok=True)
+
+
+
     ## Parte de Brandon
 
     # ============================================================
