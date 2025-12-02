@@ -565,6 +565,111 @@ class InvMovimiento(db.Model):
             f"<InvMovimiento {self.Id} "
             f"Insumo={self.Insumo_Id} {self.Tipo} Δ={self.Delta}>"
         )
+    
+    # ---------------------------------------------------------------------------
+# FAC-07-008 - Cobros recurrentes / estadías prolongadas
+# ---------------------------------------------------------------------------
+from datetime import datetime
+from extensions import db
+
+
+class FinRecurringPlan(db.Model):
+    __tablename__ = "fin_recurring_plan"
+
+    id_plan          = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    reserva_id       = db.Column(
+        db.Integer,
+        db.ForeignKey("Reserva.Codigo_Reserva"),
+        nullable=True,
+        index=True
+    )
+    cliente_id       = db.Column(
+        db.Integer,
+        db.ForeignKey("Cliente.Codigo_Cliente"),
+        nullable=True,
+        index=True
+    )
+    descripcion      = db.Column(db.String(160))
+    frecuencia       = db.Column(
+        db.Enum("DAILY", "WEEKLY", "MONTHLY"),
+        nullable=False,
+        default="MONTHLY"
+    )
+    monto            = db.Column(db.Numeric(14, 2), nullable=False)
+    currency         = db.Column(db.String(10), nullable=False, default="CRC")
+    fecha_inicio     = db.Column(db.Date, nullable=False)
+    fecha_fin        = db.Column(db.Date)
+    numero_cuotas    = db.Column(db.Integer)
+    proximo_cobro_en = db.Column(db.Date, nullable=False)
+    estado           = db.Column(
+        db.Enum("ACTIVE", "PAUSED", "CANCELLED", "FINISHED"),
+        nullable=False,
+        default="ACTIVE"
+    )
+
+    creado_por       = db.Column(db.Integer, nullable=False)
+    created_at       = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_by       = db.Column(db.Integer)
+    updated_at       = db.Column(db.DateTime, onupdate=datetime.utcnow)
+
+    # Relaciones de conveniencia
+    Reserva = db.relationship("Reserva", lazy="joined")
+    Cliente = db.relationship("Cliente", lazy="joined")
+
+    def __repr__(self) -> str:
+        return f"<FinRecurringPlan {self.id_plan} freq={self.frecuencia} status={self.estado}>"
+
+
+class FinRecurringRun(db.Model):
+    __tablename__ = "fin_recurring_run"
+
+    id_run           = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    plan_id          = db.Column(
+        db.Integer,
+        db.ForeignKey("fin_recurring_plan.id_plan"),
+        nullable=False,
+        index=True
+    )
+    fecha_programada = db.Column(db.Date, nullable=False)
+    fecha_ejecucion  = db.Column(db.DateTime)
+    tx_id            = db.Column(db.Integer, db.ForeignKey("fin_ledger_tx.id_tx"), index=True)
+    estado           = db.Column(
+        db.Enum("PENDING", "EXECUTED", "FAILED", "SKIPPED"),
+        nullable=False,
+        default="PENDING"
+    )
+    mensaje_error    = db.Column(db.String(255))
+    created_at       = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    Plan = db.relationship("FinRecurringPlan", lazy="joined")
+
+    def __repr__(self) -> str:
+        return f"<FinRecurringRun {self.id_run} plan={self.plan_id} status={self.estado}>"
+
+# ---------------------------------------------------------------------------
+# FAC-07-009 - Tipos de cambio diarios (fin_fx_rate)
+# ---------------------------------------------------------------------------
+from datetime import datetime
+from extensions import db
+
+
+class FinFxRate(db.Model):
+    __tablename__ = "fin_fx_rate"
+
+    id_rate = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    currency = db.Column(db.String(10), nullable=False)          # Ej. 'USD', 'EUR'
+    rate_to_base = db.Column(db.Numeric(18, 6), nullable=False)  # Cuántos CRC por 1 unidad
+    rate_date = db.Column(db.Date, nullable=False)
+    source = db.Column(db.String(40), default="MANUAL")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("currency", "rate_date", name="UX_fxrate_currency_date"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<FinFxRate {self.currency} {self.rate_date}={self.rate_to_base}>"
+
 
 
 

@@ -2181,3 +2181,72 @@ FROM Marcacion
 WHERE Codigo_Funcionario = 4
   AND Fecha >= CURDATE() - INTERVAL 30 DAY
 ORDER BY Fecha DESC, Id DESC;
+
+/* ------------------------------------------------------------------------- */
+/* Cobros recurrentes / estadías prolongadas (FAC-07-008)                    */
+/* ------------------------------------------------------------------------- */
+
+CREATE TABLE fin_recurring_plan (
+  id_plan          INT NOT NULL AUTO_INCREMENT,
+  reserva_id       INT NULL,
+  cliente_id       INT NULL,
+  descripcion      VARCHAR(160) NULL,
+  frecuencia       ENUM('DAILY','WEEKLY','MONTHLY') NOT NULL,
+  monto            DECIMAL(14,2) NOT NULL,
+  currency         VARCHAR(10) NOT NULL DEFAULT 'CRC',
+  fecha_inicio     DATE NOT NULL,
+  fecha_fin        DATE NULL,
+  numero_cuotas    INT NULL,
+  proximo_cobro_en DATE NOT NULL,
+  estado           ENUM('ACTIVE','PAUSED','CANCELLED','FINISHED') NOT NULL DEFAULT 'ACTIVE',
+  creado_por       INT NOT NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by       INT NULL,
+  updated_at       DATETIME NULL,
+  PRIMARY KEY (id_plan),
+  KEY IX_fin_recurring_plan_reserva (reserva_id),
+  KEY IX_fin_recurring_plan_cliente (cliente_id),
+  KEY IX_fin_recurring_plan_estado (estado),
+  CONSTRAINT FK_fin_recurring_plan_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_fin_recurring_plan_cliente
+    FOREIGN KEY (cliente_id) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE fin_recurring_run (
+  id_run           INT NOT NULL AUTO_INCREMENT,
+  plan_id          INT NOT NULL,
+  fecha_programada DATE NOT NULL,
+  fecha_ejecucion  DATETIME NULL,
+  tx_id            INT NULL,
+  estado           ENUM('PENDING','EXECUTED','FAILED','SKIPPED') NOT NULL DEFAULT 'PENDING',
+  mensaje_error    VARCHAR(255) NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_run),
+  KEY IX_fin_recurring_run_plan (plan_id),
+  KEY IX_fin_recurring_run_tx (tx_id),
+  CONSTRAINT FK_fin_recurring_run_plan
+    FOREIGN KEY (plan_id) REFERENCES fin_recurring_plan(id_plan)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_fin_recurring_run_tx
+    FOREIGN KEY (tx_id) REFERENCES fin_ledger_tx(id_tx)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* ------------------------------------------------------------------------- */
+/* FAC-07-009 - Tabla diaria de tipos de cambio                               */
+/* ------------------------------------------------------------------------- */
+
+CREATE TABLE fin_fx_rate (
+  id_rate        INT NOT NULL AUTO_INCREMENT,
+  currency       VARCHAR(10) NOT NULL,         -- Moneda de la que parte (USD, EUR, etc.)
+  rate_to_base   DECIMAL(18,6) NOT NULL,       -- Cuántos colones (u otra base) por 1 unidad
+  rate_date      DATE NOT NULL,                -- Fecha del tipo de cambio
+  source         VARCHAR(40) NULL DEFAULT 'MANUAL',
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_rate),
+  UNIQUE KEY UX_fxrate_currency_date (currency, rate_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

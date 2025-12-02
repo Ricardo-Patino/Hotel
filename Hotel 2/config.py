@@ -42,6 +42,17 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # Moneda base del hotel
+    BASE_CURRENCY = "CRC"
+
+    # API de tipo de cambio (base USD, incluye CRC)
+    FX_API_URL = "https://open.er-api.com/v6/latest/USD"
+
+    # Esta API NO requiere key, así que lo dejamos vacío
+    FX_API_KEY = None
+
+
+
     print(
     "DB ->",
     os.environ.get("DB_USER", "root"),

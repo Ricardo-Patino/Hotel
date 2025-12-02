@@ -1,40 +1,294 @@
-{% set title = "Nómina | Hotel Villa Grace" %} <!DOCTYPE html>
+{% set title = "Nómina | Hotel Villa Grace" %}
+<!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{{ title }}</title>
-    <link
-      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/css/style.css') }}"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <header id="header" class="header fixed-top">
-      <div class="container d-flex align-items-center justify-content-between">
-        <a href="/" class="logo d-flex align-items-center me-auto me-xl-0"
-          ><h1 class="sitename">Hotel Villa Grace</h1></a
-        >
-      </div>
-    </header>
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>{{ title }}</title>
 
-    <main class="main" style="margin-top: 90px">
-      <div class="container">
-        <h2 class="mb-3" style="color: #4b49ac">Nómina quincenal</h2>
+  <!-- Favicon -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
 
-        <div class="card p-3 mb-4">
+  <!-- Tipografías -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- CSS base -->
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    :root{
+      --vg-green: #1c4b3c;
+      --vg-green-soft: #e0f2eb;
+      --vg-muted: #6c757d;
+    }
+
+    body{
+      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background-color:#f5f6f7;
+      color:#212529;
+    }
+
+    /* wrapper central tipo card */
+    .hrm-wrapper{
+      background:#ffffff;
+      border-radius:1.5rem;
+      padding:1.75rem;
+      border:1px solid #edf1f4;
+      box-shadow:0 12px 30px rgba(15,34,58,0.08);
+    }
+
+    .hrm-header{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap:.75rem;
+      margin-bottom:1.5rem;
+    }
+
+    .hrm-title{
+      display:flex;
+      align-items:center;
+      gap:.75rem;
+    }
+
+    .hrm-title-icon{
+      width:42px;
+      height:42px;
+      border-radius:999px;
+      background:var(--vg-green-soft);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      color:var(--vg-green);
+    }
+
+    .hrm-title h2{
+      margin:0;
+      font-size:1.6rem;
+      font-weight:600;
+      color:#12212b;
+    }
+
+    .hrm-subtitle{
+      margin:0;
+      font-size:.9rem;
+      color:var(--vg-muted);
+    }
+
+    /* Cards formularios */
+    .vg-card{
+      border-radius:1.2rem;
+      border:1px solid #edf1f4;
+      background:#ffffff;
+      box-shadow:0 10px 28px rgba(15,34,58,0.08);
+    }
+
+    .vg-card h5{
+      font-size:1.05rem;
+      font-weight:600;
+      color:#12212b;
+    }
+
+    .vg-card small{
+      color:var(--vg-muted);
+    }
+
+    .form-control,
+    .form-select{
+      background-color:#ffffff;
+      border-radius:.75rem;
+      border:1px solid #dfe4ea;
+      color:#495057;
+      font-size:.86rem;
+    }
+
+    .form-control::placeholder{ color:#adb5bd; }
+
+    .form-control:focus,
+    .form-select:focus{
+      border-color:var(--vg-green);
+      box-shadow:0 0 0 .15rem rgba(28,75,60,.18);
+      background-color:#ffffff;
+      color:#212529;
+    }
+
+    .btn-primary{
+      background:var(--vg-green);
+      border:none;
+      color:#ffffff;
+      font-weight:600;
+      border-radius:999px;
+      padding-inline:1.4rem;
+    }
+
+    .btn-primary:hover{
+      filter:brightness(1.05);
+      color:#ffffff;
+    }
+
+    .btn-success{
+      border-radius:999px;
+      font-weight:600;
+    }
+
+    /* Tabla periodos */
+    .table-wrapper{
+      border-radius:1.1rem;
+      border:1px solid #edf1f4;
+      background:#ffffff;
+      overflow:hidden;
+      box-shadow:0 10px 26px rgba(15,34,58,0.08);
+    }
+
+    .table{
+      margin-bottom:0;
+      color:#212529;
+      font-size:.86rem;
+    }
+
+    .table thead{
+      background:#f7fafc;
+    }
+
+    .table thead th{
+      border-bottom:none;
+      font-weight:500;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      font-size:.75rem;
+      color:#4a5568;
+    }
+
+    .table tbody tr{
+      border-color:#edf1f4;
+    }
+
+    .badge-estado{
+      padding:.15rem .7rem;
+      border-radius:999px;
+      font-size:.72rem;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+
+    .badge-estado.ACTIVO,
+    .badge-estado.CERRADO{
+      background:var(--vg-green-soft);
+      color:var(--vg-green);
+      border:1px solid #a3d4c4;
+    }
+
+    .badge-estado.ABIERTO,
+    .badge-estado.PENDIENTE{
+      background:#fff3cd;
+      color:#856404;
+      border:1px solid #ffe49b;
+    }
+
+    .badge-estado.CANCELADO{
+      background:#fde4e5;
+      color:#b3261e;
+      border:1px solid #f5b5ba;
+    }
+
+    hr{ border-color:#edf1f4; }
+
+    @media (max-width:768px){
+      .hrm-wrapper{ padding:1.25rem; border-radius:1.2rem; }
+      .hrm-header{ align-items:flex-start; }
+      .hrm-title h2{ font-size:1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER VERDE (igual al resto del sitio) -->
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="/">Inicio</a></li>
+        <li><a href="/grr">Reservas</a></li>
+        <li><a href="/fin">Finanzas</a></li>
+        <li><a href="/hrm/empleados-ui">Colaboradores</a></li>
+        <li><a href="/hrm/mis-horas">Mis horas</a></li>
+        <li><a href="/hrm" class="active">RRHH</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="/grr">Reservar</a>
+  </div>
+</header>
+
+<main class="main">
+  <!-- BANDA CON IMAGEN (mismo estilo que RRHH) -->
+  <div class="page-title dark-background"
+       data-aos="fade"
+       style="
+         background-image:url('https://images.pexels.com/photos/1181562/pexels-photo-1181562.jpeg?auto=compress&cs=tinysrgb&w=1600');
+         background-size: cover;
+         background-position: center 25%;
+       ">
+    <div class="container position-relative">
+      <h1>Nómina quincenal</h1>
+      <p>Gestione periodos y ejecute el cálculo de nómina del Hotel Villa Grace.</p>
+      <nav class="breadcrumbs">
+        <ol>
+          <li><a href="/">Inicio</a></li>
+          <li><a href="/hrm">RRHH</a></li>
+          <li class="current">Nómina</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container" data-aos="fade-up">
+      <div class="hrm-wrapper">
+
+        <!-- Encabezado interno -->
+        <div class="hrm-header">
+          <div class="hrm-title">
+            <span class="hrm-title-icon">
+              <i class="bi bi-cash-stack"></i>
+            </span>
+            <div>
+              <h2>Nómina quincenal</h2>
+              <p class="hrm-subtitle">
+                Defina el periodo, quincena y rango de fechas, y luego ejecute el cálculo de nómina.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario de creación de periodo -->
+        <div class="card vg-card p-3 p-md-4 mb-4">
+          <h5 class="mb-3">
+            <i class="bi bi-calendar-plus me-1"></i>
+            Nuevo periodo de nómina
+          </h5>
+          <small class="d-block mb-3">
+            Registre un nuevo periodo (año-mes y quincena) indicando el rango de fechas que corresponde.
+          </small>
+
           <div class="row g-2 align-items-end">
             <div class="col-md-3">
-              <label class="form-label">Periodo (YYYY-MM)</label
-              ><input id="pk" class="form-control" placeholder="2025-11" />
+              <label class="form-label">Periodo (YYYY-MM)</label>
+              <input id="pk" class="form-control" placeholder="2025-11">
             </div>
             <div class="col-md-2">
               <label class="form-label">Quincena</label>
@@ -44,12 +298,12 @@
               </select>
             </div>
             <div class="col-md-3">
-              <label class="form-label">Desde</label
-              ><input id="d" type="date" class="form-control" />
+              <label class="form-label">Desde</label>
+              <input id="d" type="date" class="form-control">
             </div>
             <div class="col-md-3">
-              <label class="form-label">Hasta</label
-              ><input id="h" type="date" class="form-control" />
+              <label class="form-label">Hasta</label>
+              <input id="h" type="date" class="form-control">
             </div>
             <div class="col-md-1 text-end">
               <button id="btnNew" class="btn btn-primary">
@@ -59,14 +313,19 @@
           </div>
         </div>
 
+        <!-- Tabla de periodos -->
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h5>Periodos existentes</h5>
+          <div>
+            <h5 class="mb-0">Periodos existentes</h5>
+            <small class="text-muted">Consulte el estado de los periodos registrados.</small>
+          </div>
           <button id="btnCalc" class="btn btn-success">
             <i class="bi bi-calculator"></i> Calcular nómina
           </button>
         </div>
-        <div class="table-responsive">
-          <table class="table table-sm" id="tb">
+
+        <div class="table-responsive table-wrapper mt-2">
+          <table class="table table-sm align-middle" id="tb">
             <thead>
               <tr>
                 <th>Id</th>
@@ -85,52 +344,90 @@
                 <td>{{p.Quincena}}</td>
                 <td>{{p.Fecha_Desde}}</td>
                 <td>{{p.Fecha_Hasta}}</td>
-                <td>{{p.Estado}}</td>
+                <td>
+                  <span class="badge-estado {{ p.Estado }}">
+                    {{ p.Estado }}
+                  </span>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-3">
+                  No hay periodos de nómina registrados aún.
+                </td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-      </div>
-    </main>
 
-    <script>
-      let selectedId = null;
-      document.querySelectorAll("#tb tbody tr").forEach((tr) => {
-        tr.onclick = () => {
-          document
-            .querySelectorAll("#tb tbody tr")
-            .forEach((r) => r.classList.remove("table-active"));
-          tr.classList.add("table-active");
-          selectedId = tr.dataset.id;
-        };
-      });
-      document.getElementById("btnNew").onclick = async () => {
-        const body = {
-          periodo_key: document.getElementById("pk").value,
-          quincena: document.getElementById("q").value,
-          desde: document.getElementById("d").value,
-          hasta: document.getElementById("h").value,
-        };
-        await fetch('{{ url_for("hrm.create_period") }}', {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        location.reload();
-      };
-      document.getElementById("btnCalc").onclick = async () => {
-        if (!selectedId) {
-          alert("Seleccione un periodo");
-          return;
-        }
-        await fetch('{{ url_for("hrm.payroll_generate") }}', {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ period_id: parseInt(selectedId) }),
-        });
-        alert("Nómina calculada");
-      };
-    </script>
-  </body>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">
+      © <strong><span>Hotel Villa Grace</span></strong>
+    </div>
+  </div>
+</footer>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+  <i class="bi bi-arrow-up-short"></i>
+</a>
+<div id="preloader"></div>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+  let selectedId = null;
+
+  document.querySelectorAll("#tb tbody tr").forEach((tr) => {
+    tr.onclick = () => {
+      document
+        .querySelectorAll("#tb tbody tr")
+        .forEach((r) => r.classList.remove("table-active"));
+      tr.classList.add("table-active");
+      selectedId = tr.dataset.id;
+    };
+  });
+
+  document.getElementById("btnNew").onclick = async () => {
+    const body = {
+      periodo_key: document.getElementById("pk").value,
+      quincena: document.getElementById("q").value,
+      desde: document.getElementById("d").value,
+      hasta: document.getElementById("h").value,
+    };
+
+    await fetch('{{ url_for("hrm.create_period") }}', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    location.reload();
+  };
+
+  document.getElementById("btnCalc").onclick = async () => {
+    if (!selectedId) {
+      alert("Seleccione un periodo");
+      return;
+    }
+
+    await fetch('{{ url_for("hrm.payroll_generate") }}', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ period_id: parseInt(selectedId) }),
+    });
+
+    alert("Nómina calculada");
+  };
+</script>
+</body>
 </html>
+
