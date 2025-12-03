@@ -15,6 +15,8 @@
     die( 'Unable to load the "PHP Email Form" Library!');
   }
 
+  Hotel 2
+
   $contact = new PHP_Email_Form;
   $contact->ajax = true;
   
