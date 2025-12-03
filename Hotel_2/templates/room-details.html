@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-  <title>Detalle de Habitación – Hotel Villa Grace, Cóbano</title>
+  <title>Habitación {{ hab.Numero_Habitacion }} — {{ hab.Tipo }} | Hotel Villa Grace</title>
   <meta name="description" content="Hotel Villa Grace en Cóbano, Puntarenas. Habitación amplia con balcón, Wi-Fi, aire acondicionado/ventilador y estacionamiento. Consulta disponibilidad y reserva.">
   <meta name="keywords" content="Hotel Villa Grace, Cóbano, Santa Teresa, hospedaje, habitaciones, Costa Rica">
 
@@ -82,11 +82,11 @@
     <!-- ======= Page Title ======= -->
     <div class="page-title dark-background" data-aos="fade" style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }})">
       <div class="container position-relative">
-        <h1>Suite Familiar con Balcón</h1>
+        <h1>Habitación {{ hab.Numero_Habitacion }} — {{ hab.Tipo }}</h1>
         <p>Comodidad práctica en Cóbano, Puntarenas — ideal para familias o grupos pequeños.</p>
         <nav class="breadcrumbs">
           <ol>
-            <li><a href="index.html">Inicio</a></li>
+            <li class="current">Habitación {{ hab.Numero_Habitacion }} — {{ hab.Tipo }}</li>
             <li><a href="rooms.html">Habitaciones</a></li>
             <li class="current">Suite Familiar con Balcón</li>
           </ol>
@@ -157,7 +157,9 @@
                 </div>
               </div>
 
-              <h2 class="mb-3">Suite Familiar con Balcón</h2>
+              <h2 class="mb-3">
+                Habitación {{ hab.Numero_Habitacion }} — {{ hab.Tipo }}
+              </h2>
               <p class="mb-3">
                 Habitación cómoda y luminosa en el corazón de Cóbano, ideal para familias o grupos pequeños. Cuenta con
                 balcón, Wi-Fi, baño privado con agua caliente y opciones de aire acondicionado o ventilador
@@ -165,14 +167,28 @@
               </p>
 
               <ul class="list-unstyled mb-3">
-                <li class="mb-2"><i class="bi bi-people me-2"></i>Capacidad: 2–4 huéspedes</li>
-                <li class="mb-2"><i class="bi bi-rulers me-2"></i>Superficie aprox.: 24–30 m²</li>
-                <li class="mb-2"><i class="bi bi-moon-stars me-2"></i>Camas: 1 King + 2 individuales <em>(configurable)</em></li>
-                <li class="mb-2"><i class="bi bi-geo-alt me-2"></i>Cóbano, Puntarenas, Costa Rica</li>
+                <li class="mb-2">
+                  <i class="bi bi-door-closed me-2"></i>
+                  Habitación {{ hab.Numero_Habitacion }} · Código {{ hab.Codigo_Habitacion }}
+                </li>
+                <li class="mb-2">
+                  <i class="bi bi-check-circle me-2"></i>
+                  Estado: {{ hab.Estado }}
+                </li>
+                <li class="mb-2">
+                  <i class="bi bi-people me-2"></i>
+                  Capacidad: 2–4 huéspedes
+                </li>
+                <li class="mb-2">
+                  <i class="bi bi-geo-alt me-2"></i>
+                  Cóbano, Puntarenas, Costa Rica
+                </li>
               </ul>
 
               <div class="price-box d-flex align-items-center gap-2 mb-3">
-                <span class="h3 m-0">Desde ₡15,000 por persona</span>
+                <span class="h3 m-0">
+                  Desde ₡{{ "{:,.0f}".format(hab.Precio_Noche) }}
+                </span>
                 <span>/ noche</span>
               </div>
 
@@ -357,7 +373,7 @@
                     <img src="{{ url_for('static', filename='assets/img/hotel/room-3.webp') }}" class="rounded me-3" width="72" height="72" alt="Doble Jardín">
                     <div>
                       <a href="room-details.html" class="fw-semibold d-block">Doble Vista Jardín</a>
-                      <small class="text-muted">Desde ₡15,000 por persona / noche</small>
+                      <small class="text-muted">Tarifas desde ₡{{ "{:,.0f}".format(hab.Precio_Noche) }} por noche</small>
                     </div>
                   </li>
                   <li class="d-flex align-items-center mb-3">

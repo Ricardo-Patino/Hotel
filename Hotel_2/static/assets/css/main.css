@@ -7584,3 +7584,191 @@ section,
   --nav-color: rgba(255, 255, 255, 0.95);
   --nav-hover-color: #ffffff;
 }
+
+/* =========================
+   ADMIN – HABITACIONES
+   ========================= */
+
+.admin-main {
+  margin-top: 90px;
+  background: #f5faf7;
+  padding-bottom: 40px;
+}
+
+.admin-title {
+  font-weight: 700;
+  color: #145c3b;
+}
+
+.admin-card {
+  border: none;
+  border-radius: 18px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.06);
+}
+
+/* Botón "Nueva habitación" tipo pastilla */
+.admin-cta {
+  border-radius: 999px;
+  padding-inline: 24px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Tabla */
+#tblVillas {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#tblVillas thead.admin-thead th {
+  background: #145c3b;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+}
+
+#tblVillas thead.admin-thead th:first-child {
+  border-top-left-radius: 12px;
+}
+
+#tblVillas thead.admin-thead th:last-child {
+  border-top-right-radius: 12px;
+}
+
+#tblVillas tbody tr {
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+
+#tblVillas tbody tr:hover {
+  background: #e7f3ef;
+}
+
+/* Badge de tipo (Sencilla, Doble, Suite) */
+.admin-badge {
+  background: #e1f2ec;
+  color: #145c3b;
+  border-radius: 999px;
+  font-weight: 600;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+}
+
+/* Botones de acción */
+.btn-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border-width: 1px;
+}
+
+.btn-icon i {
+  font-size: 1rem;
+}
+/* CARD estilo LuxuryHotel adaptado a color verde */
+.modern-room-card {
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.modern-room-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 26px rgba(0,0,0,0.12);
+}
+
+/* Zoom hover */
+.room-img-zoom {
+  transition: transform .5s ease;
+}
+
+.modern-room-card:hover .room-img-zoom {
+  transform: scale(1.08);
+}
+
+/* Precio flotante */
+.room-price-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 1rem;
+  background: #1b5e3a !important; /* verde Villa Grace */
+}
+
+/* Título */
+.room-title {
+  font-family: "Playfair Display", serif;
+  font-size: 1.35rem;
+  color: #1b3a29;
+}
+
+/* Feature chips */
+.feature-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid #d9e2da;
+  border-radius: 30px;
+  background: #fafdfb;
+  color: #345c45;
+  font-size: 0.85rem;
+}
+
+/* Botones del demo pero en verde */
+.btn-success {
+  background-color: #1b5e3a !important;
+  border-color: #1b5e3a !important;
+}
+
+.btn-outline-success {
+  color: #1b5e3a !important;
+  border-color: #1b5e3a !important;
+}
+
+.btn-outline-success:hover {
+  background-color: #1b5e3a !important;
+  color: white !important;
+}
+
+/* Icono de mantenimiento */
+.maintenance-btn {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Botón "Consultar disponibilidad" más compacto y en una sola línea */
+.btn-availability {
+  white-space: nowrap;
+}
+
+/* Icono de mantenimiento discreto, tipo pastilla verde */
+.maintenance-pill {
+  background-color: #1b5e3a;
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.maintenance-pill i {
+  font-size: 1rem;
+}
+
+.maintenance-pill:hover {
+  background-color: #15472c;
+  color: #ffffff;
+}

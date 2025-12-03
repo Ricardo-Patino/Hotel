@@ -1,0 +1,219 @@
+{% set page_title = "Administración – Habitaciones" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ page_title }} | Hotel Villa Grace</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon"/>
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon"/>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet"/>
+
+</head>
+<body>
+<header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container position-relative d-flex align-items-center justify-content-between">
+      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+        <h1 class="sitename">Hotel Villa Grace</h1>
+      </a>
+
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li class="dropdown"><a href="#" class="active"><span>Recepción</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+            <ul>
+              <li><a href="ops-dashboard.html" class="active">Tablero</a></li>
+              <li><a href="ops-checkin.html">Check-in</a></li>
+              <li><a href="ops-checkout.html">Check-out</a></li>
+              <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
+              <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
+              <li><a href="ops-rooms-status.html">Estado de habitaciones</a></li>
+              <li><a href="/ops/housekeeping">Limpieza</a></li>
+              <li><a href="/ops/coupons">Cupones</a></li>
+            </ul>
+          </li>
+          <li><a href="admin-calendario.html">Calendario</a></li>
+          <li><a href="portal-reservas.html">Reservas del huésped</a></li>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
+
+      <a class="btn-getstarted d-none d-sm-block" href="ops-checkin.html">Ir a Check-in</a>
+    </div>
+  </header>>
+
+<main class="main admin-main">
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="mb-0 admin-title">Habitaciones</h2>
+      <button class="btn btn-primary admin-cta" data-bs-toggle="modal" data-bs-target="#villaModal">
+        <i class="bi bi-plus-circle"></i> Nueva habitación
+      </button>
+    </div>
+
+    <div class="card shadow-sm admin-card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table align-middle" id="tblVillas">
+            <thead class="admin-thead">
+              <tr>
+                <th>#</th>
+                <th>Código</th>
+                <th>Tipo</th>
+                <th>Precio/Noche</th>
+                <th>Estado</th>
+                <th style="width: 160px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody><!-- rows dinámicas --></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Modal Crear/Editar -->
+<div class="modal fade" id="villaModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" onsubmit="return submitVilla(event)">
+      <div class="modal-header"><h5 class="modal-title">Habitación</h5></div>
+      <div class="modal-body">
+        <input type="hidden" id="hidId" />
+        <div class="mb-2">
+          <label class="form-label">Código</label>
+          <input id="txtNumero" class="form-control" required maxlength="10" placeholder="H-101" />
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Tipo</label>
+          <select id="selTipo" class="form-select">
+            <option value="Sencilla">Sencilla</option>
+            <option value="Doble">Doble</option>
+            <option value="Suite">Suite</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Precio/Noche</label>
+          <input id="txtPrecio" class="form-control" type="number" step="0.01" min="0" value="0" required />
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Estado</label>
+          <select id="selEstado" class="form-select">
+            <option value="Disponible">Disponible</option>
+            <option value="Ocupada">Ocupada</option>
+            <option value="Ocupada-temprana">Ocupada-temprana</option>
+            <option value="Ocupada-extendida">Ocupada-extendida</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+            <option value="Limpieza">Limpieza</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Bootstrap -->
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+<script>
+async function loadVillas() {
+  const res = await fetch("{{ url_for('api_villas_list') }}"); // GET /api/villas
+  if(!res.ok){ console.error('GET /api/villas', res.status); return; }
+  const data = await res.json();
+  const tb = document.querySelector("#tblVillas tbody");
+  tb.innerHTML = "";
+  data.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${r.numero}</td>
+      <td><span class="badge admin-badge">${r.tipo}</span></td>
+      <td>₡ ${Number(r.precio_noche || 0).toFixed(2)}</td>
+      <td>${r.estado}</td>
+      <td>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline-warning btn-icon" onclick="editVilla(${r.id})">
+            <i class="bi bi-pencil-square"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger btn-icon" onclick="delVilla(${r.id})">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </td>`;
+    tr.dataset.row = JSON.stringify(r);
+    tb.appendChild(tr);
+  });
+}
+
+function openModal(obj) {
+  document.getElementById("hidId").value = obj?.id || "";
+  document.getElementById("txtNumero").value = obj?.numero || "";
+  document.getElementById("selTipo").value = obj?.tipo || "Sencilla";
+  document.getElementById("txtPrecio").value = obj?.precio_noche ?? 0;
+  document.getElementById("selEstado").value = obj?.estado || "Disponible";
+  const el = document.getElementById('villaModal');
+  const M = window.bootstrap.Modal;
+  (M.getInstance(el) || new M(el)).show();
+}
+
+function editVilla(id) {
+  const row = [...document.querySelectorAll("#tblVillas tbody tr")]
+    .map(tr => JSON.parse(tr.dataset.row))
+    .find(x => x.id === id);
+  if (row) openModal(row);
+  else alert("No se encontró la fila.");
+}
+
+async function delVilla(id) {
+  if (!confirm("¿Eliminar esta habitación?")) return;
+  const url = "{{ url_for('api_villas_delete', villa_id=0) }}".replace('0', id);
+  const res = await fetch(url, { method: "DELETE" });
+  const js = await res.json().catch(()=>({}));
+  if (!res.ok || js.ok === false) return alert(js.msg || "No se pudo eliminar");
+  loadVillas();
+}
+
+async function submitVilla(ev) {
+  ev.preventDefault();
+  const id = document.getElementById("hidId").value;
+  const payload = {
+    numero: document.getElementById("txtNumero").value.trim(),
+    tipo: document.getElementById("selTipo").value,
+    precio_noche: parseFloat(document.getElementById("txtPrecio").value || 0),
+    estado: document.getElementById("selEstado").value
+  };
+  const url = id
+    ? "{{ url_for('api_villas_update', villa_id=0) }}".replace('0', id)
+    : "{{ url_for('api_villas_create') }}";
+
+  const res = await fetch(url, {
+    method: "POST", // tu API usa POST para create/update
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const js = await res.json().catch(()=>({}));
+  if (!res.ok || js.ok === false) {
+    console.error('SAVE habitacion', res.status, js);
+    return alert(js.msg || "No se pudo guardar. Revisa consola/servidor.");
+  }
+  const modalEl = document.getElementById('villaModal');
+  const modal = window.bootstrap.Modal.getInstance(modalEl);
+  if (modal) modal.hide();
+  loadVillas();
+  return false;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadVillas();
+  document.querySelector('[data-bs-target="#villaModal"]').addEventListener('click', () => openModal(null));
+});
+</script>
+</body>
+</html>

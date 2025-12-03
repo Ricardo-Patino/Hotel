@@ -21,7 +21,6 @@
 
   <!-- Estilos -->
   <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 
   <style>
     .kpi-card .icon { font-size: 1.75rem; opacity:.9 }
@@ -179,6 +178,16 @@
                     <i class="bi bi-door-closed text-secondary"></i>
                     <div class="txt"><div class="fw-semibold">Estado habitaciones</div><small>Tablero</small></div>
                   </a>
+
+                  <!-- NUEVA TARJETA: Gestión de Habitaciones -->
+                  <a class="ops-item text-decoration-none" href="{{ url_for('admin.villas_html') }}">
+                    <i class="bi bi-house-gear text-secondary"></i>
+                    <div class="txt">
+                      <div class="fw-semibold">Gestión de Habitaciones</div>
+                      <small>Crear y editar habitaciones</small>
+                    </div>
+                  </a>
+
                   <a class="ops-item text-decoration-none" href="/ops/housekeeping">
                     <i class="bi bi-bucket text-secondary"></i>
                     <div class="txt"><div class="fw-semibold">Limpieza</div><small>Asignaciones</small></div>

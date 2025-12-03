@@ -17,7 +17,7 @@ from models_sql import (
 )  # <- usamos Usuario para resolver el cliente
 from services.grr.reservation_service import ReservationService
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from sqlalchemy import text
 from extensions import db
 
@@ -72,33 +72,46 @@ def _precio_noche(h: Habitacion) -> float:
 # --- Helpers para columnas y funcionario por defecto ---
 from sqlalchemy import text as _text
 
+
 def _col_exists(table_name: str, column_name: str) -> bool:
     try:
-        row = db.session.execute(_text("""
+        row = db.session.execute(
+            _text(
+                """
             SELECT 1
               FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
                AND TABLE_NAME = :t
                AND COLUMN_NAME = :c
              LIMIT 1
-        """), {"t": table_name, "c": column_name}).first()
+        """
+            ),
+            {"t": table_name, "c": column_name},
+        ).first()
         return bool(row)
     except Exception:
         return False
 
+
 def _col_nullable(table: str, column: str) -> bool:
     try:
-        row = db.session.execute(_text("""
+        row = db.session.execute(
+            _text(
+                """
             SELECT CASE WHEN IS_NULLABLE='YES' THEN 1 ELSE 0 END
               FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
                AND TABLE_NAME = :t
                AND COLUMN_NAME = :c
              LIMIT 1
-        """), {"t": table, "c": column}).scalar()
+        """
+            ),
+            {"t": table, "c": column},
+        ).scalar()
         return bool(row)
     except Exception:
         return True
+
 
 def _resolve_funcionario_id(payload: dict) -> tuple[bool, int | None, str | None]:
     """
@@ -121,7 +134,7 @@ def _resolve_funcionario_id(payload: dict) -> tuple[bool, int | None, str | None
     if fid:
         ok = db.session.execute(
             _text("SELECT 1 FROM Funcionario WHERE Codigo_Funcionario=:f LIMIT 1"),
-            {"f": fid}
+            {"f": fid},
         ).first()
         if ok:
             return True, fid, None
@@ -131,8 +144,10 @@ def _resolve_funcionario_id(payload: dict) -> tuple[bool, int | None, str | None
         uid = session.get("user_id")
         if uid:
             mapped = db.session.execute(
-                _text("SELECT Codigo_Funcionario FROM Funcionario WHERE Codigo_Usuario=:u LIMIT 1"),
-                {"u": uid}
+                _text(
+                    "SELECT Codigo_Funcionario FROM Funcionario WHERE Codigo_Usuario=:u LIMIT 1"
+                ),
+                {"u": uid},
             ).scalar()
             if mapped:
                 return True, int(mapped), None
@@ -141,7 +156,9 @@ def _resolve_funcionario_id(payload: dict) -> tuple[bool, int | None, str | None
 
     # 3) Tomar el primero disponible
     any_f = db.session.execute(
-        _text("SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario ASC LIMIT 1")
+        _text(
+            "SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario ASC LIMIT 1"
+        )
     ).scalar()
     if any_f:
         return True, int(any_f), None
@@ -150,8 +167,11 @@ def _resolve_funcionario_id(payload: dict) -> tuple[bool, int | None, str | None
     nullable = _col_nullable("Reserva", "Codigo_Funcionario")
     if nullable:
         return True, None, None
-    return True, None, "No hay funcionarios creados y la columna Reserva.Codigo_Funcionario no admite NULL."
-
+    return (
+        True,
+        None,
+        "No hay funcionarios creados y la columna Reserva.Codigo_Funcionario no admite NULL.",
+    )
 
 
 def _compute_total_and_pax(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -189,7 +209,9 @@ def _compute_total_and_pax(payload: Dict[str, Any]) -> Dict[str, Any]:
         guests_field = int(guests_field) if guests_field is not None else None
     except Exception:
         guests_field = None
-    total_pax = max(1, guests_field if guests_field is not None else (adults + children or 1))
+    total_pax = max(
+        1, guests_field if guests_field is not None else (adults + children or 1)
+    )
 
     # Precio base por noche (por huésped). Aceptar también 'price' del front.
     price_night = None
@@ -201,7 +223,11 @@ def _compute_total_and_pax(payload: Dict[str, Any]) -> Dict[str, Any]:
     elif "Precio_Base_Noche" in payload:
         price_night = float(payload.get("Precio_Base_Noche") or 0.0)
     else:
-        room_id = payload.get("Codigo_Habitacion") or payload.get("room") or payload.get("roomCode")
+        room_id = (
+            payload.get("Codigo_Habitacion")
+            or payload.get("room")
+            or payload.get("roomCode")
+        )
         if room_id:
             try:
                 h = Habitacion.query.get(int(room_id))
@@ -213,12 +239,14 @@ def _compute_total_and_pax(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     # Tarifa NRB => 10% descuento (aceptar rateCode/rate/tarifa)
     rate_code = (
-        (payload.get("rateCode")
-         or payload.get("rate")
-         or payload.get("Tarifa")
-         or payload.get("Tipo_Tarifa")
-         or payload.get("RateCode")
-         or "")
+        (
+            payload.get("rateCode")
+            or payload.get("rate")
+            or payload.get("Tarifa")
+            or payload.get("Tipo_Tarifa")
+            or payload.get("RateCode")
+            or ""
+        )
         .strip()
         .lower()
     )
@@ -238,19 +266,18 @@ def _compute_total_and_pax(payload: Dict[str, Any]) -> Dict[str, Any]:
         "price_night": float(price_night),  # por huésped/noche (ya con NRB si aplica)
         "subtotal": float(subtotal),
         "tax": float(tax),
-        "total": float(total),               # <-- guardar en Monto_Total
+        "total": float(total),  # <-- guardar en Monto_Total
         "rate_code": rate_code or "flex",
     }
-
-
 
 
 # ======================= Cálculo autoritativo de totales ======================
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime
 
-VAT_RATE = Decimal("0.13")      # 13%
+VAT_RATE = Decimal("0.13")  # 13%
 NRB_DISCOUNT = Decimal("0.10")  # 10% descuento para tarifa No Reembolsable
+
 
 def _d2(v) -> Decimal:
     if isinstance(v, Decimal):
@@ -261,6 +288,7 @@ def _d2(v) -> Decimal:
         except Exception:
             d = Decimal("0")
     return d.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
 
 def _to_date(v):
     if isinstance(v, date):
@@ -277,6 +305,7 @@ def _to_date(v):
         except Exception:
             return None
 
+
 def _safe_int(v, default=0):
     try:
         if v is None:
@@ -288,12 +317,14 @@ def _safe_int(v, default=0):
     except Exception:
         return default
 
+
 def _nights(ci: date, co: date) -> int:
     try:
         n = (co - ci).days
         return max(1, n)
     except Exception:
         return 1
+
 
 def _lookup_price_per_guest_night(payload: Dict[str, Any]) -> Decimal:
     """
@@ -304,7 +335,16 @@ def _lookup_price_per_guest_night(payload: Dict[str, Any]) -> Decimal:
     4) Fallback 0.
     Si la tarifa es NRB => aplicar -10%.
     """
-    rate_code = (str(payload.get("Tarifa_Codigo") or payload.get("rateCode") or payload.get("rate") or "flex").strip().lower())
+    rate_code = (
+        str(
+            payload.get("Tarifa_Codigo")
+            or payload.get("rateCode")
+            or payload.get("rate")
+            or "flex"
+        )
+        .strip()
+        .lower()
+    )
     raw_price = payload.get("Precio_Noche")
 
     if raw_price:
@@ -316,12 +356,16 @@ def _lookup_price_per_guest_night(payload: Dict[str, Any]) -> Decimal:
             room_code = payload.get("Codigo_Habitacion") or payload.get("roomCode")
             if room_code:
                 h = Habitacion.query.filter(
-                    (Habitacion.Codigo_Habitacion == _safe_int(room_code)) |
-                    (Habitacion.Numero_Habitacion == str(room_code))
+                    (Habitacion.Codigo_Habitacion == _safe_int(room_code))
+                    | (Habitacion.Numero_Habitacion == str(room_code))
                 ).first()
             else:
                 tipo = payload.get("Tipo") or payload.get("tipo")
-                h = Habitacion.query.filter(Habitacion.Tipo.ilike(f"%{tipo}%")).first() if tipo else None
+                h = (
+                    Habitacion.query.filter(Habitacion.Tipo.ilike(f"%{tipo}%")).first()
+                    if tipo
+                    else None
+                )
 
             if h:
                 # Usa _precio_noche existente (ya prueba varios campos)
@@ -334,6 +378,7 @@ def _lookup_price_per_guest_night(payload: Dict[str, Any]) -> Decimal:
         price = _d2(price * (Decimal("1.00") - NRB_DISCOUNT))
 
     return price
+
 
 def _calc_totales(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -371,10 +416,27 @@ def _calc_totales(payload: Dict[str, Any]) -> Dict[str, Any]:
         "total": total,
         "checkin": ci,
         "checkout": co,
-        "rate_code": str(payload.get("Tarifa_Codigo") or payload.get("rateCode") or payload.get("rate") or "flex").lower(),
-        "rate_name": str(payload.get("Tarifa_Nombre") or payload.get("rateName") or ("No Reembolsable" if (str(payload.get("Tarifa_Codigo") or '').lower()=="nrb") else "Tarifa Flexible")),
-        "es_nrb": (str(payload.get("Tarifa_Codigo") or payload.get("rateCode") or '').lower()=="nrb"),
+        "rate_code": str(
+            payload.get("Tarifa_Codigo")
+            or payload.get("rateCode")
+            or payload.get("rate")
+            or "flex"
+        ).lower(),
+        "rate_name": str(
+            payload.get("Tarifa_Nombre")
+            or payload.get("rateName")
+            or (
+                "No Reembolsable"
+                if (str(payload.get("Tarifa_Codigo") or "").lower() == "nrb")
+                else "Tarifa Flexible"
+            )
+        ),
+        "es_nrb": (
+            str(payload.get("Tarifa_Codigo") or payload.get("rateCode") or "").lower()
+            == "nrb"
+        ),
     }
+
 
 def _set_if(obj, field: str, value):
     """Asigna sólo si el atributo existe en el modelo, para evitar AttributeError."""
@@ -481,6 +543,20 @@ def _force_owner(reserva_id: int, cli_id: int) -> None:
             )
 
 
+# Helper
+
+
+def _is_admin() -> bool:
+    """
+    Devuelve True si el usuario logueado es Administrador.
+    El rol se guarda en session["user_role"] (según tu app.py).
+    """
+    role = (session.get("user_role") or "").strip().lower()
+    return role == "administrador"
+    # Si más adelante quieres que Recepcionista también vea el icono:
+    # return role in ("administrador", "recepcionista")
+
+
 # ------------------------------- Health --------------------------------------
 
 
@@ -526,18 +602,24 @@ def disponibilidad():
             q = q.filter(hab_estado != "Mantenimiento")
 
         # Capacidad >= pax (si existe)
-        hab_cap = _attr(Habitacion, ["Capacidad", "Capacidad_Maxima", "Capacidad_Huespedes"])
+        hab_cap = _attr(
+            Habitacion, ["Capacidad", "Capacidad_Maxima", "Capacidad_Huespedes"]
+        )
         if hab_cap is not None:
             q = q.filter(func.coalesce(hab_cap, 2) >= int(total_pax))
 
         # Excluir habitaciones con reservas solapadas
         if ini and fin:
-            res_estado  = _attr(Reserva, ["Estado"])
-            res_fini    = _attr(Reserva, ["Fecha_Entrada"])
-            res_ffin    = _attr(Reserva, ["Fecha_Salida"])
+            res_estado = _attr(Reserva, ["Estado"])
+            res_fini = _attr(Reserva, ["Fecha_Entrada"])
+            res_ffin = _attr(Reserva, ["Fecha_Salida"])
             res_cod_hab = _attr(Reserva, ["Codigo_Habitacion"])
 
-            if res_fini is not None and res_ffin is not None and res_cod_hab is not None:
+            if (
+                res_fini is not None
+                and res_ffin is not None
+                and res_cod_hab is not None
+            ):
                 filters = [res_fini < fin, res_ffin > ini]  # solape [ini,fin)
                 # Ignorar canceladas si hay columna Estado
                 if res_estado is not None:
@@ -552,7 +634,9 @@ def disponibilidad():
 
         # Orden estable: por número si existe, si no por código
         if hasattr(Habitacion, "Numero_Habitacion"):
-            q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
+            q = q.order_by(
+                Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc()
+            )
         else:
             q = q.order_by(Habitacion.Codigo_Habitacion.asc())
 
@@ -562,12 +646,14 @@ def disponibilidad():
                 {
                     # claves "amigables" que el front sabe leer
                     "code": int(getattr(h, "Codigo_Habitacion")),
-                    "name": getattr(h, "Nombre", None) or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
+                    "name": getattr(h, "Nombre", None)
+                    or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
                     # compatibilidad con vistas antiguas:
                     "Codigo_Habitacion": int(getattr(h, "Codigo_Habitacion")),
                     "Numero_Habitacion": getattr(h, "Numero_Habitacion", None),
                     "tipo": getattr(h, "Tipo", None) or "",
-                    "desc": getattr(h, "Descripcion", None) or (getattr(h, "Tipo", None) or ""),
+                    "desc": getattr(h, "Descripcion", None)
+                    or (getattr(h, "Tipo", None) or ""),
                     "capacity": int(getattr(h, "Capacidad", None) or 2),
                     "price": _precio_noche(h),
                     "img": getattr(h, "Imagen_URL", None) or "",
@@ -577,18 +663,27 @@ def disponibilidad():
                 }
             )
 
-        return jsonify({
-            "ok": True,
-            "rooms": rooms,
-            "params": {"checkin": checkin, "checkout": checkout, "adults": adults, "children": children},
-        }), 200
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "rooms": rooms,
+                    "params": {
+                        "checkin": checkin,
+                        "checkout": checkout,
+                        "adults": adults,
+                        "children": children,
+                    },
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         # ⛑️ Devuelve 500 real para que el front NO lo confunda con "sin disponibilidad"
         if current_app:
             current_app.logger.exception(f"[GRR] disponibilidad error: {e}")
         return jsonify({"ok": False, "msg": f"Error en disponibilidad: {e}"}), 500
-
 
 
 # Lista completa de habitaciones para la UI (GRR-01-014)
@@ -598,13 +693,15 @@ def grr_habitaciones():
         q = Habitacion.query
         # Ordenar por número si existe, si no por código
         if hasattr(Habitacion, "Numero_Habitacion"):
-            q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
+            q = q.order_by(
+                Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc()
+            )
         else:
             q = q.order_by(Habitacion.Codigo_Habitacion.asc())
 
         rooms = []
         for h in q.all():
-            tipo = (getattr(h, "Tipo", None) or "Sencilla")
+            tipo = getattr(h, "Tipo", None) or "Sencilla"
             # Derivar capacidad si la tabla no la tuviera
             tl = tipo.lower()
             cap = 4 if ("suite" in tl or "doble" in tl) else 2
@@ -614,7 +711,8 @@ def grr_habitaciones():
             item = {
                 # claves "amigables"
                 "code": int(getattr(h, "Codigo_Habitacion")),
-                "name": getattr(h, "Nombre", None) or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
+                "name": getattr(h, "Nombre", None)
+                or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
                 "tipo": tipo,
                 "capacity": int(getattr(h, "Capacidad", None) or cap),
                 "price": price,
@@ -638,6 +736,26 @@ def grr_habitaciones():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@grr_bp.get("/habitaciones/<int:habitacion_id>")
+def room_details_page(habitacion_id: int):
+    """
+    Página de detalle de una habitación específica.
+    Usa la plantilla room-details.html.
+    """
+    hab = Habitacion.query.get_or_404(habitacion_id)
+
+    # Descripción genérica por si tu tabla no tiene campo Descripcion
+    descripcion = (
+        getattr(hab, "Descripcion", None)
+        or "Comodidad y descanso con el estándar de calidad del Hotel Villa Grace."
+    )
+
+    return render_template(
+        "room-details.html",
+        habitacion=hab,
+        descripcion=descripcion,
+        es_admin=_is_admin(),  # 👈 para que también tengas el flag en esta vista
+    )
 
 
 # ------------------------------- Reservas ------------------------------------
@@ -660,7 +778,15 @@ def crear_reserva():
         # 1) Cliente desde sesión
         email, cli_id = _current_user_email_and_cliente()
         if not cli_id:
-            return jsonify({"ok": False, "msg": "No se pudo resolver el cliente del usuario (inicia sesión)."}), 401
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "msg": "No se pudo resolver el cliente del usuario (inicia sesión).",
+                    }
+                ),
+                401,
+            )
 
         # 2) Enriquecer datos base
         payload.setdefault("Canal", "Web")
@@ -676,26 +802,39 @@ def crear_reserva():
         if room_id and payload.get("Fecha_Entrada") and payload.get("Fecha_Salida"):
             ini = payload["Fecha_Entrada"]
             fin = payload["Fecha_Salida"]
-            if isinstance(ini, str): ini = date.fromisoformat(ini)
-            if isinstance(fin, str): fin = date.fromisoformat(fin)
+            if isinstance(ini, str):
+                ini = date.fromisoformat(ini)
+            if isinstance(fin, str):
+                fin = date.fromisoformat(fin)
 
             conflict = (
                 db.session.query(Reserva)
                 .filter(Reserva.Codigo_Habitacion == int(room_id))
-                .filter(Reserva.Fecha_Entrada < fin, Reserva.Fecha_Salida > ini)  # solape [ini, fin)
+                .filter(
+                    Reserva.Fecha_Entrada < fin, Reserva.Fecha_Salida > ini
+                )  # solape [ini, fin)
                 .filter(Reserva.Estado != "Cancelada")
                 .first()
             )
             if conflict:
-                return jsonify({"ok": False, "code": "no_availability", "msg": "Sin disponibilidad para el rango solicitado"}), 409
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "code": "no_availability",
+                            "msg": "Sin disponibilidad para el rango solicitado",
+                        }
+                    ),
+                    409,
+                )
 
         # 4) Calcular totales y pax (BACKEND manda)
         calc = _compute_total_and_pax(payload)
 
         # Añadir al payload antes de crear (para que el Service lo use si respeta campos)
-        payload["Huespedes"]   = int(calc["total_pax"])
-        payload["Monto_Total"] = float(calc["total"])   # TOTAL CON IMPUESTO
-        payload["Tarifa"]      = calc["rate_code"]
+        payload["Huespedes"] = int(calc["total_pax"])
+        payload["Monto_Total"] = float(calc["total"])  # TOTAL CON IMPUESTO
+        payload["Tarifa"] = calc["rate_code"]
 
         # 5) Crear con el servicio
         res = _res_service.create(payload)
@@ -712,20 +851,28 @@ def crear_reserva():
             try:
                 # Actualiza SIEMPRE monto total (con impuesto) y número de huéspedes
                 db.session.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE Reserva
                            SET Huespedes   = :pax,
                                Monto_Total = :monto
                          WHERE Codigo_Reserva = :rid
-                    """),
-                    {"pax": int(calc["total_pax"]), "monto": float(calc["total"]), "rid": rid},
+                    """
+                    ),
+                    {
+                        "pax": int(calc["total_pax"]),
+                        "monto": float(calc["total"]),
+                        "rid": rid,
+                    },
                 )
                 db.session.commit()
                 # Asegurar dueño correcto
                 _force_owner(rid, cli_id)
             except Exception as e:
                 if current_app:
-                    current_app.logger.warning(f"[GRR] post-create pax/monto R#{rid} fallo: {e}")
+                    current_app.logger.warning(
+                        f"[GRR] post-create pax/monto R#{rid} fallo: {e}"
+                    )
 
         # 7) Devolver el 'monto' correcto en la respuesta (útil para UI y correo)
         if res.get("ok"):
@@ -737,10 +884,6 @@ def crear_reserva():
         if current_app:
             current_app.logger.exception(f"[GRR] crear_reserva error: {e}")
         return jsonify({"ok": False, "msg": f"Error inesperado: {e}"}), 500
-
-
-
-
 
 
 @grr_bp.get("/reservas")
@@ -901,10 +1044,13 @@ def api_rooms_status():
             }
         )
     return jsonify(rooms)
-#Aqui quedaría
+
+
+# Aqui quedaría
 
 # 👇 usa la función consolidada del service
 from services.grr.housekeeping_sync import mark_room_to_cleaning
+
 
 @grr_bp.post("/api/rooms/<int:room_id>/send_to_cleaning")
 def api_send_to_cleaning(room_id: int):
@@ -917,18 +1063,27 @@ def api_send_to_cleaning(room_id: int):
         # delega todo al service (marca 'Limpieza' y crea HK si hace falta)
         out = mark_room_to_cleaning(room_id)
         if out.get("ok"):
-            return jsonify({
-                "ok": True,
-                "message": f"Habitación {hab.Numero_Habitacion} enviada a limpieza.",
-                "task_id": out.get("task_id")
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "ok": True,
+                        "message": f"Habitación {hab.Numero_Habitacion} enviada a limpieza.",
+                        "task_id": out.get("task_id"),
+                    }
+                ),
+                200,
+            )
 
-        return jsonify({"ok": False, "error": out.get("error", "No se pudo crear la orden")}), 400
+        return (
+            jsonify(
+                {"ok": False, "error": out.get("error", "No se pudo crear la orden")}
+            ),
+            400,
+        )
 
     except Exception as e:
         db.session.rollback()
         return jsonify({"ok": False, "error": str(e)}), 500
-
 
 
 @grr_bp.get("/api/rooms/calendar")
@@ -955,12 +1110,15 @@ def api_rooms_calendar():
 
 # 👇 usa el modelo real
 
+
 @grr_bp.get("/housekeeping/api/ordenes")
 def hk_list():
     # import local para evitar errores si el modelo no está cargado antes
     from models_sql import HousekeepingTask
 
-    ordenes = HousekeepingTask.query.order_by(HousekeepingTask.Fecha_Creacion.desc()).all()
+    ordenes = HousekeepingTask.query.order_by(
+        HousekeepingTask.Fecha_Creacion.desc()
+    ).all()
     items = []
     for o in ordenes:
         hab_num = None
@@ -969,15 +1127,20 @@ def hk_list():
             hab_num = hab.Numero_Habitacion if hab else None
         except Exception:
             pass
-        items.append({
-            "id": o.Id,
-            "habitacion": hab_num,
-            "estado": o.Estado,
-            "notas": getattr(o, "Observaciones", None),
-            "creado": o.Fecha_Creacion.isoformat() if getattr(o, "Fecha_Creacion", None) else None,
-        })
+        items.append(
+            {
+                "id": o.Id,
+                "habitacion": hab_num,
+                "estado": o.Estado,
+                "notas": getattr(o, "Observaciones", None),
+                "creado": (
+                    o.Fecha_Creacion.isoformat()
+                    if getattr(o, "Fecha_Creacion", None)
+                    else None
+                ),
+            }
+        )
     return jsonify(items)
-
 
 
 @grr_bp.post("/housekeeping/orden/<int:orden_id>/estado")
@@ -1000,7 +1163,6 @@ def hk_set_estado(orden_id):
 
     db.session.commit()
     return jsonify({"ok": True, "antes": estado_anterior, "despues": nuevo})
-
 
 
 from models_sql import MantenimientoSolicitud
@@ -1055,17 +1217,18 @@ def mant_list():
     ]
     return jsonify(data)
 
+
 @grr_bp.get("/ops/housekeeping")
 def ops_housekeeping():
     """Vista del módulo de limpieza (Housekeeping)."""
     return render_template("ops-housekeeping.html")
 
 
-
 # =========================
 # GRR-01-014: Lista de espera y ofertas
 # =========================
 from datetime import datetime, timedelta
+
 
 def _send_offer_email(to_email: str, subject: str, body: str):
     """
@@ -1075,44 +1238,62 @@ def _send_offer_email(to_email: str, subject: str, body: str):
     try:
         host = current_app.config.get("MAIL_SERVER")
         port = int(current_app.config.get("MAIL_PORT", 0) or 0)
-        user = current_app.config.get("MAIL_USERNAME"); pwd = current_app.config.get("MAIL_PASSWORD")
-        sender = current_app.config.get("MAIL_DEFAULT_SENDER") or user or "no-reply@hotel.local"
+        user = current_app.config.get("MAIL_USERNAME")
+        pwd = current_app.config.get("MAIL_PASSWORD")
+        sender = (
+            current_app.config.get("MAIL_DEFAULT_SENDER")
+            or user
+            or "no-reply@hotel.local"
+        )
         use_tls = bool(current_app.config.get("MAIL_USE_TLS", False))
         use_ssl = bool(current_app.config.get("MAIL_USE_SSL", False))
         if not (host and port and user and pwd):
-            current_app.logger.info(f"[WAITLIST OFFER MOCK]\nTo: {to_email}\nSubj: {subject}\n\n{body}")
+            current_app.logger.info(
+                f"[WAITLIST OFFER MOCK]\nTo: {to_email}\nSubj: {subject}\n\n{body}"
+            )
             return
         from email.message import EmailMessage
         import ssl, smtplib
+
         msg = EmailMessage()
-        msg["Subject"] = subject; msg["From"] = sender; msg["To"] = to_email
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = to_email
         msg.set_content(body)
         if use_ssl:
             ctx = ssl.create_default_context()
             with smtplib.SMTP_SSL(host, port, context=ctx, timeout=30) as s:
-                s.login(user, pwd); s.send_message(msg)
+                s.login(user, pwd)
+                s.send_message(msg)
         else:
             with smtplib.SMTP(host, port, timeout=30) as s:
-                if use_tls: s.starttls(context=ssl.create_default_context())
-                s.login(user, pwd); s.send_message(msg)
+                if use_tls:
+                    s.starttls(context=ssl.create_default_context())
+                s.login(user, pwd)
+                s.send_message(msg)
     except Exception as e:
         current_app.logger.warning(f"[WAITLIST MAIL] {e}")
+
 
 def _room_free_in_range(room_id: int, ci: date, co: date) -> bool:
     r = (
         db.session.query(Reserva)
         .filter(Reserva.Codigo_Habitacion == int(room_id))
-        .filter(Reserva.Estado.in_(("Confirmada","Pendiente")))
+        .filter(Reserva.Estado.in_(("Confirmada", "Pendiente")))
         .filter(Reserva.Fecha_Entrada < co, Reserva.Fecha_Salida > ci)
         .first()
     )
     return r is None
 
-def _find_room_for_waitlist(tipo: str, ci: date, co: date, pax: int, superior_ok: bool=True):
+
+def _find_room_for_waitlist(
+    tipo: str, ci: date, co: date, pax: int, superior_ok: bool = True
+):
     """
     Busca habitación libre del mismo tipo; si no hay y superior_ok=True,
     busca otra con capacidad >= pax y tarifa >= del tipo solicitado (aprox “superior”).
     """
+
     def _q(base_cond=None):
         q = Habitacion.query
         if base_cond is not None:
@@ -1139,16 +1320,22 @@ def _find_room_for_waitlist(tipo: str, ci: date, co: date, pax: int, superior_ok
     type_price = None
     for h in all_rooms:
         if getattr(h, "Tipo", None) == tipo:
-            type_price = _precio_noche(h); break
+            type_price = _precio_noche(h)
+            break
     if type_price is None:
         type_price = 0.0
 
     for h in all_rooms:
         cap = int(getattr(h, "Capacidad", 2) or 2)
         p = _precio_noche(h)
-        if cap >= pax and p >= type_price and _room_free_in_range(h.Codigo_Habitacion, ci, co):
+        if (
+            cap >= pax
+            and p >= type_price
+            and _room_free_in_range(h.Codigo_Habitacion, ci, co)
+        ):
             return h
     return None
+
 
 # blueprints/grr/routes.py
 
@@ -1164,14 +1351,19 @@ def waitlist_add():
     p = request.get_json(silent=True) or request.form or {}
 
     # --- Leer payload desde el front (con sinónimos) ---
-    name     = (p.get("nombre") or p.get("name") or "").strip()
-    email    = (p.get("correo") or p.get("email") or "").strip().lower()
-    room_id  = (p.get("room_id") or p.get("habitacion_id") or request.args.get("room_id"))
-    tipo     = (p.get("tipo") or request.args.get("tipo"))
-    checkin  = (p.get("checkin") or request.args.get("checkin") or "").strip()
+    name = (p.get("nombre") or p.get("name") or "").strip()
+    email = (p.get("correo") or p.get("email") or "").strip().lower()
+    room_id = p.get("room_id") or p.get("habitacion_id") or request.args.get("room_id")
+    tipo = p.get("tipo") or request.args.get("tipo")
+    checkin = (p.get("checkin") or request.args.get("checkin") or "").strip()
     checkout = (p.get("checkout") or request.args.get("checkout") or "").strip()
-    guests   = (p.get("huespedes") or p.get("guests") or
-                request.args.get("huespedes") or request.args.get("guests") or 1)
+    guests = (
+        p.get("huespedes")
+        or p.get("guests")
+        or request.args.get("huespedes")
+        or request.args.get("guests")
+        or 1
+    )
     preferir_superior = p.get("preferir_superior", 1)  # 1 = sí (por defecto)
 
     try:
@@ -1181,14 +1373,19 @@ def waitlist_add():
 
     # Validación mínima de datos de entrada
     if not (name and email and checkin and checkout):
-        return jsonify({"ok": False, "msg": "Datos incompletos (nombre, correo, fechas)."}), 400
+        return (
+            jsonify(
+                {"ok": False, "msg": "Datos incompletos (nombre, correo, fechas)."}
+            ),
+            400,
+        )
 
     # Si no vino 'tipo', intentar derivarlo por room_id desde Habitacion
     if (not tipo) and room_id:
         try:
             row = db.session.execute(
                 text("SELECT Tipo FROM Habitacion WHERE Codigo_Habitacion=:id LIMIT 1"),
-                {"id": int(room_id)}
+                {"id": int(room_id)},
             ).first()
             if row and row[0]:
                 tipo = str(row[0])
@@ -1202,7 +1399,9 @@ def waitlist_add():
     # --- Garantizar que la tabla existe (no altera si ya existe) ---
     # Alineado con tu script de esquema: Tipo_Solicitado es NOT NULL y sin default.
     try:
-        db.session.execute(text("""
+        db.session.execute(
+            text(
+                """
             CREATE TABLE IF NOT EXISTS Waitlist (
               Id                 INT AUTO_INCREMENT PRIMARY KEY,
               Correo             VARCHAR(120) NOT NULL,
@@ -1221,7 +1420,9 @@ def waitlist_add():
               KEY IX_WL_Fechas (Fecha_Entrada, Fecha_Salida),
               KEY IX_WL_Correo (Correo)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        """))
+        """
+            )
+        )
         db.session.commit()
     except Exception:
         db.session.rollback()  # si falla, continuaremos asumiendo que ya existe
@@ -1230,20 +1431,35 @@ def waitlist_add():
     try:
         columns = {
             r[0]
-            for r in db.session.execute(text("""
+            for r in db.session.execute(
+                text(
+                    """
                 SELECT COLUMN_NAME
                   FROM INFORMATION_SCHEMA.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE()
                    AND TABLE_NAME   = 'Waitlist'
-            """)).all()
+            """
+                )
+            ).all()
         }
     except Exception as e:
-        current_app.logger.warning(f"[WAITLIST] No fue posible leer INFORMATION_SCHEMA: {e}")
+        current_app.logger.warning(
+            f"[WAITLIST] No fue posible leer INFORMATION_SCHEMA: {e}"
+        )
         # Si no podemos leer columnas, usamos el esquema "oficial"
         columns = {
-            "Correo","Nombre","Tipo_Solicitado","Fecha_Entrada","Fecha_Salida",
-            "Huespedes","Preferir_Superior","Estado","Expira_Oferta","Oferta_Reserva_Id",
-            "Observaciones","Fecha_Creacion"
+            "Correo",
+            "Nombre",
+            "Tipo_Solicitado",
+            "Fecha_Entrada",
+            "Fecha_Salida",
+            "Huespedes",
+            "Preferir_Superior",
+            "Estado",
+            "Expira_Oferta",
+            "Oferta_Reserva_Id",
+            "Observaciones",
+            "Fecha_Creacion",
         }
 
     def has(col: str) -> bool:
@@ -1261,12 +1477,15 @@ def waitlist_add():
     add("Correo", email)
     add("Nombre", name)
     add("Tipo_Solicitado", tipo)
-    add("Fecha_Entrada", checkin)   # YYYY-MM-DD esperado; el front ya lo genera así
+    add("Fecha_Entrada", checkin)  # YYYY-MM-DD esperado; el front ya lo genera así
     add("Fecha_Salida", checkout)
 
     # Opcionales
     add("Huespedes", int(guests))
-    add("Preferir_Superior", 1 if str(preferir_superior) in ("1", "true", "True", "on", "sí", "si") else 0)
+    add(
+        "Preferir_Superior",
+        1 if str(preferir_superior) in ("1", "true", "True", "on", "sí", "si") else 0,
+    )
     add("Estado", "Pendiente")
 
     # Algunos entornos tenían variantes con estas columnas; si existen, se agregan:
@@ -1288,7 +1507,15 @@ def waitlist_add():
 
     # Validación final: no intentes hacer INSERT vacío
     if not fields:
-        return jsonify({"ok": False, "msg": "No hay columnas válidas para insertar en Waitlist."}), 500
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "msg": "No hay columnas válidas para insertar en Waitlist.",
+                }
+            ),
+            500,
+        )
 
     # --- Ejecutar INSERT parametrizado ---
     ph = ", ".join(f":{f}" for f in fields)
@@ -1297,12 +1524,19 @@ def waitlist_add():
     try:
         db.session.execute(text(sql), params)
         db.session.commit()
-        return jsonify({"ok": True, "msg": "Te hemos agregado a la lista de espera."}), 201
+        return (
+            jsonify({"ok": True, "msg": "Te hemos agregado a la lista de espera."}),
+            201,
+        )
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception(f"[WAITLIST] insert error: {e}")
-        return jsonify({"ok": False, "msg": f"Error al registrar en la lista de espera: {e}"}), 500
-
+        return (
+            jsonify(
+                {"ok": False, "msg": f"Error al registrar en la lista de espera: {e}"}
+            ),
+            500,
+        )
 
 
 @grr_bp.post("/waitlist/room/<int:room_id>")
@@ -1311,14 +1545,14 @@ def waitlist_add_room(room_id: int):
     p = request.get_json(silent=True) or request.form or {}
 
     # Aceptar distintos nombres
-    name  = (p.get("name") or p.get("nombre") or "").strip()
+    name = (p.get("name") or p.get("nombre") or "").strip()
     email = (p.get("email") or p.get("correo") or "").strip().lower()
 
     # Fallback a querystring si no vienen en body
-    checkin  = (p.get("checkin")  or request.args.get("checkin")  or None)
-    checkout = (p.get("checkout") or request.args.get("checkout") or None)
-    tipo     = (p.get("tipo")     or request.args.get("tipo")     or None)
-    guests   = p.get("guests") or request.args.get("guests") or 1
+    checkin = p.get("checkin") or request.args.get("checkin") or None
+    checkout = p.get("checkout") or request.args.get("checkout") or None
+    tipo = p.get("tipo") or request.args.get("tipo") or None
+    guests = p.get("guests") or request.args.get("guests") or 1
     try:
         guests = int(guests)
     except Exception:
@@ -1326,22 +1560,37 @@ def waitlist_add_room(room_id: int):
 
     # Validar solo lo imprescindible
     if not name or not email:
-        return jsonify({"ok": False, "message": "Nombre y correo son obligatorios."}), 400
+        return (
+            jsonify({"ok": False, "message": "Nombre y correo son obligatorios."}),
+            400,
+        )
 
     # Guardar (ajusta el nombre de tu tabla/columnas si difieren)
-    db.session.execute(text("""
+    db.session.execute(
+        text(
+            """
         INSERT INTO Waitlist
             (Habitacion_Id, Tipo, Checkin, Checkout, Guests, Nombre, Email, Estado, Fecha_Solicitud)
         VALUES
             (:hid, :tipo, :ci, :co, :g, :n, :e, 'Pendiente', NOW())
-    """), {
-        "hid": room_id, "tipo": tipo, "ci": checkin, "co": checkout,
-        "g": guests, "n": name, "e": email
-    })
+    """
+        ),
+        {
+            "hid": room_id,
+            "tipo": tipo,
+            "ci": checkin,
+            "co": checkout,
+            "g": guests,
+            "n": name,
+            "e": email,
+        },
+    )
     db.session.commit()
 
-    return jsonify({"ok": True, "message": "Te hemos agregado a la lista de espera."}), 201
-
+    return (
+        jsonify({"ok": True, "message": "Te hemos agregado a la lista de espera."}),
+        201,
+    )
 
 
 @grr_bp.get("/waitlist")
@@ -1355,6 +1604,7 @@ def waitlist_list():
         rows = db.session.execute(text(sql)).mappings().all()
     return jsonify({"ok": True, "items": [dict(r) for r in rows]})
 
+
 @grr_bp.post("/waitlist/process")
 def waitlist_process():
     """
@@ -1362,11 +1612,19 @@ def waitlist_process():
     La oferta expira en X horas (config por env WAITLIST_OFFER_HOURS, default 12).
     """
     hours = int(current_app.config.get("WAITLIST_OFFER_HOURS", 12))
-    pend = db.session.execute(text("""
+    pend = (
+        db.session.execute(
+            text(
+                """
         SELECT * FROM Waitlist
          WHERE Estado='Pendiente'
          ORDER BY Fecha_Creacion ASC
-    """)).mappings().all()
+    """
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     processed = 0
     for w in pend:
@@ -1381,11 +1639,16 @@ def waitlist_process():
                 continue
             # Generar oferta (no bloquea inventario aquí)
             exp = datetime.utcnow() + timedelta(hours=hours)
-            db.session.execute(text("""
+            db.session.execute(
+                text(
+                    """
                 UPDATE Waitlist
                    SET Estado='Ofertado', Expira_Oferta=:exp
                  WHERE Id=:id
-            """), {"id": w["Id"], "exp": exp})
+            """
+                ),
+                {"id": w["Id"], "exp": exp},
+            )
             db.session.commit()
 
             # Email con instrucciones (link genérico)
@@ -1395,8 +1658,18 @@ def waitlist_process():
                 f"Puedes completar tu reserva desde el portal. Oferta válida hasta {exp} UTC.\n\n"
                 f"— Hotel Villa Grace"
             )
-            _send_offer_email(w["Correo"], "Oferta de disponibilidad — Hotel Villa Grace", body)
-            _audit_log(w["Correo"], "waitlist.offer", {"id": int(w["Id"]), "hab": int(hab.Codigo_Habitacion), "expira": exp.isoformat()})
+            _send_offer_email(
+                w["Correo"], "Oferta de disponibilidad — Hotel Villa Grace", body
+            )
+            _audit_log(
+                w["Correo"],
+                "waitlist.offer",
+                {
+                    "id": int(w["Id"]),
+                    "hab": int(hab.Codigo_Habitacion),
+                    "expira": exp.isoformat(),
+                },
+            )
             processed += 1
         except Exception as e:
             current_app.logger.warning(f"[WAITLIST] {e}")
@@ -1404,16 +1677,21 @@ def waitlist_process():
     return jsonify({"ok": True, "processed": processed})
 
 
-
 # =========================
 # GRR-01-015: Tarifas dinámicas / cupones / override
 # =========================
 def _apply_coupon_to_amount(codigo: str, monto_total: float) -> tuple[float, str]:
-    row = db.session.execute(
-        text("""SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
-                FROM Coupon WHERE Codigo=:c LIMIT 1"""),
-        {"c": (codigo or "").strip()}
-    ).mappings().first()
+    row = (
+        db.session.execute(
+            text(
+                """SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
+                FROM Coupon WHERE Codigo=:c LIMIT 1"""
+            ),
+            {"c": (codigo or "").strip()},
+        )
+        .mappings()
+        .first()
+    )
     if not row or not row["Activo"]:
         return monto_total, "Código inválido o inactivo"
 
@@ -1426,7 +1704,7 @@ def _apply_coupon_to_amount(codigo: str, monto_total: float) -> tuple[float, str
         return monto_total, "Código agotado"
 
     tipo = row["Tipo"]
-    val  = float(row["Valor"] or 0.0)
+    val = float(row["Valor"] or 0.0)
     if tipo == "porcentaje":
         nuevo = max(0.0, monto_total * (1.0 - val / 100.0))
     elif tipo == "monto":
@@ -1436,6 +1714,7 @@ def _apply_coupon_to_amount(codigo: str, monto_total: float) -> tuple[float, str
 
     # reservar el incremento de uso (no confirmamos aquí; lo hará la ruta)
     return round(nuevo, 2), ""
+
 
 @grr_bp.post("/reservas/<int:reserva_id>/apply-coupon")
 def reservas_apply_coupon(reserva_id: int):
@@ -1447,9 +1726,16 @@ def reservas_apply_coupon(reserva_id: int):
     if not codigo:
         return jsonify({"ok": False, "msg": "Falta código."}), 400
 
-    row = db.session.execute(text(
-        "SELECT Monto_Total, Fecha_Entrada, Fecha_Salida FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"
-    ), {"r": reserva_id}).mappings().first()
+    row = (
+        db.session.execute(
+            text(
+                "SELECT Monto_Total, Fecha_Entrada, Fecha_Salida FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"
+            ),
+            {"r": reserva_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         return jsonify({"ok": False, "msg": "Reserva no encontrada."}), 404
 
@@ -1459,19 +1745,42 @@ def reservas_apply_coupon(reserva_id: int):
         return jsonify({"ok": False, "msg": err}), 409
 
     # guardar ajuste
-    db.session.execute(text(
-        "UPDATE Reserva SET Monto_Total=:m WHERE Codigo_Reserva=:r"
-    ), {"m": nuevo, "r": reserva_id})
-    db.session.execute(text(
-        """INSERT INTO ReservaAjuste (Codigo_Reserva, Tipo, Codigo, Monto_Antes, Monto_Despues, Usuario, Motivo)
+    db.session.execute(
+        text("UPDATE Reserva SET Monto_Total=:m WHERE Codigo_Reserva=:r"),
+        {"m": nuevo, "r": reserva_id},
+    )
+    db.session.execute(
+        text(
+            """INSERT INTO ReservaAjuste (Codigo_Reserva, Tipo, Codigo, Monto_Antes, Monto_Despues, Usuario, Motivo)
            VALUES (:r,'coupon',:c,:a,:d,:u,'Cupón aplicado')"""
-    ), {"r": reserva_id, "c": codigo, "a": monto_antes, "d": nuevo, "u": _current_user_email() or ""})
+        ),
+        {
+            "r": reserva_id,
+            "c": codigo,
+            "a": monto_antes,
+            "d": nuevo,
+            "u": _current_user_email() or "",
+        },
+    )
     # incrementar uso del cupón
-    db.session.execute(text("UPDATE Coupon SET Usos=Usos+1 WHERE Codigo=:c"), {"c": codigo})
+    db.session.execute(
+        text("UPDATE Coupon SET Usos=Usos+1 WHERE Codigo=:c"), {"c": codigo}
+    )
     db.session.commit()
 
-    _audit_log(_current_user_email(), "reserva.coupon", {"reserva": reserva_id, "codigo": codigo, "antes": monto_antes, "despues": nuevo}, str(reserva_id))
+    _audit_log(
+        _current_user_email(),
+        "reserva.coupon",
+        {
+            "reserva": reserva_id,
+            "codigo": codigo,
+            "antes": monto_antes,
+            "despues": nuevo,
+        },
+        str(reserva_id),
+    )
     return jsonify({"ok": True, "monto": nuevo})
+
 
 @grr_bp.post("/reservas/<int:reserva_id>/manual-rate")
 def reservas_manual_rate(reserva_id: int):
@@ -1480,41 +1789,75 @@ def reservas_manual_rate(reserva_id: int):
     Body JSON: { monto_total: 123456.78, motivo:"Tarifa corporativa XYZ" }
     """
     p = request.get_json(silent=True) or {}
-    nuevo  = float(p.get("monto_total") or 0.0)
+    nuevo = float(p.get("monto_total") or 0.0)
     motivo = (p.get("motivo") or "Ajuste manual").strip()
     if nuevo <= 0:
         return jsonify({"ok": False, "msg": "Monto inválido."}), 400
 
-    row = db.session.execute(text(
-        "SELECT Monto_Total, Fecha_Entrada, Fecha_Salida FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"
-    ), {"r": reserva_id}).mappings().first()
+    row = (
+        db.session.execute(
+            text(
+                "SELECT Monto_Total, Fecha_Entrada, Fecha_Salida FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"
+            ),
+            {"r": reserva_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         return jsonify({"ok": False, "msg": "Reserva no encontrada."}), 404
 
     monto_antes = float(row["Monto_Total"] or 0.0)
     # ADR (sin impuestos): revenue / noches
     try:
-        ci = row["Fecha_Entrada"]; co = row["Fecha_Salida"]
+        ci = row["Fecha_Entrada"]
+        co = row["Fecha_Salida"]
         noches = max(1, (co - ci).days)
     except Exception:
         noches = 1
     adr_antes = round((monto_antes / (1.0 + TAX_RATE)) / noches, 2) if noches else 0.0
-    adr_desp  = round((nuevo        / (1.0 + TAX_RATE)) / noches, 2) if noches else 0.0
+    adr_desp = round((nuevo / (1.0 + TAX_RATE)) / noches, 2) if noches else 0.0
 
-    db.session.execute(text("UPDATE Reserva SET Monto_Total=:m WHERE Codigo_Reserva=:r"), {"m": nuevo, "r": reserva_id})
-    db.session.execute(text(
-        """INSERT INTO ReservaAjuste (Codigo_Reserva, Tipo, Monto_Antes, Monto_Despues, ADR_Antes, ADR_Despues, Usuario, Motivo)
+    db.session.execute(
+        text("UPDATE Reserva SET Monto_Total=:m WHERE Codigo_Reserva=:r"),
+        {"m": nuevo, "r": reserva_id},
+    )
+    db.session.execute(
+        text(
+            """INSERT INTO ReservaAjuste (Codigo_Reserva, Tipo, Monto_Antes, Monto_Despues, ADR_Antes, ADR_Despues, Usuario, Motivo)
            VALUES (:r,'manual',:a,:d,:aa,:ad,:u,:mot)"""
-    ), {"r": reserva_id, "a": monto_antes, "d": nuevo, "aa": adr_antes, "ad": adr_desp, "u": _current_user_email() or "", "mot": motivo})
+        ),
+        {
+            "r": reserva_id,
+            "a": monto_antes,
+            "d": nuevo,
+            "aa": adr_antes,
+            "ad": adr_desp,
+            "u": _current_user_email() or "",
+            "mot": motivo,
+        },
+    )
     db.session.commit()
 
-    _audit_log(_current_user_email(), "reserva.rate_override", {"reserva": reserva_id, "antes": monto_antes, "despues": nuevo, "motivo": motivo}, str(reserva_id))
+    _audit_log(
+        _current_user_email(),
+        "reserva.rate_override",
+        {
+            "reserva": reserva_id,
+            "antes": monto_antes,
+            "despues": nuevo,
+            "motivo": motivo,
+        },
+        str(reserva_id),
+    )
     return jsonify({"ok": True, "monto": nuevo, "adr": adr_desp})
+
 
 # routes.py (o donde declares tus rutas)
 from flask import Blueprint, render_template
 
 ops_bp = Blueprint("ops", __name__, url_prefix="/grr/ops")
+
 
 @ops_bp.get("/coupons")
 def ops_coupons_page():
@@ -1525,6 +1868,7 @@ def ops_coupons_page():
 # --- PREVIEW DE CUPONES (estimación) ---
 from datetime import date as _date, datetime as _dt
 from sqlalchemy import text as _text
+
 
 def _d10(v):
     """Normaliza fechas a 'YYYY-MM-DD' o None."""
@@ -1538,6 +1882,7 @@ def _d10(v):
     except Exception:
         return None
 
+
 @grr_bp.get("/coupons/preview")
 def coupons_preview():
     code = (request.args.get("code") or "").strip().upper()
@@ -1549,12 +1894,21 @@ def coupons_preview():
     if not code:
         return jsonify({"ok": False, "msg": "Código de cupón requerido."}), 200
 
-    row = db.session.execute(_text("""
+    row = (
+        db.session.execute(
+            _text(
+                """
         SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
           FROM Coupon
          WHERE Codigo = :c
          LIMIT 1
-    """), {"c": code}).mappings().first()
+    """
+            ),
+            {"c": code},
+        )
+        .mappings()
+        .first()
+    )
 
     if not row or not row["Activo"]:
         return jsonify({"ok": False, "msg": "Cupón inválido o inactivo."}), 200
@@ -1570,7 +1924,7 @@ def coupons_preview():
 
     # Límite de usos
     max_usos = row.get("Max_Usos")
-    usos     = row.get("Usos") or 0
+    usos = row.get("Usos") or 0
     if max_usos and usos >= max_usos:
         return jsonify({"ok": False, "msg": "Cupón agotado."}), 200
 
@@ -1583,12 +1937,16 @@ def coupons_preview():
     elif tipo in ("monto", "monto_fijo"):
         amount = valor
 
-    return jsonify({
-        "ok": True,
-        "type": tipo or "monto",
-        "amount": float(amount),
-        "msg": f"Descuento estimado: ₡ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    })
+    return jsonify(
+        {
+            "ok": True,
+            "type": tipo or "monto",
+            "amount": float(amount),
+            "msg": f"Descuento estimado: ₡ {amount:,.2f}".replace(",", "X")
+            .replace(".", ",")
+            .replace("X", "."),
+        }
+    )
 
 
 @grr_bp.get("/coupons/validate")
@@ -1609,8 +1967,17 @@ def coupons_validate():
         base = 0.0
 
     nuevo, err = _apply_coupon_to_amount(code, base)
-    return jsonify({"valid": (err == ""), "type": ("-" if err else "ok"),
-                    "value": None, "total": nuevo, "msg": (err or "Cupón válido.")})
+    return jsonify(
+        {
+            "valid": (err == ""),
+            "type": ("-" if err else "ok"),
+            "value": None,
+            "total": nuevo,
+            "msg": (err or "Cupón válido."),
+        }
+    )
+
+
 # =========================
 # GRR-01-016: Gestión de No-Show
 # =========================
@@ -1619,16 +1986,26 @@ def _no_show_penalty_for_reserva(reserva_id: int) -> float:
     Penalización por No-Show:
       - 1 noche (con impuestos) según tarifa actual de la habitación.
     """
-    row = db.session.execute(text("""
+    row = (
+        db.session.execute(
+            text(
+                """
         SELECT R.Codigo_Habitacion, H.Precio_Noche
           FROM Reserva R JOIN Habitacion H ON H.Codigo_Habitacion=R.Codigo_Habitacion
          WHERE R.Codigo_Reserva=:r LIMIT 1
-    """), {"r": reserva_id}).mappings().first()
+    """
+            ),
+            {"r": reserva_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         return 0.0
     price = float(row["Precio_Noche"] or 0.0)
     total = round(price * (1.0 + TAX_RATE), 2)
     return total
+
 
 @grr_bp.post("/jobs/run-noshow")
 def run_noshow():
@@ -1644,7 +2021,10 @@ def run_noshow():
     now_h = datetime.utcnow().hour  # usa UTC; si deseas TZ local, ajusta aquí
 
     # Candidatas: fecha_entrada < hoy, o (== hoy y hora >= cutoff)
-    cand = db.session.execute(text("""
+    cand = (
+        db.session.execute(
+            text(
+                """
         SELECT Codigo_Reserva, Codigo_Habitacion, Fecha_Entrada, Fecha_Salida, Monto_Total
           FROM Reserva
          WHERE Estado IN ('Confirmada','Pendiente')
@@ -1652,7 +2032,13 @@ def run_noshow():
                 DATE(Fecha_Entrada) < CURDATE()
                 OR (DATE(Fecha_Entrada) = CURDATE() AND :h >= :cut)
            )
-    """), {"h": now_h, "cut": cutoff}).mappings().all()
+    """
+            ),
+            {"h": now_h, "cut": cutoff},
+        )
+        .mappings()
+        .all()
+    )
 
     changed = 0
     for r in cand:
@@ -1660,20 +2046,35 @@ def run_noshow():
             # penalización
             fee = _no_show_penalty_for_reserva(int(r["Codigo_Reserva"]))
             nuevo_total = float(r["Monto_Total"] or 0.0) + fee
-            db.session.execute(text("""
+            db.session.execute(
+                text(
+                    """
                 UPDATE Reserva
                    SET Estado='NoShow',
                        Monto_Total=:m,
                        Observaciones = CONCAT(COALESCE(Observaciones,''),' | No-Show aplicado')
                  WHERE Codigo_Reserva=:id
-            """), {"m": nuevo_total, "id": r["Codigo_Reserva"]})
+            """
+                ),
+                {"m": nuevo_total, "id": r["Codigo_Reserva"]},
+            )
             # devolver la habitación a Disponible
-            db.session.execute(text("""
+            db.session.execute(
+                text(
+                    """
                 UPDATE Habitacion SET Estado='Disponible'
                  WHERE Codigo_Habitacion=:h
-            """), {"h": r["Codigo_Habitacion"]})
+            """
+                ),
+                {"h": r["Codigo_Habitacion"]},
+            )
             db.session.commit()
-            _audit_log(_current_user_email(), "reserva.noshow", {"reserva": int(r["Codigo_Reserva"]), "fee": fee}, str(r["Codigo_Reserva"]))
+            _audit_log(
+                _current_user_email(),
+                "reserva.noshow",
+                {"reserva": int(r["Codigo_Reserva"]), "fee": fee},
+                str(r["Codigo_Reserva"]),
+            )
             # KPI: ingresos (sin noches) para ADR correcto
             _update_kpis(nuevo_total, str(r["Fecha_Entrada"]), noches=0)
             changed += 1
@@ -1688,12 +2089,22 @@ def run_noshow():
 # GRR-01-017: Early Check-in / Late Check-out
 # =========================
 def _night_price_for_reserva(reserva_id: int) -> float:
-    row = db.session.execute(text("""
+    row = (
+        db.session.execute(
+            text(
+                """
         SELECT H.Precio_Noche
           FROM Reserva R JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
          WHERE R.Codigo_Reserva=:r LIMIT 1
-    """), {"r": reserva_id}).mappings().first()
+    """
+            ),
+            {"r": reserva_id},
+        )
+        .mappings()
+        .first()
+    )
     return float(row["Precio_Noche"] or 0.0) if row else 0.0
+
 
 @grr_bp.post("/reservas/<int:reserva_id>/early-checkin")
 def reservas_early_checkin(reserva_id: int):
@@ -1701,24 +2112,43 @@ def reservas_early_checkin(reserva_id: int):
     Adelanta la habitación (estado 'Ocupada-temprana') y aplica cargo.
     Body: { porcentaje: 30 }  # default EARLY_CHECKIN_PERCENT (30%)
     """
-    percent = float((request.json or {}).get("porcentaje") or current_app.config.get("EARLY_CHECKIN_PERCENT", 30))
+    percent = float(
+        (request.json or {}).get("porcentaje")
+        or current_app.config.get("EARLY_CHECKIN_PERCENT", 30)
+    )
     base = _night_price_for_reserva(reserva_id)
     cargo = round(base * (percent / 100.0) * (1.0 + TAX_RATE), 2)
-    db.session.execute(text("""
+    db.session.execute(
+        text(
+            """
         UPDATE Reserva
            SET Monto_Total = Monto_Total + :c,
                Observaciones = CONCAT(COALESCE(Observaciones,''), ' | Early check-in ', :p, '%')
          WHERE Codigo_Reserva=:r
-    """), {"c": cargo, "p": int(percent), "r": reserva_id})
+    """
+        ),
+        {"c": cargo, "p": int(percent), "r": reserva_id},
+    )
     # marcar habitación
-    db.session.execute(text("""
+    db.session.execute(
+        text(
+            """
         UPDATE Habitacion
            SET Estado='Ocupada-temprana'
          WHERE Codigo_Habitacion = (SELECT Codigo_Habitacion FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1)
-    """), {"r": reserva_id})
+    """
+        ),
+        {"r": reserva_id},
+    )
     db.session.commit()
-    _audit_log(_current_user_email(), "reserva.early_checkin", {"reserva": reserva_id, "cargo": cargo, "percent": percent}, str(reserva_id))
+    _audit_log(
+        _current_user_email(),
+        "reserva.early_checkin",
+        {"reserva": reserva_id, "cargo": cargo, "percent": percent},
+        str(reserva_id),
+    )
     return jsonify({"ok": True, "cargo": cargo})
+
 
 @grr_bp.post("/reservas/<int:reserva_id>/late-checkout")
 def reservas_late_checkout(reserva_id: int):
@@ -1735,23 +2165,37 @@ def reservas_late_checkout(reserva_id: int):
     table = {"medio": p30, "tarde": p60, "noche": p100}
     percent = float(table.get(tramo, p60))
     base = _night_price_for_reserva(reserva_id)
-    cargo = round(base * (percent/100.0) * (1.0 + TAX_RATE), 2)
+    cargo = round(base * (percent / 100.0) * (1.0 + TAX_RATE), 2)
 
-    db.session.execute(text("""
+    db.session.execute(
+        text(
+            """
         UPDATE Reserva
            SET Monto_Total = Monto_Total + :c,
                Observaciones = CONCAT(COALESCE(Observaciones,''), ' | Late check-out ', :p, '%')
          WHERE Codigo_Reserva=:r
-    """), {"c": cargo, "p": int(percent), "r": reserva_id})
-    db.session.execute(text("""
+    """
+        ),
+        {"c": cargo, "p": int(percent), "r": reserva_id},
+    )
+    db.session.execute(
+        text(
+            """
         UPDATE Habitacion
            SET Estado='Ocupada-extendida'
          WHERE Codigo_Habitacion = (SELECT Codigo_Habitacion FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1)
-    """), {"r": reserva_id})
+    """
+        ),
+        {"r": reserva_id},
+    )
     db.session.commit()
-    _audit_log(_current_user_email(), "reserva.late_checkout", {"reserva": reserva_id, "cargo": cargo, "percent": percent, "tramo": tramo}, str(reserva_id))
+    _audit_log(
+        _current_user_email(),
+        "reserva.late_checkout",
+        {"reserva": reserva_id, "cargo": cargo, "percent": percent, "tramo": tramo},
+        str(reserva_id),
+    )
     return jsonify({"ok": True, "cargo": cargo})
-
 
 
 # --- helpers que faltaban ---
@@ -1759,19 +2203,28 @@ import json
 from typing import Optional
 from datetime import date
 
+
 def _current_user_email() -> Optional[str]:
     email, _cli = _current_user_email_and_cliente()
     return email
 
-def _audit_log(usuario: Optional[str], accion: str, datos: dict | None = None,
-               entidad_id: Optional[str] = None, entidad: str = "GRR") -> None:
+
+def _audit_log(
+    usuario: Optional[str],
+    accion: str,
+    datos: dict | None = None,
+    entidad_id: Optional[str] = None,
+    entidad: str = "GRR",
+) -> None:
     """Inserta una línea en Auditoria_Log y, por trigger, se replica en Audit_Log."""
     try:
         db.session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO Auditoria_Log (Usuario, Entidad, Entidad_Id, Accion, Datos)
                 VALUES (:u, :ent, :eid, :acc, :dat)
-            """),
+            """
+            ),
             {
                 "u": usuario or "",
                 "ent": entidad,
@@ -1784,6 +2237,7 @@ def _audit_log(usuario: Optional[str], accion: str, datos: dict | None = None,
     except Exception as e:
         if current_app:
             current_app.logger.warning(f"[AUDIT] {e}")
+
 
 def _update_kpis(total_con_impuesto: float, fecha_ref: str | date, noches: int) -> None:
     """
@@ -1802,7 +2256,8 @@ def _update_kpis(total_con_impuesto: float, fecha_ref: str | date, noches: int) 
 
         def up(periodo: str, clave: str):
             db.session.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto, Revenue_SinImpuesto, Total_Noches)
                     VALUES (:p,:c,1,:m,:r,:n)
                     ON DUPLICATE KEY UPDATE
@@ -1811,12 +2266,19 @@ def _update_kpis(total_con_impuesto: float, fecha_ref: str | date, noches: int) 
                       Revenue_SinImpuesto = Revenue_SinImpuesto + :r,
                       Total_Noches = Total_Noches + :n,
                       Fecha_Ultima = NOW()
-                """),
-                {"p": periodo, "c": clave, "m": total_con_impuesto, "r": rev_sin_iva, "n": int(noches)},
+                """
+                ),
+                {
+                    "p": periodo,
+                    "c": clave,
+                    "m": total_con_impuesto,
+                    "r": rev_sin_iva,
+                    "n": int(noches),
+                },
             )
 
-        up("day",   f.strftime("%Y-%m-%d"))
-        up("week",  f.strftime("%G-W%V"))  # ISO week
+        up("day", f.strftime("%Y-%m-%d"))
+        up("week", f.strftime("%G-W%V"))  # ISO week
         up("month", f.strftime("%Y-%m"))
         db.session.commit()
     except Exception as e:

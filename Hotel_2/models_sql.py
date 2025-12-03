@@ -344,31 +344,25 @@ class LimpiezaInsumo(db.Model):
 
 class Temporada(db.Model):
     __tablename__ = "Temporada"
+    __table_args__ = {"extend_existing": True}
     Id           = db.Column(db.Integer, primary_key=True, autoincrement=True)
     Nombre       = db.Column(db.String(60), nullable=False)
     Fecha_Inicio = db.Column(db.Date, nullable=False)
     Fecha_Fin    = db.Column(db.Date, nullable=False)
 
 
+
 class TarifaTemporada(db.Model):
     __tablename__ = "TarifaTemporada"
+    __table_args__ = {'extend_existing': True}  # <- evita la colisión de meta
     Id                = db.Column(db.Integer, primary_key=True, autoincrement=True)
     Codigo_Habitacion = db.Column(
         db.Integer,
         db.ForeignKey("Habitacion.Codigo_Habitacion"),
         nullable=False,
-        index=True
     )
-    Temporada_Id      = db.Column(
-        db.Integer,
-        db.ForeignKey("Temporada.Id"),
-        nullable=False,
-        index=True
-    )
-    Precio_Noche      = db.Column(db.Numeric(12, 2), nullable=False)
-
-    Habitacion        = db.relationship("Habitacion", lazy="joined")
-    Temporada         = db.relationship("Temporada",  lazy="joined")
+    Temporada_Id      = db.Column(db.Integer, db.ForeignKey("Temporada.Id"), nullable=False)
+    Precio_Noche      = db.Column(db.Numeric(10, 2), nullable=False)
 
 
 class MantenimientoSolicitud(db.Model):
@@ -568,3 +562,14 @@ class InvMovimiento(db.Model):
 
 
 
+# --- Villas / Casas ---
+class VillaUnidad(db.Model):
+    __tablename__ = "VillaUnidad"
+    __table_args__ = {"extend_existing": True}  # seguro en dev
+
+    Id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Numero = db.Column(db.String(20), unique=True, nullable=False)        # V001 / CASA-01
+    Tipo = db.Column(db.String(10), nullable=False, default="Villa")      # Villa | Casa
+    Precio_Noche = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    Estado = db.Column(db.String(20), nullable=False, default="Disponible")  # Disponible | Ocupada | Limpieza | Mantenimiento
+    CreatedAt = db.Column(db.DateTime, server_default=db.func.now())

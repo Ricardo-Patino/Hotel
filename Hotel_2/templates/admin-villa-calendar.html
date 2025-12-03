@@ -1,0 +1,61 @@
+{% set page_title = "Calendario – " ~ (hab.Numero_Habitacion) %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ page_title }} | Hotel Villa Grace</title>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet"/>
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet"/>
+</head>
+<body>
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="{{ url_for('admin_villas_html') }}" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a class="active" href="{{ url_for('admin_villas_html') }}">Villas/Casas</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+  </div>
+</header>
+
+<main class="main" style="margin-top: 80px;">
+  <div class="container">
+    <h3 class="mb-3">Calendario – {{ hab.Numero_Habitacion }} <span class="badge bg-secondary">{{ hab.Tipo }}</span></h3>
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm" id="tblCal">
+            <thead><tr><th>#</th><th>Entrada</th><th>Salida</th><th>Estado</th><th>Cliente</th><th>Monto</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <a class="btn btn-outline-secondary" href="{{ url_for('admin_villas_html') }}"><i class="bi bi-arrow-left"></i> Volver</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+async function loadCal() {
+  const res = await fetch(`/villas/api/{{ hab.Codigo_Habitacion }}/calendario`);
+  const js = await res.json();
+  const tb = document.querySelector("#tblCal tbody");
+  tb.innerHTML = "";
+  js.items.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td>
+      <td>${r.entrada}</td>
+      <td>${r.salida}</td>
+      <td>${r.estado}</td>
+      <td>${r.cliente_id}</td>
+      <td>₡ ${r.monto.toFixed(2)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+document.addEventListener("DOMContentLoaded", loadCal);
+</script>
+</body>
+</html>
