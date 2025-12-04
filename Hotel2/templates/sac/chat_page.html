@@ -1,0 +1,274 @@
+<!-- templates/sac/chat_page.html -->
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Chat SAC / RAG – Hotel Villa Grace</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #f5f5f7;
+        }
+        header {
+            padding: 0.75rem 1rem;
+            background: #1e3050;
+            color: #fff;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1rem;
+        }
+        header p {
+            margin: 0.1rem 0 0;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 720px;
+            margin: 0.75rem auto;
+            width: 100%;
+            padding: 0 0.75rem;
+            box-sizing: border-box;
+        }
+        .chat-log {
+            flex: 1;
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 0.75rem;
+            overflow-y: auto;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        .msg-row {
+            margin-bottom: 0.5rem;
+            display: flex;
+        }
+        .msg-row.user {
+            justify-content: flex-end;
+        }
+        .msg-row.bot {
+            justify-content: flex-start;
+        }
+        .msg-bubble {
+            max-width: 80%;
+            padding: 0.4rem 0.6rem;
+            border-radius: 14px;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            white-space: pre-wrap;
+        }
+        .msg-user {
+            background: #2859ab;
+            color: #fff;
+            border-bottom-right-radius: 2px;
+        }
+        .msg-bot {
+            background: #f0f0f5;
+            color: #222;
+            border-bottom-left-radius: 2px;
+        }
+        .msg-meta {
+            font-size: 0.7rem;
+            color: #777;
+            margin-top: 0.15rem;
+        }
+        .input-area {
+            margin-top: 0.5rem;
+            display: flex;
+            gap: 0.4rem;
+        }
+        textarea {
+            flex: 1;
+            resize: none;
+            min-height: 50px;
+            max-height: 120px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 0.4rem 0.5rem;
+            border-radius: 10px;
+            border: 1px solid #cfd0d5;
+            box-sizing: border-box;
+        }
+        button {
+            border-radius: 999px;
+            border: none;
+            padding: 0.4rem 0.9rem;
+            background: #2859ab;
+            color: #fff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            align-self: flex-end;
+            white-space: nowrap;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+        .status {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 0.25rem;
+            min-height: 1rem;
+        }
+        .suggestions {
+            margin-top: 0.25rem;
+            font-size: 0.8rem;
+        }
+        .suggestions span {
+            display: inline-block;
+            background: #e5e7f3;
+            color: #283053;
+            border-radius: 999px;
+            padding: 0.15rem 0.5rem;
+            margin: 0 0.25rem 0.25rem 0;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Chat SAC / RAG – Hotel Villa Grace</h1>
+        <p>Prueba del endpoint <code>/sac/ask</code> con base de conocimiento.</p>
+    </header>
+
+    <div class="chat-container">
+        <div id="chatLog" class="chat-log"></div>
+
+        <div class="suggestions" id="suggestions"></div>
+
+        <div class="input-area">
+            <textarea id="inputText" placeholder="Escribe tu consulta sobre el hotel..."></textarea>
+            <button id="sendBtn">Enviar</button>
+        </div>
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+    (function() {
+        const chatLog   = document.getElementById("chatLog");
+        const inputText = document.getElementById("inputText");
+        const sendBtn   = document.getElementById("sendBtn");
+        const statusEl  = document.getElementById("status");
+        const suggEl    = document.getElementById("suggestions");
+
+        // Reutilizar un session-id simple para la sesión de navegador
+        function getSessionId() {
+            const key = "vg_sac_sid";
+            let sid = localStorage.getItem(key);
+            if (!sid) {
+                sid = "web-" + Math.random().toString(36).slice(2);
+                localStorage.setItem(key, sid);
+            }
+            return sid;
+        }
+
+        function appendMessage(text, who, meta) {
+            const row = document.createElement("div");
+            row.className = "msg-row " + who;
+
+            const bubble = document.createElement("div");
+            bubble.className = "msg-bubble " + (who === "user" ? "msg-user" : "msg-bot");
+            bubble.textContent = text;
+            row.appendChild(bubble);
+
+            if (meta) {
+                const m = document.createElement("div");
+                m.className = "msg-meta";
+                m.textContent = meta;
+                row.appendChild(m);
+            }
+
+            chatLog.appendChild(row);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function renderSuggestions(list) {
+            suggEl.innerHTML = "";
+            if (!Array.isArray(list) || !list.length) return;
+            list.forEach((s) => {
+                const span = document.createElement("span");
+                span.textContent = s;
+                span.addEventListener("click", () => {
+                    inputText.value = s;
+                    inputText.focus();
+                });
+                suggEl.appendChild(span);
+            });
+        }
+
+        function sendMessage() {
+            const q = (inputText.value || "").trim();
+            if (!q) return;
+
+            appendMessage(q, "user");
+            inputText.value = "";
+            statusEl.textContent = "Consultando...";
+            sendBtn.disabled = true;
+
+            const sid = getSessionId();
+
+            fetch("{{ url_for('sac.sac_ask') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Session-Id": sid
+                },
+                body: JSON.stringify({ q: q })
+            })
+            .then(r => r.json())
+            .then(js => {
+                sendBtn.disabled = false;
+
+                if (!js.ok) {
+                    statusEl.textContent = "Error: " + (js.error || "No se pudo obtener respuesta.");
+                    appendMessage("Lo siento, no pude procesar tu consulta.", "bot");
+                    return;
+                }
+
+                const answer = js.answer || js.a || "(sin respuesta)";
+                appendMessage(answer, "bot");
+
+                const conf = typeof js.confidence === "number" ? js.confidence : null;
+                const source = js.source || "";
+                let metaMsg = "";
+                if (conf !== null) {
+                    metaMsg += "Confianza aprox: " + (conf * 100).toFixed(0) + "%";
+                }
+                if (source) {
+                    if (metaMsg) metaMsg += " · ";
+                    metaMsg += "Fuente: " + source;
+                }
+                statusEl.textContent = metaMsg;
+
+                const sugg = js.suggestions || js.sugs || [];
+                renderSuggestions(sugg);
+            })
+            .catch(err => {
+                sendBtn.disabled = false;
+                statusEl.textContent = "Error de red: " + err;
+                appendMessage("Ha ocurrido un error de red al procesar tu consulta.", "bot");
+            });
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        inputText.addEventListener("keydown", (e) => {
+            if ((e.key === "Enter" || e.keyCode === 13) && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Mensaje de bienvenida
+        appendMessage("Hola, soy el asistente del Hotel Villa Grace. ¿En qué puedo ayudarle?", "bot");
+    })();
+    </script>
+</body>
+</html>

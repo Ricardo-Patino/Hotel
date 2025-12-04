@@ -3,5 +3,12 @@ Flask-SQLAlchemy>=3.1
 Flask-Migrate>=4.0
 PyMySQL>=1.1
 python-dotenv>=1.0
-reportlab>=3.4.0
-gunicorn==23.0.0
+faiss-cpu
+sentence-transformers
+pypdf
+python-docx
+rapidfuzz
+requests
+Flask-Mail>=0.9.1
+twilio>=9.2
+pdfplumber>=0.11
