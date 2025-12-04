@@ -11,4 +11,3 @@ from .evt import (
     EvtNotificacion, EvtWorkOrder
 )
 
-from extensions import db

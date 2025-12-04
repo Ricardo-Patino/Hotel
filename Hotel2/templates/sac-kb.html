@@ -1,0 +1,366 @@
+<!-- templates/sac-kb.html -->
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>SAC – Base de Conocimiento</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            padding: 1.5rem;
+            background: #f5f5f7;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr;
+            grid-gap: 1.5rem;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        th, td {
+            padding: 0.35rem 0.4rem;
+            border-bottom: 1px solid #e1e1e4;
+            text-align: left;
+        }
+        th {
+            background: #f0f0f5;
+            font-weight: 600;
+        }
+        tr:hover td {
+            background: #fafafa;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.1rem 0.35rem;
+            border-radius: 999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        .badge-activo { background: #e1f7e5; color: #146c2e; }
+        .badge-inactivo { background: #fdeaea; color: #a01313; }
+        .badge-estado-nueva { background: #fff5d6; color: #8a6300; }
+        .badge-estado-revisada { background: #ddeeff; color: #124c90; }
+        .badge-estado-respondida { background: #e1f7e5; color: #146c2e; }
+        .pill {
+            padding: 0.15rem 0.45rem;
+            border-radius: 999px;
+            background: #f0f0f5;
+            font-size: 0.7rem;
+        }
+        .gap-row {
+            cursor: pointer;
+        }
+        .gap-row:hover td {
+            background: #f9fbff;
+        }
+        .form-group {
+            margin-bottom: 0.75rem;
+        }
+        label {
+            display: block;
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
+        }
+        input[type="text"], textarea, input[type="file"] {
+            width: 100%;
+            font-family: inherit;
+            font-size: 0.85rem;
+            padding: 0.4rem 0.5rem;
+            border-radius: 6px;
+            border: 1px solid #d0d0d6;
+            box-sizing: border-box;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        button {
+            border: none;
+            border-radius: 999px;
+            padding: 0.4rem 0.9rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background: #2859ab;
+            color: #fff;
+        }
+        .btn-secondary {
+            background: #e5e5ea;
+            color: #333;
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: default;
+        }
+        .muted {
+            color: #777;
+            font-size: 0.8rem;
+        }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-3 { margin-top: 1rem; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 1rem; }
+        .text-right { text-align: right; }
+        .text-small { font-size: 0.8rem; }
+        .status-bar {
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            min-height: 1.1rem;
+        }
+        @media (max-width: 960px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>SAC – Base de Conocimiento</h1>
+    <p class="muted mb-3">
+        Administración de documentos de la KB, preguntas sin respuesta y Q/A manual del chatbot.
+    </p>
+
+    <div class="layout">
+        <!-- Columna izquierda: documentos -->
+        <div class="card">
+            <h2 class="mb-2">Documentos</h2>
+
+            <form id="uploadForm" class="mb-3">
+                <div class="form-group">
+                    <label for="kbFile">Archivo (txt, md, pdf, docx, html)</label>
+                    <input type="file" id="kbFile" name="file" required>
+                </div>
+                <div class="form-group">
+                    <label for="kbTitle">Título (opcional)</label>
+                    <input type="text" id="kbTitle" name="title" placeholder="Ej. Políticas de Reservas 2025">
+                </div>
+                <button type="submit" class="btn-primary">Subir documento</button>
+                <span id="uploadStatus" class="status-bar"></span>
+            </form>
+
+            <h3 class="mb-1">Listado de documentos</h3>
+            <p class="muted mb-2">Haz un rebuild automático al subir; el contador de chunks se actualiza solo.</p>
+
+            <div style="max-height: 320px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Título</th>
+                            <th>Archivo</th>
+                            <th class="text-right">Bytes</th>
+                            <th>Chunks</th>
+                            <th>Estado</th>
+                            <th>Subido</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% if docs %}
+                        {% for d in docs %}
+                        <tr>
+                            <td>{{ d.Id }}</td>
+                            <td>{{ d.Titulo }}</td>
+                            <td><span class="text-small">{{ d.FileName }}</span></td>
+                            <td class="text-right">{{ d.Bytes }}</td>
+                            <td>{{ d.Chunks }}</td>
+                            <td>
+                                {% if d.Activo %}
+                                  <span class="badge badge-activo">ACTIVO</span>
+                                {% else %}
+                                  <span class="badge badge-inactivo">INACTIVO</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="text-small">{{ d.SubidoEn }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="7" class="muted">No hay documentos registrados todavía.</td></tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Columna derecha: gaps + Q/A -->
+        <div class="card">
+            <h2 class="mb-2">Preguntas sin respuesta</h2>
+            <p class="muted mb-2">
+                Selecciona una fila para cargar la pregunta en el formulario y registrar una respuesta.
+            </p>
+
+            <div style="max-height: 220px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Pregunta</th>
+                            <th>Origen</th>
+                            <th>Estado</th>
+                            <th>Creada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% if gaps %}
+                        {% for g in gaps %}
+                        <tr class="gap-row"
+                            data-pregunta="{{ g.Pregunta|e }}">
+                            <td>{{ g.Id }}</td>
+                            <td style="max-width: 260px;">
+                                <span class="text-small">{{ g.Pregunta }}</span>
+                            </td>
+                            <td><span class="pill">{{ g.Origen }}</span></td>
+                            <td>
+                                {% if g.Estado == 'NUEVA' %}
+                                  <span class="badge badge-estado-nueva">NUEVA</span>
+                                {% elif g.Estado == 'REVISADA' %}
+                                  <span class="badge badge-estado-revisada">REVISADA</span>
+                                {% else %}
+                                  <span class="badge badge-estado-respondida">RESPONDIDA</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="text-small">{{ g.Creada_At }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr><td colspan="5" class="muted">No hay preguntas pendientes.</td></tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 class="mt-3 mb-1">Registrar / actualizar respuesta</h3>
+            <form id="teachForm">
+                <div class="form-group">
+                    <label for="teachPregunta">Pregunta</label>
+                    <textarea id="teachPregunta" name="pregunta" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="teachRespuesta">Respuesta</label>
+                    <textarea id="teachRespuesta" name="respuesta" required></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Guardar en Q/A</button>
+                <button type="button" id="teachClear" class="btn-secondary">Limpiar</button>
+                <div id="teachStatus" class="status-bar"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        const uploadForm   = document.getElementById("uploadForm");
+        const uploadStatus = document.getElementById("uploadStatus");
+        const teachForm    = document.getElementById("teachForm");
+        const teachStatus  = document.getElementById("teachStatus");
+        const teachPregunta = document.getElementById("teachPregunta");
+        const teachRespuesta = document.getElementById("teachRespuesta");
+        const teachClear   = document.getElementById("teachClear");
+
+        // Subida de documentos
+        if (uploadForm) {
+            uploadForm.addEventListener("submit", function(ev) {
+                ev.preventDefault();
+                const fileInput = document.getElementById("kbFile");
+                if (!fileInput.files || !fileInput.files[0]) {
+                    uploadStatus.textContent = "Selecciona un archivo primero.";
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append("file", fileInput.files[0]);
+                const title = document.getElementById("kbTitle").value || "";
+                if (title.trim()) {
+                    formData.append("title", title.trim());
+                }
+
+                uploadStatus.textContent = "Subiendo y reindexando...";
+                fetch("{{ url_for('sac.sac_kb_upload') }}", {
+                    method: "POST",
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(js => {
+                    if (js.ok) {
+                        uploadStatus.textContent = "Documento subido correctamente. Recargando...";
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        uploadStatus.textContent = "Error: " + (js.error || "No se pudo subir el archivo.");
+                    }
+                })
+                .catch(err => {
+                    uploadStatus.textContent = "Error de red: " + err;
+                });
+            });
+        }
+
+        // Selección de gaps para cargar en el formulario de Q/A
+        document.querySelectorAll(".gap-row").forEach(row => {
+            row.addEventListener("click", () => {
+                const p = row.getAttribute("data-pregunta") || "";
+                teachPregunta.value = p;
+                teachRespuesta.focus();
+                teachStatus.textContent = "Pregunta cargada desde preguntas no contestadas.";
+            });
+        });
+
+        // Envío de Q/A a /sac/kb/teach
+        if (teachForm) {
+            teachForm.addEventListener("submit", function(ev) {
+                ev.preventDefault();
+                const q = teachPregunta.value.trim();
+                const a = teachRespuesta.value.trim();
+                if (!q || !a) {
+                    teachStatus.textContent = "Completa pregunta y respuesta.";
+                    return;
+                }
+                teachStatus.textContent = "Guardando respuesta...";
+                fetch("{{ url_for('sac.sac_kb_teach') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ pregunta: q, respuesta: a })
+                })
+                .then(r => r.json())
+                .then(js => {
+                    if (js.ok) {
+                        teachStatus.textContent = "Respuesta guardada correctamente.";
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        teachStatus.textContent = "Error: " + (js.error || "No se pudo guardar.");
+                    }
+                })
+                .catch(err => {
+                    teachStatus.textContent = "Error de red: " + err;
+                });
+            });
+        }
+
+        if (teachClear) {
+            teachClear.addEventListener("click", () => {
+                teachPregunta.value = "";
+                teachRespuesta.value = "";
+                teachStatus.textContent = "";
+            });
+        }
+    })();
+    </script>
+</body>
+</html>
