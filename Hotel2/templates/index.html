@@ -146,6 +146,8 @@
               <a href="#"><span>Gestión</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
               <ul>
                 <li><a href="{{ url_for('ops_dashboard_html') }}">Panel de Operaciones</a></li>
+                <li><a href="{{ url_for('sac.conversaciones_html') }}">Conversaciones</a></li>
+
     
                 <li class="dropdown">
                   <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
@@ -178,6 +180,7 @@
     
                 {% if session.get('user_role') == 'Administrador' %}
                   <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+                  <li><a href="{{ url_for('sac.sac_chat_admin') }}">Chatbot</a></li>
                 {% endif %}
               </ul>
             </li>

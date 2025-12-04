@@ -1271,7 +1271,7 @@ def create_app() -> Flask:
     app.register_blueprint(arep_bp)
     
     # === SAC (Atención al Cliente y Comunicación) ===
-    from blueprints.sac import sac_bp
+    from blueprints.sac.routes import sac_bp
     app.register_blueprint(sac_bp)
 
     # === FAC (008) ===
