@@ -32,7 +32,7 @@
     <link href="https://fonts.googleapis.com" rel="preconnect" />
     <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,800;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
       rel="stylesheet"
     />
 
@@ -74,8 +74,7 @@
   * Updated: Jun 30 2025 with Bootstrap v5.3.7
   * Author: BootstrapMade.com
   * License: https://bootstrapmade.com/license/
-  -->
-  </head>
+  --></head>
 
   <body class="index-page">
     <header id="header" class="header d-flex align-items-center fixed-top">
@@ -146,6 +145,7 @@
               <a href="#"><span>Gestión</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
               <ul>
                 <li><a href="{{ url_for('ops_dashboard_html') }}">Panel de Operaciones</a></li>
+                <li><a href="{{ url_for('sac.conversaciones_html') }}">Conversaciones</a></li>
     
                 <li class="dropdown">
                   <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
@@ -178,6 +178,7 @@
     
                 {% if session.get('user_role') == 'Administrador' %}
                   <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+                  <li><a href="{{ url_for('sac.sac_chat_admin') }}">Chatbot</a></li>
                 {% endif %}
               </ul>
             </li>
@@ -248,23 +249,6 @@
       .header .sitename { font-size: 1.4rem; line-height: 1; margin-left: .5rem; }
       @media (max-width: 1199.98px){
         .header .navmenu > ul > li { margin: 0 6px; }
-      }
-
-      /* Widget tipo de cambio en el hero */
-      .fx-widget {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        background: rgba(0,0,0,0.35);
-        backdrop-filter: blur(4px);
-      }
-      .fx-widget .badge {
-        font-size: 0.75rem;
-      }
-      .fx-widget span {
-        font-size: 0.8rem;
       }
     </style>
 
@@ -411,32 +395,6 @@
                           >.
                         </p>
                       </form>
-
-                      <!-- Widget tipo de cambio -->
-                      <div class="mt-3 d-flex justify-content-center">
-                        <div class="fx-widget text-white">
-                          {% if fx_usd_crc %}
-                            <span class="badge bg-light text-dark">
-                              <i class="bi bi-currency-exchange me-1"></i>
-                              Tipo de cambio hoy
-                            </span>
-                            <span>
-                              USD 1 = ₡{{ "%.2f"|format(fx_usd_crc) }}
-                            </span>
-                            {% if fx_date %}
-                              <span class="text-white-50">
-                                ({{ fx_date }})
-                              </span>
-                            {% endif %}
-                          {% else %}
-                            <span class="text-white-50">
-                              Tipo de cambio no disponible en este momento.
-                            </span>
-                          {% endif %}
-                        </div>
-                      </div>
-                      <!-- /Widget tipo de cambio -->
-
                     </div>
                   </div>
                 </div>
@@ -2051,47 +2009,5 @@
 
     {% include "partials/sac-widget.html" %}
     <script src="{{ url_for('static', filename='assets/js/sac-widget.js') }}"></script>
-
-    <!-- 🔹 Script API tipo de cambio (agregado) -->
-    <script>
-      document.addEventListener("DOMContentLoaded", async () => {
-        const widget = document.querySelector(".fx-widget");
-        if (!widget) return;
-
-        try {
-          const res = await fetch(
-            "https://api.exchangerate.host/latest?base=USD&symbols=CRC"
-          );
-          if (!res.ok) throw new Error("HTTP " + res.status);
-
-          const data = await res.json();
-          const rate = data && data.rates && data.rates.CRC;
-          const fxDate = data && data.date;
-
-          if (rate) {
-            widget.innerHTML = `
-              <span class="badge bg-light text-dark">
-                <i class="bi bi-currency-exchange me-1"></i>
-                Tipo de cambio hoy
-              </span>
-              <span>
-                USD 1 = ₡${Number(rate).toFixed(2)}
-              </span>
-              ${
-                fxDate
-                  ? `<span class="text-white-50">
-                      (${fxDate})
-                    </span>`
-                  : ""
-              }
-            `;
-          }
-        } catch (err) {
-          console.error("Error obteniendo tipo de cambio:", err);
-          // Si falla, se mantiene el contenido renderizado por Jinja (fx_usd_crc o el mensaje de no disponible)
-        }
-      });
-    </script>
   </body>
 </html>
-

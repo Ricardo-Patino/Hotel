@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title>Consola SAC - Base de Conocimiento</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        :root {
+            --sac-bg: #f5f5f7;
+            --sac-primary: #145a86;
+            --sac-primary-soft: #e0edf7;
+            --sac-border: #d2d2dd;
+            --sac-danger: #c0392b;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--sac-bg);
+        }
+
+        .sac-kb-page {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 24px 12px;
+        }
+
+        .sac-kb-shell {
+            width: 100%;
+            max-width: 960px;
+            background: #ffffff;
+            border-radius: 14px;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
+            padding: 18px 20px 22px;
+        }
+
+        .sac-kb-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            gap: 12px;
+        }
+
+        .sac-kb-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .sac-kb-subtitle {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .sac-kb-layout {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 900px) {
+            .sac-kb-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .sac-card {
+            background: #fafbff;
+            border-radius: 12px;
+            border: 1px solid var(--sac-border);
+            padding: 12px 12px 10px;
+        }
+
+        .sac-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+
+        .sac-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #222;
+        }
+
+        .sac-card-subtitle {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .sac-tag {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            border: 1px solid var(--sac-border);
+            padding: 2px 10px;
+            font-size: 11px;
+            color: #444;
+            background: #fff;
+        }
+
+        .sac-kb-table-wrapper {
+            overflow-x: auto;
+            max-height: 420px;
+        }
+
+        table.sac-kb-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        table.sac-kb-table thead {
+            background: var(--sac-primary-soft);
+        }
+
+        table.sac-kb-table th,
+        table.sac-kb-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e2e4ee;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        table.sac-kb-table th {
+            font-weight: 600;
+            color: #444;
+            font-size: 11px;
+        }
+
+        table.sac-kb-table tbody tr:hover {
+            background: rgba(20, 90, 134, 0.04);
+        }
+
+        .sac-badge-active {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            background: rgba(30, 130, 76, 0.1);
+            color: #1e824c;
+        }
+
+        .sac-badge-inactive {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            background: rgba(192, 57, 43, 0.08);
+            color: #c0392b;
+        }
+
+        .sac-kb-empty {
+            font-size: 12px;
+            color: #777;
+            padding: 8px;
+        }
+
+        .sac-form-field {
+            margin-bottom: 8px;
+        }
+
+        .sac-form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .sac-input,
+        .sac-select {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--sac-border);
+            padding: 6px 8px;
+            font-size: 12px;
+            outline: none;
+            background: #fff;
+        }
+
+        .sac-input:focus,
+        .sac-select:focus {
+            border-color: var(--sac-primary);
+            box-shadow: 0 0 0 1px rgba(20, 90, 134, 0.18);
+        }
+
+        .sac-input-file {
+            width: 100%;
+            font-size: 11px;
+        }
+
+        .sac-helper-text {
+            font-size: 10px;
+            color: #777;
+            margin-top: 2px;
+        }
+
+        .sac-btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border-radius: 999px;
+            border: none;
+            padding: 7px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--sac-primary);
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .sac-btn-primary:disabled {
+            opacity: 0.62;
+            cursor: default;
+        }
+
+        .sac-status-text {
+            font-size: 11px;
+            margin-top: 6px;
+            min-height: 14px;
+        }
+
+        .sac-status-text.ok {
+            color: #1e824c;
+        }
+
+        .sac-status-text.err {
+            color: var(--sac-danger);
+        }
+
+        .sac-kb-footer {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #777;
+        }
+
+        .sac-kb-footer strong {
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+<div class="sac-kb-page">
+    <div class="sac-kb-shell">
+        <header class="sac-kb-header">
+            <div>
+                <div class="sac-kb-title">SAC - Base de Conocimiento</div>
+                <div class="sac-kb-subtitle">
+                    Administración básica de documentos que alimentan el asistente del Hotel Villa Grace.
+                </div>
+            </div>
+            <div class="sac-tag">
+                Módulo SAC · RAG
+            </div>
+        </header>
+
+        <section class="sac-kb-layout">
+            <!-- Panel izquierdo: lista de documentos -->
+            <div class="sac-card">
+                <div class="sac-card-header">
+                    <div>
+                        <div class="sac-card-title">Documentos cargados</div>
+                        <div class="sac-card-subtitle">
+                            Resumen de la base de conocimiento actualmente indexada.
+                        </div>
+                    </div>
+                </div>
+                <div class="sac-kb-table-wrapper">
+                    <table class="sac-kb-table">
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Título</th>
+                            <th>Archivo</th>
+                            <th>Tipo</th>
+                            <th>Idioma</th>
+                            <th>Estado</th>
+                            <th>Creado</th>
+                        </tr>
+                        </thead>
+                        <tbody id="sac-kb-tbody">
+                        <tr>
+                            <td colspan="7">
+                                <div class="sac-kb-empty">
+                                    Cargando documentos de la base de conocimiento...
+                                </div>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Panel derecho: carga de documentos -->
+            <div class="sac-card">
+                <div class="sac-card-header">
+                    <div>
+                        <div class="sac-card-title">Agregar documento</div>
+                        <div class="sac-card-subtitle">
+                            Carga un nuevo archivo (por ejemplo, PDF de políticas o manuales internos).
+                        </div>
+                    </div>
+                </div>
+
+                <form id="sac-kb-upload-form">
+                    <div class="sac-form-field">
+                        <label class="sac-form-label" for="kb-file">
+                            Archivo
+                        </label>
+                        <input
+                            id="kb-file"
+                            name="file"
+                            type="file"
+                            class="sac-input-file"
+                            accept=".pdf,.txt,.md,.docx"
+                            required
+                        >
+                        <div class="sac-helper-text">
+                            Admite PDF, TXT, Markdown o DOCX. Tamaño máx. según configuración del servidor.
+                        </div>
+                    </div>
+
+                    <div class="sac-form-field">
+                        <label class="sac-form-label" for="kb-title">
+                            Título (opcional)
+                        </label>
+                        <input
+                            id="kb-title"
+                            name="title"
+                            type="text"
+                            class="sac-input"
+                            placeholder="Ej.: Políticas de check-in y check-out"
+                        >
+                    </div>
+
+                    <div class="sac-form-field">
+                        <label class="sac-form-label" for="kb-source-type">
+                            Tipo de fuente
+                        </label>
+                        <select id="kb-source-type" name="source_type" class="sac-select" required>
+                            <option value="">Selecciona un tipo…</option>
+                            <option value="manual">Manual / Procedimiento</option>
+                            <option value="faq">FAQ / Preguntas frecuentes</option>
+                            <option value="policy">Política interna</option>
+                            <option value="promo">Promociones / Marketing</option>
+                            <option value="other">Otro</option>
+                        </select>
+                    </div>
+
+                    <div class="sac-form-field">
+                        <label class="sac-form-label" for="kb-lang">
+                            Idioma (opcional)
+                        </label>
+                        <select id="kb-lang" name="lang" class="sac-select">
+                            <option value="">Detectar automáticamente</option>
+                            <option value="es">Español</option>
+                            <option value="en">Inglés</option>
+                        </select>
+                    </div>
+
+                    <button id="kb-upload-btn" type="submit" class="sac-btn-primary">
+                        Subir e indexar
+                    </button>
+                </form>
+
+                <div id="kb-status" class="sac-status-text"></div>
+
+                <div class="sac-kb-footer">
+                    <strong>Nota:</strong> esta consola únicamente carga documentos
+                    y muestra el estado básico. La lógica RAG (chunking, embeddings, etc.)
+                    se gestiona en el backend del módulo SAC.
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/sac_kb_console.js') }}"></script>
+</body>
+</html>
