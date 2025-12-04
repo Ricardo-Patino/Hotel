@@ -49,15 +49,3 @@ class Config:
     # Esta API NO requiere key, así que lo dejamos vacío
     FX_API_KEY = None
 
-
-
-    print(
-    "DB ->",
-    os.environ.get("DB_USER", "root"),
-    "@",
-    os.environ.get("DB_HOST", "127.0.0.1"),
-    ":",
-    os.environ.get("DB_PORT", "3306"),
-    "/",
-    os.environ.get("DB_NAME", "Hotel_VillaGrace"),
-)
