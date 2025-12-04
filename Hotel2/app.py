@@ -66,12 +66,9 @@ BASE_DIR = Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-# .env opcional
-try:
-    from dotenv import load_dotenv  # type: ignore
-    load_dotenv(BASE_DIR / ".env")
-except Exception:
-    pass
+# .env opcionalno
+from dotenv import load_dotenv  # type: ignore
+load_dotenv(BASE_DIR / ".env")
 
 # Imports del proyecto
 from services.grr.assignment import auto_assign_for_reserva, reassign_reserva, split_reserva, merge_reserva  # noqa
@@ -159,18 +156,13 @@ def _get_role_by_name(name: str):
 
 
 def _get_role_name(user: Usuario) -> str:
-    try:
-        if getattr(user, "rol", None) and getattr(user.rol, "Nombre", None):
-            return user.rol.Nombre
-    except Exception:
-        pass
-    try:
-        if getattr(user, "Rol_Id", None):
-            rol = Rol.query.filter_by(Codigo_Rol=user.Rol_Id).first()
-            if rol and rol.Nombre:
-                return rol.Nombre
-    except Exception:
-        pass
+    if getattr(user, "rol", None) and getattr(user.rol, "Nombre", None):
+        return user.rol.Nombre
+    if getattr(user, "Rol_Id", None):
+        rol = Rol.query.filter_by(Codigo_Rol=user.Rol_Id).first()
+        if rol and rol.Nombre:
+            return rol.Nombre
+    
     return "Cliente"
 
 
