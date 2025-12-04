@@ -1,4 +1,4 @@
-from flask import request, render_template, jsonify, abort, send_file, current_app, session
+from flask import request, render_template, jsonify, abort, send_file, session
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import io
@@ -6,6 +6,8 @@ import io
 from models import db  # tu SQLAlchemy
 from sqlalchemy import text, or_
 import os
+
+from . import ace_bp
 
 # -------- Helpers de rol --------
 ROLE_ORDER = {'Cliente': 1, 'Recepcionista': 2, 'Administrador': 3}
@@ -18,7 +20,7 @@ def can_view(min_role):
     return ROLE_ORDER.get(current_role(), 0) >= ROLE_ORDER.get(min_role, 99)
 
 # -------- ACE-01-001: Historial de reservas --------
-@current_app.route('/ace/reservas/historial')
+@ace_bp.route('/ace/reservas/historial')
 def ace_hist_reservas():
     q = """
       SELECT * FROM v_hist_reservas
@@ -36,7 +38,7 @@ def ace_hist_reservas():
     return render_template('ace/historial_reservas.html', rows=rows)
 
 # -------- ACE-01-003: Historial de pagos --------
-@current_app.route('/ace/pagos/historial')
+@ace_bp.route('/ace/pagos/historial')
 def ace_hist_pagos():
     q = """
       SELECT p.*, r.Correo AS ClienteCorreo, concat(c.Nombre,' ',c.Apellido) AS Cliente
@@ -59,7 +61,7 @@ def ace_hist_pagos():
     return render_template('ace/historial_pagos.html', rows=rows)
 
 # -------- ACE-01-007: Alta de cliente con validación de duplicados --------
-@current_app.route('/ace/clientes/alta', methods=['POST'])
+@ace_bp.route('/ace/clientes/alta', methods=['POST'])
 def ace_alta_cliente():
     data = request.form if request.form else request.json
     if not data:
@@ -98,7 +100,7 @@ def allowed_ext(filename):
     _, ext = os.path.splitext(filename.lower())
     return ext in ALLOWED
 
-@current_app.route('/ace/clientes/<int:cliente_id>/documentos', methods=['POST'])
+@ace_bp.route('/ace/clientes/<int:cliente_id>/documentos', methods=['POST'])
 def ace_upload_doc(cliente_id):
     if current_role() not in ROLE_ORDER:
         abort(403)
@@ -114,7 +116,7 @@ def ace_upload_doc(cliente_id):
     if min_rol not in ROLE_ORDER:
         min_rol = 'Cliente'
 
-    upload_dir = current_app.config.get('UPLOAD_FOLDER_CLIENTES', 'uploads/clientes')
+    upload_dir = ace_bp.config.get('UPLOAD_FOLDER_CLIENTES', 'uploads/clientes')
     os.makedirs(os.path.join(upload_dir, str(cliente_id)), exist_ok=True)
 
     safe = secure_filename(f.filename)
@@ -151,7 +153,7 @@ def ace_upload_doc(cliente_id):
     return jsonify({'ok': True, 'Documento_Id': doc_id})
 
 # Descarga con control de rol (solo si cumple Min_Rol)
-@current_app.route('/ace/clientes/<int:cliente_id>/documentos/<int:doc_id>')
+@ace_bp.route('/ace/clientes/<int:cliente_id>/documentos/<int:doc_id>')
 def ace_get_doc(cliente_id, doc_id):
     row = db.session.execute(text("""
       SELECT d.Ruta, cd.Min_Rol, cd.Visible
@@ -170,7 +172,7 @@ def ace_get_doc(cliente_id, doc_id):
     return send_file(row['Ruta'], as_attachment=True)
 
 # -------- ACE-01-008: Exportación vCard --------
-@current_app.route('/ace/clientes/<int:cliente_id>/vcard')
+@ace_bp.route('/ace/clientes/<int:cliente_id>/vcard')
 def ace_vcard(cliente_id):
     cli = db.session.execute(text("""
       SELECT Nombre, Apellido, Correo, Telefono
