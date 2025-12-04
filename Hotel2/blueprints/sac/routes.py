@@ -220,6 +220,54 @@ def _noinfo_answer() -> str:
         "adivinar una respuesta incorrecta.\n\n"
         "¿Desea que transfiera esta conversación a un agente humano de recepción?"
     )
+    
+    
+    
+def _looks_like_noinfo(text: str) -> bool:
+    """
+    Detecta respuestas genéricas de “no tengo información / no hay información”
+    para tratarlas como NO_INFO y ofrecer derivar a un agente.
+    Se aplica tanto a respuestas base (KB_QA, RAG) como a textos
+    ya reescritos por la IA.
+    """
+    if not text:
+        return False
+
+    t = text.lower()
+    patterns = [
+        # Formas típicas
+        "no tengo información",
+        "no tengo informacion",
+        "no tengo información específica",
+        "no tengo informacion especifica",
+        "no tengo información sobre",
+        "no tengo informacion sobre",
+
+        # No hay datos
+        "no hay información",
+        "no hay informacion",
+        "no encuentro información",
+        "no encuentro informacion",
+        "no dispongo de información",
+        "no dispongo de informacion",
+        "no cuento con información",
+        "no cuento con informacion",
+        "no tengo datos",
+
+        # Formulaciones frecuentes en respuestas “no sé”
+        "no se indica",
+        "no se encuentra registrada",
+        "no se menciona",
+
+        # Muy importante: frases como la que estás viendo ahora
+        "no está disponible en nuestra base de conocimiento",
+        "no esta disponible en nuestra base de conocimiento",
+        "no está disponible en la base de conocimiento",
+        "no esta disponible en la base de conocimiento",
+    ]
+    return any(p in t for p in patterns)
+
+
 
 
 def _default_suggestions(cid: Optional[int]) -> List[str]:
@@ -1282,6 +1330,35 @@ def sac_kb_upload():
     return jsonify(ok=True, docs=docs, chunks=chunks)
 
 
+@sac_bp.get("/kb/debug_search")
+@role_required("Administrador")
+def sac_kb_debug_search():
+    """
+    Endpoint de depuración para verificar que el índice RAG
+    está leyendo correctamente los documentos de la KB.
+
+    Uso:
+      GET /sac/kb/debug_search?q=horario%20de%20la%20piscina
+    """
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"ok": False, "error": "Parámetro q requerido (q)"}), 400
+
+    # Reutilizamos directamente las funciones de RAG, sin duplicar lógica
+    hits = search(q, topk=5)
+    ans = answer_from_chunks(q, hits)
+
+    return jsonify(
+        {
+            "ok": True,
+            "query": q,
+            "hits": hits,
+            "rag_answer": ans,
+        }
+    )
+
+
+
 @sac_bp.get("/kb")
 @role_required("Administrador")
 def sac_kb_list():
@@ -2144,11 +2221,26 @@ def sac_ask():
                     ans = answer_from_chunks(raw_q, hits)
                     # Se asume que answer_from_chunks ya está instruido
                     # para NO inventar más allá del contexto.
-                    if ans.get("ok") and float(ans.get("confidence", 0.0)) >= 0.28:
+
+                    # Umbral más permisivo acorde con la heurística de RAG.
+                    #  - <0.02 → conf=0.15 (ruido)
+                    #  - 0.02–0.05 → conf=0.35
+                    #  - 0.05–0.10 → conf=0.55
+                    #  - 0.10–0.20 → conf=0.75
+                    #  - >0.20 → conf=0.90
+                    KB_DOCS_CONF_THRESHOLD = 0.15
+
+                    conf = float(ans.get("confidence", 0.0) or 0.0)
+                    if ans.get("ok") and conf >= KB_DOCS_CONF_THRESHOLD and ans.get("answer"):
                         # ans ya incluye 'answer', 'confidence', etc.
                         result.update(ans)
                         result["source"] = "KB_DOCS"
                         result["suggestions"] = suggestions
+                    else:
+                        current_app.logger.info(
+                            "[SAC] RAG sin confianza suficiente o sin respuesta: "
+                            f"conf={conf}, q='{raw_q}'"
+                        )
                 except Exception as e:
                     current_app.logger.warning(f"[SAC] RAG error: {e}")
 
@@ -2246,6 +2338,8 @@ def sac_ask():
                     result["handoff_state"] = "OFFER"
                     conv_status = "handoff_offer"
                     conv_needs_agent = False
+                    
+                    
 
     # ---------- 7) Capa de IA conversacional (n8n / Ollama) ----------
     base_answer = (result.get("answer") or "").strip()
@@ -2280,6 +2374,20 @@ def sac_ask():
             current_app.logger.warning(
                 f"[SAC-AI] Error al reescribir respuesta: {e}"
             )
+            
+        # ---------- 7-bis) Normalización final de respuestas "no tengo información" ----------
+    final_answer = (result.get("answer") or "").strip()
+    
+    if final_answer and _looks_like_noinfo(final_answer) and result.get("source") != "NO_INFO":
+        # Forzamos el flujo estándar de "no sé" + oferta de agente humano
+        result["answer"] = _noinfo_answer()
+        result["confidence"] = 0.0
+        result["source"] = "NO_INFO"
+        result["need_handoff"] = True
+        result["handoff_state"] = "OFFER"
+        conv_status = "handoff_offer"
+        conv_needs_agent = False
+
 
     # ---------- 8) Registrar conversación (último paso) ----------
     try:
