@@ -6196,12 +6196,12 @@ def convert_to_base(amount: float, currency: str, rate_date: date) -> Tuple[floa
     return float(amount) * fx, fx
 
 
+app = create_app()
 # =========================
 # EJECUCIÓN
 # =========================
 # al final de app.py
 if __name__ == "__main__":
-    app = create_app()
     app.run(
         host="127.0.0.1",
         port=int(os.getenv("PORT", 5000)),
