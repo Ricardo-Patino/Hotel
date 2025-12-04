@@ -877,6 +877,49 @@ CREATE TABLE IF NOT EXISTS MantenimientoNotificacion (
   KEY IX_MantenimientoNotificacion_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+/* ------------------------------------------------------------------------- */
+/* ChatBot                                         */
+/* ------------------------------------------------------------------------- */
+
+
+CREATE TABLE IF NOT EXISTS SAC_KB_Doc (
+  Id           INT AUTO_INCREMENT PRIMARY KEY,
+  Titulo       VARCHAR(180) NOT NULL,
+  FileName     VARCHAR(240) NOT NULL,
+  MimeType     VARCHAR(80)  NOT NULL,
+  Bytes        INT          NULL,
+  Chunks       INT          NOT NULL DEFAULT 0,
+  HashSum      CHAR(64)     NULL,
+  Activo       TINYINT(1)   NOT NULL DEFAULT 1,
+  SubidoPor    INT          NULL,
+  SubidoEn     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_KB_Activo (Activo, SubidoEn)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_KB_QA (
+  Id         INT AUTO_INCREMENT PRIMARY KEY,
+  Pregunta   VARCHAR(500) NOT NULL,
+  Respuesta  TEXT NOT NULL,
+  Activo     TINYINT(1) NOT NULL DEFAULT 1,
+  CreadoPor  INT NULL,
+  CreadoEn   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY UQ_KB_Q (Pregunta(255))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS SAC_KB_Unanswered (
+  Id           INT AUTO_INCREMENT PRIMARY KEY,
+  Pregunta     VARCHAR(500) NOT NULL,
+  Detalle      TEXT NULL,
+  Origen       ENUM('WEB','WHATSAPP') NOT NULL DEFAULT 'WEB',
+  Session_Id   VARCHAR(64) NULL,
+  Cliente_Id   INT NULL,
+  Estado       ENUM('NUEVA','REVISADA','RESPONDIDA') NOT NULL DEFAULT 'NUEVA',
+  Creada_At    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Revisada_At  DATETIME NULL,
+  Respondida_At DATETIME NULL,
+  KEY IX_KB_Un_Q (Estado, Creada_At)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 
 
@@ -1328,129 +1371,229 @@ CREATE TABLE ArepExportLog (
 
 -- ====================== SAC — Tablas básicas ======================
 CREATE TABLE IF NOT EXISTS SAC_Config (
-  Clave VARCHAR(60) PRIMARY KEY,
-  Valor VARCHAR(240) NOT NULL,
-  Actualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  Clave        VARCHAR(60) PRIMARY KEY,
+  Valor        VARCHAR(240) NOT NULL,
+  Actualizado  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                          ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS SAC_NotifPref (
   Codigo_Cliente INT PRIMARY KEY,
-  Canal ENUM('email','sms','ambos') NOT NULL DEFAULT 'email',
-  Email VARCHAR(120), Telefono VARCHAR(25),
-  Verif_Email TINYINT(1) NOT NULL DEFAULT 0,
-  Verif_SMS   TINYINT(1) NOT NULL DEFAULT 0,
-  Actualizado DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  Canal          ENUM('email','sms','ambos') NOT NULL DEFAULT 'email',
+  Email          VARCHAR(120),
+  Telefono       VARCHAR(25),
+  Verif_Email    TINYINT(1) NOT NULL DEFAULT 0,
+  Verif_SMS      TINYINT(1) NOT NULL DEFAULT 0,
+  Actualizado    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                             ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS SAC_Outbox (
-  Id INT AUTO_INCREMENT PRIMARY KEY,
-  Canal ENUM('email','sms') NOT NULL,
-  Para  VARCHAR(180) NOT NULL,
-  Asunto VARCHAR(160), Cuerpo TEXT,
-  Estado ENUM('PENDIENTE','ENVIADO','ERROR') NOT NULL DEFAULT 'PENDIENTE',
-  ErrorMsg VARCHAR(240),
+  Id            INT AUTO_INCREMENT PRIMARY KEY,
+  Canal         ENUM('email','sms') NOT NULL,
+  Para          VARCHAR(180) NOT NULL,
+  Asunto        VARCHAR(160),
+  Cuerpo        TEXT,
+  Estado        ENUM('PENDIENTE','ENVIADO','ERROR')
+                  NOT NULL DEFAULT 'PENDIENTE',
+  ErrorMsg      VARCHAR(240),
   Programado_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Enviado_At DATETIME NULL,
-  Ref_Entidad VARCHAR(40), Ref_Id VARCHAR(40),
-  Meta_JSON JSON NULL,
+  Enviado_At    DATETIME NULL,
+  Ref_Entidad   VARCHAR(40),
+  Ref_Id        VARCHAR(40),
+  Meta_JSON     JSON NULL,
   KEY IX_Outbox_Estado (Estado, Programado_At)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS SAC_Solicitud (
-  Id INT AUTO_INCREMENT PRIMARY KEY,
-  Codigo_Reserva INT NOT NULL,
-  Codigo_Cliente INT NULL,
-  Clave VARCHAR(60) NOT NULL,
-  Valor VARCHAR(240) NULL,
-  Estado ENUM('NUEVA','VISTA','ATENDIDA','RECHAZADA') NOT NULL DEFAULT 'NUEVA',
-  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY IX_SAC_Solicitud_Reserva (Codigo_Reserva),
-  KEY IX_SAC_Solicitud_Estado (Estado)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS SAC_Conversation (
-  Id INT AUTO_INCREMENT PRIMARY KEY,
-  Codigo_Cliente INT NULL,
-  Session_Id VARCHAR(64) NULL,
-  Abierta TINYINT(1) NOT NULL DEFAULT 1,
-  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Actualizada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  KEY IX_SAC_Conv_Session (Session_Id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS SAC_ConversationMsg (
-  Id INT AUTO_INCREMENT PRIMARY KEY,
-  Conv_Id INT NOT NULL,
-  Rol ENUM('user','bot','agente') NOT NULL,
-  Texto TEXT NOT NULL,
-  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY IX_SAC_ConvMsg_Conv (Conv_Id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS SAC_Incident (
-  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Id             INT AUTO_INCREMENT PRIMARY KEY,
   Codigo_Reserva INT NULL,
   Codigo_Cliente INT NULL,
-  Tipo ENUM('INCIDENTE','COMENTARIO') NOT NULL DEFAULT 'INCIDENTE',
-  Severidad ENUM('BAJA','MEDIA','ALTA','CRITICA') NOT NULL DEFAULT 'MEDIA',
-  Titulo VARCHAR(160) NOT NULL,
-  Detalle TEXT NULL,
-  Estado ENUM('ABIERTA','EN_PROCESO','CERRADA') NOT NULL DEFAULT 'ABIERTA',
-  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY IX_SAC_Incident_Reserva (Codigo_Reserva), KEY IX_SAC_Incident_Estado (Estado)
+  Clave          VARCHAR(60)  NOT NULL,
+  Valor          VARCHAR(240) NULL,
+  Estado         ENUM('NUEVA','VISTA','EN_PROCESO','ATENDIDA','RECHAZADA')
+                    NOT NULL DEFAULT 'NUEVA',
+  Creada_At      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_SAC_Solicitud_Reserva (Codigo_Reserva),
+  KEY IX_SAC_Solicitud_Estado  (Estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `SAC_Conversation` (
+  `Id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `Codigo_Cliente`  INT NULL,
+  `Session_Id`      VARCHAR(64) NOT NULL,
+
+  -- Estado general de la conversación para el widget/chat
+  `Status`          VARCHAR(20)  NOT NULL DEFAULT 'bot',
+
+  -- Flag usado por el widget/chat para marcar que necesita agente
+  `Needs_Agent`     TINYINT(1)   NOT NULL DEFAULT 0,
+
+  -- Datos básicos del huésped/visitante cuando se conocen
+  `Guest_Name`      VARCHAR(160) NULL,
+  `Guest_Email`     VARCHAR(160) NULL,
+
+  -- Canal de origen (web, whatsapp, etc.)
+  `Channel`         VARCHAR(20)  NOT NULL DEFAULT 'web',
+
+  -- Último mensaje registrado en la conversación
+  `Last_Msg_At`     DATETIME     NULL,
+  `Last_Msg_Role`   VARCHAR(10)  NULL,
+
+  -- 1 = conversación visible/abierta en SAC
+  `Abierta`         TINYINT(1)   NOT NULL DEFAULT 1,
+
+  -- Flags funcionales del módulo SAC (panel de administración)
+  `Requiere_Agente` TINYINT(1)   NOT NULL DEFAULT 0,
+  `Estado`          ENUM('NORMAL','PENDIENTE_AGENT','EN_ATENCION','CERRADA')
+                    NOT NULL DEFAULT 'NORMAL',
+
+  `Creada_At`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `Actualizada_At`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                    ON UPDATE CURRENT_TIMESTAMP,
+
+  KEY `IX_SAC_Conv_Session` (`Session_Id`),
+  -- Índice que usa el panel para listar pendientes de agente
+  KEY `IX_SAC_Conv_Agente`  (`Requiere_Agente`, `Estado`, `Abierta`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE `SAC_ConversationMsg` (
+  `Id`         INT AUTO_INCREMENT PRIMARY KEY,
+  `Conv_Id`    INT NOT NULL,
+
+  -- Rol del emisor del mensaje en la conversación
+  -- (valores usados por tu backend: 'user', 'bot', 'agent')
+  `Rol`        ENUM('user','bot','agent') NOT NULL,
+
+  `Texto`      TEXT NOT NULL,
+  `Creada_At`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  KEY `IX_SAC_ConvMsg_Conv` (`Conv_Id`),
+
+  CONSTRAINT `FK_SAC_ConvMsg_Conv`
+    FOREIGN KEY (`Conv_Id`)
+    REFERENCES `SAC_Conversation`(`Id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+CREATE TABLE IF NOT EXISTS SAC_Incident (
+  Id             INT AUTO_INCREMENT PRIMARY KEY,
+  Codigo_Reserva INT NULL,
+  Codigo_Cliente INT NULL,
+  Tipo           ENUM('INCIDENTE','COMENTARIO')
+                    NOT NULL DEFAULT 'INCIDENTE',
+  Severidad      ENUM('BAJA','MEDIA','ALTA','CRITICA')
+                    NOT NULL DEFAULT 'MEDIA',
+  Titulo         VARCHAR(160) NOT NULL,
+  Detalle        TEXT NULL,
+  Estado         ENUM('ABIERTA','EN_PROCESO','CERRADA')
+                    NOT NULL DEFAULT 'ABIERTA',
+  Creada_At      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY IX_SAC_Incident_Reserva (Codigo_Reserva),
+  KEY IX_SAC_Incident_Estado  (Estado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS SAC_Feedback (
-  Id INT AUTO_INCREMENT PRIMARY KEY,
+  Id             INT AUTO_INCREMENT PRIMARY KEY,
   Codigo_Reserva INT NOT NULL,
-  NPS TINYINT NULL,
-  Comentario TEXT NULL,
-  Registrada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  NPS            TINYINT NULL,
+  Comentario     TEXT NULL,
+  Registrada_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY IX_SAC_Feedback_Reserva (Codigo_Reserva)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO SAC_Config (Clave, Valor) VALUES
-('checkin_inicio','12:00'),
-('checkin_fin','00:00'),
-('checkout_limite','12:00'),
-('contacto_recepcion_email','recepcion@hotel.test')
-ON DUPLICATE KEY UPDATE Valor=VALUES(Valor);
+  ('checkin_inicio','12:00'),
+  ('checkin_fin','00:00'),
+  ('checkout_limite','12:00'),
+  ('contacto_recepcion_email','recepcion@hotel.test')
+ON DUPLICATE KEY UPDATE Valor = VALUES(Valor);
 
 -- (Opcional) disparador: al crear reserva, agendar recordatorios 48h/24h por canal preferido (si existe)
 DELIMITER $$
 CREATE TRIGGER trg_sac_reserva_after_ins
-AFTER INSERT ON Reserva FOR EACH ROW
+AFTER INSERT ON Reserva
+FOR EACH ROW
 BEGIN
   DECLARE cli_email VARCHAR(120);
   DECLARE cli_tel   VARCHAR(25);
   DECLARE canal     VARCHAR(10);
 
-  SELECT c.Correo, c.Telefono INTO cli_email, cli_tel
-  FROM Cliente c WHERE c.Codigo_Cliente = NEW.Codigo_Cliente LIMIT 1;
+  SELECT c.Correo, c.Telefono
+    INTO cli_email, cli_tel
+  FROM Cliente c
+  WHERE c.Codigo_Cliente = NEW.Codigo_Cliente
+  LIMIT 1;
 
-  SELECT COALESCE(p.Canal,'email') INTO canal
-  FROM SAC_NotifPref p WHERE p.Codigo_Cliente = NEW.Codigo_Cliente LIMIT 1;
+  SELECT COALESCE(p.Canal,'email')
+    INTO canal
+  FROM SAC_NotifPref p
+  WHERE p.Codigo_Cliente = NEW.Codigo_Cliente
+  LIMIT 1;
 
+  -- Notificaciones por email
   IF canal IN ('email','ambos') AND cli_email IS NOT NULL THEN
-    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
-    VALUES ('email', cli_email, 'Recordatorio de reserva',
-            CONCAT('Su reserva ', COALESCE(NEW.Numero_Comprobante,''), ' se acerca. ',
-                   'Check-in desde ', (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1), 
-                   '. Check-out hasta ', (SELECT Valor FROM SAC_Config WHERE Clave='checkout_limite' LIMIT 1), '.'),
-            'PENDIENTE', DATE_SUB(NEW.Fecha_Entrada, INTERVAL 48 HOUR),'Reserva', NEW.Codigo_Reserva);
-    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
-    VALUES ('email', cli_email, 'Recordatorio de reserva',
-            CONCAT('Le esperamos mañana. Check-in desde ',
-                   (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1), '.'),
-            'PENDIENTE', DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),'Reserva', NEW.Codigo_Reserva);
+    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado,
+                            Programado_At, Ref_Entidad, Ref_Id)
+    VALUES (
+      'email',
+      cli_email,
+      'Recordatorio de reserva',
+      CONCAT(
+        'Su reserva ', COALESCE(NEW.Numero_Comprobante,''), ' se acerca. ',
+        'Check-in desde ',
+        (SELECT Valor FROM SAC_Config
+          WHERE Clave='checkin_inicio' LIMIT 1),
+        '. Check-out hasta ',
+        (SELECT Valor FROM SAC_Config
+          WHERE Clave='checkout_limite' LIMIT 1), '.'
+      ),
+      'PENDIENTE',
+      DATE_SUB(NEW.Fecha_Entrada, INTERVAL 48 HOUR),
+      'Reserva',
+      NEW.Codigo_Reserva
+    );
+
+    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado,
+                            Programado_At, Ref_Entidad, Ref_Id)
+    VALUES (
+      'email',
+      cli_email,
+      'Recordatorio de reserva',
+      CONCAT(
+        'Le esperamos mañana. Check-in desde ',
+        (SELECT Valor FROM SAC_Config
+          WHERE Clave='checkin_inicio' LIMIT 1), '.'
+      ),
+      'PENDIENTE',
+      DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),
+      'Reserva',
+      NEW.Codigo_Reserva
+    );
   END IF;
 
+  -- Notificación SMS (si aplica)
   IF canal IN ('sms','ambos') AND cli_tel IS NOT NULL THEN
-    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado, Programado_At, Ref_Entidad, Ref_Id)
-    VALUES ('sms', cli_tel, NULL,
-            CONCAT('Villa Grace: su reserva ', COALESCE(NEW.Numero_Comprobante,''), 
-                   '. Check-in ', (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1)),
-            'PENDIENTE', DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),'Reserva', NEW.Codigo_Reserva);
+    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado,
+                            Programado_At, Ref_Entidad, Ref_Id)
+    VALUES (
+      'sms',
+      cli_tel,
+      NULL,
+      CONCAT(
+        'Villa Grace: su reserva ',
+        COALESCE(NEW.Numero_Comprobante,''), 
+        '. Check-in ',
+        (SELECT Valor FROM SAC_Config
+          WHERE Clave='checkin_inicio' LIMIT 1)
+      ),
+      'PENDIENTE',
+      DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),
+      'Reserva',
+      NEW.Codigo_Reserva
+    );
   END IF;
 END$$
 DELIMITER ;
@@ -2132,6 +2275,7 @@ SELECT * FROM KPI_Stats;
 SELECT * FROM Coupon;
 SELECT * FROM Waitlist;
 SELECT * FROM ArepViewConfig;
+SELECT * FROM sac_conversation;
 SELECT Codigo_ArepAtencion, Area, Duracion_Seg FROM ArepAtencion ORDER BY Codigo_ArepAtencion DESC;
 SELECT Codigo_ArepSatisfaccion, Puntaje FROM ArepSatisfaccion ORDER BY Codigo_ArepSatisfaccion DESC;
 
@@ -2181,3 +2325,7 @@ FROM Marcacion
 WHERE Codigo_Funcionario = 4
   AND Fecha >= CURDATE() - INTERVAL 30 DAY
 ORDER BY Fecha DESC, Id DESC;
+
+
+
+
