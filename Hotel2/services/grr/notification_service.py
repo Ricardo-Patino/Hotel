@@ -1,3 +1,4 @@
+# services/grr/notification_service.py
 from __future__ import annotations
 
 import os, re, smtplib, ssl, unicodedata
@@ -87,8 +88,7 @@ def _to_gsm7_approx(s: str) -> str:
     return s.strip()
 
 def _sms_limit_trial_len() -> int:
-    # Muy conservador: el prefijo "Sent from your Twilio trial account - "
-    # cuenta contra el segmento total. 80 por defecto para asegurar 1 segmento.
+    # Conservador: el prefijo “Sent from your Twilio trial account - ” cuenta contra el segmento total.
     default_max = "80" if _is_twilio_trial() else "140"
     return int(os.getenv("TWILIO_TRIAL_MAX_SMS", default_max))
 
@@ -122,8 +122,6 @@ def _cfg(key: str, default: str = "") -> str:
 def _get_pref(codigo_cliente: Optional[int]) -> Tuple[str, Optional[str], Optional[str]]:
     """
     Devuelve (canal, email_pref, tel_pref). canal ∈ {'email','sms','ambos'} o 'email' por defecto.
-    No asume columnas como Id/Fecha_modificacion; funciona con esquemas simples (1 fila por cliente).
-    Si hubiera múltiples filas, la base debería garantizar unicidad por aplicación/BD.
     """
     canal = "email"; email = None; tel = None
     if not codigo_cliente:
@@ -204,7 +202,6 @@ def _send_sms_twilio(to_phone: str, body: str) -> str:
 
     client = Client(sid, token)
 
-    # Saneamiento FINAL + recorte por Trial
     sms = (body or "").replace("\n", " ")
     sms = _to_gsm7_approx(sms)
     sms = _truncate_for_trial(sms)
@@ -224,7 +221,6 @@ def _send_sms_twilio(to_phone: str, body: str) -> str:
             current_app.logger.info(f"[SMS] Twilio sid={msg.sid} len={len(sms)}")
         return msg.sid
     except TwilioRestException as e:
-        # Si excede el límite Trial (30044), reintentamos con un mensaje ultra-corto
         if "30044" in str(e):
             brand = os.getenv("SMS_BRAND_SHORT", "VG")
             mini = f"{brand} confirmado"
@@ -340,7 +336,6 @@ def _compose_reserva_messages(payload: Dict) -> Tuple[str, str, str]:
     features    = _fetch_room_features(hid)
     total_txt   = _fmt_currency(total, symbol=moneda_sym) if total is not None else ""
 
-    # Email (rico)
     subject = f"Confirmación de reserva #{rid} – {hotel_nom}"
     lines: List[str] = [
         f"{nombre},", "",
@@ -371,7 +366,6 @@ def _compose_reserva_messages(payload: Dict) -> Tuple[str, str, str]:
     ])
     email_body = "\n".join([x for x in lines if x is not None])
 
-    # SMS (compacto Trial-safe)
     brand = os.getenv("SMS_BRAND_SHORT", "VG")
     tel_c = _tel_compact(hotel_tel)
     sms_raw = f"{brand} Res#{rid} {hab}{(' '+tipo) if tipo else ''} {f_in}->{f_out} CI {checkin_ini}-{checkin_fin} CO {checkout} Tel {tel_c}"
@@ -414,11 +408,11 @@ class NotificationService:
     Enrutador de notificaciones:
     - route_and_queue: genérico (usa preferencias del cliente si hay).
     - send_confirmation: plantilla simple (compatibilidad).
+    - send_reserva_details / send_reserva_confirmation: confirmación con payload de reserva.
     """
 
     def __init__(self, *_, **__):
-        # Acepta parámetros ignorándolos para compatibilidad (antes se pasaba db)
-        self.db = db
+        self.db = db  # compatibilidad
 
     @staticmethod
     def _resolve_kwargs(kwargs: Dict) -> Dict:
@@ -504,7 +498,7 @@ class NotificationService:
         )
         self.route_and_queue(email=correo, phone=telefono, subject=subject, body=body)
 
-    # Método opcional de conveniencia: enviar detalles de reserva por canales
+    # Conveniencia: enviar detalles de reserva por canales (respeta preferencias)
     def send_reserva_details(self, reserva_id: int) -> Dict[str, object]:
         payload = _fetch_reserva_payload(reserva_id)
         if not payload:
@@ -512,7 +506,6 @@ class NotificationService:
 
         subject, email_body, sms_body = _compose_reserva_messages(payload)
         cid = payload.get("cid")
-        # Respeta preferencias y envía cuerpo apropiado en cada canal
         return self.route_and_queue(
             cliente_id=cid,
             subject=subject,
@@ -521,3 +514,8 @@ class NotificationService:
             ref_entidad="Reserva",
             ref_id=str(reserva_id),
         )
+
+    # *** Alias de compatibilidad esperado por app.py ***
+    # app.py invoca ns.send_reserva_confirmation(rid); mapeamos a send_reserva_details.
+    def send_reserva_confirmation(self, reserva_id: int) -> Dict[str, object]:
+        return self.send_reserva_details(reserva_id)

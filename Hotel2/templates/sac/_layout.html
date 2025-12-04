@@ -40,6 +40,9 @@
   </head>
   <body class="index-page">
 
+    
+
+
     {# Header compacto (mismo que ya te pasé) #}
     {% set _role = session.get('user_role') %}
     <header id="header" class="header d-flex align-items-center fixed-top">
@@ -88,7 +91,8 @@
                   <li><a href="{{ url_for('sac.conversaciones_html') }}">Historial de conversaciones</a></li>
                 {% endif %}
                 {% if _role == 'Administrador' %}
-                  <li><a href="{{ url_for('sac.indicadores_html') }}">Indicadores</a></li>
+                  <li><a href="{{ url_for('sac.indicadores_html') }}">Indicadores</a></li>                
+                  <li><a href="{{ url_for('sac.sac_kb_list') }}">Base de Conocimiento (KB)</a></li>
                 {% endif %}
               </ul>
             </li>

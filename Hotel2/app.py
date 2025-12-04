@@ -27,18 +27,10 @@ from datetime import datetime, date
 from flask import session, render_template
 from models_sql import Usuario
 from blueprints.fin_kpi import fin_kpi_bp
-
+from blueprints.sac.routes import sac_bp
 from blueprints.pos import pos_bp
 from blueprints.fin_kpi import fin_kpi_bp
 from blueprints.fin_periods import fin_periods_bp
-
-from datetime import date
-from typing import Tuple
-
-from flask import current_app
-from sqlalchemy import text
-
-from extensions import db
 
 
 from flask import (
@@ -1271,17 +1263,8 @@ def create_app() -> Flask:
     app.register_blueprint(arep_bp)
     
     # === SAC (Atención al Cliente y Comunicación) ===
-    from blueprints.sac import sac_bp
+    
     app.register_blueprint(sac_bp)
-
-    # === FAC (008) ===
-
-    from blueprints.fin_recurring import fin_recurring_bp
-    app.register_blueprint(fin_recurring_bp)
-
-    # ============ACE=============
-    from blueprints.ace import ace_bp
-    app.register_blueprint(ace_bp, url_prefix='/ace')
 
     
 
@@ -1558,30 +1541,7 @@ def create_app() -> Flask:
     @app.route("/")
     @app.route("/index.html")
     def index_html():
-        """Landing público del hotel + widget de tipo de cambio."""
-        fx_usd_crc = None
-        fx_date = None
-
-        try:
-            # Tipo de cambio USD → moneda base (normalmente CRC)
-            hoy = date.today()
-            fx = get_fx_rate_for_date("USD", hoy)
-
-            if fx is not None:
-                fx_usd_crc = fx          # número que usas en el widget
-                fx_date = hoy.strftime("%d/%m/%Y")  # fecha que se muestra debajo
-        except Exception as exc:
-            # Si hay cualquier error, simplemente mostramos el mensaje de “no disponible”
-            app.logger.warning(
-                "No se pudo obtener el tipo de cambio USD/CRC para index: %s", exc
-            )
-
-        return render_template(
-            "index.html",
-            fx_usd_crc=fx_usd_crc,
-            fx_date=fx_date,
-        )
-
+        return render_template("index.html")
 
     @app.route("/contact.html")
     def contact_html():
@@ -5813,14 +5773,6 @@ def create_app() -> Flask:
         bd_after = _checkout_breakdown(int(reserva_id), estancia_id=estancia_id) or bd_before
         return jsonify({"ok": True, "reserva_id": int(reserva_id), "receipt": receipt, "breakdown": bd_after})
     
-    
-    
-    
-    # Configuración de carpetas de uploads ACE
-    os.makedirs(app.config.get('UPLOAD_FOLDER_CLIENTES'), exist_ok=True)
-
-
-
     ## Parte de Brandon
 
     # ============================================================
@@ -6127,76 +6079,15 @@ def create_app() -> Flask:
     return app
 
 
-def get_base_currency() -> str:
-    """
-    Moneda base del sistema.
-    Puedes mover esto a config, por ahora usamos 'CRC' por defecto.
-    """
-    return current_app.config.get("FIN_BASE_CURRENCY", "CRC")
-
-
-def get_fx_rate_for_date(currency: str, rate_date: date) -> float:
-    """
-    Devuelve el tipo de cambio (rate_to_base) para la moneda y fecha dadas.
-    Si no existe para ese día exacto, busca el último <= fecha.
-    """
-    if not currency:
-        raise ValueError("Moneda no especificada")
-
-    base = get_base_currency()
-    currency = currency.upper()
-    if currency == base:
-        return 1.0
-
-    row = db.session.execute(
-        text(
-            """
-            SELECT rate_to_base
-            FROM fin_fx_rate
-            WHERE currency = :curr
-              AND rate_date <= :d
-            ORDER BY rate_date DESC
-            LIMIT 1
-            """
-        ),
-        {"curr": currency, "d": rate_date},
-    ).fetchone()
-
-    if not row:
-        raise RuntimeError(
-            f"No hay tipo de cambio para {currency} (<= {rate_date.isoformat()})"
-        )
-
-    return float(row[0])
-
-
-def convert_to_base(amount: float, currency: str, rate_date: date) -> Tuple[float, float]:
-    """
-    Convierte un monto desde 'currency' a moneda base.
-    Retorna (monto_base, fx_rate).
-    """
-    if amount is None:
-        raise ValueError("amount no puede ser None")
-
-    currency = (currency or "").upper()
-    base = get_base_currency()
-
-    if currency == base:
-        return float(amount), 1.0
-
-    fx = get_fx_rate_for_date(currency, rate_date)
-    return float(amount) * fx, fx
-
-
-app = create_app()
 # =========================
 # EJECUCIÓN
 # =========================
 # al final de app.py
-# if __name__ == "__main__":
-#     app.run(
-#         host="127.0.0.1",
-#         port=int(os.getenv("PORT", 5000)),
-#         debug=True,
-#         use_reloader=True,   # <-- clave para quitar ese error
-#     )
+if __name__ == "__main__":
+    app = create_app()
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", 5000)),
+        debug=True,
+        use_reloader=True,   # <-- clave para quitar ese error
+    )

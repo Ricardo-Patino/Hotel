@@ -1,0 +1,734 @@
+{# templates/sac/chat_admin.html #}
+{% extends "base.html" %}
+
+{% block title %}Administración Chatbot – SAC{% endblock %}
+
+{% block content %}
+<div class="container chat-admin-container mt-3 mb-4">
+  <div id="chat-admin-alert-area"></div>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h3 mb-1">Administración del Chatbot – SAC</h1>
+      <p class="text-muted mb-0 small-muted">
+        Panel para gestionar la base de conocimiento, revisar tendencias de uso
+        y ajustar el comportamiento del asistente virtual del Hotel Villa Grace.
+      </p>
+    </div>
+    <div class="text-end">
+      <span class="badge text-bg-secondary badge-status" id="badge-ollama">Ollama: verificando…</span><br />
+      <span class="badge text-bg-secondary badge-status mt-1" id="badge-n8n">n8n: verificando…</span>
+    </div>
+  </div>
+
+  <!-- Pestañas principales -->
+  <ul class="nav nav-tabs" id="chatAdminTab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link active"
+        id="kb-tab"
+        data-bs-toggle="tab"
+        data-bs-target="#kb-pane"
+        type="button"
+        role="tab"
+        aria-controls="kb-pane"
+        aria-selected="true"
+      >
+        Base de conocimiento (KB)
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="stats-tab"
+        data-bs-toggle="tab"
+        data-bs-target="#stats-pane"
+        type="button"
+        role="tab"
+        aria-controls="stats-pane"
+        aria-selected="false"
+      >
+        Tendencias de preguntas
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        id="config-tab"
+        data-bs-toggle="tab"
+        data-bs-target="#config-pane"
+        type="button"
+        role="tab"
+        aria-controls="config-pane"
+        aria-selected="false"
+      >
+        Configuración del bot
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="chatAdminTabContent">
+    <!-- TAB 1 – KB -->
+    <div
+      class="tab-pane fade show active"
+      id="kb-pane"
+      role="tabpanel"
+      aria-labelledby="kb-tab"
+      tabindex="0"
+    >
+      <div class="row mt-3">
+        <div class="col-lg-4">
+          <div class="card mb-3">
+            <div class="card-header">
+              Subir documento a KB
+            </div>
+            <div class="card-body">
+              <p class="small text-muted">
+                Puedes subir archivos <strong>.pdf</strong>, <strong>.docx</strong>, <strong>.txt</strong>, <strong>.md</strong>, <strong>.html</strong>.
+                El índice RAG se reconstruye automáticamente para que el chatbot use esta información.
+              </p>
+              <form id="kb-upload-form">
+                <div class="mb-3">
+                  <label for="kb-upload-title" class="form-label">Título del documento</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="kb-upload-title"
+                    name="title"
+                    placeholder="Ej: Manual de políticas del hotel"
+                    required
+                  />
+                </div>
+                <div class="mb-3">
+                  <label for="kb-upload-file" class="form-label">Archivo</label>
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="kb-upload-file"
+                    name="file"
+                    accept=".pdf,.docx,.txt,.md,.html,.htm"
+                    required
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  Subir y reindexar KB
+                </button>
+              </form>
+            </div>
+          </div>
+          <div class="alert alert-info small">
+            <strong>Recomendación:</strong><br />
+            Suba documentos internos relevantes: reglamentos de la casa, manuales de recepción,
+            instrucciones de limpieza, protocolos de emergencia, listas de servicios, etc.
+          </div>
+        </div>
+
+        <div class="col-lg-8">
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Documentos en la base de conocimiento</span>
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                id="btn-refresh-kb"
+              >
+                Actualizar lista
+              </button>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-sm table-hover kb-docs-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 5%">ID</th>
+                      <th style="width: 40%">Título</th>
+                      <th style="width: 25%">Nombre archivo</th>
+                      <th style="width: 15%">Tamaño</th>
+                      <th style="width: 15%">Subido</th>
+                    </tr>
+                  </thead>
+                  <tbody id="kb-docs-tbody">
+                    <tr>
+                      <td colspan="5" class="text-center text-muted">
+                        No hay datos cargados todavía.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="small text-muted mb-0">
+                Los documentos marcados como activos son los que se consideran en el índice vectorial.
+                El control fino de activación/desactivación se maneja desde la vista principal de KB si lo requieres.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2 – Tendencias de preguntas -->
+    <div
+      class="tab-pane fade"
+      id="stats-pane"
+      role="tabpanel"
+      aria-labelledby="stats-tab"
+      tabindex="0"
+    >
+      <div class="row mt-3">
+        <div class="col-12">
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Preguntas más frecuentes al chatbot</span>
+              <div>
+                <label class="me-2 small">
+                  Máx. mensajes analizados:
+                  <input
+                    type="number"
+                    id="stats-max-rows"
+                    class="form-control form-control-sm d-inline-block"
+                    style="width: 110px"
+                    value="2000"
+                    min="100"
+                    max="10000"
+                  />
+                </label>
+                <label class="me-2 small">
+                  Máx. filas:
+                  <input
+                    type="number"
+                    id="stats-limit"
+                    class="form-control form-control-sm d-inline-block"
+                    style="width: 80px"
+                    value="30"
+                    min="5"
+                    max="100"
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  id="btn-refresh-stats"
+                >
+                  Actualizar
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="small text-muted">
+                Estas estadísticas se construyen a partir de los mensajes de usuario registrados en
+                <strong>SAC_ConversationMsg</strong> (rol = <code>user</code>), excluyendo saludos
+                y small-talk. Útil para detectar qué temas conviene reforzar en la KB o en los flujos
+                de atención del hotel.
+              </p>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover stats-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 10%">#</th>
+                      <th style="width: 70%">Pregunta normalizada</th>
+                      <th style="width: 20%">Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody id="stats-tbody">
+                    <tr>
+                      <td colspan="3" class="text-center text-muted">
+                        No se han cargado estadísticas todavía.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="small text-muted mb-0" id="stats-summary">
+                Total de mensajes analizados: 0
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3 – Configuración del bot -->
+    <div
+      class="tab-pane fade"
+      id="config-pane"
+      role="tabpanel"
+      aria-labelledby="config-tab"
+      tabindex="0"
+    >
+      <div class="row mt-3">
+        <div class="col-lg-7">
+          <div class="card mb-3">
+            <div class="card-header">
+              Prompt / instrucciones del bot
+            </div>
+            <div class="card-body">
+              <p class="small text-muted">
+                Aquí puedes definir o ajustar el <strong>prompt de sistema</strong> que controla el tono y
+                el comportamiento del asistente virtual. Si dejas vacío el campo y marcas la opción de
+                restaurar, se usará el prompt por defecto definido en el código.
+              </p>
+
+              <div class="mb-2">
+                <label for="chatbot-prompt" class="form-label">Prompt personalizado</label>
+                <textarea
+                  id="chatbot-prompt"
+                  class="form-control prompt-textarea"
+                  placeholder="Escribe aquí el prompt personalizado del chatbot..."
+                >{{ prompt_current or '' }}</textarea>
+              </div>
+
+              <div class="form-check mb-2">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="chatbot-clear-default"
+                />
+                <label class="form-check-label small" for="chatbot-clear-default">
+                  Restaurar prompt por defecto (ignorar texto e instrucciones personalizadas).
+                </label>
+              </div>
+
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                id="btn-save-prompt"
+              >
+                Guardar configuración
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="card mb-3">
+            <div class="card-header">
+              Prompt efectivo actual
+            </div>
+            <div class="card-body">
+              <p class="small text-muted mb-2">
+                Esta es la versión del prompt que realmente se está aplicando en tiempo de ejecución,
+                considerando tanto el prompt por defecto como cualquier personalización guardada.
+              </p>
+              <pre
+                id="chatbot-effective-prompt"
+                class="border rounded p-2 small bg-light"
+                style="max-height: 380px; overflow-y: auto; white-space: pre-wrap;"
+              >Cargando…</pre>
+            </div>
+          </div>
+          <div class="alert alert-secondary small mb-0">
+            <strong>Sugerencia:</strong>
+            Usa este prompt para reforzar que las respuestas se basen en la información del hotel
+            (KB, PDFs, reglamentos), que no invente datos sensibles y que mantenga un tono coherente
+            con la marca del Hotel Villa Grace.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .chat-admin-container {
+    margin-top: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .kb-docs-table tbody tr td,
+  .stats-table tbody tr td {
+    vertical-align: middle;
+  }
+  .prompt-textarea {
+    font-family: monospace;
+    font-size: 0.9rem;
+    min-height: 260px;
+    white-space: pre-wrap;
+  }
+  .small-muted {
+    font-size: 0.85rem;
+  }
+  .badge-status {
+    font-size: 0.75rem;
+  }
+  .tab-pane {
+    padding-top: 1rem;
+  }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const alertArea = document.getElementById("chat-admin-alert-area");
+
+  function showAdminAlert(type, message) {
+    if (!alertArea) return;
+    const div = document.createElement("div");
+    const bsType = type === "success" ? "success"
+                 : type === "danger"  ? "danger"
+                 : type === "warning" ? "warning"
+                 : "info";
+
+    div.className = "alert alert-" + bsType + " alert-dismissible fade show";
+    div.role = "alert";
+    div.innerHTML = `
+      <span>${message}</span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    alertArea.appendChild(div);
+
+    // Autocierre suave
+    setTimeout(function () {
+      try {
+        if (window.bootstrap && bootstrap.Alert) {
+          const inst = bootstrap.Alert.getOrCreateInstance(div);
+          inst.close();
+        } else {
+          div.remove();
+        }
+      } catch (e) {
+        div.remove();
+      }
+    }, 6000);
+  }
+
+  // ------------------ KB: listado de documentos ------------------
+  async function loadKbDocs() {
+    const tbody = document.getElementById("kb-docs-tbody");
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted">
+          Cargando documentos de KB…
+        </td>
+      </tr>
+    `;
+
+    try {
+      const resp = await fetch("{{ url_for('sac.sac_kb_docs') }}");
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "Error al cargar documentos");
+
+      const items = data.items || [];
+      if (items.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="text-center text-muted">
+              No hay documentos registrados en la base de conocimiento.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      const fmtSize = function (bytes) {
+        const n = Number(bytes || 0);
+        if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
+        if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
+        return n + " B";
+      };
+
+      const fmtDate = function (iso) {
+        if (!iso) return "";
+        try {
+          const d = new Date(iso);
+          if (isNaN(d.getTime())) return iso;
+          return d.toLocaleString();
+        } catch (e) {
+          return iso;
+        }
+      };
+
+      tbody.innerHTML = "";
+      items.forEach((doc) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${doc.id}</td>
+          <td>${doc.title || "-"}</td>
+          <td>${doc.filename || "-"}</td>
+          <td>${fmtSize(doc.size_bytes)}</td>
+          <td>${fmtDate(doc.created_at)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-danger">
+            Error al cargar documentos de KB.
+          </td>
+        </tr>
+      `;
+      showAdminAlert("danger", "No se pudo cargar la lista de documentos de KB.");
+    }
+  }
+
+  // ------------------ KB: upload de documento ------------------
+  async function handleKbUpload(ev) {
+    ev.preventDefault();
+    const form = ev.target;
+    const titleInput = document.getElementById("kb-upload-title");
+    const fileInput  = document.getElementById("kb-upload-file");
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      showAdminAlert("warning", "Debes seleccionar un archivo para subir.");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("file", fileInput.files[0]);
+    fd.append("title", (titleInput && titleInput.value) ? titleInput.value : fileInput.files[0].name);
+
+    const btn = form.querySelector("button[type='submit']");
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Subiendo…';
+    }
+
+    try {
+      const resp = await fetch("{{ url_for('sac.sac_kb_upload') }}", {
+        method: "POST",
+        body: fd
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || ("HTTP " + resp.status));
+      }
+      showAdminAlert("success", "Documento subido e indexado correctamente.");
+      // Reseteo ligero
+      if (titleInput) titleInput.value = "";
+      if (fileInput) fileInput.value = "";
+      loadKbDocs();
+    } catch (err) {
+      console.error(err);
+      showAdminAlert("danger", "Error al subir el documento a la base de conocimiento.");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = "Subir y reindexar KB";
+      }
+    }
+  }
+
+  // ------------------ STATS: tendencias de preguntas ------------------
+  async function loadChatStats() {
+    const tbody   = document.getElementById("stats-tbody");
+    const summary = document.getElementById("stats-summary");
+    const maxRowsInput = document.getElementById("stats-max-rows");
+    const limitInput   = document.getElementById("stats-limit");
+
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="3" class="text-center text-muted">
+          Calculando estadísticas…
+        </td>
+      </tr>
+    `;
+    if (summary) {
+      summary.textContent = "Total de mensajes analizados: 0";
+    }
+
+    let maxRows = 2000;
+    let limit   = 30;
+    try {
+      if (maxRowsInput) maxRows = parseInt(maxRowsInput.value || "2000", 10);
+      if (limitInput)   limit   = parseInt(limitInput.value || "30", 10);
+    } catch (e) {
+      // dejamos valores por defecto
+    }
+
+    const params = new URLSearchParams();
+    params.set("max_rows", String(maxRows));
+    params.set("limit", String(limit));
+
+    try {
+      const url = "{{ url_for('sac.sac_chat_stats') }}" + "?" + params.toString();
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "Error al cargar estadísticas");
+
+      const items = data.items || [];
+      const total = data.total_counted || 0;
+
+      if (items.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="3" class="text-center text-muted">
+              No hay suficientes mensajes de usuario registrados para mostrar tendencias.
+            </td>
+          </tr>
+        `;
+      } else {
+        tbody.innerHTML = "";
+        items.forEach((r, idx) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td>${r.question || ""}</td>
+            <td>${r.count || 0}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      if (summary) {
+        summary.textContent = "Total de mensajes analizados: " + total;
+      }
+    } catch (err) {
+      console.error(err);
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="3" class="text-center text-danger">
+            Error al cargar tendencias de preguntas.
+          </td>
+        </tr>
+      `;
+      if (summary) {
+        summary.textContent = "Total de mensajes analizados: 0";
+      }
+      showAdminAlert("danger", "No se pudieron cargar las tendencias de preguntas del chatbot.");
+    }
+  }
+
+  // ------------------ CONFIG: cargar prompt y badges ------------------
+  async function loadChatConfig() {
+    const promptArea   = document.getElementById("chatbot-prompt");
+    const effectivePre = document.getElementById("chatbot-effective-prompt");
+    const clearCheck   = document.getElementById("chatbot-clear-default");
+    const badgeOllama  = document.getElementById("badge-ollama");
+    const badgeN8n     = document.getElementById("badge-n8n");
+
+    if (effectivePre) {
+      effectivePre.textContent = "Cargando…";
+    }
+
+    try {
+      const resp = await fetch("{{ url_for('sac.sac_chat_config_get') }}");
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "Error al cargar configuración");
+
+      const customPrompt   = data.custom_prompt || "";
+      const effectivePrompt = data.effective_prompt || "";
+      const ollamaEnabled  = !!data.ollama_enabled;
+      const n8nEnabled     = !!data.n8n_webhook_configured;
+
+      if (promptArea) {
+        promptArea.value = customPrompt;
+      }
+      if (effectivePre) {
+        effectivePre.textContent = effectivePrompt || "(sin prompt efectivo configurado)";
+      }
+      if (clearCheck) {
+        clearCheck.checked = false;
+      }
+
+      if (badgeOllama) {
+        badgeOllama.classList.remove("text-bg-secondary", "text-bg-success", "text-bg-danger");
+        if (ollamaEnabled) {
+          badgeOllama.classList.add("text-bg-success");
+          badgeOllama.textContent = "Ollama: activo";
+        } else {
+          badgeOllama.classList.add("text-bg-secondary");
+          badgeOllama.textContent = "Ollama: deshabilitado";
+        }
+      }
+
+      if (badgeN8n) {
+        badgeN8n.classList.remove("text-bg-secondary", "text-bg-success", "text-bg-danger");
+        if (n8nEnabled) {
+          badgeN8n.classList.add("text-bg-success");
+          badgeN8n.textContent = "n8n: configurado";
+        } else {
+          badgeN8n.classList.add("text-bg-secondary");
+          badgeN8n.textContent = "n8n: no configurado";
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      if (effectivePre) {
+        effectivePre.textContent = "No se pudo cargar el prompt efectivo.";
+      }
+      showAdminAlert("danger", "Error al cargar la configuración actual del chatbot.");
+    }
+  }
+
+  // ------------------ CONFIG: guardar prompt ------------------
+  async function saveChatConfig() {
+    const promptArea   = document.getElementById("chatbot-prompt");
+    const clearCheck   = document.getElementById("chatbot-clear-default");
+    const btnSave      = document.getElementById("btn-save-prompt");
+
+    const clear = !!(clearCheck && clearCheck.checked);
+    const promptText = (promptArea && promptArea.value) ? promptArea.value.trim() : "";
+
+    if (!clear && !promptText) {
+      showAdminAlert("warning", "El prompt no puede estar vacío si no marcas la opción de restaurar por defecto.");
+      return;
+    }
+
+    const payload = clear ? { clear: true } : { prompt: promptText };
+
+    if (btnSave) {
+      btnSave.disabled = true;
+      btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+    }
+
+    try {
+      const resp = await fetch("{{ url_for('sac.sac_chat_config_save') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || ("HTTP " + resp.status));
+      }
+
+      if (clear) {
+        showAdminAlert("success", "Se restauró el prompt por defecto del chatbot.");
+      } else {
+        showAdminAlert("success", "Prompt personalizado guardado correctamente.");
+      }
+
+      // Recargar configuración para ver el prompt efectivo actualizado
+      await loadChatConfig();
+    } catch (err) {
+      console.error(err);
+      showAdminAlert("danger", "No se pudo guardar la configuración del chatbot.");
+    } finally {
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.innerHTML = "Guardar configuración";
+      }
+    }
+  }
+
+  // ------------------ Hooks de eventos ------------------
+  const kbUploadForm  = document.getElementById("kb-upload-form");
+  const btnRefreshKb  = document.getElementById("btn-refresh-kb");
+  const btnRefreshStats = document.getElementById("btn-refresh-stats");
+  const btnSavePrompt = document.getElementById("btn-save-prompt");
+
+  if (kbUploadForm) {
+    kbUploadForm.addEventListener("submit", handleKbUpload);
+  }
+  if (btnRefreshKb) {
+    btnRefreshKb.addEventListener("click", loadKbDocs);
+  }
+  if (btnRefreshStats) {
+    btnRefreshStats.addEventListener("click", loadChatStats);
+  }
+  if (btnSavePrompt) {
+    btnSavePrompt.addEventListener("click", saveChatConfig);
+  }
+
+  // Cargas iniciales al abrir la página
+  loadKbDocs();
+  loadChatStats();
+  loadChatConfig();
+});
+</script>
+{% endblock %}

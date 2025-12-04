@@ -1,43 +1,385 @@
-{% extends "sac/_layout.html" %}
-{% block title %}Conversaciones | Hotel Villa Grace{% endblock %}
-{% block page_h1 %}Conversaciones Chat{% endblock %}
-{% block crumb %}SAC · Conversaciones{% endblock %}
+{# templates/sac/sac-conversaciones.html #}
+{% extends "base.html" %}
+
+{% block title %}Seguimiento de conversaciones – SAC{% endblock %}
+
 {% block content %}
-<section class="section" data-aos="fade-up">
-  <div class="container">
-    <div class="vg-card p-3">
-      <div class="d-flex gap-2 align-items-center mb-3">
-        <input id="q" class="form-control" style="max-width:360px" placeholder="Buscar por nombre/correo/teléfono">
-        <select id="days" class="form-select" style="max-width:140px">
-          <option value="7">7 días</option>
-          <option value="30" selected>30 días</option>
-          <option value="90">90 días</option>
-        </select>
-        <button id="btn" class="btn btn-outline-primary">Buscar</button>
+<div class="container-fluid sac-conv-page py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">Seguimiento de conversaciones – SAC</h1>
+      <p class="text-muted mb-0 small">
+        Panel para que recepción y administración vean el historial del chatbot, identifiquen
+        conversaciones que requieren atención humana y continúen la atención desde este mismo chat.
+      </p>
+    </div>
+    <div class="text-end d-none d-md-block">
+      <span class="badge rounded-pill text-bg-primary me-1">Chatbot</span>
+      <span class="badge rounded-pill text-bg-success">Agentes humanos</span>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Lista de conversaciones -->
+    <div class="col-lg-4 col-xl-3">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">Conversaciones</span>
+          <button type="button" id="btn-refresh-conv" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-clockwise"></i> Actualizar
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <div id="conv-list" class="list-group list-group-flush small">
+            <div class="p-3 text-muted">Cargando conversaciones…</div>
+          </div>
+        </div>
       </div>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle">
-          <thead><tr><th>Fecha</th><th>Cliente</th><th>Canal</th><th>Último mensaje</th><th>Estado</th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table>
+    </div>
+
+    <!-- Detalle conversación -->
+    <div class="col-lg-8 col-xl-9">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <h2 id="conv-detail-title" class="h6 mb-0">Selecciona una conversación</h2>
+            <small id="conv-detail-subtitle" class="text-muted"></small>
+          </div>
+          <div id="conv-detail-status-badges" class="text-end small"></div>
+        </div>
+
+        <div class="card-body d-flex flex-column">
+          <!-- Mensajes -->
+          <div id="conv-detail-messages" class="conv-detail-panel mb-3 small">
+            <p class="text-muted mb-0">No hay conversación seleccionada.</p>
+          </div>
+
+          <!-- Formulario respuesta agente -->
+          <form id="agent-reply-form" class="mt-auto" style="display:none;">
+            <div class="mb-2">
+              <label for="agent-reply-text" class="form-label small mb-1">
+                Responder como agente
+              </label>
+              <textarea
+                id="agent-reply-text"
+                class="form-control form-control-sm"
+                rows="3"
+                placeholder="Escribe tu respuesta como agente…"
+              ></textarea>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <div id="agent-reply-helper" class="small text-muted">
+                La respuesta quedará registrada como mensaje de agente en esta conversación.
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-send me-1"></i> Enviar respuesta
+              </button>
+            </div>
+          </form>
+
+          <!-- Mensaje cuando no se puede responder -->
+          <div id="agent-reply-disabled" class="mt-auto small text-muted" style="display:none;">
+            Esta conversación no está marcada para atención de agente o se encuentra cerrada.
+          </div>
+        </div>
       </div>
     </div>
   </div>
-</section>
+</div>
+
+<style>
+  .sac-conv-page {
+    min-height: calc(100vh - 120px);
+  }
+
+  /* Panel de detalle: evita que se corte en conversaciones largas */
+  .conv-detail-panel {
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+  }
+
+  @media (max-width: 991.98px) {
+    .conv-detail-panel {
+      max-height: none;
+      min-height: 280px;
+    }
+  }
+
+  .conv-message {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+  }
+
+  .conv-message-user {
+    background-color: #e9f5ff;
+  }
+
+  .conv-message-bot {
+    background-color: #ffffff;
+    border: 1px solid #e2e3e5;
+  }
+
+  .conv-message-agent {
+    background-color: #e8f7ea;
+  }
+
+  .conv-message-system {
+    background-color: #f1f0f5;
+    font-style: italic;
+  }
+
+  .conv-message-meta {
+    font-size: 0.7rem;
+    color: #6c757d;
+  }
+
+  .conv-row {
+    cursor: pointer;
+  }
+
+  .conv-row.active {
+    background-color: #e9f5ff;
+  }
+
+  .conv-row.needs-agent {
+    border-left: 4px solid #dc3545;
+    background-color: #fff5f5;
+  }
+
+  .conv-row .last-snippet {
+    display: block;
+    font-size: 0.75rem;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+
 <script>
-async function load(){
-  const q = document.getElementById('q').value || '';
-  const d = document.getElementById('days').value || '30';
-  const url = `/sac/conversaciones/data?days=${encodeURIComponent(d)}${q?('&q='+encodeURIComponent(q)):""}`;
-  const res = await fetch(url); const j = await res.json();
-  const tb = document.getElementById('rows'); tb.innerHTML='';
-  (j.items||[]).forEach(r=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.Fecha}</td><td>${r.Cliente}</td><td>${r.Canal}</td><td>${r.Asunto||''}</td><td>${r.Estado}</td>`;
-    tb.appendChild(tr);
-  });
-}
-document.getElementById('btn').onclick = load;
-load();
+document.addEventListener("DOMContentLoaded", function () {
+  let currentConvId = null;
+
+  const listEl = document.getElementById("conv-list");
+  const btnRefresh = document.getElementById("btn-refresh-conv");
+
+  const messagesEl = document.getElementById("conv-detail-messages");
+  const titleEl = document.getElementById("conv-detail-title");
+  const subtitleEl = document.getElementById("conv-detail-subtitle");
+  const badgesEl = document.getElementById("conv-detail-status-badges");
+
+  const replyForm = document.getElementById("agent-reply-form");
+  const replyText = document.getElementById("agent-reply-text");
+  const replyHelper = document.getElementById("agent-reply-helper");
+  const replyDisabled = document.getElementById("agent-reply-disabled");
+
+  async function loadConversations() {
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="p-3 text-muted small">Cargando conversaciones…</div>';
+
+    try {
+      const resp = await fetch("{{ url_for('sac.conversations_list') }}");
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "Error al cargar conversaciones");
+
+      const items = data.items || [];
+      if (items.length === 0) {
+        listEl.innerHTML = '<div class="p-3 text-muted small">No hay conversaciones registradas todavía.</div>';
+        return;
+      }
+
+      listEl.innerHTML = "";
+      items.forEach(item => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className =
+          "list-group-item list-group-item-action conv-row" +
+          (item.requires_attention ? " needs-agent" : "");
+        btn.dataset.convId = item.id;
+
+        btn.innerHTML = `
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <div class="fw-semibold">#${item.id}</div>
+            <div class="text-end">
+              ${item.requires_attention ? '<span class="badge bg-danger me-1">Requiere atención</span>' : ''}
+              <span class="badge bg-light text-muted">${item.status_label || item.status}</span>
+            </div>
+          </div>
+          <div class="small">${item.guest_label || "Visitante web"}</div>
+          <span class="last-snippet">${item.last_snippet || ""}</span>
+        `;
+
+        btn.addEventListener("click", () => {
+          selectRow(btn);
+          loadConversation(item.id);
+        });
+
+        listEl.appendChild(btn);
+      });
+    } catch (err) {
+      console.error(err);
+      listEl.innerHTML =
+        '<div class="p-3 text-danger small">Error al cargar conversaciones.</div>';
+    }
+  }
+
+  function selectRow(row) {
+    document.querySelectorAll(".conv-row").forEach(r => r.classList.remove("active"));
+    if (row) row.classList.add("active");
+  }
+
+  function renderHeader(conv) {
+    if (!conv) {
+      titleEl.textContent = "Selecciona una conversación";
+      subtitleEl.textContent = "";
+      badgesEl.innerHTML = "";
+      replyForm.style.display = "none";
+      replyDisabled.style.display = "none";
+      return;
+    }
+
+    titleEl.textContent = `Conversación #${conv.id}`;
+    subtitleEl.textContent = conv.guest_label || "Visitante web";
+
+    let badges = "";
+    if (conv.requires_attention) {
+      badges += '<span class="badge bg-danger me-1">Requiere atención</span>';
+    }
+    if (conv.status_label || conv.status) {
+      badges += `<span class="badge bg-secondary">${conv.status_label || conv.status}</span>`;
+    }
+    badgesEl.innerHTML = badges;
+
+    if (conv.can_agent_reply) {
+      replyForm.style.display = "";
+      replyDisabled.style.display = "none";
+      replyHelper.textContent =
+        "La respuesta quedará registrada como mensaje de agente en esta conversación.";
+    } else {
+      replyForm.style.display = "none";
+      replyDisabled.style.display = "";
+    }
+  }
+
+  function renderMessages(conv, messages) {
+    if (!messagesEl) return;
+
+    if (!messages || messages.length === 0) {
+      messagesEl.innerHTML =
+        '<p class="text-muted small mb-0">Esta conversación no tiene mensajes.</p>';
+      return;
+    }
+
+    let html = "";
+    messages.forEach(msg => {
+      const role = msg.role || "user";
+      let cls = "conv-message-bot";
+      let label = "Bot";
+
+      if (role === "user") {
+        cls = "conv-message-user";
+        label = "Cliente";
+      } else if (role === "agent") {
+        cls = "conv-message-agent";
+        label = "Agente";
+      } else if (role === "system") {
+        cls = "conv-message-system";
+        label = "Sistema";
+      }
+
+      const ts = msg.created_at_human || msg.created_at || "";
+      const content = (msg.content || "").replace(/\n/g, "<br>");
+
+      html += `
+        <div class="conv-message ${cls}">
+          <div class="conv-message-meta mb-1">${label} · ${ts}</div>
+          <div>${content}</div>
+        </div>
+      `;
+    });
+
+    messagesEl.innerHTML = html;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  async function loadConversation(convId) {
+    if (!convId) return;
+    currentConvId = convId;
+    messagesEl.innerHTML =
+      '<p class="text-muted small mb-0">Cargando conversación…</p>';
+
+    try {
+      const url = "{{ url_for('sac.conversation_detail', conversation_id=0) }}".replace("0", convId);
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "Error al cargar conversación");
+
+      renderHeader(data.conversation);
+      renderMessages(data.conversation, data.messages || []);
+    } catch (err) {
+      console.error(err);
+      messagesEl.innerHTML =
+        '<p class="text-danger small mb-0">Error al cargar la conversación.</p>';
+    }
+  }
+
+  async function handleAgentReply(ev) {
+    ev.preventDefault();
+    if (!currentConvId) return;
+
+    const text = (replyText.value || "").trim();
+    if (!text) return;
+
+    const btn = replyForm.querySelector("button[type='submit']");
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML =
+        '<span class="spinner-border spinner-border-sm me-1"></span>Enviando…';
+    }
+
+    try {
+      const url = "{{ url_for('sac.conversation_agent_reply', conversation_id=0) }}".replace("0", currentConvId);
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || ("HTTP " + resp.status));
+      }
+
+      replyText.value = "";
+      await loadConversations();       // refresca lista (puede dejar de requerir atención)
+      await loadConversation(currentConvId); // recarga mensajes
+    } catch (err) {
+      console.error(err);
+      alert("No se pudo enviar la respuesta del agente.");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send me-1"></i> Enviar respuesta';
+      }
+    }
+  }
+
+  if (replyForm) {
+    replyForm.addEventListener("submit", handleAgentReply);
+  }
+
+  if (btnRefresh) {
+    btnRefresh.addEventListener("click", loadConversations);
+  }
+
+  // Carga inicial
+  loadConversations();
+});
 </script>
 {% endblock %}

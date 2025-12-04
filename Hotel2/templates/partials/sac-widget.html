@@ -1,180 +1,418 @@
 <!-- templates/partials/sac-widget.html -->
-<style>
-  :root { --sac-panel-height: min(72vh, 620px); }
+<div id="sac-widget" class="sac-widget-container">
+  <button id="sac-open-btn" class="btn btn-primary sac-widget-toggle" type="button">
+    <i class="bi bi-chat-dots"></i>
+    <span class="ms-1 d-none d-md-inline">¿Necesitas ayuda?</span>
+  </button>
 
-  /* --- Botón flotante --- */
-  .sac-floating { position: fixed; right: 16px; bottom: 16px; z-index: 1050; }
-  .sac-fab {
-    width: 56px; height: 56px; border-radius: 28px; border: none;
-    background: #0d6efd; color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.2);
-    font-size: 20px; display: grid; place-items: center;
-  }
-
-  /* --- Panel principal (altura fija) --- */
-  .sac-panel {
-    position: fixed; right: 16px; bottom: 84px; width: 360px; max-width: calc(100vw - 32px);
-    background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
-    box-shadow: 0 12px 28px rgba(0,0,0,.18);
-    display: flex; flex-direction: column;
-    height: var(--sac-panel-height);                 /* 💡 altura fija del componente */
-    max-height: var(--sac-panel-height);
-  }
-  .sac-panel-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 12px; border-bottom: 1px solid #e5e7eb; flex: 0 0 auto;
-  }
-
-  /* --- Cuerpo: columna flex. El min-height:0 es CLAVE --- */
-  .sac-panel-body {
-    display: flex; flex-direction: column; gap: 10px;
-    padding: 12px; flex: 1 1 auto; min-height: 0;     /* 💡 permite que el hijo con scroll no empuje */
-  }
-
-  /* --- Historial: ÚNICO que scrollea --- */
-  .sac-chatlog {
-    flex: 1 1 0; min-height: 0;                       /* 💡 evita crecimiento infinito */
-    overflow-y: auto; overscroll-behavior: contain;
-    border: 1px solid #eee; border-radius: 10px; padding: 10px; background: #fafafa;
-    scrollbar-gutter: stable both-edges;
-  }
-  .sac-msg { padding: 6px 10px; margin-bottom: 8px; border-radius: 12px; max-width: 88%; }
-  .sac-bot  { background: #f1f1f1; color: #111; }
-  .sac-user { background: #e7f1ff; color: #0b3d91; margin-left: auto; }
-
-  /* --- Chips, input y acciones: fijos (no scrollean) --- */
-  .sac-chipbar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
-    overflow-x: auto; overflow-y: hidden; white-space: nowrap; padding: 4px 2px 0 2px; }
-  .sac-chipbar::-webkit-scrollbar { height: 8px; }
-  .sac-chip { border: 1px solid #d0d7de; padding: 6px 10px; border-radius: 999px;
-    background: #fff; cursor: pointer; user-select: none; font-size: .92rem; flex: 0 0 auto; }
-  .sac-chip:hover { background: #f6f8fa; }
-
-  .sac-inputrow { flex: 0 0 auto; }
-  .sac-actions  { flex: 0 0 auto; display: grid; gap: 8px; }
-
-  /* Scrollbar visual del historial */
-  .sac-chatlog::-webkit-scrollbar { width: 10px; }
-  .sac-chatlog::-webkit-scrollbar-thumb { background: #c9ced6; border-radius: 10px; }
-  .sac-chatlog::-webkit-scrollbar-track { background: #f1f3f5; border-radius: 10px; }
-
-  @media (max-width: 480px) {
-    .sac-panel { right: 8px; bottom: 76px; width: calc(100vw - 16px); height: min(76vh, 640px); }
-  }
-</style>
-
-<div class="sac-floating">
-  <button id="sac-fab" class="sac-fab" aria-label="Asistente">💬</button>
-
-  <div id="sac-panel" class="sac-panel d-none" role="dialog" aria-modal="true" aria-label="Asistente Villa Grace">
-    <div class="sac-panel-header">
-      <strong>Asistente Villa Grace</strong>
-      <button id="sac-close" class="btn btn-sm btn-light" aria-label="Cerrar">✕</button>
+  <div id="sac-chat-panel" class="sac-chat-panel card shadow d-none">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div>
+        <strong>Asistente Hotel Villa Grace</strong><br>
+        <small class="text-muted">Chatbot + equipo de recepción</small>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="sac-close-btn">
+        <i class="bi bi-x-lg"></i>
+      </button>
     </div>
-
-    <div class="sac-panel-body">
-      <!-- HISTORIAL (scrollea) -->
-      <div id="sac-log" class="sac-chatlog" aria-live="polite">
-        <div class="sac-msg sac-bot">¡Hola! ¿En qué puedo ayudarle hoy?</div>
+    <div class="card-body p-2">
+      <div id="sac-messages" class="sac-messages">
+        <!-- Mensajes dinámicos -->
       </div>
 
-      <!-- SUGERENCIAS (fijas) -->
-      <div id="sac-chips" class="sac-chipbar">
-        <button class="sac-chip" data-q="Horarios de check-in/out">Horarios de check-in/out</button>
-        <button class="sac-chip" data-q="Servicios del hotel">Servicios del hotel</button>
-      </div>
-
-      <!-- INPUT (fijo) -->
-      <div class="sac-inputrow">
-        <div class="input-group">
-          <input id="sac-input" class="form-control" placeholder="Escriba su pregunta…" />
-          <button id="sac-send" class="btn btn-primary">Enviar</button>
+      <!-- Zona para oferta de traspaso a agente -->
+      <div id="sac-handoff-box" class="alert alert-warning py-2 px-3 mt-2 mb-2 d-none">
+        <div class="small mb-2">
+          ¿Desea que un agente humano de recepción continúe la atención?
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-primary" id="sac-handoff-yes">
+            Sí, hablar con un agente
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="sac-handoff-no">
+            No, gracias
+          </button>
         </div>
       </div>
-
-      <!-- ACCIONES (fijas) -->
-      <div class="sac-actions">
-        <button id="sac-escalar" class="btn btn-outline-danger w-100">Hablar con un agente</button>
-        <a class="btn btn-outline-secondary w-100" href="/sac/faq" target="_blank" rel="noopener">FAQ y horarios</a>
-      </div>
+    </div>
+    <div class="card-footer">
+      <form id="sac-chat-form" class="d-flex gap-2">
+        <input type="text" id="sac-input" class="form-control" autocomplete="off"
+               placeholder="Escribe tu consulta...">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-send"></i>
+        </button>
+      </form>
     </div>
   </div>
 </div>
 
+<style>
+  .sac-widget-container {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 1050;
+  }
+  .sac-widget-toggle {
+    border-radius: 999px;
+    box-shadow: 0 3px 10px rgba(0,0,0,.25);
+  }
+  .sac-chat-panel {
+    position: absolute;
+    right: 0;
+    bottom: 60px;
+    width: 320px;
+    max-height: 520px;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .sac-messages {
+    max-height: 360px;
+    overflow-y: auto;
+    background:#f8f9fa;
+    padding: 6px;
+    border-radius: 8px;
+  }
+  .sac-msg-row {
+    display:flex;
+    margin-bottom: 6px;
+  }
+  .sac-msg-row.user { justify-content: flex-end; }
+  .sac-msg-row.bot  { justify-content: flex-start; }
+  .sac-msg-bubble {
+    border-radius: 12px;
+    padding: 6px 10px;
+    max-width: 80%;
+    font-size: 0.9rem;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  .sac-msg-bubble.user {
+    background:#0d6efd;
+    color:#fff;
+  }
+  .sac-msg-bubble.bot {
+    background:#ffffff;
+    border:1px solid #dee2e6;
+  }
+  .sac-msg-meta {
+    font-size:0.7rem;
+    color:#6c757d;
+    margin-top:2px;
+  }
+
+  @media (max-width: 575.98px) {
+    .sac-chat-panel {
+      width: 100vw;
+      right: 0;
+      bottom: 56px;
+    }
+  }
+</style>
+
 <script>
-(function(){
-  const panel   = document.getElementById('sac-panel');
-  const fab     = document.getElementById('sac-fab');
-  const closeBt = document.getElementById('sac-close');
-  const log     = document.getElementById('sac-log');
-  const chips   = document.getElementById('sac-chips');
-  const input   = document.getElementById('sac-input');
-  const sendBt  = document.getElementById('sac-send');
-  const escalar = document.getElementById('sac-escalar');
+  window.addEventListener('DOMContentLoaded', function () {
+    const widget      = document.getElementById('sac-widget');
+    if (!widget) {
+      console.warn('[SAC] No se encontró #sac-widget en el DOM.');
+      return;
+    }
 
-  // SID estable para vincular conversación
-  let sid = localStorage.getItem('sac_sid');
-  if(!sid){ sid = 'sid-' + Math.random().toString(36).slice(2) + Date.now(); localStorage.setItem('sac_sid', sid); }
+    const openBtn     = document.getElementById('sac-open-btn');
+    const panel       = document.getElementById('sac-chat-panel');
+    const closeBtn    = document.getElementById('sac-close-btn');
+    const messagesBox = document.getElementById('sac-messages');
+    const form        = document.getElementById('sac-chat-form');
+    const input       = document.getElementById('sac-input');
+    const handoffBox  = document.getElementById('sac-handoff-box');
+    const handoffYes  = document.getElementById('sac-handoff-yes');
+    const handoffNo   = document.getElementById('sac-handoff-no');
 
-  function openPanel(){
-    panel.classList.remove('d-none');
-    fab.style.display = 'none';         // 💡 ocultar FAB para que no tape botones
-    input.focus();
-  }
-  function closePanel(){
-    panel.classList.add('d-none');
-    fab.style.display = 'grid';
-  }
+    if (!openBtn || !panel || !closeBtn || !messagesBox || !form || !input) {
+      console.warn('[SAC] Widget no inicializado: faltan elementos clave en la plantilla.');
+      return;
+    }
 
-  function addMsg(role, text){
-    const div = document.createElement('div');
-    div.className = 'sac-msg ' + (role === 'user' ? 'sac-user' : 'sac-bot');
-    div.textContent = text || '';
-    log.appendChild(div);
-    log.scrollTop = log.scrollHeight;   // siempre al final
-  }
+    console.log('[SAC] Widget SAC inicializado correctamente.');
 
-  async function ask(q){
-    if(!q || !q.trim()) return;
-    addMsg('user', q.trim());
-    input.value = '';
-    try{
-      const r  = await fetch('/sac/chat/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Session-Id': sid },
-        body: JSON.stringify({ q })
-      });
-      const js = await r.json();
-      addMsg('bot', js && js.a ? js.a : 'Gracias, lo estamos procesando.');
-      if(js && Array.isArray(js.suggestions)){
-        chips.innerHTML = js.suggestions.map(s => `<button class="sac-chip" data-q="${s}">${s}</button>`).join('');
+    // --- Sesión persistente por visitante ---
+    let sid = localStorage.getItem('sac_sid');
+    if (!sid) {
+      sid = 'sac-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+      localStorage.setItem('sac_sid', sid);
+    }
+
+    // --- Estado de conversación / polling ---
+    let lastMsgAt = null;      // string ISO del último mensaje
+    let pollTimer = null;
+    let polling   = false;
+    let convId    = null;
+    const seenIds = new Set(); // ids ya pintados
+
+    function formatTime(ts) {
+      if (!ts) return '';
+      try {
+        const parts = ts.split(' ');
+        if (parts.length !== 2) return '';
+        return parts[1].slice(0,5); // HH:MM
+      } catch (_) {
+        return '';
       }
-    }catch(e){
-      addMsg('bot','No fue posible responder en este momento.');
     }
-  }
 
-  async function escalarHumano(){
-    try{
-      await fetch('/sac/chat/escalar', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ session_id: sid, texto: 'Cliente solicita atención humana desde el widget.' })
+    function appendMessage(role, text, createdAt) {
+      if (!text) return;
+
+      const isUser  = (role === 'user');
+      const isAgent = (role === 'agent');
+
+      const row = document.createElement('div');
+      row.classList.add('sac-msg-row');
+      row.classList.add(isUser ? 'user' : 'bot');
+
+      const col = document.createElement('div');
+
+      const bubble = document.createElement('div');
+      bubble.classList.add('sac-msg-bubble');
+      bubble.classList.add(isUser ? 'user' : 'bot');
+      bubble.textContent = text;
+
+      const meta = document.createElement('div');
+      meta.classList.add('sac-msg-meta');
+
+      let label = '';
+      if (isUser) {
+        label = 'Tú';
+      } else if (isAgent) {
+        label = 'Agente de recepción';
+      } else {
+        label = 'Asistente Hotel Villa Grace';
+      }
+
+      const timeStr = formatTime(createdAt);
+      meta.textContent = timeStr ? (label + ' · ' + timeStr) : label;
+
+      col.appendChild(bubble);
+      col.appendChild(meta);
+      row.appendChild(col);
+
+      messagesBox.appendChild(row);
+      messagesBox.scrollTop = messagesBox.scrollHeight;
+    }
+
+    function showHandoffOffer() {
+      if (handoffBox) {
+        handoffBox.classList.remove('d-none');
+      }
+    }
+
+    function hideHandoffOffer() {
+      if (handoffBox) {
+        handoffBox.classList.add('d-none');
+      }
+    }
+
+    // --- Historial completo / incremental ---
+    async function syncHistoryOnce(initial) {
+      try {
+        const params = new URLSearchParams();
+        params.set('session_id', sid);
+        if (!initial && lastMsgAt) {
+          params.set('since', lastMsgAt);
+        }
+
+        const resp = await fetch('/sac/chat/history?' + params.toString(), {
+          method: 'GET',
+          headers: {
+            'X-Session-Id': sid
+          }
+        });
+
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        if (!data.ok) return;
+
+        if (data.conv_id) {
+          convId = data.conv_id;
+        }
+
+        const statusRaw = data.status || '';
+        const status = String(statusRaw || '').toLowerCase();
+        const abierta = (typeof data.abierta === 'undefined') ? true : !!data.abierta;
+
+        if (abierta && status === 'handoff_offer') {
+          showHandoffOffer();
+        } else {
+          hideHandoffOffer();
+        }
+
+        const msgs = data.messages || [];
+        for (const m of msgs) {
+          const id        = m.id;
+          const role      = m.role || 'bot';   // 'user' | 'bot' | 'agent'
+          const text      = m.text || '';
+          const createdAt = m.created_at || null;
+
+          if (id && seenIds.has(id)) {
+            continue; // ya pintado
+          }
+
+          appendMessage(role, text, createdAt);
+
+          if (id) {
+            seenIds.add(id);
+          }
+          if (createdAt) {
+            if (!lastMsgAt || createdAt > lastMsgAt) {
+              lastMsgAt = createdAt;
+            }
+          }
+        }
+
+        if (data.last_msg_at && (!lastMsgAt || data.last_msg_at > lastMsgAt)) {
+          lastMsgAt = data.last_msg_at;
+        }
+      } catch (err) {
+        console.error('[SAC] Error al sincronizar historial', err);
+      }
+    }
+
+    function startPolling() {
+      if (polling) return;
+      polling = true;
+      pollTimer = setInterval(function () {
+        syncHistoryOnce(false);
+      }, 4000);
+    }
+
+    function stopPolling() {
+      polling = false;
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    // --- Llamada principal al bot (IA / RAG) ---
+    async function ask(question) {
+      const q = (question || input.value || '').trim();
+      if (!q) return;
+
+      appendMessage('user', q, null);
+      input.value = '';
+
+      try {
+        const resp = await fetch('/sac/ask', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Session-Id': sid
+          },
+          body: JSON.stringify({ q: q })
+        });
+
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+
+        if (data.need_handoff) {
+          if (data.handoff_state === 'OFFER') {
+            showHandoffOffer();
+          } else {
+            hideHandoffOffer();
+          }
+        } else {
+          hideHandoffOffer();
+        }
+
+        // Sincronizamos para traer la respuesta real desde la BD
+        await syncHistoryOnce(false);
+      } catch (err) {
+        console.error('[SAC] Error en /sac/ask', err);
+        appendMessage(
+          'bot',
+          'Lo siento, no pude contactar al servidor en este momento.',
+          null
+        );
+      }
+    }
+
+    // --- Escalar explícitamente a agente humano ---
+    async function escalarHumano() {
+      try {
+        const resp = await fetch('/sac/chat/escalar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Session-Id': sid
+          },
+          body: JSON.stringify({
+            session_id: sid,
+            texto: 'El cliente ha solicitado ser atendido por un agente humano.'
+          })
+        });
+
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+
+        appendMessage(
+          'bot',
+          data.mensaje || 'Tu consulta ha sido enviada a un agente humano de recepción. En breve continuarán la atención por este mismo chat.',
+          null
+        );
+
+        hideHandoffOffer();
+        await syncHistoryOnce(false);
+      } catch (err) {
+        console.error('[SAC] Error en /sac/chat/escalar', err);
+        appendMessage(
+          'bot',
+          'No pude contactar al sistema de recepción en este momento. Por favor llámanos al +506 2642 0225 para ayudarte.',
+          null
+        );
+      }
+    }
+
+    // --- Manejo de panel ---
+    function openPanel() {
+      panel.classList.remove('d-none');
+      if (!polling) {
+        syncHistoryOnce(true).then(startPolling);
+      }
+    }
+
+    function closePanel() {
+      panel.classList.add('d-none');
+      // Si quisieras detener el polling al cerrar, descomenta:
+      // stopPolling();
+    }
+
+    // --- Listeners UI ---
+    openBtn.addEventListener('click', openPanel);
+    closeBtn.addEventListener('click', closePanel);
+
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      ask();
+    });
+
+    if (handoffYes) {
+      handoffYes.addEventListener('click', function () {
+        escalarHumano();
       });
-      addMsg('bot','Gracias. Un agente humano se pondrá en contacto pronto.');
-    }catch(e){
-      addMsg('bot','No se pudo escalar la solicitud en este momento.');
     }
-  }
 
-  // Eventos
-  fab.addEventListener('click', openPanel);
-  closeBt.addEventListener('click', closePanel);
-  sendBt.addEventListener('click', () => ask(input.value));
-  input.addEventListener('keydown', (ev) => { if(ev.key === 'Enter') ask(input.value); });
-  escalar.addEventListener('click', escalarHumano);
-  chips.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('.sac-chip'); if(!btn) return;
-    ask(btn.getAttribute('data-q') || btn.textContent);
+    if (handoffNo) {
+      handoffNo.addEventListener('click', function () {
+        hideHandoffOffer();
+        // Opcional: podríamos enviar un mensaje corto al bot indicando que no
+        // desea escalar, para que el estado pase de handoff_offer → bot.
+        // ask('No, gracias');
+      });
+    }
+
+    // Cargar historial y empezar polling incluso si el panel está cerrado,
+    // de forma que al abrirlo ya esté la conversación lista.
+    syncHistoryOnce(true).then(startPolling);
   });
-})();
 </script>
