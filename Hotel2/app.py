@@ -1580,6 +1580,12 @@ def create_app() -> Flask:
     def portal_dashboard_html():
         return render_template("portal-dashboard.html")
 
+    @app.route("/admin-users.html")
+    @role_required("Administrador", "Recepcionista")
+    def admin_users_html():
+        return render_template("admin-users.html")
+
+
     @app.route("/portal-perfil.html")
     @role_required("Cliente")
     def portal_perfil_html():
