@@ -6,3 +6,8 @@ from utils.auth import role_required
 @role_required("Administrador")
 def dashboard():
     return render_template("admin/dashboard.html")
+
+@admin_bp.route("/admin-hotel.html", methods=["GET"])
+@role_required("Administrador")
+def dashboard():
+    return render_template("admin/admin-hotel.html")
