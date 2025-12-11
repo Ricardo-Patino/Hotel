@@ -190,7 +190,7 @@
             </section>
         </main>
 
-        <!-- Modal tipo -->
+        <!-- Modal room -->
         <div class="modal fade" id="modalRoom" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
@@ -244,11 +244,19 @@
                                     class="form-select"
                                     aria-label="Estado"
                                 >
-                                    <option value="Disponible">Disponible</option>
+                                    <option value="Disponible">
+                                        Disponible
+                                    </option>
                                     <option value="Ocupada">Ocupada</option>
-                                    <option value="Ocupada-temprana">Ocupada-temprana</option>
-                                    <option value="Ocupada-extendida">Ocupada-extendida</option>
-                                    <option value="Mantenimiento">Mantenimiento</option>
+                                    <option value="Ocupada-temprana">
+                                        Ocupada-temprana
+                                    </option>
+                                    <option value="Ocupada-extendida">
+                                        Ocupada-extendida
+                                    </option>
+                                    <option value="Mantenimiento">
+                                        Mantenimiento
+                                    </option>
                                     <option value="Limpieza">Limpieza</option>
                                 </select>
                             </div>
@@ -269,7 +277,82 @@
                         </form>
                         <br />
                         <div
-                            id="error"
+                            id="errorRoom"
+                            class="alert alert-danger invisible"
+                            role="alert"
+                        ></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal"
+                        >
+                            Cancelar</button
+                        ><button class="btn btn-success">Guardar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal mantenimiento -->
+        <div
+            class="modal fade"
+            id="modalMantenimiento"
+            tabindex="-1"
+            aria-hidden="true"
+        >
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Nueva solicitud</h5>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                        ></button>
+                    </div>
+                    <div class="modal-body">
+                        <form class="row g-3">
+                            <div class="col-12">
+                                <label
+                                    for="Codigo_Habitacion"
+                                    class="form-label"
+                                    >Código de habitación</label
+                                ><input
+                                    id="Codigo_HabitacionMantenimiento"
+                                    type="number"
+                                    class="form-control"
+                                    disabled=""
+                                />
+                            </div>
+                            <div class="col-12">
+                                <label for="Titulo" class="form-label"
+                                    >Título</label
+                                ><input
+                                    id="TituloMantenimiento"
+                                    class="form-control"
+                                />
+                            </div>
+                            <div class="col-12">
+                                <label for="Descripcion" class="form-label"
+                                    >Descripción</label
+                                ><input
+                                    id="DescripcionMantenimiento"
+                                    class="form-control"
+                                />
+                            </div>
+                            <div class="col-12">
+                                <label for="Prioridad" class="form-label"
+                                    >Prioridad</label
+                                ><input
+                                    id="PrioridadMantenimiento"
+                                    class="form-control"
+                                />
+                            </div>
+                        </form>
+                        <br />
+                        <div
+                            id="errorMantenimiento"
                             class="alert alert-danger invisible"
                             role="alert"
                         ></div>
@@ -312,24 +395,36 @@
     </body>
     <script>
         $(document).ready(function () {
-            function cleanForm() {
-                $("*[name='action']", "#modalRoom").val("create");
-                $(".modal-title").text("Nueva habitación");
-                $("#error", "#modalRoom").addClass("invisible");
-                $("#error", "#modalRoom").text("");
+            function cleanFormRoom() {
+                $("input[name='action']", "#modalRoom").val("create");
+                $(".modal-title", "#modalRoom").text("Nueva habitación");
+                $("#errorRoom", "#modalRoom").addClass("invisible");
+                $("#errorRoom", "#modalRoom").text("");
                 $("#Codigo_Habitacion").val("");
                 $("#Numero_Habitacion").val("");
                 $("#Precio_Noche").val("");
                 $("#Estado").val("Disponible");
                 $("#Tipo").val("Sencilla");
                 $("#Codigo_Habitacion").removeAttr("disabled");
-                $("button", ".modal-header").click();
+                $("button", $(".modal-header", "#modalRoom")).click();
+            }
+
+            function cleanFormMantenimiento() {
+                $("#errorMantenimiento", "#modalMantenimiento").addClass(
+                    "invisible",
+                );
+                $("#errorMantenimiento", "#modalMantenimiento").text("");
+                $("#Codigo_HabitacionMantenimiento").val("");
+                $("#TituloMantenimiento").val("");
+                $("#DescripcionMantenimiento").val("");
+                $("#PrioridadMantenimiento").val("");
+                $("button", $(".modal-header", "#modalMantenimiento")).click();
             }
 
             async function saveRoom() {
                 let response = null;
                 let result = null;
-                const action = $("*[name='action']", "#modalRoom").val();
+                const action = $("input[name='action']", "#modalRoom").val();
                 switch (action) {
                     case "create":
                         response = await fetch("/admin-rooms", {
@@ -347,10 +442,12 @@
                         });
                         result = await response.json();
                         if ("error" in result) {
-                            $("#error", "#modalRoom").text(result.error);
-                            $("#error", "#modalRoom").removeClass("invisible");
+                            $("#errorRoom", "#modalRoom").text(result.error);
+                            $("#errorRoom", "#modalRoom").removeClass(
+                                "invisible",
+                            );
                         } else {
-                            cleanForm();
+                            cleanFormRoom();
                             await readRooms();
                         }
                         break;
@@ -373,10 +470,12 @@
                         );
                         result = await response.json();
                         if ("error" in result) {
-                            $("#error", "#modalRoom").text(result.error);
-                            $("#error", "#modalRoom").removeClass("invisible");
+                            $("#errorRoom", "#modalRoom").text(result.error);
+                            $("#errorRoom", "#modalRoom").removeClass(
+                                "invisible",
+                            );
                         } else {
-                            cleanForm();
+                            cleanFormRoom();
                             await readRooms();
                         }
                         break;
@@ -410,6 +509,10 @@
                 for (const result of results) {
                     const habitacionHTML = document.createElement("tr");
                     $("tbody").append(habitacionHTML);
+                    const splitHTML1 = document.createElement("span");
+                    splitHTML1.innerHTML = "&middot;";
+                    const splitHTML2 = document.createElement("span");
+                    splitHTML2.innerHTML = "&middot;";
 
                     const numeroHabitacionHTML = document.createElement("td");
                     $(numeroHabitacionHTML).text(result.Numero_Habitacion);
@@ -443,6 +546,29 @@
                     const accionHTML = document.createElement("td");
                     $(accionHTML).addClass("text-end");
 
+                    // Mantenimiento button
+                    const accionMantenimientoButtonHTML =
+                        document.createElement("button");
+                    $(accionMantenimientoButtonHTML).addClass(
+                        "btn btn-outline-secondary btn-sm",
+                    );
+                    $(accionMantenimientoButtonHTML).attr(
+                        "data-bs-toggle",
+                        "modal",
+                    );
+                    $(accionMantenimientoButtonHTML).attr(
+                        "data-bs-target",
+                        "#modalMantenimiento",
+                    );
+                    $(accionMantenimientoButtonHTML).text("Mantenimiento");
+                    $(accionMantenimientoButtonHTML).on("click", function () {
+                        $("#Codigo_HabitacionMantenimiento").val(
+                            result.Codigo_Habitacion,
+                        );
+                    });
+                    $(accionHTML).append(accionMantenimientoButtonHTML);
+                    $(accionHTML).append(splitHTML1);
+
                     // Editar button
                     const accionEditarButtonHTML =
                         document.createElement("button");
@@ -457,11 +583,14 @@
                         $("#Numero_Habitacion").val(result.Numero_Habitacion);
                         $("#Precio_Noche").val(result.Precio_Noche);
                         $("#Tipo").val(result.Tipo);
-                        $(".modal-title").text("Editar habitación");
-                        $("*[name='action']", "#modalRoom").val("update");
+                        $(".modal-title", "#modalRoom").text(
+                            "Editar habitación",
+                        );
+                        $("input[name='action']", "#modalRoom").val("update");
                         $("button", ".card-header").click();
                     });
                     $(accionHTML).append(accionEditarButtonHTML);
+                    $(accionHTML).append(splitHTML2);
 
                     // Eliminar button
                     const accionEliminarButtonHTML =
@@ -479,13 +608,46 @@
                 }
             }
 
+            async function createMantenimiento() {
+                const form = new FormData();
+                form.append(
+                    "habitacion_id",
+                    $("#Codigo_HabitacionMantenimiento").val(),
+                );
+                form.append("titulo", $("#TituloMantenimiento").val());
+                form.append(
+                    "descripcion",
+                    $("#DescripcionMantenimiento").val(),
+                );
+                form.append("prioridad", $("#PrioridadMantenimiento").val());
+
+                const options = { method: "POST", body: form };
+
+                response = await fetch("/grr/mant/solicitudes", options);
+                result = await response.json();
+                if ("error" in result) {
+                    $("#errorMantenimiento", "#modalMantenimiento").text(
+                        result.error,
+                    );
+                    $("#errorMantenimiento", "#modalMantenimiento").removeClass(
+                        "invisible",
+                    );
+                } else {
+                    cleanFormMantenimiento();
+                }
+            }
+
             readRooms();
-            $("button[class*='btn-success']", ".modal-footer").on(
-                "click",
-                saveRoom,
-            );
+            $(
+                "button[class*='btn-success']",
+                $(".modal-footer", "#modalRoom"),
+            ).on("click", saveRoom);
+            $(
+                "button[class*='btn-success']",
+                $(".modal-footer", "#modalMantenimiento"),
+            ).on("click", createMantenimiento);
             $("#modalRoom").on("hidden.bs.modal", function () {
-                cleanForm();
+                cleanFormRoom();
             });
         });
     </script>
