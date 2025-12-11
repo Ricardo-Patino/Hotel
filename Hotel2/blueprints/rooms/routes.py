@@ -1,10 +1,8 @@
-# from utils.auth import role_required
-# @role_required("Administrador")
 import logging
 from typing import Literal
 
 from extensions import db
-from flask import Response, jsonify, render_template, request
+from flask import Response, jsonify, request
 from models_sql import Habitacion
 from sqlalchemy.exc import DataError, IntegrityError
 
@@ -21,15 +19,10 @@ def serialize(habitacion: Habitacion) -> dict:
     return {column.name: str(getattr(habitacion, column.name)) for column in habitacion.__table__.columns}
 
 
-def _create(payload: dict) -> Habitacion |  None:
+def _create(payload: dict) -> Habitacion:
     habitacion = Habitacion(**payload)
     db.session.add(habitacion)
-    try:
-        db.session.commit()
-    except (DataError, IntegrityError):
-        logging.exception("Unable to create habitacion.")
-        return None
-
+    db.session.commit()
     db.session.flush()
     return habitacion
 
@@ -50,6 +43,7 @@ def _update(room_id: str, payload: dict) -> Habitacion | None:
     db.session.flush()
     return habitacion
 
+
 def _delete(room_id: str) -> Habitacion | None:
     habitacion = Habitacion.query.get(room_id)
     if not habitacion:
@@ -62,14 +56,16 @@ def _delete(room_id: str) -> Habitacion | None:
     return habitacion
 
 
-
 @rooms_bp.route("/admin-rooms", methods=["POST"])
 def rooms_create() -> Response:
     """Create a room."""
     payload = request.get_json()
-    habitacion = _create(payload)
-    if not habitacion:
-        return jsonify({"error": "Hubo un problema creando la habitación."})
+    try:
+        habitacion = _create(payload)
+    except (DataError, IntegrityError):
+        error = "Hubo un problema creando la habitación."
+        logging.exception(error)
+        return jsonify({"error": error})
     return jsonify(serialize(habitacion))
 
 
@@ -84,7 +80,12 @@ def rooms_read() -> Response:
 def rooms_update(room_id: str) -> tuple[Response, Literal[404]] | Response:
     """Update a habitacion given an incoming payload."""
     payload = request.get_json()
-    habitacion = _update(room_id, payload)
+    try:
+        habitacion = _update(room_id, payload)
+    except (DataError, IntegrityError):
+        error = "Hubo un problema actualizando la habitación."
+        logging.exception(error)
+        return jsonify({"error": error})
     if not habitacion:
         return jsonify({"ok": False, "error": "Habitacion no encontrada"}), 404
 
@@ -94,7 +95,12 @@ def rooms_update(room_id: str) -> tuple[Response, Literal[404]] | Response:
 @rooms_bp.route("/admin-rooms/<int:room_id>", methods=["DELETE"])
 def rooms_delete(room_id: str) -> tuple[Response, Literal[404]] | Response:
     """Delete habitacion from DB."""
-    habitacion = _delete(room_id)
+    try:
+        habitacion = _delete(room_id)
+    except (DataError, IntegrityError):
+        error = "Hubo un problema borrando la habitación."
+        logging.exception(error)
+        return jsonify({"error": error})
     if not habitacion:
         return jsonify({"ok": False, "error": "Habitacion no encontrada"}), 404
 
