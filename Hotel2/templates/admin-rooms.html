@@ -236,6 +236,23 @@
                                 />
                             </div>
                             <div class="col-12">
+                                <label for="Estado" class="form-label"
+                                    >Estado</label
+                                >
+                                <select
+                                    id="Estado"
+                                    class="form-select"
+                                    aria-label="Estado"
+                                >
+                                    <option value="Disponible">Disponible</option>
+                                    <option value="Ocupada">Ocupada</option>
+                                    <option value="Ocupada-temprana">Ocupada-temprana</option>
+                                    <option value="Ocupada-extendida">Ocupada-extendida</option>
+                                    <option value="Mantenimiento">Mantenimiento</option>
+                                    <option value="Limpieza">Limpieza</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
                                 <label for="Tipo" class="form-label"
                                     >Tipo</label
                                 >
@@ -297,11 +314,13 @@
         $(document).ready(function () {
             function cleanForm() {
                 $("*[name='action']", "#modalRoom").val("create");
+                $(".modal-title").text("Nueva habitación");
                 $("#error", "#modalRoom").addClass("invisible");
                 $("#error", "#modalRoom").text("");
                 $("#Codigo_Habitacion").val("");
                 $("#Numero_Habitacion").val("");
                 $("#Precio_Noche").val("");
+                $("#Estado").val("Disponible");
                 $("#Tipo").val("Sencilla");
                 $("#Codigo_Habitacion").removeAttr("disabled");
                 $("button", ".modal-header").click();
@@ -318,7 +337,7 @@
                             body: JSON.stringify({
                                 Codigo_Habitacion:
                                     $("#Codigo_Habitacion").val(),
-                                Estado: "Disponible",
+                                Estado: $("#Estado").val(),
                                 Numero_Habitacion:
                                     $("#Numero_Habitacion").val(),
                                 Precio_Noche: $("#Precio_Noche").val(),
@@ -343,7 +362,7 @@
                                 body: JSON.stringify({
                                     Codigo_Habitacion:
                                         $("#Codigo_Habitacion").val(),
-                                    Estado: "Disponible",
+                                    Estado: $("#Estado").val(),
                                     Numero_Habitacion:
                                         $("#Numero_Habitacion").val(),
                                     Precio_Noche: $("#Precio_Noche").val(),
@@ -438,6 +457,7 @@
                         $("#Numero_Habitacion").val(result.Numero_Habitacion);
                         $("#Precio_Noche").val(result.Precio_Noche);
                         $("#Tipo").val(result.Tipo);
+                        $(".modal-title").text("Editar habitación");
                         $("*[name='action']", "#modalRoom").val("update");
                         $("button", ".card-header").click();
                     });

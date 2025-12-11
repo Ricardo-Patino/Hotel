@@ -4,6 +4,7 @@ from typing import Literal
 from extensions import db
 from flask import Response, jsonify, request
 from models_sql import Habitacion
+from services.grr.housekeeping_sync import create_cleaning_task_if_needed
 from sqlalchemy.exc import DataError, IntegrityError
 
 from . import rooms_bp
@@ -37,6 +38,8 @@ def _update(room_id: str, payload: dict) -> Habitacion | None:
     if not habitacion:
         return None
 
+    if habitacion.Estado != "Limpieza" and "Estado" in payload and payload["Estado"] == "Limpieza":
+        create_cleaning_task_if_needed(habitacion.Codigo_Habitacion)
     [setattr(habitacion, key, value) for key, value in payload.items()]
     db.session.add(habitacion)
     db.session.commit()
