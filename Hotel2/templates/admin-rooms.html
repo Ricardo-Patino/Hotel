@@ -235,7 +235,7 @@
                                 </select>
                             </div>
                         </form>
-                        <br/>
+                        <br />
                         <div
                             id="error"
                             class="alert alert-danger invisible"
@@ -280,11 +280,25 @@
     </body>
     <script>
         $(document).ready(function () {
+            function cleanForm() {
+                $("*[name='action']", "#modalRoom").val("create");
+                $("#error", "#modalRoom").addClass("invisible");
+                $("#error", "#modalRoom").text("");
+                $("#Codigo_Habitacion").val("");
+                $("#Numero_Habitacion").val("");
+                $("#Precio_Noche").val("");
+                $("#Tipo").val("Sencilla");
+                $("#Codigo_Habitacion").removeAttr("disabled");
+                $("button", ".modal-header").click();
+            }
+
             async function saveRoom() {
+                let response = null;
+                let result = null;
                 const action = $("*[name='action']", "#modalRoom").val();
                 switch (action) {
                     case "create":
-                        const response = await fetch("/admin-rooms", {
+                        response = await fetch("/admin-rooms", {
                             method: "POST",
                             body: JSON.stringify({
                                 Codigo_Habitacion:
@@ -297,22 +311,39 @@
                             }),
                             headers: { "Content-Type": "application/json" },
                         });
-                        const result = await response.json();
+                        result = await response.json();
                         if ("error" in result) {
                             $("#error", "#modalRoom").text(result.error);
                             $("#error", "#modalRoom").removeClass("invisible");
                         } else {
-                            $("*[name='action']", "#modalRoom").val("create");
-                            $("#error", "#modalRoom").addClass("invisible");
-                            $("#error", "#modalRoom").text("");
-                            $("#Codigo_Habitacion").val("");
-                            $("#Numero_Habitacion").val("");
-                            $("#Precio_Noche").val("");
-                            $("#Tipo").val("Sencilla");
-                            $("button", ".modal-header").click();
+                            cleanForm();
                         }
                         break;
                     case "update":
+                        response = await fetch(
+                            `/admin-rooms/${$("#Codigo_Habitacion").val()}`,
+                            {
+                                method: "PUT",
+                                body: JSON.stringify({
+                                    Codigo_Habitacion:
+                                        $("#Codigo_Habitacion").val(),
+                                    Estado: "Disponible",
+                                    Numero_Habitacion:
+                                        $("#Numero_Habitacion").val(),
+                                    Precio_Noche: $("#Precio_Noche").val(),
+                                    Tipo: $("#Tipo").val(),
+                                }),
+                                headers: { "Content-Type": "application/json" },
+                            },
+                        );
+                        result = await response.json();
+                        if ("error" in result) {
+                            $("#error", "#modalRoom").text(result.error);
+                            $("#error", "#modalRoom").removeClass("invisible");
+                        } else {
+                            cleanForm();
+                            await readRooms();
+                        }
                         break;
                 }
             }
@@ -323,6 +354,7 @@
                 });
                 const results = await response.json();
 
+                $("tbody").html("");
                 for (const result of results) {
                     const habitacionHTML = document.createElement("tr");
                     $("tbody").append(habitacionHTML);
@@ -363,17 +395,30 @@
                         "btn btn-outline-secondary btn-sm",
                     );
                     $(accionButtonHTML).text("Editar");
-                    $(accionButtonHTML).attr(
-                        "href",
-                        `/admin-rooms.html/${result.Codigo_Habitacion}`,
-                    );
+                    $(accionButtonHTML).on("click", function () {
+                        $("#Codigo_Habitacion").val(result.Codigo_Habitacion);
+                        $("#Codigo_Habitacion").attr("disabled", "");
+                        $("#Estado").val(result.Estado);
+                        $("#Numero_Habitacion").val(result.Numero_Habitacion);
+                        $("#Precio_Noche").val(result.Precio_Noche);
+                        $("#Tipo").val(result.Tipo);
+                        $("*[name='action']", "#modalRoom").val("update");
+
+                        $("button", ".card-header").click();
+                    });
                     $(accionHTML).append(accionButtonHTML);
                     $(habitacionHTML).append(accionHTML);
                 }
             }
 
             readRooms();
-            $("button", ".modal-footer").on("click", saveRoom);
+            $("button[class*='btn-success']", ".modal-footer").on(
+                "click",
+                saveRoom,
+            );
+            $("#modalRoom").on("hidden.bs.modal", function () {
+                cleanForm();
+            });
         });
     </script>
 </html>
