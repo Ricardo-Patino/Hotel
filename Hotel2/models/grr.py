@@ -51,7 +51,7 @@ class CodigoDescuento(db.Model):
     Activo = db.Column(db.Boolean, nullable=False, default=True)
 
 class HousekeepingTask(db.Model):
-    __tablename__ = "housekeepingtask"
+    __tablename__ = "HousekeepingTask"
 
     Id = db.Column(db.BigInteger, primary_key=True)
     Habitacion_Id = db.Column(db.Integer, db.ForeignKey('Habitacion.Codigo_Habitacion'), nullable=False)  # ✅ CAMBIO AQUÍ
