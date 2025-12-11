@@ -1283,6 +1283,8 @@ def create_app() -> Flask:
     from blueprints.ace import ace_bp
     app.register_blueprint(ace_bp, url_prefix='/ace')
 
+    from blueprints.rooms import rooms_bp
+    app.register_blueprint(rooms_bp)
     
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
