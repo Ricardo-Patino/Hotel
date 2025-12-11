@@ -1,5 +1,7 @@
 # blueprints/grr/routes.py
 from __future__ import annotations
+import logging
+from sqlalchemy.exc import DataError, IntegrityError
 
 import json, random, string, secrets
 from decimal import Decimal, ROUND_HALF_UP
@@ -31,6 +33,10 @@ NRB_DISCOUNT = Decimal("0.10")
 grr_bp = Blueprint("grr", __name__)
 _res_service = ReservationService()
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s -%(filename)s:%(lineno)d - %(message)s",
+)
 
 
 # -------------------------- Utilidades comunes -------------------------------
@@ -381,7 +387,7 @@ def _set_if(obj, field: str, value):
     """Asigna sólo si el atributo existe en el modelo, para evitar AttributeError."""
     if hasattr(obj, field):
         setattr(obj, field, value)
-        
+
  # --- Helper unificado para extraer el ID de la reserva desde cualquier forma de respuesta del Service
 def _extract_reserva_id(res: Dict[str, Any]) -> int:
     """
@@ -397,7 +403,7 @@ def _extract_reserva_id(res: Dict[str, Any]) -> int:
         except (TypeError, ValueError):
             continue
     return 0
-       
+
 
 
 
@@ -915,7 +921,7 @@ def _issue_reset_token(usuario_id: int) -> str | None:
     except Exception as e:
         current_app.logger.warning(f"[RESET] {e}")
         return None
-    
+
 def _ensure_user_and_reset(email: str, nombre: str) -> tuple[str | None, str | None]:
     temp_pwd, reset_url = _maybe_create_user_with_temp_password(email, nombre)
     if (not reset_url) and email:
@@ -1077,8 +1083,8 @@ def _maybe_create_user_with_temp_password(email: str, nombre: str) -> tuple[str 
 
 
 
-    
-    
+
+
 
 @grr_bp.get("/reservas")
 def listar_reservas():
@@ -1318,10 +1324,10 @@ def grr_crear_estancia_sin_reserva():
     }), 201
 
 
-    
-    
-    
-    
+
+
+
+
 @grr_bp.post("/api/reservas/anon")
 def api_reservas_anon():
     """
@@ -1349,7 +1355,7 @@ def api_reservas_anon():
     cli_id = _ensure_cliente_by_email(nombre, apellido, tel, email)
     if not cli_id:
         return jsonify({"ok": False, "msg": "No fue posible registrar el cliente."}), 500
-    
+
     # Requisito operativo: no permitir reservas anónimas sin habitación
     if not (p.get("Codigo_Habitacion")):
         return jsonify({"ok": False, "msg": "Debe seleccionar una habitación disponible."}), 400
@@ -1383,15 +1389,15 @@ def api_reservas_anon():
         "Estado":            "Confirmada",
         "Monto_Total":       float(tot["total"]),
     }
-    
+
     col_ex, fid, ferr = _resolve_funcionario_id(p)
     if col_ex:
         if fid is not None:
             payload["Codigo_Funcionario"] = int(fid)
         elif ferr:
-            return jsonify({"ok": False, "msg": ferr}), 400    
-    
-    
+            return jsonify({"ok": False, "msg": ferr}), 400
+
+
     # Crear reserva con el service
     res = _res_service.create(payload)
     if not res.get("ok"):
@@ -1399,7 +1405,7 @@ def api_reservas_anon():
         err = res.get("msg") or res.get("message") or res.get("error") or "No se pudo crear la reserva."
         resto = {k: v for k, v in res.items() if k not in ("ok", "msg", "message", "error")}
         return jsonify({"ok": False, "msg": err, **resto}), code
-    
+
     # Soportar 'reserva_id' (lo que realmente te está devolviendo el Service)
     reserva_id = _extract_reserva_id(res)
     if not reserva_id:
@@ -1408,7 +1414,7 @@ def api_reservas_anon():
             "msg": "Reserva creada por el service pero sin identificador en la respuesta.",
             "raw": res
         }), 500
-    
+
 
     # Registrar pago online (tarjeta)
     pay = p.get("payment") or {}
@@ -1671,7 +1677,12 @@ def mant_crear():
         Estado="Abierta",
     )
     db.session.add(s)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except (DataError, IntegrityError):
+        error = "Hubo un problema creando la orden de matenimiento."
+        logging.exception(error)
+        return jsonify({"error": error})
     return jsonify({"ok": True, "id": s.Id})
 
 
