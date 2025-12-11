@@ -105,7 +105,7 @@
                 </nav>
                 <a
                     class="btn-getstarted d-none d-sm-block"
-                    href="#modalRoomType"
+                    href="#modalRoom"
                     data-bs-toggle="modal"
                     >Nuevo tipo</a
                 >
@@ -136,7 +136,6 @@
             <section class="section">
                 <div class="container" data-aos="fade-up">
                     <div class="row g-4">
-
                         <div class="col-lg-12">
                             <div class="card shadow-sm border-0">
                                 <div
@@ -146,7 +145,7 @@
                                     <button
                                         class="btn btn-success btn-sm"
                                         data-bs-toggle="modal"
-                                        data-bs-target="#modalRoomType"
+                                        data-bs-target="#modalRoom"
                                     >
                                         Agregar
                                     </button>
@@ -177,16 +176,11 @@
         </main>
 
         <!-- Modal tipo -->
-        <div
-            class="modal fade"
-            id="modalRoomType"
-            tabindex="-1"
-            aria-hidden="true"
-        >
+        <div class="modal fade" id="modalRoom" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Nuevo tipo de habitación</h5>
+                        <h5 class="modal-title">Nueva habitación</h5>
                         <button
                             type="button"
                             class="btn-close"
@@ -195,33 +189,58 @@
                     </div>
                     <div class="modal-body">
                         <form class="row g-3">
+                            <input type="hidden" name="action" value="create" />
                             <div class="col-12">
-                                <label class="form-label">Nombre</label
-                                ><input class="form-control" />
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">Capacidad</label
+                                <label
+                                    for="Codigo_Habitacion"
+                                    class="form-label"
+                                    >Código de habitación</label
                                 ><input
+                                    id="Codigo_Habitacion"
                                     type="number"
                                     class="form-control"
-                                    value="2"
-                                />
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label">Camas</label
-                                ><input
-                                    class="form-control"
-                                    placeholder="King / Queen / Twin"
                                 />
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Descripción</label
-                                ><textarea
+                                <label
+                                    for="Numero_Habitacion"
+                                    class="form-label"
+                                    >Número de habitación</label
+                                ><input
+                                    id="Numero_Habitacion"
                                     class="form-control"
-                                    rows="2"
-                                ></textarea>
+                                />
+                            </div>
+                            <div class="col-12">
+                                <label for="Precio_Noche" class="form-label"
+                                    >Precio de noche</label
+                                ><input
+                                    id="Precio_Noche"
+                                    type="number"
+                                    class="form-control"
+                                />
+                            </div>
+                            <div class="col-12">
+                                <label for="Tipo" class="form-label"
+                                    >Tipo</label
+                                >
+                                <select
+                                    id="Tipo"
+                                    class="form-select"
+                                    aria-label="Tipo"
+                                >
+                                    <option value="Sencilla">Sencilla</option>
+                                    <option value="Doble">Doble</option>
+                                    <option value="Suite">Suite</option>
+                                </select>
                             </div>
                         </form>
+                        <br/>
+                        <div
+                            id="error"
+                            class="alert alert-danger invisible"
+                            role="alert"
+                        ></div>
                     </div>
                     <div class="modal-footer">
                         <button
@@ -261,6 +280,43 @@
     </body>
     <script>
         $(document).ready(function () {
+            async function saveRoom() {
+                const action = $("*[name='action']", "#modalRoom").val();
+                switch (action) {
+                    case "create":
+                        const response = await fetch("/admin-rooms", {
+                            method: "POST",
+                            body: JSON.stringify({
+                                Codigo_Habitacion:
+                                    $("#Codigo_Habitacion").val(),
+                                Estado: "Disponible",
+                                Numero_Habitacion:
+                                    $("#Numero_Habitacion").val(),
+                                Precio_Noche: $("#Precio_Noche").val(),
+                                Tipo: $("#Tipo").val(),
+                            }),
+                            headers: { "Content-Type": "application/json" },
+                        });
+                        const result = await response.json();
+                        if ("error" in result) {
+                            $("#error", "#modalRoom").text(result.error);
+                            $("#error", "#modalRoom").removeClass("invisible");
+                        } else {
+                            $("*[name='action']", "#modalRoom").val("create");
+                            $("#error", "#modalRoom").addClass("invisible");
+                            $("#error", "#modalRoom").text("");
+                            $("#Codigo_Habitacion").val("");
+                            $("#Numero_Habitacion").val("");
+                            $("#Precio_Noche").val("");
+                            $("#Tipo").val("Sencilla");
+                            $("button", ".modal-header").click();
+                        }
+                        break;
+                    case "update":
+                        break;
+                }
+            }
+
             async function readRooms() {
                 const response = await fetch("/admin-rooms", {
                     headers: { Accept: "application/json" },
@@ -282,15 +338,15 @@
                     const estadoHTML = document.createElement("td");
                     const estadoBadgeHTML = document.createElement("span");
                     $(estadoBadgeHTML).addClass("badge");
-                    switch(result.Estado) {
-                      case "Disponible":
-                        $(estadoBadgeHTML).addClass("bg-success");
-                        break;
-                      case "Mantenimiento":
-                        $(estadoBadgeHTML).addClass("bg-danger");
-                        break;
-                      default:
-                        $(estadoBadgeHTML).addClass("bg-secondary");
+                    switch (result.Estado) {
+                        case "Disponible":
+                            $(estadoBadgeHTML).addClass("bg-success");
+                            break;
+                        case "Mantenimiento":
+                            $(estadoBadgeHTML).addClass("bg-danger");
+                            break;
+                        default:
+                            $(estadoBadgeHTML).addClass("bg-secondary");
                     }
                     $(estadoBadgeHTML).text(result.Estado);
                     $(estadoHTML).append(estadoBadgeHTML);
@@ -303,14 +359,21 @@
                     const accionHTML = document.createElement("td");
                     const accionButtonHTML = document.createElement("a");
                     $(accionHTML).addClass("text-end");
-                    $(accionButtonHTML).addClass("btn btn-outline-secondary btn-sm");
+                    $(accionButtonHTML).addClass(
+                        "btn btn-outline-secondary btn-sm",
+                    );
                     $(accionButtonHTML).text("Editar");
-                    $(accionButtonHTML).attr("href", `/admin-rooms.html/${result.Codigo_Habitacion}`);
+                    $(accionButtonHTML).attr(
+                        "href",
+                        `/admin-rooms.html/${result.Codigo_Habitacion}`,
+                    );
                     $(accionHTML).append(accionButtonHTML);
                     $(habitacionHTML).append(accionHTML);
                 }
             }
+
             readRooms();
+            $("button", ".modal-footer").on("click", saveRoom);
         });
     </script>
 </html>

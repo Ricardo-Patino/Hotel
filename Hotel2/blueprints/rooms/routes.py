@@ -6,6 +6,7 @@ from typing import Literal
 from extensions import db
 from flask import Response, jsonify, render_template, request
 from models_sql import Habitacion
+from sqlalchemy.exc import DataError, IntegrityError
 
 from . import rooms_bp
 
@@ -20,10 +21,15 @@ def serialize(habitacion: Habitacion) -> dict:
     return {column.name: str(getattr(habitacion, column.name)) for column in habitacion.__table__.columns}
 
 
-def _create(payload: dict) -> Habitacion:
+def _create(payload: dict) -> Habitacion |  None:
     habitacion = Habitacion(**payload)
     db.session.add(habitacion)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except (DataError, IntegrityError):
+        logging.exception("Unable to create habitacion.")
+        return None
+
     db.session.flush()
     return habitacion
 
@@ -62,6 +68,8 @@ def rooms_create() -> Response:
     """Create a room."""
     payload = request.get_json()
     habitacion = _create(payload)
+    if not habitacion:
+        return jsonify({"error": "Hubo un problema creando la habitación."})
     return jsonify(serialize(habitacion))
 
 
