@@ -1924,7 +1924,7 @@ def _call_ai_chat(
     # 2) Ollama local (chat API)
     if os.getenv("SAC_ENABLE_OLLAMA", "0") in ("1", "true", "True"):
         ollama_url = (
-            os.getenv("OLLAMA_URL") or "http://localhost:11434/api/chat"
+            os.getenv("OLLAMA_URL") or "http://20.115.131.117:11434/api/chat"
         ).strip()
         model = (os.getenv("OLLAMA_MODEL") or "llama3.2").strip()
         try:
@@ -1936,7 +1936,9 @@ def _call_ai_chat(
                 "stream": False,
                 "options": {"temperature": temperature},
             }
-            resp = requests.post(ollama_url, json=payload, timeout=30)
+            timeout = int(os.getenv("OLLAMA_TIMEOUT", "30"))
+            resp = requests.post(ollama_url, json=payload, timeout=timeout)
+
             if resp.ok:
                 js = resp.json()
                 msg = js.get("message") or {}
