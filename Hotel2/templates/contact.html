@@ -1,363 +1,588 @@
 <!DOCTYPE html>
 <html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Contacto – Hotel Villa Grace | Cóbano, Puntarenas</title>
+    <meta
+      name="description"
+      content="Ponte en contacto con Hotel Villa Grace en Cóbano, Puntarenas. Consultas, reservas y atención por WhatsApp y correo."
+    />
+    <meta
+      name="keywords"
+      content="Hotel Villa Grace, contacto, WhatsApp, Cóbano, Puntarenas, Montezuma, Santa Teresa, Costa Rica"
+    />
 
-<head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Contacto – Hotel Villa Grace | Cóbano, Puntarenas</title>
-  <meta name="description" content="Ponte en contacto con Hotel Villa Grace en Cóbano, Puntarenas. Consultas, reservas y atención por WhatsApp y correo.">
-  <meta name="keywords" content="Hotel Villa Grace, contacto, WhatsApp, Cóbano, Puntarenas, Montezuma, Santa Teresa, Costa Rica">
+    <!-- Favicons -->
+    <link
+      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
+      rel="icon"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
+      rel="apple-touch-icon"
+    />
 
-  <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+      rel="stylesheet"
+    />
 
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <!-- Vendor CSS Files -->
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}"
+      rel="stylesheet"
+    />
+    <link
+      href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}"
+      rel="stylesheet"
+    />
 
-  <!-- Vendor CSS Files -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
+    <!-- Main CSS File -->
+    <link
+      href="{{ url_for('static', filename='assets/css/main.css') }}"
+      rel="stylesheet"
+    />
 
-  <!-- Main CSS File -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+    <style>
+      /* Ajustes mínimos específicos de la página */
+      .contact-info-box {
+        background: var(--surface-color);
+        border-radius: 14px;
+        padding: 24px;
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        box-shadow: var(--shadow);
+      }
+      .contact-info-box .icon-box {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--accent-color);
+        color: #fff;
+        flex: 0 0 48px;
+      }
+      .form-container-overlap {
+        margin-top: -140px;
+        position: relative;
+      }
+      .contact-form-wrapper {
+        background: var(--surface-color);
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: var(--shadow-lg);
+      }
+      .input-with-icon {
+        position: relative;
+      }
+      .input-with-icon i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+      }
+      .input-with-icon .form-control,
+      .input-with-icon textarea {
+        padding-left: 42px;
+      }
+      .btn-submit {
+        padding: 10px 24px;
+      }
+      .map-section iframe {
+        display: block;
+        width: 100%;
+        height: 460px;
+      }
+      /* Botón flotante de WhatsApp */
+      .whatsapp-float {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 9999;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: #25d366;
+        color: #fff;
+        border-radius: 999px;
+        padding: 10px 16px;
+        text-decoration: none;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      }
+      .whatsapp-float i {
+        font-size: 20px;
+      }
+      .whatsapp-float span {
+        font-weight: 600;
+      }
+      @media (max-width: 540px) {
+        .whatsapp-float span {
+          display: none;
+        }
+      }
+    </style>
 
-  <style>
-    /* Ajustes mínimos específicos de la página */
-    .contact-info-box { background: var(--surface-color); border-radius: 14px; padding: 24px; display: flex; gap: 16px; align-items: flex-start; box-shadow: var(--shadow); }
-    .contact-info-box .icon-box { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-color); color: #fff; flex: 0 0 48px; }
-    .form-container-overlap { margin-top: -140px; position: relative; }
-    .contact-form-wrapper { background: var(--surface-color); border-radius: 16px; padding: 32px; box-shadow: var(--shadow-lg); }
-    .input-with-icon { position: relative; }
-    .input-with-icon i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-    .input-with-icon .form-control, .input-with-icon textarea { padding-left: 42px; }
-    .btn-submit { padding: 10px 24px; }
-    .map-section iframe { display: block; width: 100%; height: 460px; }
-    /* Botón flotante de WhatsApp */
-    .whatsapp-float { position: fixed; right: 18px; bottom: 18px; z-index: 9999; display: inline-flex; align-items: center; gap: 10px; background: #25D366; color: #fff; border-radius: 999px; padding: 10px 16px; text-decoration: none; box-shadow: 0 8px 20px rgba(0,0,0,.2); }
-    .whatsapp-float i { font-size: 20px; }
-    .whatsapp-float span { font-weight: 600; }
-    @media (max-width: 540px) { .whatsapp-float span { display: none; } }
-  </style>
-
-  <!-- =======================================================
+    <!-- =======================================================
   * Template Name: LuxuryHotel
   * Template URL: https://bootstrapmade.com/luxury-hotel-bootstrap-template/
   * Updated: Jun 30 2025 with Bootstrap v5.3.7
   * Author: BootstrapMade.com
   * License: https://bootstrapmade.com/license/
   ======================================================== -->
-</head>
+  </head>
 
-<body class="contact-page">
-
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <!-- <img src="{{ url_for('static', filename='assets/img/logo.webp') }}" alt="Hotel Villa Grace"> -->
-        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" fill="#000000" aria-hidden="true">
-          <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-          <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-          <g id="SVGRepo_iconCarrier">
-            <g id="a"></g>
-            <g id="b">
-              <path d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z" style="fill:#f2ebe2;"></path>
-              <path d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897ZM11,5h10c.5518,0,1,.4487,1,1V27h-2v-6c0-1.103-.8975-2-2-2h-4c-1.1025,0-2,.897-2,2v6h-2V6c0-.5513,.4482-1,1-1Zm7,22h-4v-6h4v6ZM3,11.8672l5-.7144v15.8472H3V11.8672Zm26,15.1328h-5V11.1528l5,.7144v15.1328ZM15,15.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3-7v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm7.5,7v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm0,3v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5ZM6.5,14.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5Zm0,3v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5Zm5.5-2v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm0-7v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3,0v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3,3.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm-6,0v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3,0v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Z" style="fill:#917a5a;"></path>
+  <body class="contact-page">
+    <header id="header" class="header d-flex align-items-center fixed-top">
+      <div
+        class="container position-relative d-flex align-items-center justify-content-between"
+      >
+        <a
+          href="index.html"
+          class="logo d-flex align-items-center me-auto me-xl-0"
+        >
+          <!-- <img src="{{ url_for('static', filename='assets/img/logo.webp') }}" alt="Hotel Villa Grace"> -->
+          <svg
+            viewBox="0 0 32 32"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="#000000"
+            aria-hidden="true"
+          >
+            <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+            <g
+              id="SVGRepo_tracerCarrier"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ></g>
+            <g id="SVGRepo_iconCarrier">
+              <g id="a"></g>
+              <g id="b">
+                <path
+                  d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z"
+                  style="fill: #f2ebe2"
+                ></path>
+                <path
+                  d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897ZM11,5h10c.5518,0,1,.4487,1,1V27h-2v-6c0-1.103-.8975-2-2-2h-4c-1.1025,0-2,.897-2,2v6h-2V6c0-.5513,.4482-1,1-1Zm7,22h-4v-6h4v6ZM3,11.8672l5-.7144v15.8472H3V11.8672Zm26,15.1328h-5V11.1528l5,.7144v15.1328ZM15,15.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3-7v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm7.5,7v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm0,3v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5ZM6.5,14.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5Zm0,3v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5Zm5.5-2v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm0-7v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3,0v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3,3.5v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm-6,0v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Zm3,0v-1c0-.2762,.2239-.5,.5-.5h1c.2761,0,.5,.2238,.5,.5v1c0,.2761-.2239,.5-.5,.5h-1c-.2761,0-.5-.2239-.5-.5Z"
+                  style="fill: #917a5a"
+                ></path>
+              </g>
             </g>
-          </g>
-        </svg>
-        <h1 class="sitename">Hotel Villa Grace</h1>
-      </a>
+          </svg>
+          <h1 class="sitename">Hotel Villa Grace</h1>
+        </a>
 
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li><a href="index.html">Inicio</a></li>
-          <li><a href="about.html">Nosotros</a></li>
-          <li><a href="rooms.html">Habitaciones</a></li>
-          <li><a href="amenities.html">Servicios</a></li>
-          <li><a href="location.html">Ubicación</a></li>
-          <li class="dropdown"><a href="#"><span>Páginas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-            <ul>
-              <li><a href="room-details.html">Detalle de Habitación</a></li>
-              <li><a href="restaurant.html">Restaurante</a></li>
-              <li><a href="offers.html">Ofertas</a></li>
-              <li><a href="events.html">Eventos</a></li>
-              <li><a href="gallery.html">Galería</a></li>
-              <li><a href="booking.html">Reservas</a></li>
-              <li><a href="terms.html">Términos</a></li>
-              <li><a href="privacy.html">Privacidad</a></li>
-              <li><a href="404.html">404</a></li>
-              <li><a href="starter-page.html">Página base</a></li>
-            </ul>
-          </li>
-          <li><a href="contact.html" class="active">Contacto</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
-
-      <a class="btn-getstarted d-none d-sm-block" href="booking.html">Reservar</a>
-
-    </div>
-  </header>
-
-  <main class="main">
-
-    <!-- Page Title -->
-    <div class="page-title dark-background" data-aos="fade" style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-      <div class="container position-relative">
-        <h1>Contacto</h1>
-        <p>Estamos listos para ayudarte con reservas, consultas y recomendaciones para tu viaje a la Península de Nicoya.</p>
-        <nav class="breadcrumbs">
-          <ol>
+        <nav id="navmenu" class="navmenu">
+          <ul>
             <li><a href="index.html">Inicio</a></li>
-            <li class="current">Contacto</li>
-          </ol>
+            <li><a href="about.html">Nosotros</a></li>
+            <li><a href="rooms.html">Habitaciones</a></li>
+            <li><a href="amenities.html">Servicios</a></li>
+            <li><a href="location.html">Ubicación</a></li>
+            <li class="dropdown">
+              <a href="#"
+                ><span>Páginas</span>
+                <i class="bi bi-chevron-down toggle-dropdown"></i
+              ></a>
+              <ul>
+                <li><a href="room-details.html">Detalle de Habitación</a></li>
+                <li><a href="restaurant.html">Restaurante</a></li>
+                <li><a href="offers.html">Ofertas</a></li>
+                <li><a href="events.html">Eventos</a></li>
+                <li><a href="gallery.html">Galería</a></li>
+                <li><a href="booking.html">Reservas</a></li>
+                <li><a href="terms.html">Términos</a></li>
+                <li><a href="privacy.html">Privacidad</a></li>
+                <li><a href="404.html">404</a></li>
+                <li><a href="starter-page.html">Página base</a></li>
+              </ul>
+            </li>
+            <li><a href="contact.html" class="active">Contacto</a></li>
+          </ul>
+          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
         </nav>
+
+        <a class="btn-getstarted d-none d-sm-block" href="booking.html"
+          >Reservar</a
+        >
       </div>
-    </div><!-- End Page Title -->
+    </header>
 
-    <!-- Contact Section -->
-    <section id="contact" class="contact section">
-
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-
-        <!-- Contact Info Boxes -->
-        <div class="row gy-4 mb-5">
-          <div class="col-lg-4" data-aos="fade-up" data-aos-delay="100">
-            <div class="contact-info-box">
-              <div class="icon-box">
-                <i class="bi bi-geo-alt"></i>
-              </div>
-              <div class="info-content">
-                <h4>Dirección</h4>
-                <p>Cóbano, Puntarenas, Costa Rica</p>
-                <small class="text-muted">A minutos de Montezuma y Santa Teresa</small>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-lg-4" data-aos="fade-up" data-aos-delay="200">
-            <div class="contact-info-box">
-              <div class="icon-box">
-                <i class="bi bi-envelope"></i>
-              </div>
-              <div class="info-content">
-                <h4>Correo</h4>
-                <p><a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a></p>
-                </div>
-            </div>
-          </div>
-
-          <div class="col-lg-4" data-aos="fade-up" data-aos-delay="300">
-            <div class="contact-info-box">
-              <div class="icon-box">
-                <i class="bi bi-headset"></i>
-              </div>
-              <div class="info-content">
-                <h4>Horario</h4>
-                <p>Atención: 7:00–21:00 (GMT‑6)</p>
-                <p>Check‑in 1:00 pm | Check‑out 11:00</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Google Maps (Full Width) -->
-      <div class="map-section" data-aos="fade-up" data-aos-delay="200">
-        <iframe src="https://www.google.com/maps?q=C%C3%B3bano,+Puntarenas,+Costa+Rica&output=embed" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-      </div>
-
-      <!-- Contact Form Section (Overlapping) -->
-      <div class="container form-container-overlap">
-        <div class="row justify-content-center" data-aos="fade-up" data-aos-delay="300">
-          <div class="col-lg-10">
-            <div class="contact-form-wrapper">
-              <h2 class="text-center mb-4">Escríbenos</h2>
-
-              <!-- Tip: cambia 'forms/contact.php' por tu endpoint real (Formspree/Netlify/tu backend) -->
-              <form action="forms/contact.php" method="post" class="php-email-form">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <div class="form-group">
-                      <div class="input-with-icon">
-                        <i class="bi bi-person"></i>
-                        <input type="text" class="form-control" name="name" placeholder="Nombre y Apellido" required>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="form-group">
-                      <div class="input-with-icon">
-                        <i class="bi bi-envelope"></i>
-                        <input type="email" class="form-control" name="email" placeholder="Correo electrónico" required>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="form-group">
-                      <div class="input-with-icon">
-                        <i class="bi bi-telephone"></i>
-                        <input type="tel" class="form-control" name="phone" placeholder="Teléfono / WhatsApp (opcional)">
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="form-group">
-                      <div class="input-with-icon">
-                        <i class="bi bi-text-left"></i>
-                        <input type="text" class="form-control" name="subject" placeholder="Asunto" required>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-12">
-                    <div class="form-group">
-                      <div class="input-with-icon">
-                        <i class="bi bi-chat-dots message-icon"></i>
-                        <textarea class="form-control" name="message" placeholder="Cuéntanos sobre tu consulta (fechas, número de personas, preferencias...)" style="height: 180px" required></textarea>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="col-12 d-flex align-items-center gap-2">
-                    <input type="checkbox" id="privacy" required>
-                    <label for="privacy" class="mb-0">Acepto la <a href="privacy.html">política de privacidad</a>.</label>
-                  </div>
-
-                  <div class="col-12">
-                    <div class="loading">Cargando…</div>
-                    <div class="error-message"></div>
-                    <div class="sent-message">¡Tu mensaje ha sido enviado. Gracias!</div>
-                  </div>
-
-                  <div class="col-12 text-center">
-                    <button type="submit" class="btn btn-primary btn-submit">Enviar Mensaje</button>
-                    <div class="mt-2">
-                      <a class="text-muted small" href="mailto:reservas@hotelvillagrace.com?subject=Consulta%20desde%20la%20web">o escríbenos por correo</a>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-    </section><!-- /Contact Section -->
-
-  </main>
-
-  <footer id="footer" class="footer position-relative dark-background">
-
-    <div class="footer-top">
-      <div class="container">
-        <div class="row gy-4">
-          <div class="col-lg-4 col-md-6 footer-about">
-            <a href="index.html" class="logo d-flex align-items-center">
-              <span class="sitename">Hotel Villa Grace</span>
-            </a>
-           <div class="footer-contact pt-3">
-              <p>Cóbano, 100 m del Banco Nacional</p>
-              <p>Puntarenas, Costa Rica · 60111</p>
-              <p class="mt-3"><strong>Teléfono:</strong> <a href="Tel: +50626420225">2642-0225</a></p>
-              <p><strong>Email:</strong> <span><a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a></span></p>
-            </div>
-          </div>
-
-          <div class="col-lg-2 col-md-3 footer-links">
-            <h4>Explorar</h4>
-            <ul>
+    <main class="main">
+      <!-- Page Title -->
+      <div
+        class="page-title dark-background"
+        data-aos="fade"
+        style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
+      >
+        <div class="container position-relative">
+          <h1>Contacto</h1>
+          <p>
+            Estamos listos para ayudarte con reservas, consultas y
+            recomendaciones para tu viaje a la Península de Nicoya.
+          </p>
+          <nav class="breadcrumbs">
+            <ol>
               <li><a href="index.html">Inicio</a></li>
-              <li><a href="about.html">Nosotros</a></li>
-              <li><a href="rooms.html">Habitaciones</a></li>
-              <li><a href="terms.html">Términos</a></li>
-              <li><a href="privacy.html">Privacidad</a></li>
-            </ul>
-          </div>
-
-          <div class="col-lg-2 col-md-3 footer-links">
-            <h4>Servicios</h4>
-            <ul>
-              <li><a href="amenities.html">Piscina & Spa</a></li>
-              <li><a href="restaurant.html">Restaurante</a></li>
-              <li><a href="events.html">Eventos</a></li>
-              <li><a href="offers.html">Ofertas</a></li>
-              <li><a href="gallery.html">Galería</a></li>
-            </ul>
-          </div>
-
-          <div class="col-lg-4 col-md-6 footer-links">
-            <h4>Redes</h4>
-            <ul class="d-flex gap-3 list-unstyled">
-              <li><a href="https://www.facebook.com/HotelVillaGrace" target="_blank" rel="noopener"><i class="bi bi-facebook"></i> Facebook</a></li>
-              <!--<li><a href="https://rickpatinor.wixsite.com/hotelvillagrace" target="_blank" rel="noopener"><i class="bi bi-globe"></i> Sitio Wix</a></li>  -->
-             <!-- <li><a href="https://www.letsbookhotel.com/es/costa-rica/cobano/hotel/hotel-villa-grace.aspx" target="_blank" rel="noopener"><i class="bi bi-buildings"></i> LetsBookHotel</a></li> -->
-            </ul>
-          </div>
-
+              <li class="current">Contacto</li>
+            </ol>
+          </nav>
         </div>
       </div>
-    </div>
+      <!-- End Page Title -->
 
-    <div class="copyright text-center">
-      <div class="container d-flex flex-column flex-lg-row justify-content-center justify-content-lg-between align-items-center">
+      <!-- Contact Section -->
+      <section id="contact" class="contact section">
+        <div class="container" data-aos="fade-up" data-aos-delay="100">
+          <!-- Contact Info Boxes -->
+          <div class="row gy-4 mb-5">
+            <div class="col-lg-4" data-aos="fade-up" data-aos-delay="100">
+              <div class="contact-info-box">
+                <div class="icon-box">
+                  <i class="bi bi-geo-alt"></i>
+                </div>
+                <div class="info-content">
+                  <h4>Dirección</h4>
+                  <p>Cóbano, Puntarenas, Costa Rica</p>
+                  <small class="text-muted"
+                    >A minutos de Montezuma y Santa Teresa</small
+                  >
+                </div>
+              </div>
+            </div>
 
-        <div class="d-flex flex-column align-items-center align-items-lg-start">
-          <div>
-            © <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados
+            <div class="col-lg-4" data-aos="fade-up" data-aos-delay="200">
+              <div class="contact-info-box">
+                <div class="icon-box">
+                  <i class="bi bi-envelope"></i>
+                </div>
+                <div class="info-content">
+                  <h4>Correo</h4>
+                  <p>
+                    <a href="mailto:hotelvillagrace@gmail.com"
+                      >hotelvillagrace@gmail.com</a
+                    >
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-4" data-aos="fade-up" data-aos-delay="300">
+              <div class="contact-info-box">
+                <div class="icon-box">
+                  <i class="bi bi-headset"></i>
+                </div>
+                <div class="info-content">
+                  <h4>Horario</h4>
+                  <p>Atención: 7:00–21:00 (GMT‑6)</p>
+                  <p>Check‑in 1:00 pm | Check‑out 11:00</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="social-links order-first order-lg-last mb-3 mb-lg-0">
-          <a href="https://www.facebook.com/HotelVillaGrace" target="_blank" rel="noopener"><i class="bi bi-facebook"></i></a>
-          <a href="https://rickpatinor.wixsite.com/hotelvillagrace" target="_blank" rel="noopener"><i class="bi bi-globe"></i></a>
-          <a href="https://www.letsbookhotel.com/es/costa-rica/cobano/hotel/hotel-villa-grace.aspx" target="_blank" rel="noopener"><i class="bi bi-buildings"></i></a>
+        <!-- Google Maps (Full Width) -->
+        <div class="map-section" data-aos="fade-up" data-aos-delay="200">
+          <iframe
+            src="https://www.google.com/maps?q=C%C3%B3bano,+Puntarenas,+Costa+Rica&output=embed"
+            allowfullscreen=""
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
         </div>
 
+        <!-- Contact Form Section (Overlapping) -->
+        <div class="container form-container-overlap">
+          <div
+            class="row justify-content-center"
+            data-aos="fade-up"
+            data-aos-delay="300"
+          >
+            <div class="col-lg-10">
+              <div class="contact-form-wrapper">
+                <h2 class="text-center mb-4">Escríbenos</h2>
+
+                <!-- Tip: cambia 'forms/contact.php' por tu endpoint real (Formspree/Netlify/tu backend) -->
+                <form
+                  action="forms/contact.php"
+                  method="post"
+                  class="php-email-form"
+                >
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <div class="input-with-icon">
+                          <i class="bi bi-person"></i>
+                          <input
+                            type="text"
+                            class="form-control"
+                            name="name"
+                            placeholder="Nombre y Apellido"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <div class="input-with-icon">
+                          <i class="bi bi-envelope"></i>
+                          <input
+                            type="email"
+                            class="form-control"
+                            name="email"
+                            placeholder="Correo electrónico"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <div class="input-with-icon">
+                          <i class="bi bi-telephone"></i>
+                          <input
+                            type="tel"
+                            class="form-control"
+                            name="phone"
+                            placeholder="Teléfono / WhatsApp (opcional)"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <div class="input-with-icon">
+                          <i class="bi bi-text-left"></i>
+                          <input
+                            type="text"
+                            class="form-control"
+                            name="subject"
+                            placeholder="Asunto"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-12">
+                      <div class="form-group">
+                        <div class="input-with-icon">
+                          <i class="bi bi-chat-dots message-icon"></i>
+                          <textarea
+                            class="form-control"
+                            name="message"
+                            placeholder="Cuéntanos sobre tu consulta (fechas, número de personas, preferencias...)"
+                            style="height: 180px"
+                            required
+                          ></textarea>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-12 d-flex align-items-center gap-2">
+                      <input type="checkbox" id="privacy" required />
+                      <label for="privacy" class="mb-0"
+                        >Acepto la
+                        <a href="privacy.html">política de privacidad</a
+                        >.</label
+                      >
+                    </div>
+
+                    <div class="col-12">
+                      <div class="loading">Cargando…</div>
+                      <div class="error-message"></div>
+                      <div class="sent-message">
+                        ¡Tu mensaje ha sido enviado. Gracias!
+                      </div>
+                    </div>
+
+                    <div class="col-12 text-center">
+                      <button type="submit" class="btn btn-primary btn-submit">
+                        Enviar Mensaje
+                      </button>
+                      <div class="mt-2">
+                        <a
+                          class="text-muted small"
+                          href="mailto:reservas@hotelvillagrace.com?subject=Consulta%20desde%20la%20web"
+                          >o escríbenos por correo</a
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- /Contact Section -->
+    </main>
+
+    <footer id="footer" class="footer position-relative dark-background">
+      <div class="footer-top">
+        <div class="container">
+          <div class="row gy-4">
+            <div class="col-lg-4 col-md-6 footer-about">
+              <a href="index.html" class="logo d-flex align-items-center">
+                <span class="sitename">Hotel Villa Grace</span>
+              </a>
+              <div class="footer-contact pt-3">
+                <p>Cóbano, 100 m del Banco Nacional</p>
+                <p>Puntarenas, Costa Rica · 60111</p>
+                <p class="mt-3">
+                  <strong>Teléfono:</strong>
+                  <a href="Tel: +50626420225">2642-0225</a>
+                </p>
+                <p>
+                  <strong>Email:</strong>
+                  <span
+                    ><a href="mailto:hotelvillagrace@gmail.com"
+                      >hotelvillagrace@gmail.com</a
+                    ></span
+                  >
+                </p>
+              </div>
+            </div>
+
+            <div class="col-lg-2 col-md-3 footer-links">
+              <h4>Explorar</h4>
+              <ul>
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="about.html">Nosotros</a></li>
+                <li><a href="rooms.html">Habitaciones</a></li>
+                <li><a href="terms.html">Términos</a></li>
+                <li><a href="privacy.html">Privacidad</a></li>
+              </ul>
+            </div>
+
+            <div class="col-lg-2 col-md-3 footer-links">
+              <h4>Servicios</h4>
+              <ul>
+                <li><a href="amenities.html">Piscina & Spa</a></li>
+                <li><a href="restaurant.html">Restaurante</a></li>
+                <li><a href="events.html">Eventos</a></li>
+                <li><a href="offers.html">Ofertas</a></li>
+                <li><a href="gallery.html">Galería</a></li>
+              </ul>
+            </div>
+
+            <div class="col-lg-4 col-md-6 footer-links">
+              <h4>Redes</h4>
+              <ul class="d-flex gap-3 list-unstyled">
+                <li>
+                  <a
+                    href="https://www.facebook.com/HotelVillaGrace"
+                    target="_blank"
+                    rel="noopener"
+                    ><i class="bi bi-facebook"></i> Facebook</a
+                  >
+                </li>
+                <!--<li><a href="https://rickpatinor.wixsite.com/hotelvillagrace" target="_blank" rel="noopener"><i class="bi bi-globe"></i> Sitio Wix</a></li>  -->
+                <!-- <li><a href="https://www.letsbookhotel.com/es/costa-rica/cobano/hotel/hotel-villa-grace.aspx" target="_blank" rel="noopener"><i class="bi bi-buildings"></i> LetsBookHotel</a></li> -->
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-  </footer>
+      <div class="copyright text-center">
+        <div
+          class="container d-flex flex-column flex-lg-row justify-content-center justify-content-lg-between align-items-center"
+        >
+          <div
+            class="d-flex flex-column align-items-center align-items-lg-start"
+          >
+            <div>
+              © <strong><span>Hotel Villa Grace</span></strong
+              >. Todos los derechos reservados
+            </div>
+          </div>
 
-  <!-- Scroll Top -->
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+          <div class="social-links order-first order-lg-last mb-3 mb-lg-0">
+            <a
+              href="https://www.facebook.com/HotelVillaGrace"
+              target="_blank"
+              rel="noopener"
+              ><i class="bi bi-facebook"></i
+            ></a>
+            <a
+              href="https://rickpatinor.wixsite.com/hotelvillagrace"
+              target="_blank"
+              rel="noopener"
+              ><i class="bi bi-globe"></i
+            ></a>
+            <a
+              href="https://www.letsbookhotel.com/es/costa-rica/cobano/hotel/hotel-villa-grace.aspx"
+              target="_blank"
+              rel="noopener"
+              ><i class="bi bi-buildings"></i
+            ></a>
+          </div>
+        </div>
+      </div>
+    </footer>
 
-  <!-- WhatsApp Floating Button (reemplaza 50600000000 por tu número real) -->
-  <a class="whatsapp-float" href="https://wa.me/50689488202?text=Hola%20Hotel%20Villa%20Grace%2C%20quiero%20más%20informaci%C3%B3n%20🙌" target="_blank" rel="noopener" aria-label="Chatear por WhatsApp">
-    <i class="bi bi-whatsapp"></i>
-    <span>Chatea por WhatsApp</span>
-  </a>
+    <!-- Scroll Top -->
+    <a
+      href="#"
+      id="scroll-top"
+      class="scroll-top d-flex align-items-center justify-content-center"
+      ><i class="bi bi-arrow-up-short"></i
+    ></a>
 
-  <!-- Preloader -->
-  <div id="preloader"></div>
+    <!-- WhatsApp Floating Button (reemplaza 50600000000 por tu número real) -->
+    <a
+      class="whatsapp-float"
+      href="https://wa.me/50689488202?text=Hola%20Hotel%20Villa%20Grace%2C%20quiero%20más%20informaci%C3%B3n%20🙌"
+      target="_blank"
+      rel="noopener"
+      aria-label="Chatear por WhatsApp"
+    >
+      <i class="bi bi-whatsapp"></i>
+      <span>Chatea por WhatsApp</span>
+    </a>
 
-  <!-- Vendor JS Files -->
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/php-email-form/validate.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+    <!-- Preloader -->
+    <div id="preloader"></div>
 
-  <!-- Main JS File -->
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+    <!-- Vendor JS Files -->
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/php-email-form/validate.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
 
-</body>
-
+    <!-- Main JS File -->
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+  </body>
 </html>
