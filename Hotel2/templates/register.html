@@ -1,81 +1,225 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Registro - Hotel Villa Grace</title>
-  <meta name="description" content="Crea tu cuenta para gestionar reservas en el Hotel Villa Grace.">
-  <meta name="keywords" content="hotel, villa grace, registro, crear cuenta">
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>
+    Hotel Villa Grace | Cóbano, Puntarenas – Piscina, Restaurante y Parqueo
+    Gratis
+  </title>
+
+  <!-- Meta SEO correctos -->
+  <meta name="description"
+    content="Hotel Villa Grace en Cóbano, Puntarenas. Piscina para adultos y niños, restaurante y bar, Wi-Fi y parqueo gratis. A 7 km de Montezuma y 14 km de Santa Teresa. Tel: +506 2642 0225" />
+  <meta name="keywords"
+    content="Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa, hotel con piscina, restaurante, hospedaje Costa Rica" />
 
   <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
 
-  <!-- Fuentes -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,800;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+    rel="stylesheet" />
 
   <!-- Vendor CSS -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet" />
 
-  <!-- Estilos del proyecto -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  <!-- Main CSS -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
 
-  <style>
-    .form-control.is-valid{background-image:none;border-color:#198754}
-    .form-control.is-invalid{background-image:none;border-color:#dc3545}
-    .valid-hint, .invalid-feedback{min-height:1.25rem}
-    .password-hints li{margin-left:1rem}
-    .form-check-input.is-invalid{border-color:#dc3545}
-  </style>
+  <!--
+  * Template Name: LuxuryHotel
+  * Template URL: https://bootstrapmade.com/luxury-hotel-bootstrap-template/
+  * Updated: Jun 30 2025 with Bootstrap v5.3.7
+  * Author: BootstrapMade.com
+  * License: https://bootstrapmade.com/license/
+  -->
 </head>
+
 <body class="privacy-page">
 
   <!-- Header -->
   <header id="header" class="header d-flex align-items-center fixed-top">
     <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+
+      <!-- Logo -->
+      <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0"
+        aria-label="Hotel Villa Grace - Inicio">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <g>
+            <path
+              d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z"
+              style="fill:#f2ebe2"></path>
+            <path
+              d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897Z"
+              style="fill:#917a5a"></path>
+          </g>
+        </svg>
         <h1 class="sitename">Hotel Villa Grace</h1>
       </a>
 
+      <!-- NAV -->
       <nav id="navmenu" class="navmenu">
         <ul>
-          <li><a href="index.html">Inicio</a></li>
-          <li><a href="about.html">Nosotros</a></li>
-          <li><a href="rooms.html">Habitaciones</a></li>
-          <li><a href="amenities.html">Servicios</a></li>
-          <li><a href="location.html">Ubicación</a></li>
-          <li class="dropdown"><a href="#"><span>Páginas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+          <!-- Público principal (prioridad alta) -->
+          <li><a href="{{ url_for('index_html') }}" class="active">Inicio</a></li>
+          <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
+          <li><a href="{{ url_for('rooms_html') }}">Habitaciones</a></li>
+          <li><a href="{{ url_for('contact_html') }}">Contáctenos</a></li>
+          <!--<li><a href="amenities.html">Servicios</a></li>
+            <li><a href="location.html">Ubicación</a></li>-->
+
+          <!-- Contenido secundario agrupado 
+            <li class="dropdown">
+              <a href="#"><span>Más</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+              <ul>
+                <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
+                <li><a href="room-details.html">Detalle de habitación</a></li>
+                <li><a href="restaurant.html">Restaurante</a></li>
+                <li><a href="offers.html">Ofertas</a></li>
+                <li><a href="events.html">Eventos</a></li>
+                <li><a href="gallery.html">Galería</a></li>
+                <li><a href="{{ url_for('booking_search') }}">Reservas – Buscar</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a href="{{ url_for('contact_html') }}">Contacto</a></li>
+                <li><a href="terms.html">Términos</a></li>
+                <li><a href="privacy.html">Privacidad</a></li>
+              </ul>
+            </li>-->
+
+          <!-- Atención (SAC) -->
+          <li class="dropdown">
+            <a href="#"><span>Atención</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
             <ul>
-              <li><a href="booking.html">Reservas</a></li>
-              <li><a href="offers.html">Ofertas</a></li>
-              <li><a href="events.html">Eventos</a></li>
-              <li><a href="gallery.html">Galería</a></li>
-              <li><a href="terms.html">Términos</a></li>
-              <li><a href="privacy.html">Privacidad</a></li>
-              <li><a href="login.html">Login</a></li>
+              <li><a href="{{ url_for('sac.faq_html') }}">FAQ y horarios</a></li>
+              {% if session.get('user_role') == 'Cliente' %}
+              <li><a href="{{ url_for('sac.preferencias_html') }}">Preferencias de notificación</a></li>
+              <li><a href="{{ url_for('sac.solicitud_nueva_html') }}">Solicitudes especiales</a></li>
+              {% endif %}
+              {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
+              <li>
+                <hr class="dropdown-divider">
+              </li>
+              <li><a href="{{ url_for('sac.panel_solicitudes') }}">Panel de solicitudes</a></li>
+              <li><a href="{{ url_for('sac.incidentes_html') }}">Incidentes / comentarios</a></li>
+              <li><a href="{{ url_for('sac.conversaciones_html') }}">Historial de conversaciones</a></li>
+              {% endif %}
+              {% if session.get('user_role') == 'Administrador' %}
+              <li><a href="{{ url_for('sac.indicadores_html') }}">Indicadores</a></li>
+              {% endif %}
             </ul>
           </li>
-          <li><a href="contact.html">Contacto</a></li>
+
+          <!-- Gestión (solo staff) -->
+          {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
+          <li class="dropdown">
+            <a href="#"><span>Gestión</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+            <ul>
+              <li><a href="{{ url_for('ops_dashboard_html') }}">Panel de Operaciones</a></li>
+              <li><a href="{{ url_for('sac.conversaciones_html') }}">Conversaciones</a></li>
+
+
+              <li class="dropdown">
+                <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li><a href="{{ url_for('fin_reports.ui_reports') }}">Reportes</a></li>
+                  <li><a href="{{ url_for('fin_invoices_html') }}">Facturas</a></li>
+                  <li><a href="{{ url_for('fin_cash.ui') }}">Caja / arqueos</a></li>
+                  <li><a href="{{ url_for('fin_periods.ui_periods') }}">Periodos / cierres</a></li>
+                </ul>
+              </li>
+
+              <li class="dropdown">
+                <a href="#"><span>RR. HH.</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li><a href="{{ url_for('hrm.empleados_ui') }}">Empleados</a></li>
+                  <li><a href="{{ url_for('hrm.mis_horas_ui') }}">Mis horas</a></li>
+                  <li><a href="{{ url_for('hrm.validar_horas_ui') }}">Validar horas</a></li>
+                </ul>
+              </li>
+
+              <li class="dropdown">
+                <a href="#"><span>Inventario</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li><a href="{{ url_for('inv.insumos_list') }}">Insumos</a></li>
+                  <li><a href="{{ url_for('inv.insumo_new') }}">Nuevo insumo</a></li>
+                  <li><a href="{{ url_for('inv.categorias_list') }}">Categorías</a></li>
+                  <li><a href="{{ url_for('inv.categorias_new') }}">Nueva categoría</a></li>
+                </ul>
+              </li>
+
+              {% if session.get('user_role') == 'Administrador' %}
+              <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+              <li><a href="{{ url_for('sac.sac_chat_admin') }}">Chatbot</a></li>
+              {% endif %}
+            </ul>
+          </li>
+          {% endif %}
+
+          <!-- Idioma 
+            <li class="dropdown">
+              <a href="#" aria-label="Cambiar idioma"><span>Español</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+              <ul>
+                <li><a href="#en">English</a></li>
+                <li><a href="#fr">Français</a></li>
+              </ul>
+            </li>-->
+
+          <!-- Cuenta -->
+          {% if session.get('user_id') %}
+          <li class="dropdown">
+            <a href="{{ url_for('portal_perfil_html') }}" aria-label="Perfil">
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+              <span>{{ session.get('user_name', 'Mi cuenta') }}</span>
+              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
+            </a>
+            <ul>
+              <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
+              <li><a href="{{ url_for('portal_reservas_html') }}">Mis reservas</a></li>
+              <li><a href="{{ url_for('portal_perfil_html') }}">Perfil</a></li>
+              <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
+            </ul>
+          </li>
+          {% else %}
+          <li class="dropdown">
+            <a href="#" aria-label="Cuenta">
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+              <span>Cuenta</span>
+              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
+            </a>
+            <ul>
+              <li><a href="{{ url_for('login_html') }}">Iniciar sesión</a></li>
+              <li><a href="{{ url_for('register') }}">Crear cuenta</a></li>
+              <li><a href="{{ url_for('forgot_password') }}">¿Olvidaste tu contraseña?</a></li>
+            </ul>
+          </li>
+          {% endif %}
         </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+
+        <i class="mobile-nav-toggle d-xl-none bi bi-list" aria-label="Abrir menú"></i>
       </nav>
 
-      <a class="btn-getstarted d-none d-sm-block" href="booking.html">Reservar ahora</a>
+      <!-- CTA -->
+      <a class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4"
+        href="{{ url_for('booking_search') }}">Reservar</a>
     </div>
   </header>
 
   <main class="main">
 
     <!-- Título -->
-    <div class="page-title dark-background" data-aos="fade" style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="page-title dark-background" data-aos="fade"
+      style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
       <div class="container position-relative">
         <h1>Crear cuenta</h1>
         <p>Regístrate para gestionar tus reservas, preferencias y beneficios.</p>
@@ -95,16 +239,16 @@
         <!-- Mensajes del servidor (flash) -->
         {% with msgs = get_flashed_messages(with_categories=true) %}
         {% if msgs %}
-          <div class="row justify-content-center mb-3">
-            <div class="col-lg-7">
-              {% for cat, msg in msgs %}
-                <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
-                  {{ msg }}
-                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-                </div>
-              {% endfor %}
+        <div class="row justify-content-center mb-3">
+          <div class="col-lg-7">
+            {% for cat, msg in msgs %}
+            <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+              {{ msg }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
             </div>
+            {% endfor %}
           </div>
+        </div>
         {% endif %}
         {% endwith %}
 
@@ -123,14 +267,16 @@
                 <form action="{{ url_for('register') }}" method="post" class="row g-3" id="registerForm" novalidate>
                   <div class="col-md-6">
                     <label for="nombre" class="form-label">Nombre</label>
-                    <input type="text" id="nombre" name="nombre" class="form-control" autocomplete="given-name" required>
+                    <input type="text" id="nombre" name="nombre" class="form-control" autocomplete="given-name"
+                      required>
                     <div class="valid-hint text-success small d-none">✓ Se ve bien</div>
                     <div class="invalid-feedback small">Usa solo letras y espacios (2–50).</div>
                   </div>
 
                   <div class="col-md-6">
                     <label for="apellidos" class="form-label">Apellidos</label>
-                    <input type="text" id="apellidos" name="apellidos" class="form-control" autocomplete="family-name" required>
+                    <input type="text" id="apellidos" name="apellidos" class="form-control" autocomplete="family-name"
+                      required>
                     <div class="valid-hint text-success small d-none">✓ Se ve bien</div>
                     <div class="invalid-feedback small">Usa solo letras y espacios (2–50).</div>
                   </div>
@@ -138,22 +284,27 @@
                   <!-- Cédula/Pasaporte (requerido) -->
                   <div class="col-md-6">
                     <label for="cedula" class="form-label">Cédula / Pasaporte <span class="text-danger">*</span></label>
-                    <input type="text" id="cedula" name="cedula" class="form-control" placeholder="1-2345-6789" autocomplete="off" required>
-                    <div class="form-text">Formato CR (1-2345-6789 o 9 dígitos), DIMEX (11–12 dígitos) o pasaporte (6–12 alfanuméricos).</div>
+                    <input type="text" id="cedula" name="cedula" class="form-control" placeholder="1-2345-6789"
+                      autocomplete="off" required>
+                    <div class="form-text">Formato CR (1-2345-6789 o 9 dígitos), DIMEX (11–12 dígitos) o pasaporte (6–12
+                      alfanuméricos).</div>
                     <div class="valid-hint text-success small d-none">✓ Documento válido</div>
-                    <div class="invalid-feedback small">Documento inválido o poco confiable (no use secuencias tipo 11111111).</div>
+                    <div class="invalid-feedback small">Documento inválido o poco confiable (no use secuencias tipo
+                      11111111).</div>
                   </div>
 
                   <div class="col-md-6">
                     <label for="email" class="form-label">Correo electrónico</label>
-                    <input type="email" id="email" name="email" class="form-control" placeholder="tucorreo@ejemplo.com" autocomplete="email" required>
+                    <input type="email" id="email" name="email" class="form-control" placeholder="tucorreo@ejemplo.com"
+                      autocomplete="email" required>
                     <div class="valid-hint text-success small d-none">✓ Correo válido</div>
                     <div class="invalid-feedback small">Ingresa un correo válido (ej. usuario@dominio.com).</div>
                   </div>
 
                   <div class="col-md-6">
                     <label for="telefono" class="form-label">Teléfono</label>
-                    <input type="tel" id="telefono" name="telefono" class="form-control" placeholder="+506 0000 0000" autocomplete="tel" required>
+                    <input type="tel" id="telefono" name="telefono" class="form-control" placeholder="+506 0000 0000"
+                      autocomplete="tel" required>
                     <div class="form-text">Solo dígitos y símbolo + (mín. 8, máx. 15).</div>
                     <div class="valid-hint text-success small d-none">✓ Teléfono válido</div>
                     <div class="invalid-feedback small">Número inválido o poco confiable.</div>
@@ -161,7 +312,8 @@
 
                   <div class="col-md-6">
                     <label for="password" class="form-label">Contraseña</label>
-                    <input type="password" id="password" name="password" class="form-control" autocomplete="new-password" minlength="8" required>
+                    <input type="password" id="password" name="password" class="form-control"
+                      autocomplete="new-password" minlength="8" required>
                     <div class="form-text">Mínimo 8 caracteres, con mayúscula, minúscula y número.</div>
                     <ul class="password-hints small mb-0">
                       <li id="hLen">• ≥ 8 caracteres</li>
@@ -175,7 +327,8 @@
 
                   <div class="col-md-6">
                     <label for="password2" class="form-label">Confirmar contraseña</label>
-                    <input type="password" id="password2" name="password2" class="form-control" autocomplete="new-password" minlength="8" required>
+                    <input type="password" id="password2" name="password2" class="form-control"
+                      autocomplete="new-password" minlength="8" required>
                     <div class="valid-hint text-success small d-none">✓ Coincide</div>
                     <div class="invalid-feedback small">Las contraseñas no coinciden.</div>
                   </div>
@@ -185,7 +338,8 @@
                       <!-- CORRECCIÓN: agregar name y value -->
                       <input class="form-check-input" type="checkbox" id="terms" name="terms" value="1" required>
                       <label class="form-check-label" for="terms">
-                        Acepto los <a href="terms.html" target="_blank">Términos</a> y la <a href="privacy.html" target="_blank">Política de Privacidad</a>.
+                        Acepto los <a href="terms.html" target="_blank">Términos</a> y la <a href="privacy.html"
+                          target="_blank">Política de Privacidad</a>.
                       </label>
                       <div class="invalid-feedback small">Debes aceptar los términos para continuar.</div>
                     </div>
@@ -230,60 +384,73 @@
             </a>
             <div class="footer-contact pt-3">
               <p>Cóbano, 100 m del Banco Nacional</p>
-              <p>Puntarenas, Costa Rica • 60111</p>
-              <p class="mt-3"><strong>Teléfono:</strong> <span>+506 2642-0225</span></p>
-              <p><strong>Email:</strong> <span>info@hotelvillagrace.com</span></p>
+              <p>Puntarenas, Costa Rica · 60111</p>
+              <p class="mt-3">
+                <strong>Teléfono:</strong>
+                <a href="Tel: +50626420225">2642-0225</a>
+              </p>
+              <p>
+                <strong>Email:</strong>
+                <span><a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a></span>
+              </p>
             </div>
           </div>
 
           <div class="col-lg-2 col-md-3 footer-links">
             <h4>Enlaces</h4>
             <ul>
+              <li><a href="index.html">Inicio</a></li>
               <li><a href="about.html">Nosotros</a></li>
-              <li><a href="rooms.html">Habitaciones</a></li>
-              <li><a href="offers.html">Ofertas</a></li>
-              <li><a href="terms.html">Términos</a></li>
-              <li><a href="privacy.html">Privacidad</a></li>
+              <li><a href="rooms.html">Reservas</a></li>
+              <li><a href="{{ url_for('sac.faq_html') }}">FAQ y horarios</a></li>
+              <!--<li><a href="privacy.html">Privacidad</a></li>-->
             </ul>
           </div>
 
           <div class="col-lg-2 col-md-3 footer-links">
             <h4>Servicios</h4>
             <ul>
-              <li><a href="amenities.html">Amenidades</a></li>
-              <li><a href="restaurant.html">Restaurante</a></li>
-              <li><a href="events.html">Eventos</a></li>
-              <li><a href="gallery.html">Galería</a></li>
-              <li><a href="booking.html">Reservas</a></li>
+              <li>Piscina y Terraza</li>
+              <li>Restaurante y Bar &amp; bar</li>
+              <li>Conectividad</li>
+              <li>Comodidades</li>
+              <!--<li><a href="booking.html">Reservas</a></li>-->
             </ul>
           </div>
 
-          <div class="col-lg-4 col-md-6 footer-links">
-            <h4>Síguenos</h4>
-            <div class="social-links">
-              <a href="#"><i class="bi bi-instagram"></i></a>
-              <a href="#"><i class="bi bi-facebook"></i></a>
-              <a href="#"><i class="bi bi-twitter-x"></i></a>
-              <a href="#"><i class="bi bi-linkedin"></i></a>
-            </div>
+          <div class="col-lg-2 col-md-3 footer-links">
+            <h4>Horarios</h4>
+            <ul>
+              <li>Check-in: 1:00 pm</li>
+              <li>Check-out: 11:00 am</li>
+              <li>Recepción 24/7</li>
+              <li>Restaurante diario</li>
+              <li>Parqueo gratis</li>
+            </ul>
           </div>
 
+          <div class="col-lg-2 col-md-3 footer-links">
+            <h4>Síguenos</h4>
+            <ul>
+              <li>
+                <a href="https://www.facebook.com/HotelVillaGrace" target="_blank" rel="noopener">Facebook</a>
+              </li>
+              <li><a href="contact.html">Contacto rápido</a></li>
+              <li><a href="location.html">Mapa</a></li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="copyright text-center">
-      <div class="container d-flex flex-column flex-lg-row justify-content-center justify-content-lg-between align-items-center">
-        <div class="d-flex flex-column align-items-center align-items-lg-start">
-          <div>© <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados</div>
-        </div>
-      </div>
+    <div class="copyright text-center py-3">
+      © <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados
     </div>
-
   </footer>
 
   <!-- Scroll Top -->
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i
+      class="bi bi-arrow-up-short"></i></a>
 
   <!-- Preloader -->
   <div id="preloader"></div>
@@ -311,39 +478,39 @@
       const form = $('#registerForm');
       const submitBtn = $('#submitBtn');
 
-      const fNombre   = $('#nombre');
-      const fApellidos= $('#apellidos');
-      const fCedula   = $('#cedula');
-      const fEmail    = $('#email');
+      const fNombre = $('#nombre');
+      const fApellidos = $('#apellidos');
+      const fCedula = $('#cedula');
+      const fEmail = $('#email');
       const fTelefono = $('#telefono');
-      const fPass1    = $('#password');
-      const fPass2    = $('#password2');
-      const fTerms    = $('#terms');
+      const fPass1 = $('#password');
+      const fPass2 = $('#password2');
+      const fTerms = $('#terms');
 
       const hLen = $('#hLen'), hLow = $('#hLow'), hUp = $('#hUp'), hNum = $('#hNum');
 
       // Ocultos (mapeo a backend)
       const hFullName = $('#full_name');
-      const hNatId    = $('#national_id');
-      const hPhone    = $('#phone');
-      const hConfirm  = $('#confirm_password');
+      const hNatId = $('#national_id');
+      const hPhone = $('#phone');
+      const hConfirm = $('#confirm_password');
       const hTermsAcc = $('#terms_accepted');
 
       // Helpers
       const trimSpaces = (s) => (s || '').replace(/\s+/g, ' ').trim();
       const onlyDigits = (s) => (s || '').replace(/\D+/g, '');
-      const onlyAlnum  = (s) => (s || '').replace(/[^A-Za-z0-9]/g, '');
-      const allSameChar= (s) => !!s && s.split('').every(ch => ch === s[0]);
-      const hasRun4    = (s) => /(.)\1{3,}/.test(s);
-      const isEmpty    = (s) => !s || !s.trim();
+      const onlyAlnum = (s) => (s || '').replace(/[^A-Za-z0-9]/g, '');
+      const allSameChar = (s) => !!s && s.split('').every(ch => ch === s[0]);
+      const hasRun4 = (s) => /(.)\1{3,}/.test(s);
+      const isEmpty = (s) => !s || !s.trim();
 
-      function setState(input, ok, showWhenEmpty=false){
+      function setState(input, ok, showWhenEmpty = false) {
         const parent = input.closest('.col-md-6, .col-12') || input.parentElement;
         const validHint = parent.querySelector('.valid-hint');
         const invalidFb = parent.querySelector('.invalid-feedback');
 
         if (isEmpty(input.value) && !showWhenEmpty && input.type !== 'checkbox') {
-          input.classList.remove('is-valid','is-invalid');
+          input.classList.remove('is-valid', 'is-invalid');
           if (validHint) validHint.classList.add('d-none');
           return;
         }
@@ -358,7 +525,7 @@
       }
 
       // Reglas
-      function validName(v){
+      function validName(v) {
         v = trimSpaces(v);
         if (v.length < 2 || v.length > 50) return false;
         if (/[^A-Za-zÁÉÍÓÚáéíóúÑñüÜ\s'-]/.test(v)) return false;
@@ -366,19 +533,19 @@
         return true;
       }
 
-      function validEmail(v){
+      function validEmail(v) {
         v = (v || '').toLowerCase().trim();
         const basic = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
         return basic.test(v);
       }
 
-      function looksLikeGarbageDigits(s){
+      function looksLikeGarbageDigits(s) {
         const d = onlyDigits(s);
         if (d.length >= 4 && allSameChar(d)) return true;
         return false;
       }
 
-      function validNationalId(v){
+      function validNationalId(v) {
         v = (v || '').trim().toUpperCase();
         if (!v) return false;
         if (hasRun4(v)) return false;
@@ -395,7 +562,7 @@
         return cr1 || cr2 || dimex || passp;
       }
 
-      function validPhone(v){
+      function validPhone(v) {
         v = (v || '').trim();
         const d = onlyDigits(v);
         if (d.length < 8 || d.length > 15) return false;
@@ -403,33 +570,33 @@
         return true;
       }
 
-      const weakPwds = new Set(['password','12345678','qwerty','qwerty123','abc12345','11111111','00000000']);
-      function validPassword(v){
+      const weakPwds = new Set(['password', '12345678', 'qwerty', 'qwerty123', 'abc12345', '11111111', '00000000']);
+      function validPassword(v) {
         if (!v || v.length < 8) return false;
         if (weakPwds.has(v.toLowerCase())) return false;
         const hasLower = /[a-z]/.test(v);
         const hasUpper = /[A-Z]/.test(v);
-        const hasNum   = /\d/.test(v);
-        [hLen,hLow,hUp,hNum].forEach(el => el && el.classList.remove('text-success','fw-semibold'));
-        if (hLen && v.length >= 8) {hLen.classList.add('text-success','fw-semibold');}
-        if (hLow && hasLower)      {hLow.classList.add('text-success','fw-semibold');}
-        if (hUp && hasUpper)       {hUp.classList.add('text-success','fw-semibold');}
-        if (hNum && hasNum)        {hNum.classList.add('text-success','fw-semibold');}
+        const hasNum = /\d/.test(v);
+        [hLen, hLow, hUp, hNum].forEach(el => el && el.classList.remove('text-success', 'fw-semibold'));
+        if (hLen && v.length >= 8) { hLen.classList.add('text-success', 'fw-semibold'); }
+        if (hLow && hasLower) { hLow.classList.add('text-success', 'fw-semibold'); }
+        if (hUp && hasUpper) { hUp.classList.add('text-success', 'fw-semibold'); }
+        if (hNum && hasNum) { hNum.classList.add('text-success', 'fw-semibold'); }
         return hasLower && hasUpper && hasNum;
       }
 
-      function passwordsMatch(a,b){ return !!a && a === b; }
+      function passwordsMatch(a, b) { return !!a && a === b; }
 
       // Listeners en vivo
-      function hookLive(input, validator){
+      function hookLive(input, validator) {
         input.addEventListener('input', () => setState(input, validator(input.value)));
-        input.addEventListener('blur',  () => setState(input, validator(input.value)));
+        input.addEventListener('blur', () => setState(input, validator(input.value)));
       }
 
-      hookLive(fNombre,   validName);
-      hookLive(fApellidos,validName);
-      hookLive(fCedula,   validNationalId);
-      hookLive(fEmail,    validEmail);
+      hookLive(fNombre, validName);
+      hookLive(fApellidos, validName);
+      hookLive(fCedula, validNationalId);
+      hookLive(fEmail, validEmail);
       hookLive(fTelefono, validPhone);
       fPass1.addEventListener('input', () => {
         const ok = validPassword(fPass1.value);
@@ -438,10 +605,10 @@
       });
       fPass1.addEventListener('blur', () => setState(fPass1, validPassword(fPass1.value)));
       fPass2.addEventListener('input', () => setState(fPass2, passwordsMatch(fPass1.value, fPass2.value)));
-      fPass2.addEventListener('blur',  () => setState(fPass2, passwordsMatch(fPass1.value, fPass2.value)));
+      fPass2.addEventListener('blur', () => setState(fPass2, passwordsMatch(fPass1.value, fPass2.value)));
 
       // Checkbox de términos: reflejar en hidden y estado visual
-      function syncTerms(){
+      function syncTerms() {
         hTermsAcc.value = fTerms.checked ? '1' : '0';
         if (!fTerms.checked) {
           fTerms.classList.add('is-invalid');
@@ -453,7 +620,7 @@
       fTerms.addEventListener('change', syncTerms);
 
       // Habilitar/Deshabilitar botón según validez global
-      function formIsValid(){
+      function formIsValid() {
         return (
           validName(fNombre.value) &&
           validName(fApellidos.value) &&
@@ -465,7 +632,7 @@
           fTerms.checked
         );
       }
-      function updateSubmitState(){
+      function updateSubmitState() {
         submitBtn.disabled = !formIsValid();
       }
       $$('#registerForm input').forEach(i => i.addEventListener('input', updateSubmitState));
@@ -481,7 +648,7 @@
           [fEmail, validEmail],
           [fTelefono, validPhone],
           [fPass1, validPassword],
-          [fPass2, (v)=>passwordsMatch(fPass1.value, v)],
+          [fPass2, (v) => passwordsMatch(fPass1.value, v)],
         ];
 
         let firstInvalid = null;
@@ -500,15 +667,15 @@
 
         if (firstInvalid) {
           e.preventDefault();
-          firstInvalid.focus({preventScroll:false});
+          firstInvalid.focus({ preventScroll: false });
           return false;
         }
 
         // Mapeo esperado por backend
         const fullName = `${trimSpaces(fNombre.value)} ${trimSpaces(fApellidos.value)}`.trim();
-        $('#full_name').value        = fullName;
-        $('#national_id').value      = trimSpaces(fCedula.value).toUpperCase();
-        $('#phone').value            = trimSpaces(fTelefono.value);
+        $('#full_name').value = fullName;
+        $('#national_id').value = trimSpaces(fCedula.value).toUpperCase();
+        $('#phone').value = trimSpaces(fTelefono.value);
         $('#confirm_password').value = fPass2.value;
 
         // Normalizar email a minúscula
@@ -519,4 +686,5 @@
     })();
   </script>
 </body>
+
 </html>
