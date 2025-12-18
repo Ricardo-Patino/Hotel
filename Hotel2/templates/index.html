@@ -488,83 +488,37 @@
                   </div>
                 </div>
 
-                <div
-                  class="booking-card"
-                  data-aos="fade-up"
-                  data-aos-delay="300"
-                >
-                  <div class="card">
-                    <div class="card-body">
-                      <form
-                        action=""
-                        method="post"
-                        aria-label="Formulario de búsqueda de disponibilidad"
-                      >
-                        <div class="row g-3">
-                          <div class="col-xl-3">
-                            <label for="checkin" class="form-label"
-                              >Llegada</label
-                            >
-                            <input
-                              type="date"
-                              class="form-control"
-                              id="checkin"
-                              name="checkin"
-                              required
-                            />
-                          </div>
-                          <div class="col-xl-3">
-                            <label for="checkout" class="form-label"
-                              >Salida</label
-                            >
-                            <input
-                              type="date"
-                              class="form-control"
-                              id="checkout"
-                              name="checkout"
-                              required
-                            />
-                          </div>
-                          <div class="col-xl-2">
-                            <label for="guests" class="form-label"
-                              >Huéspedes</label
-                            >
-                            <select
-                              class="form-select"
-                              id="guests"
-                              name="guests"
-                              required
-                            >
-                              <option value="">Selecciona</option>
-                              <option value="1">1 persona</option>
-                              <option value="2">2 personas</option>
-                              <option value="3">3 personas</option>
-                              <option value="4">4+ personas</option>
-                            </select>
-                          </div>
-                          <div class="col-xl-2">
-                            <label for="rooms" class="form-label"
-                              >Habitaciones</label
-                            >
-                            <select
-                              class="form-select"
-                              id="rooms"
-                              name="rooms"
-                              required
-                            >
-                              <option value="">Selecciona</option>
-                              <option value="1">1 habitación</option>
-                              <option value="2">2 habitaciones</option>
-                              <option value="3">3+ habitaciones</option>
-                            </select>
-                          </div>
-                          <div class="col-xl-2">
-                            <label class="form-label d-block">&nbsp;</label>
-                            <button type="submit" class="btn btn-primary w-100">
-                              <i class="bi bi-search"></i>
-                              Buscar
-                            </button>
-                          </div>
+              <div class="booking-card" data-aos="fade-up" data-aos-delay="300">
+                <div class="card">
+                  <!--<div class="card-body">
+                    <form action="" method="post" aria-label="Formulario de búsqueda de disponibilidad">
+                      <div class="row g-3">
+                        <div class="col-xl-3">
+                          <label for="checkin" class="form-label">Llegada</label>
+                          <input type="date" class="form-control" id="checkin" name="checkin" required />
+                        </div>
+                        <div class="col-xl-3">
+                          <label for="checkout" class="form-label">Salida</label>
+                          <input type="date" class="form-control" id="checkout" name="checkout" required />
+                        </div>
+                        <div class="col-xl-2">
+                          <label for="guests" class="form-label">Huéspedes</label>
+                          <select class="form-select" id="guests" name="guests" required>
+                            <option value="">Selecciona</option>
+                            <option value="1">1 persona</option>
+                            <option value="2">2 personas</option>
+                            <option value="3">3 personas</option>
+                            <option value="4">4+ personas</option>
+                          </select>
+                        </div>
+                        <div class="col-xl-2">
+                          <label for="rooms" class="form-label">Habitaciones</label>
+                          <select class="form-select" id="rooms" name="rooms" required>
+                            <option value="">Selecciona</option>
+                            <option value="1">1 habitación</option>
+                            <option value="2">2 habitaciones</option>
+                            <option value="3">3+ habitaciones</option>
+                          </select>
                         </div>
                         <p class="small text-white mt-2 mb-0">
                           Para reservar ahora mismo también puedes llamarnos al
@@ -595,8 +549,38 @@
                           {% endif %}
                         </div>
                       </div>
-                      <!-- /Widget tipo de cambio -->
+                      <p class="small text-white mt-2 mb-0">
+                        Para reservar ahora mismo también puedes llamarnos al
+                        <a href="Tel: +50626420225">2642-0225</a> o escribir a
+                        <a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a>.
+                      </p>
+                    </form>
+
+                    Widget tipo de cambio -->
+                    <!--<div class="mt-3 d-flex justify-content-center">
+                      <div class="fx-widget text-white">
+                        {% if fx_usd_crc %}
+                        <span class="badge bg-light text-dark">
+                          <i class="bi bi-currency-exchange me-1"></i>
+                          Tipo de cambio hoy
+                        </span>
+                        <span>
+                          USD 1 = ₡{{ "%.2f"|format(fx_usd_crc) }}
+                        </span>
+                        {% if fx_date %}
+                        <span class="text-white-50">
+                          ({{ fx_date }})
+                        </span>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-white-50">
+                          Tipo de cambio no disponible en este momento.
+                        </span>
+                        {% endif %}
+                      </div>
                     </div>
+                     /Widget tipo de cambio -->
+
                   </div>
                 </div>
 
