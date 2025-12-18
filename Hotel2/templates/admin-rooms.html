@@ -1,434 +1,316 @@
 <!doctype html>
 <html lang="es">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Administración – Habitaciones | Hotel Villa Grace</title>
-        <link
-            href="{{ url_for('static', filename='assets/img/favicon.png') }}"
-            rel="icon"
-        />
-        <link
-            href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
-            rel="apple-touch-icon"
-        />
-        <link href="https://fonts.googleapis.com" rel="preconnect" />
-        <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
-            rel="stylesheet"
-        />
-        <link
-            href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
-            rel="stylesheet"
-        />
-        <link
-            href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
-            rel="stylesheet"
-        />
-        <link
-            href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
-            rel="stylesheet"
-        />
-        <link
-            href="{{ url_for('static', filename='assets/css/main.css') }}"
-            rel="stylesheet"
-        />
-        <link
-            href="{{ url_for('static', filename='assets/css/style.css') }}"
-            rel="stylesheet"
-        />
-    </head>
-    <body>
-        <header id="header" class="header d-flex align-items-center fixed-top">
-            <div
-                class="container position-relative d-flex align-items-center justify-content-between"
-            >
-                <a
-                    href="index.html"
-                    class="logo d-flex align-items-center me-auto me-xl-0"
-                    ><h1 class="sitename">Hotel Villa Grace</h1></a
-                >
-                <nav id="navmenu" class="navmenu">
-                    <ul>
-                        <li class="dropdown">
-                            <a href="#" class="active"
-                                ><span>Administración</span>
-                                <i
-                                    class="bi bi-chevron-down toggle-dropdown"
-                                ></i
-                            ></a>
-                            <ul>
-                                <li>
-                                    <a href="admin-dashboard.html">Tablero</a>
-                                </li>
-                                <li><a href="admin-users.html">Usuarios</a></li>
-                                <li>
-                                    <a href="admin-hotel.html"
-                                        >Perfil del hotel</a
-                                    >
-                                </li>
-                                <li>
-                                    <a class="active" href="admin-rooms.html"
-                                        >Habitaciones</a
-                                    >
-                                </li>
-                                <li>
-                                    <a href="admin-rates.html"
-                                        >Tarifas y temporadas</a
-                                    >
-                                </li>
-                                <li>
-                                    <a href="admin-taxes.html"
-                                        >Impuestos y cargos</a
-                                    >
-                                </li>
-                                <li class="nav-item">
-                                    <a
-                                        class="nav-link"
-                                        href="{{ url_for('evt.calendario_evt') }}"
-                                    >
-                                        <i class="bi bi-calendar3"></i>
-                                        Eventos</a
-                                    >
-                                </li>
-                                <li>
-                                    <a href="admin-channels.html"
-                                        >Canales / OTAs</a
-                                    >
-                                </li>
-                                <li><a href="admin-audit.html">Bitácora</a></li>
-                            </ul>
-                        </li>
-                    </ul>
-                    <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-                </nav>
-                <a
-                    class="btn-getstarted d-none d-sm-block"
-                    href="#modalRoom"
-                    data-bs-toggle="modal"
-                    >Nuevo tipo</a
-                >
-            </div>
-        </header>
 
-        <main class="main">
-            <div
-                class="page-title dark-background"
-                data-aos="fade"
-                style="background-image: url({{url_for('static', filename='assets/img/hotel/rooms-banner.jpg')}});"
-            >
-                <div class="container position-relative">
-                    <h1>Tipos de habitación & inventario</h1>
-                    <nav class="breadcrumbs">
-                        <ol>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administración – Habitaciones | Hotel Villa Grace</title>
+    <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
+    <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
+        rel="stylesheet" />
+    <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet" />
+</head>
+
+<body>
+    <header id="header" class="header d-flex align-items-center fixed-top">
+        <div class="container position-relative d-flex align-items-center justify-content-between">
+            <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
+                <h1 class="sitename">Hotel Villa Grace</h1>
+            </a>
+            <nav id="navmenu" class="navmenu">
+                <ul>
+                    <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+                    <li class="dropdown">
+                        <a href="#" class="active"><span>Administración</span>
+                            <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+                        <ul>
                             <li>
-                                <a href="admin-dashboard.html"
-                                    >Administración</a
-                                >
+                                <a class="active" href="{{ url_for('admin_dashboard_html') }}">Tablero</a>
                             </li>
-                            <li class="current">Habitaciones</li>
-                        </ol>
-                    </nav>
-                </div>
-            </div>
+                            <li><a href="admin-users.html">Usuarios y roles</a></li>
+                            <!--<li><a href="admin-hotel.html">Perfil del hotel</a></li>-->
+                            <li><a href="admin-rooms.html">Habitaciones</a></li>
+                            <li><a href="admin-rates.html">Tarifas y temporadas</a></li>
+                            <li>
+                                <a href="admin-taxes.html">Impuestos y cargos</a>
+                            </li>
+                            <li><a href="admin-channels.html">Canales / OTAs</a></li>
+                            <!--<li><a href="/arep/admin-audit.html">Bitácora</a></li>-->
+                            <!--<li class="nav-item">
+                  <a
+                    class="nav-link"
+                    href="{{ url_for('evt.calendario_evt') }}"
+                  >
+                    <i class="bi bi-calendar3"></i> Eventos</a
+                  >
+                </li>-->
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('hrm.dashboard') }}">
+                                    <i class="bi bi-people"></i> RRHH
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('hrm.payroll_home') }}">
+                                    <i class="bi bi-cash-coin"></i> Nómina
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+                <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+            </nav>
+            <a class="btn-getstarted d-none d-sm-block" href="admin-users.html">Nuevo usuario</a>
+        </div>
+    </header>
 
-            <section class="section">
-                <div class="container" data-aos="fade-up">
-                    <div
-                        id="notification"
-                        class="alert alert-danger alert-dismissible fade hidden"
-                        role="alert"
-                    >
-                        <span></span>
-                        <button
-                            type="button"
-                            class="btn-close"
-                            data-bs-dismiss="alert"
-                            aria-label="Close"
-                        ></button>
-                    </div>
-                    <div class="row g-4">
-                        <div class="col-lg-12">
-                            <div class="card shadow-sm border-0">
-                                <div
-                                    class="card-header bg-white border-0 d-flex justify-content-between align-items-center"
-                                >
-                                    <h5 class="mb-0">Inventario</h5>
-                                    <button
-                                        class="btn btn-success btn-sm"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modalRoom"
-                                    >
-                                        Agregar
-                                    </button>
-                                </div>
-                                <div class="card-body p-0">
-                                    <div class="table-responsive">
-                                        <table class="table align-middle mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>
-                                                        Número de habitación
-                                                    </th>
-                                                    <th>Tipo</th>
-                                                    <th>Estado</th>
-                                                    <th>Precio por noche</th>
-                                                    <th class="text-end">
-                                                        Acciones
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody></tbody>
-                                        </table>
-                                    </div>
+    <main class="main">
+        <div class="page-title dark-background" data-aos="fade"
+            style="background-image: url({{url_for('static', filename='assets/img/hotel/rooms-banner.jpg')}});">
+            <div class="container position-relative">
+                <h1>Tipos de habitación & inventario</h1>
+                <nav class="breadcrumbs">
+                    <ol>
+                        <li>
+                            <a href="admin-dashboard.html">Administración</a>
+                        </li>
+                        <li class="current">Habitaciones</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+
+        <section class="section">
+            <div class="container" data-aos="fade-up">
+                <div id="notification" class="alert alert-danger alert-dismissible fade hidden" role="alert">
+                    <span></span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                <div class="row g-4">
+                    <div class="col-lg-12">
+                        <div class="card shadow-sm border-0">
+                            <div
+                                class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Inventario</h5>
+                                <button class="btn btn-success btn-sm" data-bs-toggle="modal"
+                                    data-bs-target="#modalRoom">
+                                    Agregar
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>
+                                                    Número de habitación
+                                                </th>
+                                                <th>Tipo</th>
+                                                <th>Estado</th>
+                                                <th>Precio por noche</th>
+                                                <th class="text-end">
+                                                    Acciones
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </section>
-        </main>
+            </div>
+        </section>
+    </main>
 
-        <!-- Modal room -->
-        <div class="modal fade" id="modalRoom" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Nueva habitación</h5>
-                        <button
-                            type="button"
-                            class="btn-close"
-                            data-bs-dismiss="modal"
-                        ></button>
-                    </div>
-                    <div class="modal-body">
-                        <form class="row g-3">
-                            <input type="hidden" name="action" value="create" />
-                            <div class="col-12">
-                                <label
-                                    for="Codigo_Habitacion"
-                                    class="form-label"
-                                    >Código de habitación</label
-                                ><input
-                                    id="Codigo_Habitacion"
-                                    type="number"
-                                    class="form-control"
-                                />
-                            </div>
-                            <div class="col-12">
-                                <label
-                                    for="Numero_Habitacion"
-                                    class="form-label"
-                                    >Número de habitación</label
-                                ><input
-                                    id="Numero_Habitacion"
-                                    class="form-control"
-                                />
-                            </div>
-                            <div class="col-12">
-                                <label for="Precio_Noche" class="form-label"
-                                    >Precio de noche</label
-                                ><input
-                                    id="Precio_Noche"
-                                    type="number"
-                                    class="form-control"
-                                />
-                            </div>
-                            <div class="col-12">
-                                <label for="Estado" class="form-label"
-                                    >Estado</label
-                                >
-                                <select
-                                    id="Estado"
-                                    class="form-select"
-                                    aria-label="Estado"
-                                >
-                                    <option value="Disponible">
-                                        Disponible
-                                    </option>
-                                    <option value="Ocupada">Ocupada</option>
-                                    <option value="Ocupada-temprana">
-                                        Ocupada-temprana
-                                    </option>
-                                    <option value="Ocupada-extendida">
-                                        Ocupada-extendida
-                                    </option>
-                                    <option value="Mantenimiento">
-                                        Mantenimiento
-                                    </option>
-                                    <option value="Limpieza">Limpieza</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label for="Tipo" class="form-label"
-                                    >Tipo</label
-                                >
-                                <select
-                                    id="Tipo"
-                                    class="form-select"
-                                    aria-label="Tipo"
-                                >
-                                    <option value="Sencilla">Sencilla</option>
-                                    <option value="Doble">Doble</option>
-                                    <option value="Suite">Suite</option>
-                                </select>
-                            </div>
-                        </form>
-                        <br />
-                        <div
-                            id="errorRoom"
-                            class="alert alert-danger invisible"
-                            role="alert"
-                        ></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button
-                            class="btn btn-outline-secondary"
-                            data-bs-dismiss="modal"
-                        >
-                            Cancelar</button
-                        ><button class="btn btn-success">Guardar</button>
-                    </div>
+    <!-- Modal room -->
+    <div class="modal fade" id="modalRoom" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nueva habitación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form class="row g-3">
+                        <input type="hidden" name="action" value="create" />
+                        <div class="col-12">
+                            <label for="Codigo_Habitacion" class="form-label">Código de habitación</label><input
+                                id="Codigo_Habitacion" type="number" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label for="Numero_Habitacion" class="form-label">Número de habitación</label><input
+                                id="Numero_Habitacion" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label for="Precio_Noche" class="form-label">Precio de noche</label><input id="Precio_Noche"
+                                type="number" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label for="Estado" class="form-label">Estado</label>
+                            <select id="Estado" class="form-select" aria-label="Estado">
+                                <option value="Disponible">
+                                    Disponible
+                                </option>
+                                <option value="Ocupada">Ocupada</option>
+                                <option value="Ocupada-temprana">
+                                    Ocupada-temprana
+                                </option>
+                                <option value="Ocupada-extendida">
+                                    Ocupada-extendida
+                                </option>
+                                <option value="Mantenimiento">
+                                    Mantenimiento
+                                </option>
+                                <option value="Limpieza">Limpieza</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="Tipo" class="form-label">Tipo</label>
+                            <select id="Tipo" class="form-select" aria-label="Tipo">
+                                <option value="Sencilla">Sencilla</option>
+                                <option value="Doble">Doble</option>
+                                <option value="Suite">Suite</option>
+                            </select>
+                        </div>
+                    </form>
+                    <br />
+                    <div id="errorRoom" class="alert alert-danger invisible" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Cancelar</button><button class="btn btn-success">Guardar</button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Modal mantenimiento -->
-        <div
-            class="modal fade"
-            id="modalMantenimiento"
-            tabindex="-1"
-            aria-hidden="true"
-        >
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Nueva solicitud</h5>
-                        <button
-                            type="button"
-                            class="btn-close"
-                            data-bs-dismiss="modal"
-                        ></button>
-                    </div>
-                    <div class="modal-body">
-                        <form class="row g-3">
-                            <div class="col-12">
-                                <label
-                                    for="Codigo_Habitacion"
-                                    class="form-label"
-                                    >Código de habitación</label
-                                ><input
-                                    id="Codigo_HabitacionMantenimiento"
-                                    type="number"
-                                    class="form-control"
-                                    disabled=""
-                                />
-                            </div>
-                            <div class="col-12">
-                                <label for="Titulo" class="form-label"
-                                    >Título</label
-                                ><input
-                                    id="TituloMantenimiento"
-                                    class="form-control"
-                                />
-                            </div>
-                            <div class="col-12">
-                                <label for="Descripcion" class="form-label"
-                                    >Descripción</label
-                                ><input
-                                    id="DescripcionMantenimiento"
-                                    class="form-control"
-                                />
-                            </div>
-                            <div class="col-12">
-                                <label for="Prioridad" class="form-label"
-                                    >Prioridad</label
-                                ><input
-                                    id="PrioridadMantenimiento"
-                                    class="form-control"
-                                />
-                            </div>
-                        </form>
-                        <br />
-                        <div
-                            id="errorMantenimiento"
-                            class="alert alert-danger invisible"
-                            role="alert"
-                        ></div>
-                    </div>
-                    <div class="modal-footer">
-                        <button
-                            class="btn btn-outline-secondary"
-                            data-bs-dismiss="modal"
-                        >
-                            Cancelar</button
-                        ><button class="btn btn-success">Guardar</button>
-                    </div>
+    <!-- Modal mantenimiento -->
+    <div class="modal fade" id="modalMantenimiento" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Nueva solicitud</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form class="row g-3">
+                        <div class="col-12">
+                            <label for="Codigo_Habitacion" class="form-label">Código de habitación</label><input
+                                id="Codigo_HabitacionMantenimiento" type="number" class="form-control" disabled="" />
+                        </div>
+                        <div class="col-12">
+                            <label for="Titulo" class="form-label">Título</label><input id="TituloMantenimiento"
+                                class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label for="Descripcion" class="form-label">Descripción</label><input
+                                id="DescripcionMantenimiento" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label for="Prioridad" class="form-label">Prioridad</label><input
+                                id="PrioridadMantenimiento" class="form-control" />
+                        </div>
+                    </form>
+                    <br />
+                    <div id="errorMantenimiento" class="alert alert-danger invisible" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Cancelar</button><button class="btn btn-success">Guardar</button>
                 </div>
             </div>
         </div>
+    </div>
 
-        <footer id="footer" class="footer position-relative dark-background">
-            <div class="copyright text-center">
-                <div class="container">
-                    ©
-                    <strong
-                        ><span
-                            >Vista Administrativa - Hotel Villa Grace</span
-                        ></strong
-                    >
-                </div>
+    <footer id="footer" class="footer position-relative dark-background">
+        <div class="copyright text-center">
+            <div class="container">
+                ©
+                <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong>
             </div>
-        </footer>
-        <a
-            href="#"
-            id="scroll-top"
-            class="scroll-top d-flex align-items-center justify-content-center"
-            ><i class="bi bi-arrow-up-short"></i
-        ></a>
-        <div id="preloader"></div>
-        <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-        <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-        <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-        <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.7.1.js"></script>
-    </body>
-    <script>
-        $(document).ready(function () {
-            function cleanFormRoom() {
-                $("input[name='action']", "#modalRoom").val("create");
-                $(".modal-title", "#modalRoom").text("Nueva habitación");
-                $("#errorRoom", "#modalRoom").addClass("invisible");
-                $("#errorRoom", "#modalRoom").text("");
-                $("#Codigo_Habitacion").val("");
-                $("#Numero_Habitacion").val("");
-                $("#Precio_Noche").val("");
-                $("#Estado").val("Disponible");
-                $("#Tipo").val("Sencilla");
-                $("#Codigo_Habitacion").removeAttr("disabled");
-                $("button", $(".modal-header", "#modalRoom")).click();
-            }
+        </div>
+    </footer>
+    <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i
+            class="bi bi-arrow-up-short"></i></a>
+    <div id="preloader"></div>
+    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.7.1.js"></script>
+</body>
+<script>
+    $(document).ready(function () {
+        function cleanFormRoom() {
+            $("input[name='action']", "#modalRoom").val("create");
+            $(".modal-title", "#modalRoom").text("Nueva habitación");
+            $("#errorRoom", "#modalRoom").addClass("invisible");
+            $("#errorRoom", "#modalRoom").text("");
+            $("#Codigo_Habitacion").val("");
+            $("#Numero_Habitacion").val("");
+            $("#Precio_Noche").val("");
+            $("#Estado").val("Disponible");
+            $("#Tipo").val("Sencilla");
+            $("#Codigo_Habitacion").removeAttr("disabled");
+            $("button", $(".modal-header", "#modalRoom")).click();
+        }
 
-            function cleanFormMantenimiento() {
-                $("#errorMantenimiento", "#modalMantenimiento").addClass(
-                    "invisible",
-                );
-                $("#errorMantenimiento", "#modalMantenimiento").text("");
-                $("#Codigo_HabitacionMantenimiento").val("");
-                $("#TituloMantenimiento").val("");
-                $("#DescripcionMantenimiento").val("");
-                $("#PrioridadMantenimiento").val("");
-                $("button", $(".modal-header", "#modalMantenimiento")).click();
-            }
+        function cleanFormMantenimiento() {
+            $("#errorMantenimiento", "#modalMantenimiento").addClass(
+                "invisible",
+            );
+            $("#errorMantenimiento", "#modalMantenimiento").text("");
+            $("#Codigo_HabitacionMantenimiento").val("");
+            $("#TituloMantenimiento").val("");
+            $("#DescripcionMantenimiento").val("");
+            $("#PrioridadMantenimiento").val("");
+            $("button", $(".modal-header", "#modalMantenimiento")).click();
+        }
 
-            async function saveRoom() {
-                let response = null;
-                let result = null;
-                const action = $("input[name='action']", "#modalRoom").val();
-                switch (action) {
-                    case "create":
-                        response = await fetch("/admin-rooms", {
-                            method: "POST",
+        async function saveRoom() {
+            let response = null;
+            let result = null;
+            const action = $("input[name='action']", "#modalRoom").val();
+            switch (action) {
+                case "create":
+                    response = await fetch("/admin-rooms", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            Codigo_Habitacion:
+                                $("#Codigo_Habitacion").val(),
+                            Estado: $("#Estado").val(),
+                            Numero_Habitacion:
+                                $("#Numero_Habitacion").val(),
+                            Precio_Noche: $("#Precio_Noche").val(),
+                            Tipo: $("#Tipo").val(),
+                        }),
+                        headers: { "Content-Type": "application/json" },
+                    });
+                    result = await response.json();
+                    if ("error" in result) {
+                        $("#errorRoom", "#modalRoom").text(result.error);
+                        $("#errorRoom", "#modalRoom").removeClass(
+                            "invisible",
+                        );
+                    } else {
+                        cleanFormRoom();
+                        await readRooms();
+                    }
+                    break;
+                case "update":
+                    response = await fetch(
+                        `/admin-rooms/${$("#Codigo_Habitacion").val()}`,
+                        {
+                            method: "PUT",
                             body: JSON.stringify({
                                 Codigo_Habitacion:
                                     $("#Codigo_Habitacion").val(),
@@ -439,216 +321,190 @@
                                 Tipo: $("#Tipo").val(),
                             }),
                             headers: { "Content-Type": "application/json" },
-                        });
-                        result = await response.json();
-                        if ("error" in result) {
-                            $("#errorRoom", "#modalRoom").text(result.error);
-                            $("#errorRoom", "#modalRoom").removeClass(
-                                "invisible",
-                            );
-                        } else {
-                            cleanFormRoom();
-                            await readRooms();
-                        }
-                        break;
-                    case "update":
-                        response = await fetch(
-                            `/admin-rooms/${$("#Codigo_Habitacion").val()}`,
-                            {
-                                method: "PUT",
-                                body: JSON.stringify({
-                                    Codigo_Habitacion:
-                                        $("#Codigo_Habitacion").val(),
-                                    Estado: $("#Estado").val(),
-                                    Numero_Habitacion:
-                                        $("#Numero_Habitacion").val(),
-                                    Precio_Noche: $("#Precio_Noche").val(),
-                                    Tipo: $("#Tipo").val(),
-                                }),
-                                headers: { "Content-Type": "application/json" },
-                            },
+                        },
+                    );
+                    result = await response.json();
+                    if ("error" in result) {
+                        $("#errorRoom", "#modalRoom").text(result.error);
+                        $("#errorRoom", "#modalRoom").removeClass(
+                            "invisible",
                         );
-                        result = await response.json();
-                        if ("error" in result) {
-                            $("#errorRoom", "#modalRoom").text(result.error);
-                            $("#errorRoom", "#modalRoom").removeClass(
-                                "invisible",
-                            );
-                        } else {
-                            cleanFormRoom();
-                            await readRooms();
-                        }
-                        break;
-                }
-            }
-
-            async function deleteRoom(room_id) {
-                const response = await fetch(`/admin-rooms/${room_id}`, {
-                    method: "DELETE",
-                });
-                const result = await response.json();
-                if ("error" in result) {
-                    $("span", "#notification").text(result.error);
-                    $("#notification").removeClass("hidden");
-                    $("#notification").addClass("show");
-                } else {
-                    $("#notification").removeClass("show");
-                    $("#notification").addClass("hidden");
-                    $("button", "#notification").click();
-                    await readRooms();
-                }
-            }
-
-            async function readRooms() {
-                const response = await fetch("/admin-rooms", {
-                    headers: { Accept: "application/json" },
-                });
-                const results = await response.json();
-
-                $("tbody").html("");
-                for (const result of results) {
-                    const habitacionHTML = document.createElement("tr");
-                    $("tbody").append(habitacionHTML);
-                    const splitHTML1 = document.createElement("span");
-                    splitHTML1.innerHTML = "&middot;";
-                    const splitHTML2 = document.createElement("span");
-                    splitHTML2.innerHTML = "&middot;";
-
-                    const numeroHabitacionHTML = document.createElement("td");
-                    $(numeroHabitacionHTML).text(result.Numero_Habitacion);
-                    $(habitacionHTML).append(numeroHabitacionHTML);
-
-                    const tipoHTML = document.createElement("td");
-                    $(tipoHTML).text(result.Tipo);
-                    $(habitacionHTML).append(tipoHTML);
-
-                    const estadoHTML = document.createElement("td");
-                    const estadoBadgeHTML = document.createElement("span");
-                    $(estadoBadgeHTML).addClass("badge");
-                    switch (result.Estado) {
-                        case "Disponible":
-                            $(estadoBadgeHTML).addClass("bg-success");
-                            break;
-                        case "Mantenimiento":
-                            $(estadoBadgeHTML).addClass("bg-danger");
-                            break;
-                        default:
-                            $(estadoBadgeHTML).addClass("bg-secondary");
+                    } else {
+                        cleanFormRoom();
+                        await readRooms();
                     }
-                    $(estadoBadgeHTML).text(result.Estado);
-                    $(estadoHTML).append(estadoBadgeHTML);
-                    $(habitacionHTML).append(estadoHTML);
-
-                    const precioNocheHTML = document.createElement("td");
-                    $(precioNocheHTML).text(result.Precio_Noche);
-                    $(habitacionHTML).append(precioNocheHTML);
-
-                    const accionHTML = document.createElement("td");
-                    $(accionHTML).addClass("text-end");
-
-                    // Mantenimiento button
-                    const accionMantenimientoButtonHTML =
-                        document.createElement("button");
-                    $(accionMantenimientoButtonHTML).addClass(
-                        "btn btn-outline-secondary btn-sm",
-                    );
-                    $(accionMantenimientoButtonHTML).attr(
-                        "data-bs-toggle",
-                        "modal",
-                    );
-                    $(accionMantenimientoButtonHTML).attr(
-                        "data-bs-target",
-                        "#modalMantenimiento",
-                    );
-                    $(accionMantenimientoButtonHTML).text("Mantenimiento");
-                    $(accionMantenimientoButtonHTML).on("click", function () {
-                        $("#Codigo_HabitacionMantenimiento").val(
-                            result.Codigo_Habitacion,
-                        );
-                    });
-                    $(accionHTML).append(accionMantenimientoButtonHTML);
-                    $(accionHTML).append(splitHTML1);
-
-                    // Editar button
-                    const accionEditarButtonHTML =
-                        document.createElement("button");
-                    $(accionEditarButtonHTML).addClass(
-                        "btn btn-outline-secondary btn-sm",
-                    );
-                    $(accionEditarButtonHTML).text("Editar");
-                    $(accionEditarButtonHTML).on("click", function () {
-                        $("#Codigo_Habitacion").val(result.Codigo_Habitacion);
-                        $("#Codigo_Habitacion").attr("disabled", "");
-                        $("#Estado").val(result.Estado);
-                        $("#Numero_Habitacion").val(result.Numero_Habitacion);
-                        $("#Precio_Noche").val(result.Precio_Noche);
-                        $("#Tipo").val(result.Tipo);
-                        $(".modal-title", "#modalRoom").text(
-                            "Editar habitación",
-                        );
-                        $("input[name='action']", "#modalRoom").val("update");
-                        $("button", ".card-header").click();
-                    });
-                    $(accionHTML).append(accionEditarButtonHTML);
-                    $(accionHTML).append(splitHTML2);
-
-                    // Eliminar button
-                    const accionEliminarButtonHTML =
-                        document.createElement("button");
-                    $(accionEliminarButtonHTML).addClass(
-                        "btn btn-outline-danger btn-sm",
-                    );
-                    $(accionEliminarButtonHTML).text("Eliminar");
-                    $(accionEliminarButtonHTML).on("click", function () {
-                        deleteRoom(result.Codigo_Habitacion);
-                    });
-                    $(accionHTML).append(accionEliminarButtonHTML);
-
-                    $(habitacionHTML).append(accionHTML);
-                }
+                    break;
             }
+        }
 
-            async function createMantenimiento() {
-                const form = new FormData();
-                form.append(
-                    "habitacion_id",
-                    $("#Codigo_HabitacionMantenimiento").val(),
-                );
-                form.append("titulo", $("#TituloMantenimiento").val());
-                form.append(
-                    "descripcion",
-                    $("#DescripcionMantenimiento").val(),
-                );
-                form.append("prioridad", $("#PrioridadMantenimiento").val());
-
-                const options = { method: "POST", body: form };
-
-                response = await fetch("/grr/mant/solicitudes", options);
-                result = await response.json();
-                if ("error" in result) {
-                    $("#errorMantenimiento", "#modalMantenimiento").text(
-                        result.error,
-                    );
-                    $("#errorMantenimiento", "#modalMantenimiento").removeClass(
-                        "invisible",
-                    );
-                } else {
-                    cleanFormMantenimiento();
-                }
-            }
-
-            readRooms();
-            $(
-                "button[class*='btn-success']",
-                $(".modal-footer", "#modalRoom"),
-            ).on("click", saveRoom);
-            $(
-                "button[class*='btn-success']",
-                $(".modal-footer", "#modalMantenimiento"),
-            ).on("click", createMantenimiento);
-            $("#modalRoom").on("hidden.bs.modal", function () {
-                cleanFormRoom();
+        async function deleteRoom(room_id) {
+            const response = await fetch(`/admin-rooms/${room_id}`, {
+                method: "DELETE",
             });
+            const result = await response.json();
+            if ("error" in result) {
+                $("span", "#notification").text(result.error);
+                $("#notification").removeClass("hidden");
+                $("#notification").addClass("show");
+            } else {
+                $("#notification").removeClass("show");
+                $("#notification").addClass("hidden");
+                $("button", "#notification").click();
+                await readRooms();
+            }
+        }
+
+        async function readRooms() {
+            const response = await fetch("/admin-rooms", {
+                headers: { Accept: "application/json" },
+            });
+            const results = await response.json();
+
+            $("tbody").html("");
+            for (const result of results) {
+                const habitacionHTML = document.createElement("tr");
+                $("tbody").append(habitacionHTML);
+                const splitHTML1 = document.createElement("span");
+                splitHTML1.innerHTML = "&middot;";
+                const splitHTML2 = document.createElement("span");
+                splitHTML2.innerHTML = "&middot;";
+
+                const numeroHabitacionHTML = document.createElement("td");
+                $(numeroHabitacionHTML).text(result.Numero_Habitacion);
+                $(habitacionHTML).append(numeroHabitacionHTML);
+
+                const tipoHTML = document.createElement("td");
+                $(tipoHTML).text(result.Tipo);
+                $(habitacionHTML).append(tipoHTML);
+
+                const estadoHTML = document.createElement("td");
+                const estadoBadgeHTML = document.createElement("span");
+                $(estadoBadgeHTML).addClass("badge");
+                switch (result.Estado) {
+                    case "Disponible":
+                        $(estadoBadgeHTML).addClass("bg-success");
+                        break;
+                    case "Mantenimiento":
+                        $(estadoBadgeHTML).addClass("bg-danger");
+                        break;
+                    default:
+                        $(estadoBadgeHTML).addClass("bg-secondary");
+                }
+                $(estadoBadgeHTML).text(result.Estado);
+                $(estadoHTML).append(estadoBadgeHTML);
+                $(habitacionHTML).append(estadoHTML);
+
+                const precioNocheHTML = document.createElement("td");
+                $(precioNocheHTML).text(result.Precio_Noche);
+                $(habitacionHTML).append(precioNocheHTML);
+
+                const accionHTML = document.createElement("td");
+                $(accionHTML).addClass("text-end");
+
+                // Mantenimiento button
+                const accionMantenimientoButtonHTML =
+                    document.createElement("button");
+                $(accionMantenimientoButtonHTML).addClass(
+                    "btn btn-outline-secondary btn-sm",
+                );
+                $(accionMantenimientoButtonHTML).attr(
+                    "data-bs-toggle",
+                    "modal",
+                );
+                $(accionMantenimientoButtonHTML).attr(
+                    "data-bs-target",
+                    "#modalMantenimiento",
+                );
+                $(accionMantenimientoButtonHTML).text("Mantenimiento");
+                $(accionMantenimientoButtonHTML).on("click", function () {
+                    $("#Codigo_HabitacionMantenimiento").val(
+                        result.Codigo_Habitacion,
+                    );
+                });
+                $(accionHTML).append(accionMantenimientoButtonHTML);
+                $(accionHTML).append(splitHTML1);
+
+                // Editar button
+                const accionEditarButtonHTML =
+                    document.createElement("button");
+                $(accionEditarButtonHTML).addClass(
+                    "btn btn-outline-secondary btn-sm",
+                );
+                $(accionEditarButtonHTML).text("Editar");
+                $(accionEditarButtonHTML).on("click", function () {
+                    $("#Codigo_Habitacion").val(result.Codigo_Habitacion);
+                    $("#Codigo_Habitacion").attr("disabled", "");
+                    $("#Estado").val(result.Estado);
+                    $("#Numero_Habitacion").val(result.Numero_Habitacion);
+                    $("#Precio_Noche").val(result.Precio_Noche);
+                    $("#Tipo").val(result.Tipo);
+                    $(".modal-title", "#modalRoom").text(
+                        "Editar habitación",
+                    );
+                    $("input[name='action']", "#modalRoom").val("update");
+                    $("button", ".card-header").click();
+                });
+                $(accionHTML).append(accionEditarButtonHTML);
+                $(accionHTML).append(splitHTML2);
+
+                // Eliminar button
+                const accionEliminarButtonHTML =
+                    document.createElement("button");
+                $(accionEliminarButtonHTML).addClass(
+                    "btn btn-outline-danger btn-sm",
+                );
+                $(accionEliminarButtonHTML).text("Eliminar");
+                $(accionEliminarButtonHTML).on("click", function () {
+                    deleteRoom(result.Codigo_Habitacion);
+                });
+                $(accionHTML).append(accionEliminarButtonHTML);
+
+                $(habitacionHTML).append(accionHTML);
+            }
+        }
+
+        async function createMantenimiento() {
+            const form = new FormData();
+            form.append(
+                "habitacion_id",
+                $("#Codigo_HabitacionMantenimiento").val(),
+            );
+            form.append("titulo", $("#TituloMantenimiento").val());
+            form.append(
+                "descripcion",
+                $("#DescripcionMantenimiento").val(),
+            );
+            form.append("prioridad", $("#PrioridadMantenimiento").val());
+
+            const options = { method: "POST", body: form };
+
+            response = await fetch("/grr/mant/solicitudes", options);
+            result = await response.json();
+            if ("error" in result) {
+                $("#errorMantenimiento", "#modalMantenimiento").text(
+                    result.error,
+                );
+                $("#errorMantenimiento", "#modalMantenimiento").removeClass(
+                    "invisible",
+                );
+            } else {
+                cleanFormMantenimiento();
+            }
+        }
+
+        readRooms();
+        $(
+            "button[class*='btn-success']",
+            $(".modal-footer", "#modalRoom"),
+        ).on("click", saveRoom);
+        $(
+            "button[class*='btn-success']",
+            $(".modal-footer", "#modalMantenimiento"),
+        ).on("click", createMantenimiento);
+        $("#modalRoom").on("hidden.bs.modal", function () {
+            cleanFormRoom();
         });
-    </script>
+    });
+</script>
+
 </html>
