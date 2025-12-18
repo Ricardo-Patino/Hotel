@@ -41,44 +41,58 @@
         class="container position-relative d-flex align-items-center justify-content-between"
       >
         <a
-          href="/index.html"
+          href="{{ url_for('index_html') }}"
           class="logo d-flex align-items-center me-auto me-xl-0"
           ><h1 class="sitename">Hotel Villa Grace</h1></a
         >
         <nav id="navmenu" class="navmenu">
           <ul>
+            <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
             <li class="dropdown">
               <a href="#" class="active"
                 ><span>Administración</span>
                 <i class="bi bi-chevron-down toggle-dropdown"></i
               ></a>
               <ul>
-                <li><a href="admin-dashboard.html">Tablero</a></li>
-                <li><a href="admin-users.html">Usuarios</a></li>
-                <li><a href="admin-hotel.html">Perfil del hotel</a></li>
+                <li>
+                  <a class="active" href="{{ url_for('admin_dashboard_html') }}"
+                    >Tablero</a
+                  >
+                </li>
+                <li><a href="admin-users.html">Usuarios y roles</a></li>
+                <!--<li><a href="admin-hotel.html">Perfil del hotel</a></li>-->
                 <li><a href="admin-rooms.html">Habitaciones</a></li>
                 <li><a href="admin-rates.html">Tarifas y temporadas</a></li>
-                <li><a href="admin-taxes.html">Impuestos y cargos</a></li>
-                <li><a href="admin-channels.html">Canales / OTAs</a></li>
-                <li><a class="active" href="admin-audit.html">Bitácora</a></li>
-                <li><a href="evt-calendario.html">Calendario </a></li>
                 <li>
-                  <a class="active" href="evt-calendario.html">Eventos</a>
+                  <a href="admin-taxes.html">Impuestos y cargos</a>
                 </li>
-                <li><a href="arep.dashboard.html">Dashboard</a></li>
-                <li>
-                  <a class="active" href="arep.analytics.html">Analítica</a>
+                <li><a href="admin-channels.html">Canales / OTAs</a></li>
+                <!--<li><a href="/arep/admin-audit.html">Bitácora</a></li>-->
+                <!--<li class="nav-item">
+                  <a
+                    class="nav-link"
+                    href="{{ url_for('evt.calendario_evt') }}"
+                  >
+                    <i class="bi bi-calendar3"></i> Eventos</a
+                  >
+                </li>-->
+                <li class="nav-item">
+                  <a class="nav-link" href="{{ url_for('hrm.dashboard') }}">
+                    <i class="bi bi-people"></i> RRHH
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="{{ url_for('hrm.payroll_home') }}">
+                    <i class="bi bi-cash-coin"></i> Nómina
+                  </a>
                 </li>
               </ul>
             </li>
           </ul>
           <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
         </nav>
-        <a
-          class="btn-getstarted d-none d-sm-block"
-          href="#"
-          onclick="window.print()"
-          >Imprimir</a
+        <a class="btn-getstarted d-none d-sm-block" href="admin-users.html"
+          >Nuevo usuario</a
         >
       </div>
     </header>
