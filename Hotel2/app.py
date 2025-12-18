@@ -1641,7 +1641,13 @@ def create_app() -> Flask:
     @app.route("/portal-reservas.html")
     @role_required("Cliente")
     def portal_reservas_html():
-        return render_template("portal-reservas.html")
+        uid = session.get("user_id")  # o como lo guardes en sesión
+        current_user = {
+            "id": int(uid) if uid is not None else None,
+            "is_authenticated": bool(uid)
+        }
+        return render_template("portal-reservas.html", user_id=session.get("user_id", 1))
+    
 
     @app.route("/portal-reserva-detalle.html")
     @app.route("/portal-reserva-detalle")
@@ -3725,7 +3731,37 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "not_available"}), 404
         return send_file(str(pdf_path), as_attachment=True, download_name=f"{numero}.pdf")
 
+    
+    
+    @app.post("/api/portal/reservas/abono")
+    def api_portal_reserva_abono():
+        # TODO: validar sesión/rol + ownership de la reserva
+        reserva_id = request.form.get("reserva_id", type=int)
+        monto = request.form.get("monto", type=float)
+        metodo = request.form.get("metodo", type=str)
+        referencia = request.form.get("referencia", type=str)
+        created_by = session.get("user_id", 1)
+    
+        if not reserva_id or not monto or monto <= 0:
+            return jsonify({"ok": False, "error": "Datos inválidos"}), 400
+    
+        # TODO: aquí conectás con tu lógica real de finanzas (fin_receipts / fin_ledger_tx)
+        # Por ahora devolvemos estructura compatible con tu JS:
+        return jsonify({
+            "ok": True,
+            "total_reserva": 0,
+            "pagado_acumulado": 0,
+            "saldo_pendiente": 0,
+            "porcentaje_pagado": 0,
+            "created_by": created_by
+        })
+
+    
     # ---------------------- RUTA de HABITACIONES DINÁMICAS (opcional) ----------------------
+    
+    
+    
+    
     @app.route("/rooms.html")
     def rooms_html():
         try:
