@@ -1,103 +1,401 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{% block title %}Hotel Villa Grace{% endblock %}</title>
 
-    <!-- Bootstrap CDN -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
 
-    <!-- Estilos del sitio (aquí mismo, sin archivos extra) -->
-    <style>
-      :root {
-        --vg-orange: #285b4b;
-        --vg-bg: #f7f7f9;
-        --vg-muted: #6c757d;
-        --vg-border: #e5e7eb;
-      }
-      body {
-        background: var(--vg-bg);
-      }
-      .vg-topbar {
-        background: var(--vg-orange);
-        color: #fff;
-      }
-      .vg-topbar a {
-        color: #fff;
-        text-decoration: none;
-        font-weight: 500;
-      }
-      .vg-topbar a:hover {
-        text-decoration: underline;
-      }
-      .vg-badge-success {
-        background: #d9f5d9;
-        color: #117a11;
-      }
-      .vg-badge-warn {
-        background: #fff3cd;
-        color: #856404;
-      }
-      .vg-badge-danger {
-        background: #f5d9d9;
-        color: #7a1111;
-      }
-      .vg-card {
-        background: #fff;
-        border: 1px solid var(--vg-border);
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      }
-      .vg-filter .btn {
-        border-radius: 0.5rem;
-      }
-      .vg-filter .btn-outline-secondary {
-        background: #f0f0f0;
-        border-color: #ccc;
-        color: #333;
-      }
-      .vg-filter .btn-vg {
-        background: var(--vg-orange);
-        color: #fff;
-        border: 1px solid var(--vg-orange);
-      }
-      .vg-table thead {
-        background: #fafafa;
-      }
-      .vg-table th,
-      .vg-table td {
-        vertical-align: middle;
-      }
-    </style>
+  <title>{% block title %}Hotel Villa Grace{% endblock %}</title>
 
-    {% block head_extra %}{% endblock %}
-  </head>
-  <body>
-    <!-- Barra superior -->
-    <nav class="vg-topbar py-2 mb-3">
-      <div class="container d-flex justify-content-between align-items-center">
-        <a href="/" class="d-inline-flex align-items-center gap-2">
-          <span style="font-size: 1.25rem">🏨</span>
-          <span class="fw-semibold">Hotel Villa Grace</span>
-        </a>
-        <div class="d-flex gap-3">
-          <a href="/index.html">Inicio</a>
-          <a href="/admin-dashboard.html">Administración</a>
-          <a href="/hrm/empleados-ui">Colaboradores</a>
+  <!-- Meta SEO (puedes sobreescribir por página si quieres) -->
+  <meta name="description" content="{% block meta_description %}Hotel Villa Grace en Cóbano, Puntarenas. Piscina, restaurante, Wi-Fi y parqueo gratis.{% endblock %}" />
+  <meta name="keywords" content="{% block meta_keywords %}Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa{% endblock %}" />
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,800;1,900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+    rel="stylesheet" />
+
+  <!-- Vendor CSS -->
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet" />
+
+  <!-- Main CSS -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
+
+  {% block head_extra %}{% endblock %}
+</head>
+
+<body class="{% block body_class %}{% endblock %}">
+
+  <!-- HEADER (tal cual tu index) -->
+  <header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container position-relative d-flex align-items-center justify-content-between">
+
+      <!-- Logo -->
+      <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0"
+        aria-label="Hotel Villa Grace - Inicio">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <g>
+            <path
+              d="M21,4H11c-1.1046,0-2,.8954-2,2V28h4v-7c0-.5523,.4477-1,1-1h4c.5523,0,1,.4477,1,1v7h4V6c0-1.1046-.8954-2-2-2Z"
+              style="fill:#f2ebe2"></path>
+            <path
+              d="M30.1416,10.0103l-6.1416-.8774v-3.1329c0-1.6543-1.3457-3-3-3H11c-1.6543,0-3,1.3457-3,3v3.1329l-6.1416,.8774c-.4922,.0703-.8584,.4922-.8584,.9897V28c0,.5522,.4473,1,1,1H30c.5527,0,1-.4478,1-1V11c0-.4976-.3662-.9194-.8584-.9897Z"
+              style="fill:#917a5a"></path>
+          </g>
+        </svg>
+        <h1 class="sitename">Hotel Villa Grace</h1>
+      </a>
+
+      <!-- NAV -->
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li><a href="{{ url_for('index_html') }}" class="{% block nav_inicio_active %}{% endblock %}">Inicio</a></li>
+          <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
+          <li><a href="{{ url_for('rooms_html') }}">Habitaciones</a></li>
+          <li><a href="{{ url_for('contact_html') }}">Contáctenos</a></li>
+
+          <!-- Atención -->
+          <li class="dropdown">
+            <a href="#"><span>Atención</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+            <ul>
+              <li><a href="{{ url_for('sac.faq_html') }}">FAQ y horarios</a></li>
+              {% if session.get('user_role') == 'Cliente' %}
+              <li><a href="{{ url_for('sac.preferencias_html') }}">Preferencias de notificación</a></li>
+              <li><a href="{{ url_for('sac.solicitud_nueva_html') }}">Solicitudes especiales</a></li>
+              {% endif %}
+              {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a href="{{ url_for('sac.panel_solicitudes') }}">Panel de solicitudes</a></li>
+              <li><a href="{{ url_for('sac.incidentes_html') }}">Incidentes / comentarios</a></li>
+              <li><a href="{{ url_for('sac.conversaciones_html') }}">Historial de conversaciones</a></li>
+              {% endif %}
+              {% if session.get('user_role') == 'Administrador' %}
+              <li><a href="{{ url_for('sac.indicadores_html') }}">Indicadores</a></li>
+              {% endif %}
+            </ul>
+          </li>
+
+          <!-- Gestión -->
+          {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
+          <li class="dropdown">
+            <a href="#"><span>Gestión</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
+            <ul>
+              <li><a href="{{ url_for('ops_dashboard_html') }}">Panel de Operaciones</a></li>
+              <li><a href="{{ url_for('sac.conversaciones_html') }}">Conversaciones</a></li>
+
+              <li class="dropdown">
+                <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li><a href="{{ url_for('fin_reports.ui_reports') }}">Reportes</a></li>
+                  <li><a href="{{ url_for('fin_invoices_html') }}">Facturas</a></li>
+                  <li><a href="{{ url_for('fin_cash.ui') }}">Caja / arqueos</a></li>
+                  <li><a href="{{ url_for('fin_periods.ui_periods') }}">Periodos / cierres</a></li>
+                </ul>
+              </li>
+
+              <li class="dropdown">
+                <a href="#"><span>RR. HH.</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li><a href="{{ url_for('hrm.empleados_ui') }}">Empleados</a></li>
+                  <li><a href="{{ url_for('hrm.mis_horas_ui') }}">Mis horas</a></li>
+                  <li><a href="{{ url_for('hrm.validar_horas_ui') }}">Validar horas</a></li>
+                </ul>
+              </li>
+
+              <li class="dropdown">
+                <a href="#"><span>Inventario</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li><a href="{{ url_for('inv.insumos_list') }}">Insumos</a></li>
+                  <li><a href="{{ url_for('inv.insumo_new') }}">Nuevo insumo</a></li>
+                  <li><a href="{{ url_for('inv.categorias_list') }}">Categorías</a></li>
+                  <li><a href="{{ url_for('inv.categorias_new') }}">Nueva categoría</a></li>
+                </ul>
+              </li>
+
+              {% if session.get('user_role') == 'Administrador' %}
+              <li><a href="{{ url_for('admin_dashboard_html') }}">Administración</a></li>
+              <li><a href="{{ url_for('sac.sac_chat_admin') }}">Chatbot</a></li>
+              {% endif %}
+            </ul>
+          </li>
+          {% endif %}
+
+          <!-- Cuenta -->
+          {% if session.get('user_id') %}
+          <li class="dropdown">
+            <a href="{{ url_for('portal_perfil_html') }}" aria-label="Perfil">
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+              <span>{{ session.get('user_name', 'Mi cuenta') }}</span>
+              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
+            </a>
+            <ul>
+              <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
+              <li><a href="{{ url_for('portal_reservas_html') }}">Mis reservas</a></li>
+              <li><a href="{{ url_for('portal_perfil_html') }}">Perfil</a></li>
+              <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
+            </ul>
+          </li>
+          {% else %}
+          <li class="dropdown">
+            <a href="#" aria-label="Cuenta">
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>
+              <span>Cuenta</span>
+              <i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i>
+            </a>
+            <ul>
+              <li><a href="{{ url_for('login_html') }}">Iniciar sesión</a></li>
+              <li><a href="{{ url_for('register') }}">Crear cuenta</a></li>
+              <li><a href="{{ url_for('forgot_password') }}">¿Olvidaste tu contraseña?</a></li>
+            </ul>
+          </li>
+          {% endif %}
+        </ul>
+
+        <i class="mobile-nav-toggle d-xl-none bi bi-list" aria-label="Abrir menú"></i>
+      </nav>
+
+      <!-- CTA -->
+      <a class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4"
+        href="{{ url_for('booking_search') }}">Reservar</a>
+    </div>
+  </header>
+
+  {% block header_offset %}{% endblock %}
+
+  <!-- CSS que tenías inline en index (lo dejamos aquí porque afecta al header) -->
+  <style>
+    .header .navmenu>ul>li { margin: 0 8px; }
+    .header .navmenu a { white-space: nowrap; }
+    .header .navmenu .dropdown>ul { width: 260px; }
+    .header .navmenu .dropdown .dropdown>ul { left: 100%; top: 0; width: 240px; }
+    .header .btn-getstarted { padding: 8px 16px; border-radius: 999px; }
+    .header .sitename { font-size: 1.4rem; line-height: 1; margin-left: .5rem; }
+    @media (max-width: 1199.98px) {
+      .header .navmenu>ul>li { margin: 0 6px; }
+    }
+    .fx-widget {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(4px);
+    }
+    .fx-widget .badge { font-size: 0.75rem; }
+    .fx-widget span { font-size: 0.8rem; }
+  </style>
+
+  <!-- Breadcrumbs (solo si se envían desde Flask) -->
+  {% if breadcrumbs %}
+  <nav aria-label="breadcrumb" class="py-3" style="margin-top: 90px;">
+    <div class="container">
+      <ol class="breadcrumb mb-0">
+        {% for item in breadcrumbs %}
+          {% if loop.last or item.url is none %}
+            <li class="breadcrumb-item active" aria-current="page">{{ item.label }}</li>
+          {% else %}
+            <li class="breadcrumb-item"><a href="{{ item.url }}">{{ item.label }}</a></li>
+          {% endif %}
+        {% endfor %}
+      </ol>
+    </div>
+  </nav>
+  {% endif %}
+
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- FOOTER (tal cual tu index) -->
+  <footer id="footer" class="footer position-relative dark-background">
+    <div class="footer-top">
+      <div class="container">
+        <div class="row gy-4">
+          <div class="col-lg-4 col-md-6 footer-about">
+            <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center">
+              <span class="sitename">Hotel Villa Grace</span>
+            </a>
+            <div class="footer-contact pt-3">
+              <p>Cóbano, 100 m del Banco Nacional</p>
+              <p>Puntarenas, Costa Rica · 60111</p>
+              <p class="mt-3">
+                <strong>Teléfono:</strong>
+                <a href="Tel: +50626420225">2642-0225</a>
+              </p>
+              <p>
+                <strong>Email:</strong>
+                <span><a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a></span>
+              </p>
+            </div>
+          </div>
+
+          <div class="col-lg-2 col-md-3 footer-links">
+            <h4>Enlaces</h4>
+            <ul>
+              <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+              <li><a href="{{ url_for('about_html') }}">Nosotros</a></li>
+              <li><a href="{{ url_for('rooms_html') }}">Reservas</a></li>
+              <li><a href="{{ url_for('sac.faq_html') }}">FAQ y horarios</a></li>
+            </ul>
+          </div>
+
+          <div class="col-lg-2 col-md-3 footer-links">
+            <h4>Servicios</h4>
+            <ul>
+              <li>Piscina y Terraza</li>
+              <li>Restaurante y Bar</li>
+              <li>Conectividad</li>
+              <li>Comodidades</li>
+            </ul>
+          </div>
+
+          <div class="col-lg-2 col-md-3 footer-links">
+            <h4>Horarios</h4>
+            <ul>
+              <li>Check-in: 1:00 pm</li>
+              <li>Check-out: 11:00 am</li>
+              <li>Recepción 24/7</li>
+              <li>Restaurante diario</li>
+              <li>Parqueo gratis</li>
+            </ul>
+          </div>
+
+          <div class="col-lg-2 col-md-3 footer-links">
+            <h4>Síguenos</h4>
+            <ul>
+              <li>
+                <a href="https://www.facebook.com/HotelVillaGrace" target="_blank" rel="noopener">Facebook</a>
+              </li>
+              <li><a href="{{ url_for('contact_html') }}">Contacto rápido</a></li>
+              <li><a href="#">Mapa</a></li>
+            </ul>
+          </div>
         </div>
       </div>
-    </nav>
+    </div>
 
-    <!-- Contenido -->
-    <main class="container">{% block content %}{% endblock %}</main>
+    <div class="copyright text-center py-3">
+      © <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados
+    </div>
+  </footer>
 
-    <!-- JS Bootstrap -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    {% block scripts %}{% endblock %} {% include "partials/sac-widget.html" %}
-    <script src="{{ url_for('static', filename='assets/js/sac-widget.js') }}"></script>
-  </body>
+  <!-- Scroll Top -->
+  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"
+    aria-label="Volver arriba"><i class="bi bi-arrow-up-short"></i></a>
+
+  <!-- Preloader -->
+  <div id="preloader" aria-hidden="true"></div>
+
+  <!-- Vendor JS Files -->
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/php-email-form/validate.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
+
+  <!-- Main JS File -->
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <!-- Script alertas inventario (tu mismo script) -->
+  <script>
+    (function () {
+      const badge = document.getElementById("inv-alert-badge");
+      const list = document.getElementById("inv-alert-list");
+      if (!badge || !list) return;
+
+      async function refreshAlerts() {
+        try {
+          const res = await fetch('{{ url_for("inv.alertas_stock") }}');
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const data = await res.json();
+          const n = data.count || 0;
+
+          if (n > 0) {
+            badge.textContent = n;
+            badge.classList.remove("d-none");
+          } else {
+            badge.classList.add("d-none");
+          }
+
+          if (n === 0) {
+            list.innerHTML = '<span class="text-success">Sin alertas de stock.</span>';
+          } else {
+            const items = (data.items || [])
+              .map((x) => {
+                return `
+                  <div class="d-flex align-items-center py-1">
+                    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+                    <div class="flex-grow-1">
+                      <div><strong>${x.Nombre}</strong> <small class="text-muted">(${x.Unidad || ""})</small></div>
+                      <div class="small">Actual: ${x.Stock_Actual} &nbsp; • &nbsp; Mín.: ${x.Stock_Minimo}</div>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("");
+            list.innerHTML = items;
+          }
+        } catch (err) {
+          list.innerHTML = '<span class="text-danger">No se pudieron obtener las alertas.</span>';
+        }
+      }
+
+      refreshAlerts();
+      setInterval(refreshAlerts, 60000);
+    })();
+  </script>
+
+  {% include "partials/sac-widget.html" %}
+  <script src="{{ url_for('static', filename='assets/js/sac-widget.js') }}"></script>
+
+  <!-- Script API tipo de cambio (tu mismo script) -->
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const widget = document.querySelector(".fx-widget");
+      if (!widget) return;
+
+      try {
+        const res = await fetch("https://api.exchangerate.host/latest?base=USD&symbols=CRC");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        const data = await res.json();
+        const rate = data && data.rates && data.rates.CRC;
+        const fxDate = data && data.date;
+
+        if (rate) {
+          widget.innerHTML = `
+            <span class="badge bg-light text-dark">
+              <i class="bi bi-currency-exchange me-1"></i>
+              Tipo de cambio hoy
+            </span>
+            <span>USD 1 = ₡${Number(rate).toFixed(2)}</span>
+            ${fxDate ? `<span class="text-white-50">(${fxDate})</span>` : ""}
+          `;
+        }
+      } catch (err) {
+        console.error("Error obteniendo tipo de cambio:", err);
+      }
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+
 </html>
