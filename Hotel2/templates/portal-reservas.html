@@ -138,8 +138,9 @@
         <input
           type="hidden"
           id="abono-reserva-id"
-          value="{{ reserva.Codigo_Reserva }}"
+          value="{{ reserva.Codigo_Reserva if reserva is defined else '' }}"
         />
+        
 
         <div class="row g-2">
           <div class="col-md-4">
@@ -680,7 +681,7 @@
           const metodo = metodoEl.value;
           const concepto = conceptoEl.value || 'Abono de reserva';
           const referencia = refEl.value || '';
-          const createdBy = {{ current_user.id if current_user.is_authenticated else 1 }};
+          const createdBy = {{ user_id|default(1) }};
 
           if (!reservaId || isNaN(monto) || monto <= 0) {
             if (msgEl) {
@@ -691,7 +692,7 @@
             return;
           }
 
-          fetch("{{ url_for('pos.pos_checkout') }}", {
+          fetch("/api/portal/reservas/abono", {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
