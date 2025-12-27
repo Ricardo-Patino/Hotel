@@ -7584,3 +7584,59 @@ section,
   --nav-color: rgba(255, 255, 255, 0.95);
   --nav-hover-color: #ffffff;
 }
+
+/* 
+   FOOTER
+   Override
+    */
+
+.footer {
+  background-color: #204e43;
+  color: #ffffff;
+}
+
+.footer .footer-top {
+  background-color: #204e43;
+}
+
+.footer h4,
+.footer .footer-about .logo span {
+  color: #ffffff;
+}
+
+.footer .footer-about p,
+.footer .footer-contact p,
+.footer .footer-links ul li {
+  color: #e6f2ef;
+}
+
+.footer .footer-links ul a {
+  color: #e6f2ef;
+}
+
+.footer .footer-links ul a:hover {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+/* Línea decorativa debajo de títulos */
+.footer h4::after {
+  background: #9fd3c7;
+}
+
+/* Copyright inferior */
+.footer .copyright {
+  background-color: #183c34;
+  color: #dbeae6;
+}
+
+.footer .footer-contact a {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.footer .footer-contact a:hover {
+  color: #9fd3c7;
+  text-decoration: underline;
+}
+
