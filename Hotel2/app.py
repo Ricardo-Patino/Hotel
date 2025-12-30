@@ -886,39 +886,89 @@ def _validate_no_overbooking(ci: str, co: str, rooms: int = 1, tipo: Optional[st
 
 
 def ensure_cliente_for_email(
-    nombre: str, correo: str, telefono: Optional[str] = None
+    nombre: str,
+    correo: str,
+    telefono: Optional[str] = None,
+    doc_num: Optional[str] = None
 ) -> Optional[int]:
+    """
+    Asegura un Cliente por correo y sincroniza Cedula cuando venga doc_num.
+    - No hace commit() aquí: el commit lo maneja el caller (registro).
+    - Cedula se guarda como string (cédula/DIMEX numérica o pasaporte alfanum).
+    """
     if not correo:
         return None
-    correo = correo.strip().lower()
+
+    correo = (correo or "").strip().lower()
+    tel = (telefono or "").strip()[:20] if telefono else ""
+    if not tel:
+        tel = "00000000"
+
+    # Normalizar documento con la misma lógica del registro
+    doc_norm = None
+    if doc_num:
+        try:
+            doc_norm = _normalize_document(doc_num)
+        except Exception:
+            doc_norm = (doc_num or "").strip() or None
+
+    # ¿Existe Cliente por correo?
     row = db.session.execute(
-        text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
+        text("SELECT Codigo_Cliente, Cedula FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
         {"e": correo},
     ).first()
-    if row:
-        return row[0]
+
+    # Parsear nombre/apellido desde "nombre completo"
     nombre = (nombre or "").strip() or "Cliente Web"
     partes = nombre.split(" ", 1)
     nom = partes[0][:50]
     ape = (partes[1] if len(partes) > 1 else "").strip()[:50]
-    tel = (telefono or "").strip()[:20] or "00000000"
 
+    if row:
+        cid = int(row[0])
+        ced_actual = row[1]
+
+        # Solo sobrescribimos Cedula si:
+        # - viene doc_norm
+        # - y en Cliente está vacía/NULL/0
+        set_ced = ""
+        params = {"id": cid, "n": nom, "a": ape, "t": tel, "e": correo}
+
+        if doc_norm and (ced_actual is None or str(ced_actual).strip() in ("", "0", "000000000")):
+            set_ced = ", Cedula = :ced"
+            params["ced"] = doc_norm
+
+        db.session.execute(
+            text(f"""
+                UPDATE Cliente
+                   SET Nombre = :n,
+                       Apellido = :a,
+                       Telefono = COALESCE(NULLIF(:t,''), Telefono),
+                       Correo = :e
+                       {set_ced}
+                 WHERE Codigo_Cliente = :id
+            """),
+            params
+        )
+        return cid
+
+    # Si no existe Cliente, crear uno
+    # Cedula: si no hay doc_norm, insert NULL (la columna ya la hicimos NULL en SQL)
     db.session.execute(
-        text(
-            """
-        INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
-        VALUES (0, :n, :a, :t, :e, '1990-01-01')
-    """
-        ),
-        {"n": nom, "a": ape, "t": tel, "e": correo},
+        text("""
+            INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
+            VALUES (:ced, :n, :a, :t, :e, '1990-01-01')
+        """),
+        {"ced": doc_norm, "n": nom, "a": ape, "t": tel, "e": correo},
     )
-    db.session.commit()
 
-    row2 = db.session.execute(
+    new_id = db.session.execute(
         text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
         {"e": correo},
-    ).first()
-    return row2[0] if row2 else None
+    ).scalar()
+
+    return int(new_id) if new_id else None
+
 
 
 # =========================
@@ -1614,6 +1664,7 @@ def create_app() -> Flask:
         uid = session.get("user_id")
         u = Usuario.query.filter_by(Codigo_Usuario=uid).first() if uid else None
         return render_template("anon-reserva.html", is_recepcionista=es_recepcionista(u))
+    
 
 
     # ---------------------- Portal / Ops / Admin (protegidas por rol) ------------
@@ -1641,12 +1692,22 @@ def create_app() -> Flask:
     @app.route("/portal-reservas.html")
     @role_required("Cliente")
     def portal_reservas_html():
-        uid = session.get("user_id")  # o como lo guardes en sesión
+        uid = session.get("user_id")
+        if not uid:
+            # Si por alguna razón llega aquí sin sesión, redirige a login (consistente con el resto)
+            return redirect(url_for("login_html", next=request.path))
+    
         current_user = {
-            "id": int(uid) if uid is not None else None,
-            "is_authenticated": bool(uid)
+            "id": int(uid),
+            "is_authenticated": True
         }
-        return render_template("portal-reservas.html", user_id=session.get("user_id", 1))
+    
+        # Pasá explícitamente lo que el template use (idealmente current_user)
+        return render_template(
+            "portal-reservas.html",
+            user_id=int(uid),
+            current_user=current_user
+        )
     
 
     @app.route("/portal-reserva-detalle.html")
@@ -4097,12 +4158,14 @@ def create_app() -> Flask:
             db.session.add(u)
     
             try:
-                # Crear/asegurar Cliente consistente (reusa tu helper existente)
-                cliente_id = ensure_cliente_for_email(full_name, email, phone_norm)
+                # 1) Asegurar Cliente con documento
+                cliente_id = ensure_cliente_for_email(full_name, email, phone_norm, doc_num=national_id)
                 if cliente_id:
                     u.Codigo_Cliente = cliente_id
-    
+                
+                # 2) Commit único (Usuario + Cliente) = consistencia total
                 db.session.commit()
+                
             except IntegrityError:
                 db.session.rollback()
                 flash("Ya existe un usuario con ese correo o cédula/pasaporte.", "danger")
@@ -6237,10 +6300,10 @@ app = create_app()
 # EJECUCIÓN
 # =========================
 # al final de app.py
-# if __name__ == "__main__":
-#     app.run(
-#         host="127.0.0.1",
-#         port=int(os.getenv("PORT", 5000)),
-#         debug=True,
-#         use_reloader=True,   # <-- clave para quitar ese error
-#     )
+if __name__ == "__main__":
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", 5000)),
+        debug=True,
+        use_reloader=True,   # <-- clave para quitar ese error
+    )
