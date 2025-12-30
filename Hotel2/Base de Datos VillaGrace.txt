@@ -9,72 +9,78 @@ SET sql_mode = 'STRICT_ALL_TABLES';
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
-DROP DATABASE IF EXISTS Hotel_VillaGrace;
-CREATE DATABASE IF NOT EXISTS Hotel_VillaGrace
+DROP DATABASE IF EXISTS defaultdb;
+CREATE DATABASE IF NOT EXISTS defaultdb
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
-USE Hotel_VillaGrace;
+USE defaultdb;
 
--- Limpieza
 SET FOREIGN_KEY_CHECKS = 0;
 
--- Vistas y triggers primero
+/* ------------------------------------------------------------------------- */
+/* Limpieza: vistas                                                          */
+/* ------------------------------------------------------------------------- */
 DROP VIEW IF EXISTS v_reservas_ext;
 DROP VIEW IF EXISTS v_reserva_pagos_pos;
 DROP VIEW IF EXISTS v_fin_caja_resumen;
+DROP VIEW IF EXISTS v_hist_reservas;
+DROP VIEW IF EXISTS v_hist_pagos;
 
+/* ------------------------------------------------------------------------- */
+/* Limpieza: funciones / procedures                                           */
+/* ------------------------------------------------------------------------- */
+DROP FUNCTION IF EXISTS loyalty_level;
+
+DROP PROCEDURE IF EXISTS __sac_add_column_if_missing;
+DROP PROCEDURE IF EXISTS __sac_add_index_if_missing;
+DROP PROCEDURE IF EXISTS __sac_add_fk_if_missing;
+DROP PROCEDURE IF EXISTS __sac_drop_trigger_if_exists;
+
+/* ------------------------------------------------------------------------- */
+/* Limpieza: triggers                                                        */
+/* ------------------------------------------------------------------------- */
 DROP TRIGGER IF EXISTS trg_auditoria_log_after_ins;
-DROP TRIGGER IF EXISTS trg_reserva_sync_before_ins;
-DROP TRIGGER IF EXISTS trg_reserva_sync_before_upd;
 
--- Tablas (orden inverso de dependencias)
-DROP TABLE IF EXISTS fin_cash_movement;
-DROP TABLE IF EXISTS fin_cash_session;
-DROP TABLE IF EXISTS fin_notes;
-DROP TABLE IF EXISTS fin_receipts;
-DROP TABLE IF EXISTS fin_ledger_line;
-DROP TABLE IF EXISTS fin_ledger_tx;
-DROP TABLE IF EXISTS fin_invoices;
-DROP TABLE IF EXISTS fin_monthly_close;
-DROP TABLE IF EXISTS fin_period_lock;
+DROP TRIGGER IF EXISTS trg_reserva_before_ins;
+DROP TRIGGER IF EXISTS trg_reserva_before_upd;
+DROP TRIGGER IF EXISTS trg_reserva_loyalty_after_upd;
 
-DROP TABLE IF EXISTS MantenimientoNotificacion;
-DROP TABLE IF EXISTS MantenimientoPreventivo;
-DROP TABLE IF EXISTS MantenimientoCambioEstado;
-DROP TABLE IF EXISTS MantenimientoSolicitud;
+DROP TRIGGER IF EXISTS trg_fin_receipts_block_upd;
+DROP TRIGGER IF EXISTS trg_fin_receipts_block_del;
+DROP TRIGGER IF EXISTS trg_fin_ledger_tx_block_upd;
+DROP TRIGGER IF EXISTS trg_fin_ledger_tx_block_del;
 
-DROP TABLE IF EXISTS InvMovimiento;
-DROP TABLE IF EXISTS InvInsumo;
-DROP TABLE IF EXISTS InvCategoria;
+DROP TRIGGER IF EXISTS trg_sac_reserva_after_ins;
+DROP TRIGGER IF EXISTS trg_sac_convmsg_after_ins;
 
-DROP TABLE IF EXISTS ReservaDocumento;
-DROP TABLE IF EXISTS Documento;
+/* ------------------------------------------------------------------------- */
+/* Limpieza: tablas (orden inverso / dependencias)                            */
+/* ------------------------------------------------------------------------- */
 
-DROP TABLE IF EXISTS HousekeepingTask;
-DROP TABLE IF EXISTS MaintenanceRequest;
-DROP TABLE IF EXISTS Villa;
+/* SAC + KB */
+DROP TABLE IF EXISTS SAC_KB_DocTag;
+DROP TABLE IF EXISTS SAC_KB_Tag;
+DROP TABLE IF EXISTS SAC_KB_QA;
+DROP TABLE IF EXISTS SAC_KB_Chunk;
+DROP TABLE IF EXISTS SAC_KB_Doc;
+DROP TABLE IF EXISTS SAC_KB_IngestJob;
 
-DROP TABLE IF EXISTS ReservaEstancia;
-DROP TABLE IF EXISTS AsignacionDecision;
-DROP TABLE IF EXISTS ReglaAsignacion;
-DROP TABLE IF EXISTS PreferenciaHuesped;
+DROP TABLE IF EXISTS SAC_Feedback;
+DROP TABLE IF EXISTS SAC_Incident;
+DROP TABLE IF EXISTS SAC_ConversationMsg;
+DROP TABLE IF EXISTS SAC_Conversation;
+DROP TABLE IF EXISTS SAC_Solicitud;
+DROP TABLE IF EXISTS SAC_Outbox;
+DROP TABLE IF EXISTS SAC_NotifPref;
+DROP TABLE IF EXISTS SAC_Config;
 
-DROP TABLE IF EXISTS ReservaAjuste;
-DROP TABLE IF EXISTS Coupon;
-DROP TABLE IF EXISTS Waitlist;
+/* AREP */
+DROP TABLE IF EXISTS ArepExportLog;
+DROP TABLE IF EXISTS ArepSatisfaccion;
+DROP TABLE IF EXISTS ArepAtencion;
+DROP TABLE IF EXISTS ArepViewConfig;
 
-DROP TABLE IF EXISTS Reserva;
-DROP TABLE IF EXISTS Usuario;
-DROP TABLE IF EXISTS Rol;
-DROP TABLE IF EXISTS Cliente;
-DROP TABLE IF EXISTS Funcionario;
-DROP TABLE IF EXISTS Habitacion;
-
-DROP TABLE IF EXISTS KPI_Stats;
-DROP TABLE IF EXISTS Audit_Log;
-DROP TABLE IF EXISTS Auditoria_Log;
-
-SET FOREIGN_KEY_CHECKS = 0;
+/* EVT */
 DROP TABLE IF EXISTS EvtWorkOrder;
 DROP TABLE IF EXISTS EvtNotificacion;
 DROP TABLE IF EXISTS EvtEncuesta;
@@ -87,20 +93,8 @@ DROP TABLE IF EXISTS EvtEvento;
 DROP TABLE IF EXISTS EvtPlantilla;
 DROP TABLE IF EXISTS EvtRecurso;
 DROP TABLE IF EXISTS EvtSalon;
-SET FOREIGN_KEY_CHECKS = 1;
 
-DROP TABLE IF EXISTS ArepExportLog;
-DROP TABLE IF EXISTS ArepSatisfaccion;
-DROP TABLE IF EXISTS ArepAtencion;
-DROP TABLE IF EXISTS ArepViewConfig;
-SET FOREIGN_KEY_CHECKS = 1;
-
-
-/* ===========================================================
-   HRM — Módulo de Recursos Humanos
-   =========================================================== */
-
-SET FOREIGN_KEY_CHECKS = 0;
+/* HRM */
 DROP TABLE IF EXISTS HRM_PaymentRecord;
 DROP TABLE IF EXISTS HRM_PayrollDetail;
 DROP TABLE IF EXISTS HRM_Payroll;
@@ -112,18 +106,88 @@ DROP TABLE IF EXISTS HRM_Warning;
 DROP TABLE IF EXISTS HRM_VacationRequest;
 DROP TABLE IF EXISTS HRM_Absence;
 DROP TABLE IF EXISTS HRM_ConfigSocial;
+DROP TABLE IF EXISTS Marcacion;
+DROP TABLE IF EXISTS FuncionarioHistorial;
+
+/* Finanzas */
+DROP TABLE IF EXISTS fin_recurring_run;
+DROP TABLE IF EXISTS fin_recurring_plan;
+DROP TABLE IF EXISTS fin_fx_rate;
+
+DROP TABLE IF EXISTS fin_ledger_line;
+DROP TABLE IF EXISTS fin_ledger_tx;
+
+DROP TABLE IF EXISTS fin_ledger;
+DROP TABLE IF EXISTS fin_payment;
+
+DROP TABLE IF EXISTS fin_cash_movement;
+DROP TABLE IF EXISTS fin_cash_session;
+
+DROP TABLE IF EXISTS fin_notes;
+DROP TABLE IF EXISTS fin_receipts;
+DROP TABLE IF EXISTS fin_invoices;
+
+DROP TABLE IF EXISTS fin_monthly_close;
+DROP TABLE IF EXISTS fin_period_lock;
+
+/* Mantenimiento (dos variantes: MaintenanceRequest y módulo Mantenimiento*) */
+DROP TABLE IF EXISTS MantenimientoNotificacion;
+DROP TABLE IF EXISTS MantenimientoPreventivo;
+DROP TABLE IF EXISTS MantenimientoCambioEstado;
+DROP TABLE IF EXISTS MantenimientoSolicitud;
+
+DROP TABLE IF EXISTS MaintenanceRequest;
+DROP TABLE IF EXISTS HousekeepingTask;
+
+/* Inventario */
+DROP TABLE IF EXISTS InvMovimiento;
+DROP TABLE IF EXISTS InvInsumo;
+DROP TABLE IF EXISTS InvCategoria;
+
+/* Documentos */
+DROP TABLE IF EXISTS ClienteLoyaltyMov;
+DROP TABLE IF EXISTS ClienteDocumento;
+DROP TABLE IF EXISTS ReservaDocumento;
+DROP TABLE IF EXISTS Documento;
+
+/* GRR / Reglas / Estancias */
+DROP TABLE IF EXISTS ReservaEstancia;
+DROP TABLE IF EXISTS AsignacionDecision;
+DROP TABLE IF EXISTS ReglaAsignacion;
+DROP TABLE IF EXISTS PreferenciaHuesped;
+
+/* Waitlist / Cupones / Ajustes */
+DROP TABLE IF EXISTS ReservaAjuste;
+DROP TABLE IF EXISTS Coupon;
+DROP TABLE IF EXISTS Waitlist;
+
+/* KPI / Auditoría */
+DROP TABLE IF EXISTS KPI_Stats;
+DROP TABLE IF EXISTS Audit_Log;
+DROP TABLE IF EXISTS Auditoria_Log;
+
+/* Core */
+DROP TABLE IF EXISTS Reserva;
+DROP TABLE IF EXISTS Usuario;
+DROP TABLE IF EXISTS Rol;
+DROP TABLE IF EXISTS Cliente;
+DROP TABLE IF EXISTS Funcionario;
+DROP TABLE IF EXISTS Habitacion;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 
-/* ------------------------------------------------------------------------- */
-/* Tablas base                                                               */
-/* ------------------------------------------------------------------------- */
+/* ===================================================================== */
+/* CORE                                                                  */
+/* ===================================================================== */
+
 CREATE TABLE Habitacion (
   Codigo_Habitacion   INT NOT NULL AUTO_INCREMENT,
   Numero_Habitacion   VARCHAR(10) NOT NULL,
   Tipo                ENUM('Sencilla','Doble','Suite') NOT NULL,
   Precio_Noche        DECIMAL(12,2) NOT NULL,
-  Estado              ENUM('Disponible','Ocupada','Ocupada-temprana','Ocupada-extendida','Mantenimiento','Limpieza') NOT NULL DEFAULT 'Disponible',
+  Estado              ENUM('Disponible','Ocupada','Ocupada-temprana','Ocupada-extendida','Mantenimiento','Limpieza')
+                      NOT NULL DEFAULT 'Disponible',
   Fecha_modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_Habitacion PRIMARY KEY (Codigo_Habitacion),
   CONSTRAINT UQ_Habitacion_Numero UNIQUE (Numero_Habitacion),
@@ -131,31 +195,59 @@ CREATE TABLE Habitacion (
   KEY IX_Habitacion_Estado (Estado)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 CREATE TABLE Funcionario (
-  Codigo_Funcionario  INT NOT NULL AUTO_INCREMENT,
-  Cedula              VARCHAR(20) NOT NULL,
-  Nombre              VARCHAR(50) NOT NULL,
-  Apellido            VARCHAR(50) NOT NULL,
-  Puesto              VARCHAR(50) NOT NULL,
-  Fecha_Nacimiento    DATE NOT NULL,
-  Fecha_modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  Codigo_Funcionario   INT NOT NULL AUTO_INCREMENT,
+  Cedula               VARCHAR(20) NOT NULL,
+  Nombre               VARCHAR(50) NOT NULL,
+  Apellido             VARCHAR(50) NOT NULL,
+  Puesto               VARCHAR(50) NOT NULL,
+
+  /* HRM-08-001 (integrado) */
+  Departamento         VARCHAR(80) NULL,
+  Fecha_Nacimiento     DATE NOT NULL,
+  Fecha_Ingreso        DATE NOT NULL DEFAULT (CURDATE()),
+  Salario_Base_Mensual DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Estado_Empleado      ENUM('Activo','Inactivo','Suspendido') NOT NULL DEFAULT 'Activo',
+  Tipo_Contrato        ENUM('Tiempo completo','Medio tiempo','Servicios profesionales','Temporal')
+                       NOT NULL DEFAULT 'Tiempo completo',
+  Cuenta_Bancaria      VARCHAR(60) NULL,
+  Banco                VARCHAR(60) NULL,
+
+  Fecha_modificacion   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  Fecha_mod_alta       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
   CONSTRAINT PK_Funcionario PRIMARY KEY (Codigo_Funcionario),
-  KEY IX_Funcionario_Cedula (Cedula)
+  KEY IX_Funcionario_Cedula (Cedula),
+  KEY IX_Funcionario_Departamento (Departamento),
+  KEY IX_Funcionario_Estado (Estado_Empleado),
+  KEY IX_Funcionario_FechaIngreso (Fecha_Ingreso)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 CREATE TABLE Cliente (
   Codigo_Cliente      INT NOT NULL AUTO_INCREMENT,
-  Cedula              VARCHAR(20) NOT NULL,
+  Cedula              VARCHAR(40) NULL,                 -- normalizado (cédula/DIMEX/pasaporte)
   Nombre              VARCHAR(50) NOT NULL,
   Apellido            VARCHAR(50) NOT NULL,
   Telefono            VARCHAR(20) NOT NULL,
-  Correo              VARCHAR(120),
+  Correo              VARCHAR(120) NULL,
   Fecha_Nacimiento    DATE NOT NULL,
+
+  /* ACE-01-009 (integrado) */
+  Nivel           ENUM('Ninguno','Silver','Gold','VIP') NOT NULL DEFAULT 'Ninguno',
+  Puntos          INT NOT NULL DEFAULT 0,
+  Descuento_Porc  DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+
   Fecha_modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
   CONSTRAINT PK_Cliente PRIMARY KEY (Codigo_Cliente),
+  CONSTRAINT UQ_Cliente_Cedula UNIQUE (Cedula),
+  CONSTRAINT UQ_Cliente_Correo UNIQUE (Correo),
   KEY IX_Cliente_Correo (Correo),
   KEY IX_Cliente_Cedula (Cedula)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 CREATE TABLE Rol (
   Codigo_Rol          INT NOT NULL AUTO_INCREMENT,
@@ -166,6 +258,7 @@ CREATE TABLE Rol (
   Fecha_Modificacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_Rol PRIMARY KEY (Codigo_Rol)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 CREATE TABLE Usuario (
   Codigo_Usuario     INT NOT NULL AUTO_INCREMENT,
@@ -179,83 +272,103 @@ CREATE TABLE Usuario (
   Fecha_Creacion     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Modificacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   Codigo_Cliente     INT NULL,
+
   CONSTRAINT PK_Usuario PRIMARY KEY (Codigo_Usuario),
   KEY IX_Usuario_Rol (Rol_Id),
-  KEY IX_Usuario_Cli (Codigo_Cliente)
+  KEY IX_Usuario_Cli (Codigo_Cliente),
+  CONSTRAINT FK_Usuario_Rol
+    FOREIGN KEY (Rol_Id) REFERENCES Rol(Codigo_Rol)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_Usuario_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* Reserva (cabecera) */
+
+/* Reserva (cabecera) — incluye totales acumulados (FAC HU2) */
 CREATE TABLE Reserva (
-  Codigo_Reserva       INT NOT NULL AUTO_INCREMENT,
-  Codigo_Cliente       INT NOT NULL,
-  Codigo_Habitacion    INT NOT NULL,   -- habitación "principal"
-  Habitacion_Id        INT NOT NULL,   -- espejo para compatibilidad
-  Codigo_Funcionario   INT NOT NULL,
-  Fecha_Entrada        DATE NOT NULL,
-  Fecha_Salida         DATE NOT NULL,
-  Monto_Total          DECIMAL(12,2) NOT NULL,
-  Estado               ENUM('Confirmada','Cancelada','Pendiente','NoShow') NOT NULL DEFAULT 'Confirmada',
-  Canal                VARCHAR(30) NULL,
-  Numero_Comprobante   VARCHAR(40) NULL,
-  Fuente               VARCHAR(30) NULL,
-  Politica_Cancelacion VARCHAR(200) NULL,
-  Observaciones        VARCHAR(255) NULL,
-  Huespedes            VARCHAR(50)  NULL,
-  Descuento_Id         VARCHAR(50)  NULL,
-  Monto_Pagado         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Fecha_Ultimo_Pago    DATETIME NULL,
-  Fecha_Registro       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Codigo_Reserva         INT NOT NULL AUTO_INCREMENT,
+  Codigo_Cliente         INT NOT NULL,
+  Codigo_Habitacion      INT NOT NULL,   -- habitación "principal"
+  Habitacion_Id          INT NOT NULL,   -- espejo para compatibilidad
+  Codigo_Funcionario     INT NOT NULL,
+
+  Fecha_Entrada          DATE NOT NULL,
+  Fecha_Salida           DATE NOT NULL,
+
+  Monto_Total            DECIMAL(12,2) NOT NULL,
+  Monto_Total_Acumulado  DECIMAL(12,2) NOT NULL DEFAULT 0.00, -- FAC HU2
+  Monto_Pagado_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00, -- FAC HU2
+
+  Estado                 ENUM('Confirmada','Cancelada','Pendiente','NoShow') NOT NULL DEFAULT 'Confirmada',
+  Canal                  VARCHAR(30) NULL,
+  Numero_Comprobante     VARCHAR(40) NULL,
+  Fuente                 VARCHAR(30) NULL,
+  Politica_Cancelacion   VARCHAR(200) NULL,
+  Observaciones          VARCHAR(255) NULL,
+  Huespedes              VARCHAR(50)  NULL,
+  Descuento_Id           VARCHAR(50)  NULL,
+
+  Monto_Pagado           DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Fecha_Ultimo_Pago      DATETIME NULL,
+  Fecha_Registro         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
   CONSTRAINT PK_Reserva PRIMARY KEY (Codigo_Reserva),
   CONSTRAINT UQ_Reserva_Comprobante UNIQUE (Numero_Comprobante),
   KEY IX_Reserva_Cliente (Codigo_Cliente),
   KEY IX_Reserva_Fechas (Fecha_Entrada, Fecha_Salida),
   KEY IX_Reserva_Estado (Estado),
   KEY IX_Reserva_MontoPagado (Monto_Pagado),
-  KEY IX_Reserva_Habitacion_Id (Habitacion_Id)
+  KEY IX_Reserva_Habitacion_Id (Habitacion_Id),
+  KEY idx_reserva_balance (Monto_Total_Acumulado, Monto_Pagado_Acumulado),
+
+  CONSTRAINT FK_Reserva_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT FK_Reserva_Habitacion
+    FOREIGN KEY (Codigo_Habitacion) REFERENCES Habitacion(Codigo_Habitacion)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT FK_Reserva_Funcionario
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Triggers para mantener Habitacion_Id sincronizado
+
+/* ------------------------------------------------------------------------- */
+/* Triggers de Reserva (CONSOLIDADOS)                                         */
+/*  - BEFORE INSERT: sincroniza Habitacion_Id                                 */
+/*  - BEFORE UPDATE: bloquea historial + sincroniza Habitacion_Id             */
+/* ------------------------------------------------------------------------- */
 DELIMITER $$
-CREATE TRIGGER trg_reserva_sync_before_ins
+
+CREATE TRIGGER trg_reserva_before_ins
 BEFORE INSERT ON Reserva
 FOR EACH ROW
 BEGIN
   SET NEW.Habitacion_Id = NEW.Codigo_Habitacion;
 END$$
 
-CREATE TRIGGER trg_reserva_sync_before_upd
+CREATE TRIGGER trg_reserva_before_upd
 BEFORE UPDATE ON Reserva
 FOR EACH ROW
 BEGIN
+  /* ACE-01-002: bloquear edición si ya es historial */
+  IF OLD.Fecha_Salida < CURDATE() THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-002: Reserva en historial, no editable';
+  END IF;
+
+  /* sync */
   IF NEW.Codigo_Habitacion <> OLD.Codigo_Habitacion THEN
     SET NEW.Habitacion_Id = NEW.Codigo_Habitacion;
   END IF;
 END$$
+
 DELIMITER ;
 
--- FKs tras tener todas las tablas base
-ALTER TABLE Usuario
-  ADD CONSTRAINT FK_Usuario_Rol
-    FOREIGN KEY (Rol_Id) REFERENCES Rol(Codigo_Rol)
-    ON UPDATE CASCADE ON DELETE SET NULL,
-  ADD CONSTRAINT FK_Usuario_Cliente
-    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
-    ON UPDATE CASCADE ON DELETE SET NULL;
 
-ALTER TABLE Reserva
-  ADD CONSTRAINT FK_Reserva_Cliente
-    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
-    ON UPDATE CASCADE ON DELETE RESTRICT,
-  ADD CONSTRAINT FK_Reserva_Habitacion
-    FOREIGN KEY (Codigo_Habitacion) REFERENCES Habitacion(Codigo_Habitacion)
-    ON UPDATE CASCADE ON DELETE RESTRICT,
-  ADD CONSTRAINT FK_Reserva_Funcionario
-    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
-    ON UPDATE CASCADE ON DELETE RESTRICT;
-
-/* ------------------------------------------------------------------------- */
-/* GRR-01-014: Lista de espera                                               */
-/* ------------------------------------------------------------------------- */
+/* ===================================================================== */
+/* GRR-01-014: Waitlist                                                  */
+/* ===================================================================== */
 CREATE TABLE Waitlist (
   Id                 INT AUTO_INCREMENT PRIMARY KEY,
   Correo             VARCHAR(120) NOT NULL,
@@ -272,26 +385,31 @@ CREATE TABLE Waitlist (
   Fecha_Creacion     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY IX_WL_Estado (Estado),
   KEY IX_WL_Fechas (Fecha_Entrada, Fecha_Salida),
-  KEY IX_WL_Correo (Correo)
+  KEY IX_WL_Correo (Correo),
+  CONSTRAINT FK_WL_Reserva
+    FOREIGN KEY (Oferta_Reserva_Id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* ------------------------------------------------------------------------- */
-/* GRR-01-015: Cupones / Ajustes de tarifa                                   */
-/* ------------------------------------------------------------------------- */
+
+/* ===================================================================== */
+/* GRR-01-015: Cupones / Ajustes                                          */
+/* ===================================================================== */
 CREATE TABLE Coupon (
-  Codigo        VARCHAR(40) PRIMARY KEY,
-  Tipo          ENUM('porcentaje','monto','corporativo') NOT NULL,
-  Valor         DECIMAL(12,2) NOT NULL,
-  Valido_Desde  DATE NULL,
-  Valido_Hasta  DATE NULL,
-  Max_Usos      INT NULL,
-  Usos          INT NOT NULL DEFAULT 0,
-  Segmento      VARCHAR(40) NULL,
+  Codigo           VARCHAR(40) PRIMARY KEY,
+  Tipo             ENUM('porcentaje','monto','corporativo') NOT NULL,
+  Valor            DECIMAL(12,2) NOT NULL,
+  Valido_Desde     DATE NULL,
+  Valido_Hasta     DATE NULL,
+  Max_Usos         INT NULL,
+  Usos             INT NOT NULL DEFAULT 0,
+  Segmento         VARCHAR(40) NULL,
   Anticipacion_Min INT NULL,
-  Temporada     VARCHAR(40) NULL,
-  Activo        TINYINT(1) NOT NULL DEFAULT 1,
+  Temporada        VARCHAR(40) NULL,
+  Activo           TINYINT(1) NOT NULL DEFAULT 1,
   KEY IX_Coupon_Activo (Activo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 CREATE TABLE ReservaAjuste (
   Id               INT AUTO_INCREMENT PRIMARY KEY,
@@ -311,9 +429,10 @@ CREATE TABLE ReservaAjuste (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* ------------------------------------------------------------------------- */
-/* INV-07-001 - Categorías de insumos / Insumos                              */
-/* ------------------------------------------------------------------------- */
+
+/* ===================================================================== */
+/* Inventario                                                            */
+/* ===================================================================== */
 CREATE TABLE InvCategoria (
   Id               INT NOT NULL AUTO_INCREMENT,
   Nombre           VARCHAR(80)  NOT NULL,
@@ -345,30 +464,35 @@ CREATE TABLE InvInsumo (
   KEY IX_InvInsumo_Categoria (Categoria_Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* ------------------------------------------------------------------------- */
-/* GRR-01-003: Estancias y reglas                                            */
-/* ------------------------------------------------------------------------- */
-CREATE TABLE ReservaEstancia (
-  Id_Estancia        INT NOT NULL AUTO_INCREMENT,
-  Codigo_Reserva     INT NOT NULL,
-  Habitacion_Id      INT NOT NULL,
-  Fecha_Desde        DATE NOT NULL,
-  Fecha_Hasta        DATE NOT NULL,
-  Origen             ENUM('Automatico','Manual','Reasignacion','Union','Division') NOT NULL DEFAULT 'Automatico',
-  Decision_Id        INT NULL,
-  Score_Total        DECIMAL(9,4) NULL,
-  Motivos_JSON       JSON NULL,
-  Preferencias_JSON  JSON NULL,
-  Estado             ENUM('Pendiente','Asignada','Liberada','Cancelada') NOT NULL DEFAULT 'Asignada',
-  Creado_Por         INT NULL,
-  Creado_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_ReservaEstancia PRIMARY KEY (Id_Estancia),
-  KEY IX_RE_Rango (Fecha_Desde, Fecha_Hasta),
-  KEY IX_RE_Habitacion (Habitacion_Id),
-  KEY IX_RE_Reserva (Codigo_Reserva),
-  KEY IX_RE_Estado (Estado)
+CREATE TABLE InvMovimiento (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Insumo_Id        INT NOT NULL,
+  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION','ENTRADA_COMPRA','ENTRADA_DEVOLUCION') NOT NULL,
+  Campo            VARCHAR(60)  NULL,
+  Valor_Antes      VARCHAR(120) NULL,
+  Valor_Despues    VARCHAR(120) NULL,
+  Delta            DECIMAL(14,3) NULL,
+  Motivo           VARCHAR(255) NOT NULL,
+  Doc_Tipo         VARCHAR(30)  NULL,
+  Doc_Numero       VARCHAR(60)  NULL,
+  Proveedor        VARCHAR(120) NULL,
+  Fecha_Mov        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Usuario_Id       INT NULL,
+  Usuario_Nombre   VARCHAR(120) NULL,
+  Usuario_Email    VARCHAR(120) NULL,
+  CONSTRAINT PK_InvMovimiento PRIMARY KEY (Id),
+  CONSTRAINT FK_InvMovimiento_Insumo
+    FOREIGN KEY (Insumo_Id) REFERENCES InvInsumo(Id)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  KEY IX_InvMovimiento_Insumo (Insumo_Id),
+  KEY IX_InvMovimiento_Tipo   (Tipo),
+  KEY IX_InvMovimiento_Fecha  (Fecha_Mov)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+/* ===================================================================== */
+/* GRR-01-003: Estancias / Reglas / Decisiones / Preferencias             */
+/* ===================================================================== */
 CREATE TABLE ReglaAsignacion (
   Id_Regla       INT NOT NULL AUTO_INCREMENT,
   Nombre         VARCHAR(80) NOT NULL,
@@ -394,7 +518,40 @@ CREATE TABLE AsignacionDecision (
   CONSTRAINT PK_AsignacionDecision PRIMARY KEY (Id_Decision),
   KEY IX_AD_Reserva (Codigo_Reserva),
   KEY IX_AD_Tipo (Tipo),
-  KEY IX_AD_Resultado (Resultado)
+  KEY IX_AD_Resultado (Resultado),
+  CONSTRAINT FK_AD_Reserva
+    FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE ReservaEstancia (
+  Id_Estancia        INT NOT NULL AUTO_INCREMENT,
+  Codigo_Reserva     INT NOT NULL,
+  Habitacion_Id      INT NOT NULL,
+  Fecha_Desde        DATE NOT NULL,
+  Fecha_Hasta        DATE NOT NULL,
+  Origen             ENUM('Automatico','Manual','Reasignacion','Union','Division') NOT NULL DEFAULT 'Automatico',
+  Decision_Id        INT NULL,
+  Score_Total        DECIMAL(9,4) NULL,
+  Motivos_JSON       JSON NULL,
+  Preferencias_JSON  JSON NULL,
+  Estado             ENUM('Pendiente','Asignada','Liberada','Cancelada') NOT NULL DEFAULT 'Asignada',
+  Creado_Por         INT NULL,
+  Creado_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ReservaEstancia PRIMARY KEY (Id_Estancia),
+  KEY IX_RE_Rango (Fecha_Desde, Fecha_Hasta),
+  KEY IX_RE_Habitacion (Habitacion_Id),
+  KEY IX_RE_Reserva (Codigo_Reserva),
+  KEY IX_RE_Estado (Estado),
+  CONSTRAINT FK_RE_Reserva
+    FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_RE_Habitacion
+    FOREIGN KEY (Habitacion_Id) REFERENCES Habitacion(Codigo_Habitacion)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT FK_RE_Decision
+    FOREIGN KEY (Decision_Id) REFERENCES AsignacionDecision(Id_Decision)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE PreferenciaHuesped (
@@ -404,30 +561,16 @@ CREATE TABLE PreferenciaHuesped (
   Valor          VARCHAR(120) NOT NULL,
   CONSTRAINT PK_PrefHuesped PRIMARY KEY (Id_Pref),
   KEY IX_Pref_Cliente (Codigo_Cliente),
-  KEY IX_Pref_Clave (Clave)
+  KEY IX_Pref_Clave (Clave),
+  CONSTRAINT FK_Pref_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE ReservaEstancia
-  ADD CONSTRAINT FK_RE_Reserva   FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
-    ON UPDATE CASCADE ON DELETE CASCADE,
-  ADD CONSTRAINT FK_RE_Habitacion FOREIGN KEY (Habitacion_Id) REFERENCES Habitacion(Codigo_Habitacion)
-    ON UPDATE CASCADE ON DELETE RESTRICT;
 
-ALTER TABLE AsignacionDecision
-  ADD CONSTRAINT FK_AD_Reserva FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
-    ON UPDATE CASCADE ON DELETE CASCADE;
-
-ALTER TABLE ReservaEstancia
-  ADD CONSTRAINT FK_RE_Decision FOREIGN KEY (Decision_Id) REFERENCES AsignacionDecision(Id_Decision)
-    ON UPDATE CASCADE ON DELETE SET NULL;
-
-ALTER TABLE PreferenciaHuesped
-  ADD CONSTRAINT FK_Pref_Cliente FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
-    ON UPDATE CASCADE ON DELETE CASCADE;
-
-/* ------------------------------------------------------------------------- */
-/* Tablas operativas adicionales                                             */
-/* ------------------------------------------------------------------------- */
+/* ===================================================================== */
+/* Operación: Villa / Housekeeping / MaintenanceRequest                   */
+/* ===================================================================== */
 CREATE TABLE Villa (
   Id         INT NOT NULL AUTO_INCREMENT,
   Nombre     VARCHAR(120) NOT NULL,
@@ -445,7 +588,8 @@ CREATE TABLE HousekeepingTask (
   Fecha_Creacion  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Cierre    DATETIME NULL,
   CONSTRAINT PK_HK PRIMARY KEY (Id),
-  CONSTRAINT FK_HK_Room FOREIGN KEY (Habitacion_Id) REFERENCES Habitacion(Codigo_Habitacion)
+  CONSTRAINT FK_HK_Room
+    FOREIGN KEY (Habitacion_Id) REFERENCES Habitacion(Codigo_Habitacion)
     ON UPDATE CASCADE ON DELETE CASCADE,
   KEY IX_HK_Estado (Estado),
   KEY IX_HK_Fecha (Fecha_Creacion)
@@ -460,13 +604,17 @@ CREATE TABLE MaintenanceRequest (
   Fecha_Creacion   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Cierre     DATETIME NULL,
   CONSTRAINT PK_MR PRIMARY KEY (Id),
-  CONSTRAINT FK_MR_Room FOREIGN KEY (Habitacion_Id) REFERENCES Habitacion(Codigo_Habitacion)
+  CONSTRAINT FK_MR_Room
+    FOREIGN KEY (Habitacion_Id) REFERENCES Habitacion(Codigo_Habitacion)
     ON UPDATE CASCADE ON DELETE CASCADE,
   KEY IX_MR_Estado (Estado),
   KEY IX_MR_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* Documentación */
+
+/* ===================================================================== */
+/* Documentos: ReservaDocumento / ClienteDocumento                        */
+/* ===================================================================== */
 CREATE TABLE Documento (
   Id              INT NOT NULL AUTO_INCREMENT,
   Tipo            VARCHAR(50) NOT NULL,
@@ -493,9 +641,30 @@ CREATE TABLE ReservaDocumento (
   KEY IX_ResDoc_Documento (Documento_Id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* ------------------------------------------------------------------------- */
-/* KPIs y Auditoría                                                          */
-/* ------------------------------------------------------------------------- */
+CREATE TABLE ClienteDocumento (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Codigo_Cliente   INT NOT NULL,
+  Documento_Id     INT NOT NULL,
+  Tipo             ENUM('ID','FACTURA','COMPROBANTE','OTRO') NOT NULL DEFAULT 'OTRO',
+  Min_Rol          ENUM('Cliente','Recepcionista','Administrador') NOT NULL DEFAULT 'Cliente',
+  Visible          TINYINT(1) NOT NULL DEFAULT 1,
+  Fecha_Creacion   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_ClienteDocumento PRIMARY KEY (Id),
+  CONSTRAINT FK_ClienteDocumento_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_ClienteDocumento_Documento
+    FOREIGN KEY (Documento_Id) REFERENCES Documento(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  KEY IX_ClienteDocumento_Cliente (Codigo_Cliente),
+  KEY IX_ClienteDocumento_Rol (Min_Rol),
+  KEY IX_ClienteDocumento_Tipo (Tipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* ===================================================================== */
+/* KPI / Auditoría                                                        */
+/* ===================================================================== */
 CREATE TABLE KPI_Stats (
   Id                     INT NOT NULL AUTO_INCREMENT,
   Periodo                ENUM('day','week','month') NOT NULL,
@@ -552,9 +721,11 @@ BEGIN
 END$$
 DELIMITER ;
 
-/* ------------------------------------------------------------------------- */
-/* Finanzas (Facturas, Libro mayor, Recibos, Notas, Caja)                    */
-/* ------------------------------------------------------------------------- */
+
+/* ===================================================================== */
+/* FINANZAS                                                               */
+/* ===================================================================== */
+
 CREATE TABLE fin_invoices (
   id_factura      INT NOT NULL AUTO_INCREMENT,
   numero          VARCHAR(50) NOT NULL,
@@ -615,7 +786,7 @@ CREATE TABLE fin_receipts (
   reserva_id   INT NULL,
   invoice_id   INT NULL,
   tx_id        INT NULL,
-  metodo       VARCHAR(30) NOT NULL DEFAULT 'Tarjeta',
+  metodo       VARCHAR(30) NOT NULL DEFAULT 'Tarjeta',  -- admite 'Efectivo'
   currency     VARCHAR(10) NOT NULL DEFAULT 'CRC',
   monto        DECIMAL(14,2) NOT NULL,
   emitido_por  INT NOT NULL,
@@ -625,7 +796,8 @@ CREATE TABLE fin_receipts (
   UNIQUE KEY UQ_fin_receipts_numero (numero),
   KEY IX_fin_receipts_reserva (reserva_id),
   KEY IX_fin_receipts_invoice (invoice_id),
-  KEY IX_fin_receipts_tx (tx_id)
+  KEY IX_fin_receipts_tx (tx_id),
+  KEY IX_fin_receipts_emitido (emitido_por)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE fin_notes (
@@ -643,10 +815,10 @@ CREATE TABLE fin_notes (
   PRIMARY KEY (id_note),
   UNIQUE KEY UQ_fin_notes_numero (numero),
   KEY IX_fin_notes_invoice (ref_invoice),
-  KEY IX_fin_notes_reserva (ref_reserva)
+  KEY IX_fin_notes_reserva (ref_reserva),
+  KEY IX_fin_notes_emitido (emitido_por)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Caja
 CREATE TABLE fin_cash_session (
   id_session            INT NOT NULL AUTO_INCREMENT,
   fecha                 DATE NOT NULL,
@@ -661,7 +833,9 @@ CREATE TABLE fin_cash_session (
   notes_close           VARCHAR(255) NULL,
   PRIMARY KEY (id_session),
   UNIQUE KEY UQ_fin_cash_session_day (fecha, opened_by),
-  KEY IX_fin_cash_session_status (status)
+  KEY IX_fin_cash_session_status (status),
+  KEY IX_fin_cash_session_opened_by (opened_by),
+  KEY IX_fin_cash_session_closed_by (closed_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE fin_cash_movement (
@@ -679,97 +853,81 @@ CREATE TABLE fin_cash_movement (
   link_invoice  INT NULL,
   link_note     INT NULL,
   estado        ENUM('Aplicado','Anulado') NOT NULL DEFAULT 'Aplicado',
+
+  /* FAC HU2 (integración) */
+  reserva_id       INT NULL,
+  ledger_entry_id  INT NULL,
+
   PRIMARY KEY (id_move),
   KEY IX_fin_cash_movement_session (session_id),
+  KEY idx_fin_cash_movement_reserva (reserva_id),
+  KEY idx_fin_cash_movement_ledger (ledger_entry_id),
+
   CONSTRAINT FK_fin_cash_movement_session
     FOREIGN KEY (session_id) REFERENCES fin_cash_session(id_session)
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* ------------------------------------------------------------------------- */
-/* Vistas (se crean DESPUÉS de las tablas referenciadas)                     */
-/* ------------------------------------------------------------------------- */
-CREATE OR REPLACE VIEW v_reservas_ext AS
-SELECT 
-  r.Codigo_Reserva, 
-  r.Numero_Comprobante,
-  r.Estado,
-  r.Canal,
-  r.Fecha_Entrada,
-  r.Fecha_Salida,
-  r.Monto_Total,
-  r.Fecha_Registro,
-  r.Observaciones,
-  r.Huespedes,
-  c.Codigo_Cliente,
-  c.Correo          AS ClienteCorreo,
-  CONCAT(c.Nombre,' ',c.Apellido) AS ClienteNombre,
-  h.Codigo_Habitacion,
-  h.Numero_Habitacion,
-  h.Tipo            AS Tipo_Habitacion,
-  h.Precio_Noche
-FROM Reserva r
-JOIN Cliente c     ON r.Codigo_Cliente    = c.Codigo_Cliente
-JOIN Habitacion h  ON r.Codigo_Habitacion = h.Codigo_Habitacion;
 
-CREATE OR REPLACE VIEW v_reserva_pagos_pos AS
-SELECT
-  t.reserva_id,
-  SUM(CASE WHEN l.debit > 0 THEN l.debit ELSE 0 END) AS total_pagado_pos
-FROM fin_ledger_tx t
-JOIN fin_ledger_line l ON l.id_tx = t.id_tx
-WHERE t.status = 'posted'
-GROUP BY t.reserva_id;
+/* FAC HU2: fin_payment */
+CREATE TABLE fin_payment (
+  id_payment        INT AUTO_INCREMENT PRIMARY KEY,
+  reserva_id        INT NOT NULL,
+  metodo            VARCHAR(50) NOT NULL,
+  monto             DECIMAL(12,2) NOT NULL,
+  referencia        VARCHAR(100) NULL,
+  created_at        DATETIME NOT NULL DEFAULT NOW(),
+  created_by        INT NOT NULL,
+  source            VARCHAR(50) NOT NULL DEFAULT 'Caja',
+  cash_session_id   INT NULL,
+  cash_movement_id  INT NULL,
+  notes             VARCHAR(255) NULL,
+  INDEX idx_fin_payment_reserva (reserva_id),
+  INDEX idx_fin_payment_cash_session (cash_session_id),
+  INDEX idx_fin_payment_cash_movement (cash_movement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE OR REPLACE VIEW v_fin_caja_resumen AS
-SELECT
-  s.id_session,
-  s.fecha,
-  s.opening_cash,
-  IFNULL(r.ingresos_efectivo, 0.00) AS ingresos_efectivo,
-  IFNULL(m.egresos_efectivo, 0.00)  AS egresos_efectivo,
-  IFNULL(m.ajustes_mas, 0.00)       AS ajustes_mas,
-  IFNULL(m.ajustes_menos, 0.00)     AS ajustes_menos,
-  (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
-    + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0)) AS efectivo_esperado,
-  s.closing_cash_counted AS efectivo_contado,
-  (IFNULL(s.closing_cash_counted,0) - 
-   (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
-     + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0))) AS descuadre
-FROM fin_cash_session s
-LEFT JOIN (
-  SELECT DATE(creado_en) AS fecha, SUM(monto) AS ingresos_efectivo
-  FROM fin_receipts
-  WHERE estado='Emitido' AND metodo='Efectivo'
-  GROUP BY DATE(creado_en)
-) r ON r.fecha = s.fecha
-LEFT JOIN (
-  SELECT DATE(created_at) AS fecha,
-         SUM(CASE WHEN tipo='Egreso' AND metodo='Efectivo' AND estado='Aplicado' THEN monto ELSE 0 END) AS egresos_efectivo,
-         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto >= 0 AND tipo IN ('Ingreso','Ajuste') THEN monto ELSE 0 END) AS ajustes_mas,
-         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto < 0  AND tipo='Ajuste' THEN -monto ELSE 0 END) AS ajustes_menos
-  FROM fin_cash_movement
-  GROUP BY DATE(created_at)
-) m ON m.fecha = s.fecha;
 
-/* ------------------------------------------------------------------------- */
-/* Cierres mensuales e historial                                             */
-/* ------------------------------------------------------------------------- */
-CREATE TABLE IF NOT EXISTS fin_period_lock (
+/* FAC HU2: fin_ledger (asiento simple) */
+CREATE TABLE fin_ledger (
+  id_entry        INT AUTO_INCREMENT PRIMARY KEY,
+  fecha           DATETIME NOT NULL DEFAULT NOW(),
+  reserva_id      INT NULL,
+  cash_session_id INT NULL,
+  descripcion     VARCHAR(255) NOT NULL,
+  account_debit   VARCHAR(50) NOT NULL,
+  account_credit  VARCHAR(50) NOT NULL,
+  monto           DECIMAL(12,2) NOT NULL,
+  created_by      INT NOT NULL,
+  INDEX idx_fin_ledger_reserva (reserva_id),
+  INDEX idx_fin_ledger_cash (cash_session_id),
+  INDEX idx_fin_ledger_created_by (created_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* fin_period_lock (definición final ya corregida) */
+CREATE TABLE fin_period_lock (
   id_lock        INT AUTO_INCREMENT PRIMARY KEY,
   period_key     CHAR(7) NOT NULL,
-  period_start   DATE     NOT NULL,
-  period_end     DATE     NOT NULL,
-  status         ENUM('closed','reopened') NOT NULL DEFAULT 'closed',
-  note           VARCHAR(255) NULL,
+  period_start   DATE NULL,
+  period_end     DATE NULL,
+  status         ENUM('open','closed','reopened') NOT NULL DEFAULT 'open',
+  locked_by      INT NULL,
+  locked_at      DATETIME NULL,
+  notes          VARCHAR(255) NULL,
+  legacy_note    VARCHAR(255) NULL,
   closed_by      INT NULL,
-  closed_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  closed_at      DATETIME NULL,
   reopened_by    INT NULL,
   reopened_at    DATETIME NULL,
-  UNIQUE KEY uq_fin_period_lock (period_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  UNIQUE KEY uq_fin_period_lock (period_key),
+  KEY IX_fin_period_lock_status (status),
+  KEY IX_fin_period_lock_locked_by (locked_by),
+  KEY IX_fin_period_lock_closed_by (closed_by),
+  KEY IX_fin_period_lock_reopened_by (reopened_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS fin_monthly_close (
+CREATE TABLE fin_monthly_close (
   id_close       INT AUTO_INCREMENT PRIMARY KEY,
   period_key     CHAR(7) NOT NULL,
   totals_json    JSON NOT NULL,
@@ -777,40 +935,227 @@ CREATE TABLE IF NOT EXISTS fin_monthly_close (
   created_by     INT NULL,
   hash_sum       CHAR(64) NULL,
   UNIQUE KEY uq_fin_monthly_close (period_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* ------------------------------------------------------------------------- */
-/* Inventario — Movimientos                                                  */
-/* ------------------------------------------------------------------------- */
-CREATE TABLE InvMovimiento (
-  Id               INT NOT NULL AUTO_INCREMENT,
-  Insumo_Id        INT NOT NULL,
-  Tipo             ENUM('AJUSTE','EDICION','INACTIVACION','REACTIVACION','ENTRADA_COMPRA','ENTRADA_DEVOLUCION') NOT NULL,
-  Campo            VARCHAR(60)  NULL,
-  Valor_Antes      VARCHAR(120) NULL,
-  Valor_Despues    VARCHAR(120) NULL,
-  Delta            DECIMAL(14,3) NULL,
-  Motivo           VARCHAR(255) NOT NULL,
-  Doc_Tipo         VARCHAR(30)  NULL,
-  Doc_Numero       VARCHAR(60)  NULL,
-  Proveedor        VARCHAR(120) NULL,
-  Fecha_Mov        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Usuario_Id       INT NULL,
-  Usuario_Nombre   VARCHAR(120) NULL,
-  Usuario_Email    VARCHAR(120) NULL,
-  CONSTRAINT PK_InvMovimiento PRIMARY KEY (Id),
-  CONSTRAINT FK_InvMovimiento_Insumo
-    FOREIGN KEY (Insumo_Id) REFERENCES InvInsumo(Id)
-    ON UPDATE CASCADE ON DELETE RESTRICT,
-  KEY IX_InvMovimiento_Insumo (Insumo_Id),
-  KEY IX_InvMovimiento_Tipo   (Tipo),
-  KEY IX_InvMovimiento_Fecha  (Fecha_Mov)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* ------------------------------------------------------------------------- */
-/* Mantenimiento                                                             */
-/* ------------------------------------------------------------------------- */
-CREATE TABLE IF NOT EXISTS MantenimientoSolicitud (
+
+/* FAC-07-008: Cobros recurrentes */
+CREATE TABLE fin_recurring_plan (
+  id_plan          INT NOT NULL AUTO_INCREMENT,
+  reserva_id       INT NULL,
+  cliente_id       INT NULL,
+  descripcion      VARCHAR(160) NULL,
+  frecuencia       ENUM('DAILY','WEEKLY','MONTHLY') NOT NULL,
+  monto            DECIMAL(14,2) NOT NULL,
+  currency         VARCHAR(10) NOT NULL DEFAULT 'CRC',
+  fecha_inicio     DATE NOT NULL,
+  fecha_fin        DATE NULL,
+  numero_cuotas    INT NULL,
+  proximo_cobro_en DATE NOT NULL,
+  estado           ENUM('ACTIVE','PAUSED','CANCELLED','FINISHED') NOT NULL DEFAULT 'ACTIVE',
+  creado_por       INT NOT NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by       INT NULL,
+  updated_at       DATETIME NULL,
+  PRIMARY KEY (id_plan),
+  KEY IX_fin_recurring_plan_reserva (reserva_id),
+  KEY IX_fin_recurring_plan_cliente (cliente_id),
+  KEY IX_fin_recurring_plan_estado (estado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE fin_recurring_run (
+  id_run           INT NOT NULL AUTO_INCREMENT,
+  plan_id          INT NOT NULL,
+  fecha_programada DATE NOT NULL,
+  fecha_ejecucion  DATETIME NULL,
+  tx_id            INT NULL,
+  estado           ENUM('PENDING','EXECUTED','FAILED','SKIPPED') NOT NULL DEFAULT 'PENDING',
+  mensaje_error    VARCHAR(255) NULL,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_run),
+  KEY IX_fin_recurring_run_plan (plan_id),
+  KEY IX_fin_recurring_run_tx (tx_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* FAC-07-009: FX rates */
+CREATE TABLE fin_fx_rate (
+  id_rate        INT NOT NULL AUTO_INCREMENT,
+  currency       VARCHAR(10) NOT NULL,
+  rate_to_base   DECIMAL(18,6) NOT NULL,
+  rate_date      DATE NOT NULL,
+  source         VARCHAR(40) NULL DEFAULT 'MANUAL',
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id_rate),
+  UNIQUE KEY UX_fxrate_currency_date (currency, rate_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* --------------------- FKs Finanzas (después de todo) --------------------- */
+ALTER TABLE fin_invoices
+  ADD CONSTRAINT FK_fin_invoices_reserva
+    FOREIGN KEY (id_reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_invoices_usuario
+    FOREIGN KEY (id_usuario) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT;
+
+ALTER TABLE fin_ledger_tx
+  ADD CONSTRAINT FK_fin_ledger_tx_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE fin_receipts
+  ADD CONSTRAINT FK_fin_receipts_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_receipts_invoice
+    FOREIGN KEY (invoice_id) REFERENCES fin_invoices(id_factura)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_receipts_tx
+    FOREIGN KEY (tx_id) REFERENCES fin_ledger_tx(id_tx)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_receipts_emitido_por
+    FOREIGN KEY (emitido_por) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT;
+
+ALTER TABLE fin_notes
+  ADD CONSTRAINT FK_fin_notes_invoice
+    FOREIGN KEY (ref_invoice) REFERENCES fin_invoices(id_factura)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_notes_reserva
+    FOREIGN KEY (ref_reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_notes_emitido_por
+    FOREIGN KEY (emitido_por) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT;
+
+ALTER TABLE fin_cash_session
+  ADD CONSTRAINT FK_fin_cash_session_opened_by
+    FOREIGN KEY (opened_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD CONSTRAINT FK_fin_cash_session_closed_by
+    FOREIGN KEY (closed_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE fin_cash_movement
+  ADD CONSTRAINT FK_fin_cash_movement_created_by
+    FOREIGN KEY (created_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD CONSTRAINT FK_fin_cash_movement_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_cash_movement_receipt
+    FOREIGN KEY (link_receipt) REFERENCES fin_receipts(id_receipt)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_cash_movement_invoice
+    FOREIGN KEY (link_invoice) REFERENCES fin_invoices(id_factura)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_cash_movement_note
+    FOREIGN KEY (link_note) REFERENCES fin_notes(id_note)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_cash_movement_ledger_entry
+    FOREIGN KEY (ledger_entry_id) REFERENCES fin_ledger(id_entry)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE fin_payment
+  ADD CONSTRAINT FK_fin_payment_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  ADD CONSTRAINT FK_fin_payment_created_by
+    FOREIGN KEY (created_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD CONSTRAINT FK_fin_payment_cash_session
+    FOREIGN KEY (cash_session_id) REFERENCES fin_cash_session(id_session)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_payment_cash_movement
+    FOREIGN KEY (cash_movement_id) REFERENCES fin_cash_movement(id_move)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE fin_ledger
+  ADD CONSTRAINT FK_fin_ledger_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_ledger_cash_session
+    FOREIGN KEY (cash_session_id) REFERENCES fin_cash_session(id_session)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_ledger_created_by
+    FOREIGN KEY (created_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT;
+
+ALTER TABLE fin_period_lock
+  ADD CONSTRAINT FK_fin_period_lock_locked_by
+    FOREIGN KEY (locked_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_period_lock_closed_by
+    FOREIGN KEY (closed_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_period_lock_reopened_by
+    FOREIGN KEY (reopened_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE fin_monthly_close
+  ADD CONSTRAINT FK_fin_monthly_close_created_by
+    FOREIGN KEY (created_by) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE fin_recurring_plan
+  ADD CONSTRAINT FK_fin_recurring_plan_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_recurring_plan_cliente
+    FOREIGN KEY (cliente_id) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  ADD CONSTRAINT FK_fin_recurring_plan_creado_por
+    FOREIGN KEY (creado_por) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE RESTRICT;
+
+ALTER TABLE fin_recurring_run
+  ADD CONSTRAINT FK_fin_recurring_run_plan
+    FOREIGN KEY (plan_id) REFERENCES fin_recurring_plan(id_plan)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  ADD CONSTRAINT FK_fin_recurring_run_tx
+    FOREIGN KEY (tx_id) REFERENCES fin_ledger_tx(id_tx)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+
+/* --------------------- Triggers inmutabilidad (ACE-01-004) ---------------- */
+DELIMITER $$
+
+CREATE TRIGGER trg_fin_receipts_block_upd
+BEFORE UPDATE ON fin_receipts
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Recibo es histórico, no editable';
+END$$
+
+CREATE TRIGGER trg_fin_receipts_block_del
+BEFORE DELETE ON fin_receipts
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Recibo es histórico, no eliminable';
+END$$
+
+CREATE TRIGGER trg_fin_ledger_tx_block_upd
+BEFORE UPDATE ON fin_ledger_tx
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Tx contable es histórica, no editable';
+END$$
+
+CREATE TRIGGER trg_fin_ledger_tx_block_del
+BEFORE DELETE ON fin_ledger_tx
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ACE-01-004: Tx contable es histórica, no eliminable';
+END$$
+
+DELIMITER ;
+
+
+/* ===================================================================== */
+/* Mantenimiento (módulo Mantenimiento*)                                  */
+/* ===================================================================== */
+CREATE TABLE MantenimientoSolicitud (
   Id                INT NOT NULL AUTO_INCREMENT,
   Codigo_Habitacion INT NOT NULL,
   Titulo            VARCHAR(120) NOT NULL,
@@ -828,7 +1173,7 @@ CREATE TABLE IF NOT EXISTS MantenimientoSolicitud (
   KEY IX_MantenimientoSolicitud_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS MantenimientoCambioEstado (
+CREATE TABLE MantenimientoCambioEstado (
   Id              INT NOT NULL AUTO_INCREMENT,
   Solicitud_Id    INT NOT NULL,
   Estado_Antes    VARCHAR(12),
@@ -845,7 +1190,7 @@ CREATE TABLE IF NOT EXISTS MantenimientoCambioEstado (
   KEY IX_MantenimientoCambioEstado_Fecha (Fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS MantenimientoPreventivo (
+CREATE TABLE MantenimientoPreventivo (
   Id              INT NOT NULL AUTO_INCREMENT,
   Equipo          VARCHAR(120) NOT NULL,
   Ubicacion       VARCHAR(120),
@@ -858,7 +1203,7 @@ CREATE TABLE IF NOT EXISTS MantenimientoPreventivo (
   KEY IX_MantenimientoPreventivo_ProximaFecha (Proxima_Fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS MantenimientoNotificacion (
+CREATE TABLE MantenimientoNotificacion (
   Id             INT NOT NULL AUTO_INCREMENT,
   Solicitud_Id   INT,
   Para_Email     VARCHAR(150),
@@ -877,164 +1222,15 @@ CREATE TABLE IF NOT EXISTS MantenimientoNotificacion (
   KEY IX_MantenimientoNotificacion_Fecha (Fecha_Creacion)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* ------------------------------------------------------------------------- */
-/* ChatBot                                         */
-/* ------------------------------------------------------------------------- */
 
-
-CREATE TABLE IF NOT EXISTS SAC_KB_Doc (
-  Id           INT AUTO_INCREMENT PRIMARY KEY,
-  Titulo       VARCHAR(180) NOT NULL,
-  FileName     VARCHAR(240) NOT NULL,
-  MimeType     VARCHAR(80)  NOT NULL,
-  Bytes        INT          NULL,
-  Chunks       INT          NOT NULL DEFAULT 0,
-  HashSum      CHAR(64)     NULL,
-  Activo       TINYINT(1)   NOT NULL DEFAULT 1,
-  SubidoPor    INT          NULL,
-  SubidoEn     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY IX_KB_Activo (Activo, SubidoEn)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS SAC_KB_QA (
-  Id         INT AUTO_INCREMENT PRIMARY KEY,
-  Pregunta   VARCHAR(500) NOT NULL,
-  Respuesta  TEXT NOT NULL,
-  Activo     TINYINT(1) NOT NULL DEFAULT 1,
-  CreadoPor  INT NULL,
-  CreadoEn   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY UQ_KB_Q (Pregunta(255))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS SAC_KB_Unanswered (
-  Id           INT AUTO_INCREMENT PRIMARY KEY,
-  Pregunta     VARCHAR(500) NOT NULL,
-  Detalle      TEXT NULL,
-  Origen       ENUM('WEB','WHATSAPP') NOT NULL DEFAULT 'WEB',
-  Session_Id   VARCHAR(64) NULL,
-  Cliente_Id   INT NULL,
-  Estado       ENUM('NUEVA','REVISADA','RESPONDIDA') NOT NULL DEFAULT 'NUEVA',
-  Creada_At    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Revisada_At  DATETIME NULL,
-  Respondida_At DATETIME NULL,
-  KEY IX_KB_Un_Q (Estado, Creada_At)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-
-
--- HU 6 de FAC necesita esto
-
--- 1) Aceptar también 'open' en el ENUM de status
-ALTER TABLE fin_period_lock
-  MODIFY COLUMN status ENUM('open','closed','reopened')
-  NOT NULL DEFAULT 'open';
-
--- 2) Hacer period_start y period_end opcionales
-ALTER TABLE fin_period_lock
-  MODIFY COLUMN period_start DATE NULL,
-  MODIFY COLUMN period_end   DATE NULL;
-
--- 3) Permitir que closed_at sea NULL para periodos aún abiertos
-ALTER TABLE fin_period_lock
-  MODIFY COLUMN closed_at DATETIME NULL;
-
-ALTER TABLE fin_period_lock
-  ADD COLUMN locked_by INT NULL AFTER status,
-  ADD COLUMN locked_at DATETIME NULL AFTER locked_by,
-  ADD COLUMN notes VARCHAR(255) NULL AFTER locked_at;
-
-ALTER TABLE fin_period_lock
-  CHANGE COLUMN note legacy_note VARCHAR(255) NULL;
-
-/* ===============================================================
-   HU 2 de FAC — Integración POS-Caja-Reserva-Contabilidad
-   Ajustado al esquema Hotel VillaGrace (tabla Reserva)
-   =============================================================== */
-
-/* 1️ fin_cash_movement → agregar vínculos */
-ALTER TABLE fin_cash_movement
-  ADD COLUMN reserva_id INT NULL AFTER estado,
-  ADD COLUMN ledger_entry_id INT NULL AFTER reserva_id,
-  ADD INDEX idx_fin_cash_movement_reserva (reserva_id),
-  ADD INDEX idx_fin_cash_movement_ledger (ledger_entry_id);
-
-/* 2️ fin_payment → crear o asegurar columnas */
-CREATE TABLE IF NOT EXISTS fin_payment (
-    id_payment        INT AUTO_INCREMENT PRIMARY KEY,
-    reserva_id        INT NOT NULL,
-    metodo            VARCHAR(50) NOT NULL,
-    monto             DECIMAL(12,2) NOT NULL,
-    referencia        VARCHAR(100) NULL,
-    created_at        DATETIME NOT NULL DEFAULT NOW(),
-    created_by        INT NOT NULL,
-    source            VARCHAR(50) NOT NULL DEFAULT 'Caja',
-    cash_session_id   INT NULL,
-    cash_movement_id  INT NULL,
-    notes             VARCHAR(255) NULL,
-    INDEX idx_fin_payment_reserva (reserva_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* 3️ Reserva → agregar columnas para totales y pagos */
-ALTER TABLE Reserva
-  ADD COLUMN Monto_Total_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total,
-  ADD COLUMN Monto_Pagado_Acumulado DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Monto_Total_Acumulado,
-  ADD INDEX idx_reserva_balance (Monto_Total_Acumulado, Monto_Pagado_Acumulado);
-
-/* 4️ Libro contable (fin_ledger) */
-CREATE TABLE IF NOT EXISTS fin_ledger (
-    id_entry        INT AUTO_INCREMENT PRIMARY KEY,
-    fecha           DATETIME NOT NULL DEFAULT NOW(),
-    reserva_id      INT NULL,
-    cash_session_id INT NULL,
-    descripcion     VARCHAR(255) NOT NULL,
-    account_debit   VARCHAR(50) NOT NULL,
-    account_credit  VARCHAR(50) NOT NULL,
-    monto           DECIMAL(12,2) NOT NULL,
-    created_by      INT NOT NULL,
-    INDEX idx_fin_ledger_reserva (reserva_id),
-    INDEX idx_fin_ledger_cash (cash_session_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* ===============================================================
-   HU 1 de HRM — Empleados y expediente
-   =============================================================== */
-
-/* ============================================================
-   HRM-08-001 — Extensión de tabla Funcionario
-   Agrega campos laborales, bancarios y de control de estado
-   ============================================================ */
-
-ALTER TABLE Funcionario
-  ADD COLUMN Departamento         VARCHAR(80) NULL AFTER Puesto,
-  ADD COLUMN Fecha_Ingreso        DATE NOT NULL DEFAULT (CURDATE()) AFTER Fecha_Nacimiento,
-  ADD COLUMN Salario_Base_Mensual DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER Fecha_Ingreso,
-  ADD COLUMN Estado_Empleado      ENUM('Activo','Inactivo','Suspendido') NOT NULL DEFAULT 'Activo' AFTER Salario_Base_Mensual,
-  ADD COLUMN Tipo_Contrato        ENUM('Tiempo completo','Medio tiempo','Servicios profesionales','Temporal') NOT NULL DEFAULT 'Tiempo completo' AFTER Estado_Empleado,
-  ADD COLUMN Cuenta_Bancaria      VARCHAR(60) NULL AFTER Tipo_Contrato,
-  ADD COLUMN Banco                VARCHAR(60) NULL AFTER Cuenta_Bancaria,
-  ADD COLUMN Fecha_mod_alta       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER Fecha_modificacion;
-
--- Índices útiles para búsquedas
-ALTER TABLE Funcionario
-  ADD INDEX IX_Funcionario_Departamento (Departamento),
-  ADD INDEX IX_Funcionario_Estado (Estado_Empleado),
-  ADD INDEX IX_Funcionario_FechaIngreso (Fecha_Ingreso);
-
+/* ===================================================================== */
+/* HRM                                                                    */
+/* ===================================================================== */
 CREATE TABLE FuncionarioHistorial (
   Id_Historial        INT NOT NULL AUTO_INCREMENT,
   Codigo_Funcionario  INT NOT NULL,
   Fecha_Evento        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Tipo_Evento         ENUM(
-      'Ingreso',
-      'Cambio Puesto',
-      'Cambio Salario',
-      'Amonestacion',
-      'Reconocimiento',
-      'Vacaciones',
-      'Incapacidad',
-      'Salida'
-  ) NOT NULL,
+  Tipo_Evento         ENUM('Ingreso','Cambio Puesto','Cambio Salario','Amonestacion','Reconocimiento','Vacaciones','Incapacidad','Salida') NOT NULL,
   Detalle             VARCHAR(500) NULL,
   Valor_Anterior      VARCHAR(200) NULL,
   Valor_Nuevo         VARCHAR(200) NULL,
@@ -1048,20 +1244,230 @@ CREATE TABLE FuncionarioHistorial (
   KEY IX_FuncHist_Fecha (Fecha_Evento)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE Marcacion (
+  Id int NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario int NOT NULL,
+  Fecha date NOT NULL,
+  Hora_Entrada datetime DEFAULT NULL,
+  Hora_Salida datetime DEFAULT NULL,
+  Horas_Regulares decimal(6,2) DEFAULT NULL,
+  Estado enum('Abierta','Cerrada','Pendiente') NOT NULL DEFAULT 'Abierta',
+  Observaciones varchar(255) DEFAULT NULL,
+  Fecha_Creacion datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Fecha_Actualiza datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY idx_marcacion_func (Codigo_Funcionario),
+  KEY idx_marcacion_fecha (Fecha),
+  KEY idx_marcacion_estado (Estado),
+  CONSTRAINT fk_marcacion_func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario (Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Gestión de Eventos y Actividades (EVT)
-   -------------------------- */
-  /* --------------------------
-   Catálogo de salones
-   -------------------------- */
+/* Cargas sociales */
+CREATE TABLE HRM_ConfigSocial (
+  Id                INT NOT NULL AUTO_INCREMENT,
+  Vigente_Desde     DATE NOT NULL,
+  CCSS_Pct          DECIMAL(6,3) NOT NULL DEFAULT 10.670,
+  IVM_Pct           DECIMAL(6,3) NOT NULL DEFAULT 2.670,
+  BP_Pct            DECIMAL(6,3) NOT NULL DEFAULT 1.000,
+  Renta_Pct         DECIMAL(6,3) NOT NULL DEFAULT 10.000,
+  Activa            TINYINT(1) NOT NULL DEFAULT 1,
+  CONSTRAINT PK_HRM_ConfigSocial PRIMARY KEY (Id),
+  KEY IX_HRM_ConfigSocial_Vigente (Vigente_Desde)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Ausencias */
+CREATE TABLE HRM_Absence (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Tipo               ENUM('SIN_GOCE') NOT NULL DEFAULT 'SIN_GOCE',
+  Fecha              DATE NOT NULL,
+  Horas              DECIMAL(5,2) NULL,
+  Motivo             VARCHAR(255) NULL,
+  Registrado_Por     INT NULL,
+  Registrado_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Absence PRIMARY KEY (Id),
+  KEY IX_HRM_Abs_Func (Codigo_Funcionario, Fecha),
+  CONSTRAINT FK_HRM_Abs_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Vacaciones */
+CREATE TABLE HRM_VacationRequest (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Fecha_Desde        DATE NOT NULL,
+  Fecha_Hasta        DATE NOT NULL,
+  Dias               DECIMAL(5,2) NOT NULL,
+  Estado             ENUM('PENDIENTE','APROBADA','RECHAZADA') NOT NULL DEFAULT 'PENDIENTE',
+  Comentario         VARCHAR(255) NULL,
+  Aprobado_Por       INT NULL,
+  Aprobado_En        DATETIME NULL,
+  Creado_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Vac PRIMARY KEY (Id),
+  KEY IX_HRM_Vac_Func (Codigo_Funcionario),
+  KEY IX_HRM_Vac_Estado (Estado),
+  CONSTRAINT FK_HRM_Vac_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Amonestaciones */
+CREATE TABLE HRM_Warning (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Severidad          ENUM('LEVE','MEDIA','GRAVE') NOT NULL DEFAULT 'LEVE',
+  Motivo             VARCHAR(500) NOT NULL,
+  Estado             ENUM('REGISTRADA','NOTIFICADA','ANULADA') NOT NULL DEFAULT 'REGISTRADA',
+  Registrada_Por     INT NULL,
+  Registrada_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Notificada_En      DATETIME NULL,
+  CONSTRAINT PK_HRM_Warn PRIMARY KEY (Id),
+  KEY IX_HRM_Warn_Func (Codigo_Funcionario),
+  KEY IX_HRM_Warn_Estado (Estado),
+  CONSTRAINT FK_HRM_Warn_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Deducciones voluntarias */
+CREATE TABLE HRM_VoluntaryDed (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Tipo               ENUM('PENSION_ALIMENTARIA','PRESTAMO','OTRA') NOT NULL,
+  Monto_Fijo         DECIMAL(12,2) NULL,
+  Porcentaje         DECIMAL(6,3) NULL,
+  Activa             TINYINT(1) NOT NULL DEFAULT 1,
+  Observacion        VARCHAR(255) NULL,
+  Creada_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Vol PRIMARY KEY (Id),
+  KEY IX_HRM_Vol_Func (Codigo_Funcionario),
+  CONSTRAINT FK_HRM_Vol_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Incapacidades */
+CREATE TABLE HRM_Incapacity (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Fuente             ENUM('CCSS','INS') NOT NULL,
+  Porcentaje_Rebajo  DECIMAL(6,3) NOT NULL,
+  Fecha_Desde        DATE NOT NULL,
+  Fecha_Hasta        DATE NOT NULL,
+  Comprobante        VARCHAR(120) NULL,
+  Observacion        VARCHAR(255) NULL,
+  Registrada_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Inc PRIMARY KEY (Id),
+  KEY IX_HRM_Inc_Func (Codigo_Funcionario),
+  KEY IX_HRM_Inc_Rango (Fecha_Desde, Fecha_Hasta),
+  CONSTRAINT FK_HRM_Inc_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Cuentas bancarias */
+CREATE TABLE HRM_BankAccount (
+  Id                 INT NOT NULL AUTO_INCREMENT,
+  Codigo_Funcionario INT NOT NULL,
+  Banco              VARCHAR(60) NOT NULL,
+  IBAN               VARCHAR(40) NOT NULL,
+  Predeterminada     TINYINT(1) NOT NULL DEFAULT 1,
+  Activa             TINYINT(1) NOT NULL DEFAULT 1,
+  Creada_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Bank PRIMARY KEY (Id),
+  UNIQUE KEY UQ_HRM_Bank_Unique (Codigo_Funcionario, IBAN),
+  KEY IX_HRM_Bank_Func (Codigo_Funcionario),
+  CONSTRAINT FK_HRM_Bank_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Periodos de nómina */
+CREATE TABLE HRM_PayrollPeriod (
+  Id          INT NOT NULL AUTO_INCREMENT,
+  Periodo_Key CHAR(7) NOT NULL,
+  Quincena    ENUM('Q1','Q2') NOT NULL,
+  Fecha_Desde DATE NOT NULL,
+  Fecha_Hasta DATE NOT NULL,
+  Estado      ENUM('ABIERTO','CALCULADO','PAGADO','CERRADO') NOT NULL DEFAULT 'ABIERTO',
+  Creado_En   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Period PRIMARY KEY (Id),
+  UNIQUE KEY UQ_HRM_Period (Periodo_Key, Quincena)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Nómina */
+CREATE TABLE HRM_Payroll (
+  Id                   INT NOT NULL AUTO_INCREMENT,
+  Period_Id            INT NOT NULL,
+  Codigo_Funcionario   INT NOT NULL,
+  Salario_Base_Mensual DECIMAL(12,2) NOT NULL,
+  Bruto_Quincena       DECIMAL(12,2) NOT NULL,
+  Rebajo_Ausencias     DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Rebajo_Incap         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_CCSS       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_IVM        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_BP         DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_Renta      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Deduccion_Vol        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  Neto_Pagar           DECIMAL(12,2) NOT NULL,
+  PDF_Path             VARCHAR(255) NULL,
+  Email_Enviado        TINYINT(1) NOT NULL DEFAULT 0,
+  Generado_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT PK_HRM_Payroll PRIMARY KEY (Id),
+  UNIQUE KEY UQ_HRM_Payroll (Period_Id, Codigo_Funcionario),
+  KEY IX_HRM_Payroll_Period (Period_Id),
+  CONSTRAINT FK_HRM_Payroll_Period
+    FOREIGN KEY (Period_Id) REFERENCES HRM_PayrollPeriod(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_HRM_Payroll_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Detalle */
+CREATE TABLE HRM_PayrollDetail (
+  Id          INT NOT NULL AUTO_INCREMENT,
+  Payroll_Id  INT NOT NULL,
+  Tipo        ENUM('AUSENCIA','INCAPACIDAD','VOLUNTARIA','LEGAL','OTRA') NOT NULL,
+  Clave       VARCHAR(60) NOT NULL,
+  Monto       DECIMAL(12,2) NOT NULL,
+  CONSTRAINT PK_HRM_PayDet PRIMARY KEY (Id),
+  KEY IX_HRM_PayDet_Pay (Payroll_Id),
+  CONSTRAINT FK_HRM_PayDet_Pay
+    FOREIGN KEY (Payroll_Id) REFERENCES HRM_Payroll(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Pagos */
+CREATE TABLE HRM_PaymentRecord (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Payroll_Id       INT NOT NULL,
+  Fecha_Pago       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Comprobante      VARCHAR(80)  NULL,
+  Banco            VARCHAR(60)  NULL,
+  Cuenta_Destino   VARCHAR(40)  NULL,
+  Emitido_Por      INT NULL,
+  CONSTRAINT PK_HRM_PayRec PRIMARY KEY (Id),
+  KEY IX_HRM_PayRec_Pay (Payroll_Id),
+  CONSTRAINT FK_HRM_PayRec_Pay
+    FOREIGN KEY (Payroll_Id) REFERENCES HRM_Payroll(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* ===================================================================== */
+/* EVT — Gestión de Eventos y Actividades                                 */
+/* ===================================================================== */
 CREATE TABLE EvtSalon (
-  Id            INT NOT NULL AUTO_INCREMENT,
-  Nombre        VARCHAR(120) NOT NULL,
-  Capacidad     INT NOT NULL DEFAULT 10,
-  Ubicacion     VARCHAR(120) NULL,
-  Activo        TINYINT(1) NOT NULL DEFAULT 1,
-  ColorHex      VARCHAR(7) NOT NULL DEFAULT '#8a6cff',
+  Id             INT NOT NULL AUTO_INCREMENT,
+  Nombre         VARCHAR(120) NOT NULL,
+  Capacidad      INT NOT NULL DEFAULT 10,
+  Ubicacion      VARCHAR(120) NULL,
+  Activo         TINYINT(1) NOT NULL DEFAULT 1,
+  ColorHex       VARCHAR(7) NOT NULL DEFAULT '#8a6cff',
   Fecha_Creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Actualiza DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_EvtSalon PRIMARY KEY (Id),
@@ -1069,15 +1475,12 @@ CREATE TABLE EvtSalon (
   KEY IX_EvtSalon_Activo (Activo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Catálogo de recursos A/V y mobiliario
-   -------------------------- */
 CREATE TABLE EvtRecurso (
-  Id            INT NOT NULL AUTO_INCREMENT,
-  Nombre        VARCHAR(120) NOT NULL,
-  Tipo          ENUM('AV','MOBILIARIO','CONSUMIBLE','OTRO') NOT NULL DEFAULT 'AV',
-  InvInsumo_Id  INT NULL,
-  Activo        TINYINT(1) NOT NULL DEFAULT 1,
+  Id             INT NOT NULL AUTO_INCREMENT,
+  Nombre         VARCHAR(120) NOT NULL,
+  Tipo           ENUM('AV','MOBILIARIO','CONSUMIBLE','OTRO') NOT NULL DEFAULT 'AV',
+  InvInsumo_Id   INT NULL,
+  Activo         TINYINT(1) NOT NULL DEFAULT 1,
   Fecha_Creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Actualiza DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_EvtRecurso PRIMARY KEY (Id),
@@ -1089,23 +1492,17 @@ CREATE TABLE EvtRecurso (
     ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Plantillas de eventos
-   -------------------------- */
 CREATE TABLE EvtPlantilla (
-  Id           INT NOT NULL AUTO_INCREMENT,
-  Nombre       VARCHAR(120) NOT NULL,
-  Descripcion  VARCHAR(255) NULL,
-  Duracion_Min INT NOT NULL DEFAULT 60,
+  Id             INT NOT NULL AUTO_INCREMENT,
+  Nombre         VARCHAR(120) NOT NULL,
+  Descripcion    VARCHAR(255) NULL,
+  Duracion_Min   INT NOT NULL DEFAULT 60,
   Fecha_Creacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Actualiza DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_EvtPlantilla PRIMARY KEY (Id),
   CONSTRAINT UQ_EvtPlantilla_Nombre UNIQUE (Nombre)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Evento principal
-   -------------------------- */
 CREATE TABLE EvtEvento (
   Id                  INT NOT NULL AUTO_INCREMENT,
   Titulo              VARCHAR(200) NOT NULL,
@@ -1136,9 +1533,6 @@ CREATE TABLE EvtEvento (
     ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Recursos por evento (cantidades)
-   -------------------------- */
 CREATE TABLE EvtEventoRecurso (
   Id         INT NOT NULL AUTO_INCREMENT,
   Evento_Id  INT NOT NULL,
@@ -1156,9 +1550,6 @@ CREATE TABLE EvtEventoRecurso (
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Asistentes y lista de espera del evento
-   -------------------------- */
 CREATE TABLE EvtAsistente (
   Id          INT NOT NULL AUTO_INCREMENT,
   Evento_Id   INT NOT NULL,
@@ -1189,9 +1580,6 @@ CREATE TABLE EvtWaitlist (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Presupuesto y costos reales
-   -------------------------- */
 CREATE TABLE EvtPresupuesto (
   Id         INT NOT NULL AUTO_INCREMENT,
   Evento_Id  INT NOT NULL,
@@ -1217,9 +1605,6 @@ CREATE TABLE EvtCosto (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Encuesta post-evento (NPS)
-   -------------------------- */
 CREATE TABLE EvtEncuesta (
   Id         INT NOT NULL AUTO_INCREMENT,
   Evento_Id  INT NOT NULL,
@@ -1233,9 +1618,6 @@ CREATE TABLE EvtEncuesta (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Notificaciones programadas
-   -------------------------- */
 CREATE TABLE EvtNotificacion (
   Id            INT NOT NULL AUTO_INCREMENT,
   Evento_Id     INT NOT NULL,
@@ -1252,9 +1634,6 @@ CREATE TABLE EvtNotificacion (
     ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* --------------------------
-   Órdenes de trabajo por confirmación
-   -------------------------- */
 CREATE TABLE EvtWorkOrder (
   Id        INT NOT NULL AUTO_INCREMENT,
   Evento_Id INT NOT NULL,
@@ -1273,38 +1652,9 @@ CREATE TABLE EvtWorkOrder (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-
-/* ============================================================
-   HRM-08-002 — Extensión de tabla Funcionario
-   Agrega campos laborales, bancarios y de control de estado
-   ============================================================ */
-
-CREATE TABLE IF NOT EXISTS `Marcacion` (
-  `Id` int NOT NULL AUTO_INCREMENT,
-  `Codigo_Funcionario` int NOT NULL,
-  `Fecha` date NOT NULL,
-  `Hora_Entrada` datetime DEFAULT NULL,
-  `Hora_Salida` datetime DEFAULT NULL,
-  `Horas_Regulares` decimal(6,2) DEFAULT NULL,
-  `Estado` enum('Abierta','Cerrada','Pendiente') NOT NULL DEFAULT 'Abierta',
-  `Observaciones` varchar(255) DEFAULT NULL,
-  `Fecha_Creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `Fecha_Actualiza` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`Id`),
-  KEY `idx_marcacion_func` (`Codigo_Funcionario`),
-  KEY `idx_marcacion_fecha` (`Fecha`),
-  KEY `idx_marcacion_estado` (`Estado`),
-  CONSTRAINT `fk_marcacion_func` FOREIGN KEY (`Codigo_Funcionario`) REFERENCES `Funcionario` (`Codigo_Funcionario`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-/* ===========================================================
-   Hotel Villa Grace — AREP (Analítica y Reportes)
-   =========================================================== */
-
-/* -----------------------------------------------------------
-   Preferencias / configuración de visualización por usuario
-   ----------------------------------------------------------- */
+/* ===================================================================== */
+/* AREP — Analítica y Reportes                                            */
+/* ===================================================================== */
 CREATE TABLE ArepViewConfig (
   Codigo_ArepConfig INT NOT NULL AUTO_INCREMENT,
   Codigo_Usuario    INT NULL,
@@ -1315,12 +1665,12 @@ CREATE TABLE ArepViewConfig (
   Fecha_Creacion    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   Fecha_Actualiza   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT PK_ArepViewConfig PRIMARY KEY (Codigo_ArepConfig),
-  CONSTRAINT UQ_ArepViewConfig UNIQUE (Codigo_Usuario, Nombre_Reporte)
+  CONSTRAINT UQ_ArepViewConfig UNIQUE (Codigo_Usuario, Nombre_Reporte),
+  CONSTRAINT FK_ArepViewConfig_Usuario
+    FOREIGN KEY (Codigo_Usuario) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* -----------------------------------------------------------
-   Tiempos de atención (para SLAs y ranking de personal)
-   ----------------------------------------------------------- */
 CREATE TABLE ArepAtencion (
   Codigo_ArepAtencion  INT NOT NULL AUTO_INCREMENT,
   Codigo_Funcionario   INT NULL,
@@ -1334,12 +1684,12 @@ CREATE TABLE ArepAtencion (
   CONSTRAINT PK_ArepAtencion PRIMARY KEY (Codigo_ArepAtencion),
   KEY IX_ArepAtencion_Func (Codigo_Funcionario),
   KEY IX_ArepAtencion_Area (Area),
-  KEY IX_ArepAtencion_Fechas (Inicio_Atencion, Fin_Atencion)
+  KEY IX_ArepAtencion_Fechas (Inicio_Atencion, Fin_Atencion),
+  CONSTRAINT FK_ArepAtencion_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* -----------------------------------------------------------
-   Satisfacción (NPS / encuestas por empleado)
-   ----------------------------------------------------------- */
 CREATE TABLE ArepSatisfaccion (
   Codigo_ArepSatisfaccion INT NOT NULL AUTO_INCREMENT,
   Codigo_Funcionario      INT NULL,
@@ -1349,12 +1699,12 @@ CREATE TABLE ArepSatisfaccion (
   Fecha_Registro          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT PK_ArepSatisfaccion PRIMARY KEY (Codigo_ArepSatisfaccion),
   KEY IX_ArepSat_Func (Codigo_Funcionario),
-  KEY IX_ArepSat_Fecha (Fecha_Registro)
+  KEY IX_ArepSat_Fecha (Fecha_Registro),
+  CONSTRAINT FK_ArepSat_Func
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-/* -----------------------------------------------------------
-   Log de exportaciones (PDF / XLSX)
-   ----------------------------------------------------------- */
 CREATE TABLE ArepExportLog (
   Codigo_ArepExport  INT NOT NULL AUTO_INCREMENT,
   Tipo               ENUM('PDF','XLSX') NOT NULL,
@@ -1363,607 +1713,586 @@ CREATE TABLE ArepExportLog (
   Filtros_JSON       JSON NULL,
   Fecha_Export       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT PK_ArepExportLog PRIMARY KEY (Codigo_ArepExport),
-  KEY IX_ArepExport_Fecha (Fecha_Export)
+  KEY IX_ArepExport_Fecha (Fecha_Export),
+  CONSTRAINT FK_ArepExport_Usuario
+    FOREIGN KEY (Codigo_Usuario) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+/* ===================================================================== */
+/* SAC — Unificado “superset” + KB/RAG                                    */
+/* ===================================================================== */
 
+/* Config */
+CREATE TABLE SAC_Config (
+  Id              BIGINT NOT NULL AUTO_INCREMENT,
+  Clave           VARCHAR(80) NOT NULL,
+  Valor           TEXT NULL,
+  Activo          TINYINT(1) NOT NULL DEFAULT 1,
+  Creada_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  UNIQUE KEY UQ_SAC_Config_Clave (Clave)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================== SAC — Tablas básicas ======================
-CREATE TABLE IF NOT EXISTS SAC_Config (
-  Clave        VARCHAR(60) PRIMARY KEY,
-  Valor        VARCHAR(240) NOT NULL,
-  Actualizado  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-                          ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/* Preferencias notificación: mezcla por Cliente y por Usuario */
+CREATE TABLE SAC_NotifPref (
+  Id              BIGINT NOT NULL AUTO_INCREMENT,
+  Codigo_Cliente  INT NULL,
+  Codigo_Usuario  INT NULL,
 
-CREATE TABLE IF NOT EXISTS SAC_NotifPref (
-  Codigo_Cliente INT PRIMARY KEY,
-  Canal          ENUM('email','sms','ambos') NOT NULL DEFAULT 'email',
-  Email          VARCHAR(120),
-  Telefono       VARCHAR(25),
-  Verif_Email    TINYINT(1) NOT NULL DEFAULT 0,
-  Verif_SMS      TINYINT(1) NOT NULL DEFAULT 0,
-  Actualizado    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-                             ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  /* legacy */
+  Canal           ENUM('email','sms','ambos') NULL,
+  Email           VARCHAR(120) NULL,
+  Telefono        VARCHAR(25) NULL,
+  Verif_Email     TINYINT(1) NOT NULL DEFAULT 0,
+  Verif_SMS       TINYINT(1) NOT NULL DEFAULT 0,
 
-CREATE TABLE IF NOT EXISTS SAC_Outbox (
-  Id            INT AUTO_INCREMENT PRIMARY KEY,
-  Canal         ENUM('email','sms') NOT NULL,
-  Para          VARCHAR(180) NOT NULL,
-  Asunto        VARCHAR(160),
-  Cuerpo        TEXT,
-  Estado        ENUM('PENDIENTE','ENVIADO','ERROR')
-                  NOT NULL DEFAULT 'PENDIENTE',
-  ErrorMsg      VARCHAR(240),
-  Programado_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Enviado_At    DATETIME NULL,
-  Ref_Entidad   VARCHAR(40),
-  Ref_Id        VARCHAR(40),
-  Meta_JSON     JSON NULL,
-  KEY IX_Outbox_Estado (Estado, Programado_At)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  /* nuevo */
+  Email_Enabled    TINYINT(1) NOT NULL DEFAULT 1,
+  WhatsApp_Enabled TINYINT(1) NOT NULL DEFAULT 0,
+  Push_Enabled     TINYINT(1) NOT NULL DEFAULT 0,
 
-CREATE TABLE IF NOT EXISTS SAC_Solicitud (
-  Id             INT AUTO_INCREMENT PRIMARY KEY,
+  Creada_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (Id),
+  UNIQUE KEY UQ_SAC_NotifPref_Cliente (Codigo_Cliente),
+  UNIQUE KEY UQ_SAC_NotifPref_Usuario (Codigo_Usuario),
+  KEY IX_SAC_NotifPref_User (Codigo_Usuario),
+  CONSTRAINT FK_SAC_NotifPref_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_NotifPref_Usuario
+    FOREIGN KEY (Codigo_Usuario) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Outbox (unificado) */
+CREATE TABLE SAC_Outbox (
+  Id             BIGINT NOT NULL AUTO_INCREMENT,
+
+  /* nuevo */
+  Tipo           ENUM('EMAIL','WHATSAPP','PUSH','SYSTEM') NOT NULL DEFAULT 'SYSTEM',
+  To_Addr        VARCHAR(255) NULL,
+  Subject        VARCHAR(255) NULL,
+  Payload_JSON   JSON NULL,
+  Estado         VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',  -- unifica PENDIENTE/ENVIADO/ERROR/PENDING/SENT/FAILED/RETRY
+  Intentos       INT NOT NULL DEFAULT 0,
+  Next_Try_At    DATETIME NULL,
+  Ultimo_Error   TEXT NULL,
+
+  /* legacy */
+  Canal          ENUM('email','sms') NULL,
+  Para           VARCHAR(180) NULL,
+  Asunto         VARCHAR(160) NULL,
+  Cuerpo         TEXT NULL,
+  ErrorMsg       VARCHAR(240) NULL,
+
+  Programado_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Enviado_At     DATETIME NULL,
+  Ref_Entidad    VARCHAR(40) NULL,
+  Ref_Id         VARCHAR(40) NULL,
+  Meta_JSON      JSON NULL,
+
+  Creada_At      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (Id),
+  KEY IX_Outbox_Estado (Estado, Programado_At),
+  KEY IX_SAC_Outbox_Estado (Estado, Next_Try_At)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Solicitudes (unificado) */
+CREATE TABLE SAC_Solicitud (
+  Id             BIGINT NOT NULL AUTO_INCREMENT,
   Codigo_Reserva INT NULL,
   Codigo_Cliente INT NULL,
-  Clave          VARCHAR(60)  NOT NULL,
+  Session_Id     VARCHAR(64) NULL,
+
+  /* legacy */
+  Clave          VARCHAR(60) NULL,
   Valor          VARCHAR(240) NULL,
-  Estado         ENUM('NUEVA','VISTA','EN_PROCESO','ATENDIDA','RECHAZADA')
-                    NOT NULL DEFAULT 'NUEVA',
+
+  /* nuevo */
+  Canal          ENUM('web','pos','whatsapp','email','internal') NOT NULL DEFAULT 'web',
+  Tipo           ENUM('INFO','QUEJA','INCIDENTE','SUGERENCIA','OTRO') NOT NULL DEFAULT 'INFO',
+  Asunto         VARCHAR(255) NULL,
+  Mensaje        TEXT NULL,
+  Prioridad      ENUM('BAJA','MEDIA','ALTA','CRITICA') NOT NULL DEFAULT 'MEDIA',
+
+  /* estado unificado (admite EN_PROCESO del endpoint) */
+  Estado         ENUM('NUEVA','VISTA','EN_PROCESO','ATENDIDA','RECHAZADA','ABIERTA','RESUELTA','CERRADA')
+                 NOT NULL DEFAULT 'NUEVA',
+
+  Asignada_A     INT NULL,
   Creada_At      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  PRIMARY KEY (Id),
   KEY IX_SAC_Solicitud_Reserva (Codigo_Reserva),
-  KEY IX_SAC_Solicitud_Estado  (Estado)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  KEY IX_SAC_Solicitud_Estado (Estado),
+  KEY IX_SAC_Solicitud_Session (Session_Id),
+  CONSTRAINT FK_SAC_Solicitud_Reserva
+    FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_Solicitud_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_Solicitud_AsignadaA
+    FOREIGN KEY (Asignada_A) REFERENCES Usuario(Codigo_Usuario)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `SAC_Conversation` (
-  `Id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `Codigo_Cliente`  INT NULL,
-  `Session_Id`      VARCHAR(64) NOT NULL,
+/* Conversation + Msg (incluye Status que faltaba) */
+CREATE TABLE SAC_Conversation (
+  Id              BIGINT NOT NULL AUTO_INCREMENT,
+  Codigo_Cliente  INT NULL,
+  Session_Id      VARCHAR(64) NOT NULL,
 
-  -- Estado general de la conversación para el widget/chat
-  `Status`          VARCHAR(20)  NOT NULL DEFAULT 'bot',
+  Status          VARCHAR(20) NOT NULL DEFAULT 'Open',
+  Needs_Agent     TINYINT(1) NOT NULL DEFAULT 0,
+  Guest_Name      VARCHAR(160) NULL,
+  Guest_Email     VARCHAR(160) NULL,
+  Channel         VARCHAR(20) NOT NULL DEFAULT 'web',
+  Last_Msg_At     DATETIME NULL,
+  Last_Msg_Role   VARCHAR(10) NULL,
 
-  -- Flag usado por el widget/chat para marcar que necesita agente
-  `Needs_Agent`     TINYINT(1)   NOT NULL DEFAULT 0,
+  Requiere_Agente TINYINT(1) NOT NULL DEFAULT 0,
+  Estado          ENUM('NORMAL','PENDIENTE_AGENT','EN_ATENCION','CERRADA') NOT NULL DEFAULT 'NORMAL',
 
-  -- Datos básicos del huésped/visitante cuando se conocen
-  `Guest_Name`      VARCHAR(160) NULL,
-  `Guest_Email`     VARCHAR(160) NULL,
+  Abierta         TINYINT(1) NOT NULL DEFAULT 1,
+  Creada_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-  -- Canal de origen (web, whatsapp, etc.)
-  `Channel`         VARCHAR(20)  NOT NULL DEFAULT 'web',
+  PRIMARY KEY (Id),
+  KEY IX_SAC_Conv_Session (Session_Id),
+  KEY IX_SAC_Conv_Creada (Creada_At),
+  KEY IX_SAC_Conv_Agente (Requiere_Agente, Estado, Abierta),
+  KEY IX_SAC_Conv_LastMsg (Last_Msg_At),
 
-  -- Último mensaje registrado en la conversación
-  `Last_Msg_At`     DATETIME     NULL,
-  `Last_Msg_Role`   VARCHAR(10)  NULL,
+  CONSTRAINT FK_SAC_Conv_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-  -- 1 = conversación visible/abierta en SAC
-  `Abierta`         TINYINT(1)   NOT NULL DEFAULT 1,
+CREATE TABLE SAC_ConversationMsg (
+  Id              BIGINT NOT NULL AUTO_INCREMENT,
+  Conversation_Id BIGINT NOT NULL,
+  Rol             ENUM('user','bot','agent') NOT NULL,
+  Msg_Text        TEXT NOT NULL,
+  Meta_JSON       JSON NULL,
+  Creada_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_SAC_ConvMsg_Conv (Conversation_Id, Creada_At),
+  CONSTRAINT FK_SAC_ConvMsg_Conv
+    FOREIGN KEY (Conversation_Id) REFERENCES SAC_Conversation(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-  -- Flags funcionales del módulo SAC (panel de administración)
-  `Requiere_Agente` TINYINT(1)   NOT NULL DEFAULT 0,
-  `Estado`          ENUM('NORMAL','PENDIENTE_AGENT','EN_ATENCION','CERRADA')
-                    NOT NULL DEFAULT 'NORMAL',
+/* Incident & Feedback */
+CREATE TABLE SAC_Incident (
+  Id              BIGINT NOT NULL AUTO_INCREMENT,
+  Codigo_Reserva  INT NULL,
+  Codigo_Cliente  INT NULL,
+  Conversation_Id BIGINT NULL,
+  Tipo            ENUM('OPERATIVO','SEGURIDAD','PAGO','HABITACION','OTRO') NOT NULL DEFAULT 'OPERATIVO',
+  Severidad       ENUM('BAJA','MEDIA','ALTA','CRITICA') NOT NULL DEFAULT 'MEDIA',
+  Descripcion     TEXT NOT NULL,
+  Estado          ENUM('ABIERTO','EN_PROCESO','RESUELTO','CERRADO') NOT NULL DEFAULT 'ABIERTO',
+  Creada_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_SAC_Incident_Estado (Estado, Severidad),
+  KEY IX_SAC_Incident_Conv (Conversation_Id),
+  CONSTRAINT FK_SAC_Incident_Reserva
+    FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_Incident_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_Incident_Conv
+    FOREIGN KEY (Conversation_Id) REFERENCES SAC_Conversation(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-  `Creada_At`       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `Actualizada_At`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-                                    ON UPDATE CURRENT_TIMESTAMP,
+CREATE TABLE SAC_Feedback (
+  Id              BIGINT NOT NULL AUTO_INCREMENT,
+  Conversation_Id BIGINT NULL,
+  Codigo_Cliente  INT NULL,
+  Rating          INT NULL,
+  Comentario      TEXT NULL,
+  Meta_JSON       JSON NULL,
+  Creada_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_SAC_Feedback_Conv (Conversation_Id),
+  CONSTRAINT FK_SAC_Feedback_Conv
+    FOREIGN KEY (Conversation_Id) REFERENCES SAC_Conversation(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_Feedback_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-  KEY `IX_SAC_Conv_Session` (`Session_Id`),
-  -- Índice que usa el panel para listar pendientes de agente
-  KEY `IX_SAC_Conv_Agente`  (`Requiere_Agente`, `Estado`, `Abierta`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/* KB / RAG */
+CREATE TABLE SAC_KB_Doc (
+  Id BIGINT NOT NULL AUTO_INCREMENT,
+  Doc_Key VARCHAR(120) NULL,
+  Source VARCHAR(120) NULL,
+  Title VARCHAR(255) NOT NULL,
+  Content LONGTEXT NOT NULL,
+  Lang VARCHAR(10) NOT NULL DEFAULT 'es',
+  Metadata_JSON JSON NULL,
+  Content_Hash CHAR(64) NULL,
+  Status ENUM('ACTIVE','DISABLED','DELETED') NOT NULL DEFAULT 'ACTIVE',
+  Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Updated_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  UNIQUE KEY UQ_SAC_KB_Doc_Hash (Content_Hash),
+  KEY IX_SAC_KB_Doc_Status (Status),
+  KEY IX_SAC_KB_Doc_Source (Source)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE SAC_KB_Chunk (
+  Id BIGINT NOT NULL AUTO_INCREMENT,
+  Doc_Id BIGINT NOT NULL,
+  Chunk_Index INT NOT NULL,
+  Chunk_Text TEXT NOT NULL,
+  Tokens INT NULL,
+  Embedding_Model VARCHAR(120) NULL,
+  Embedding_Dim INT NULL,
+  Embedding_JSON JSON NULL,
+  Embedded_At DATETIME NULL,
+  Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  UNIQUE KEY UQ_SAC_KB_Chunk (Doc_Id, Chunk_Index),
+  KEY IX_SAC_KB_Chunk_Doc (Doc_Id),
+  KEY IX_SAC_KB_Chunk_Embedded (Embedded_At),
+  CONSTRAINT FK_SAC_KB_Chunk_Doc
+    FOREIGN KEY (Doc_Id) REFERENCES SAC_KB_Doc(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE SAC_KB_QA (
+  Id BIGINT NOT NULL AUTO_INCREMENT,
+  Doc_Id BIGINT NULL,
+  Question TEXT NOT NULL,
+  Answer LONGTEXT NOT NULL,
+  Tags_JSON JSON NULL,
+  Status ENUM('ACTIVE','DISABLED','DELETED') NOT NULL DEFAULT 'ACTIVE',
+  Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Updated_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_SAC_KB_QA_Status (Status),
+  KEY IX_SAC_KB_QA_Doc (Doc_Id),
+  CONSTRAINT FK_SAC_KB_QA_Doc
+    FOREIGN KEY (Doc_Id) REFERENCES SAC_KB_Doc(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE SAC_KB_Tag (
+  Id BIGINT NOT NULL AUTO_INCREMENT,
+  Tag VARCHAR(80) NOT NULL,
+  Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  UNIQUE KEY UQ_SAC_KB_Tag (Tag)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE SAC_KB_DocTag (
+  Doc_Id BIGINT NOT NULL,
+  Tag_Id BIGINT NOT NULL,
+  PRIMARY KEY (Doc_Id, Tag_Id),
+  KEY IX_SAC_KB_DocTag_Tag (Tag_Id),
+  CONSTRAINT FK_SAC_KB_DocTag_Doc
+    FOREIGN KEY (Doc_Id) REFERENCES SAC_KB_Doc(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_SAC_KB_DocTag_Tag
+    FOREIGN KEY (Tag_Id) REFERENCES SAC_KB_Tag(Id)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE SAC_KB_IngestJob (
+  Id BIGINT NOT NULL AUTO_INCREMENT,
+  Job_Type ENUM('MANUAL','UPLOAD','URL','IMPORT') NOT NULL DEFAULT 'MANUAL',
+  Source VARCHAR(255) NULL,
+  Status ENUM('PENDING','RUNNING','DONE','FAILED') NOT NULL DEFAULT 'PENDING',
+  Total_Docs INT NOT NULL DEFAULT 0,
+  Total_Chunks INT NOT NULL DEFAULT 0,
+  Error_Text TEXT NULL,
+  Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Updated_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_SAC_KB_Ingest_Status (Status, Created_At)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-CREATE TABLE `SAC_ConversationMsg` (
-  `Id`         INT AUTO_INCREMENT PRIMARY KEY,
-  `Conv_Id`    INT NOT NULL,
-
-  -- Rol del emisor del mensaje en la conversación
-  -- (valores usados por tu backend: 'user', 'bot', 'agent')
-  `Rol`        ENUM('user','bot','agent') NOT NULL,
-
-  `Texto`      TEXT NOT NULL,
-  `Creada_At`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  KEY `IX_SAC_ConvMsg_Conv` (`Conv_Id`),
-
-  CONSTRAINT `FK_SAC_ConvMsg_Conv`
-    FOREIGN KEY (`Conv_Id`)
-    REFERENCES `SAC_Conversation`(`Id`)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-
-CREATE TABLE IF NOT EXISTS SAC_Incident (
-  Id             INT AUTO_INCREMENT PRIMARY KEY,
-  Codigo_Reserva INT NULL,
-  Codigo_Cliente INT NULL,
-  Tipo           ENUM('INCIDENTE','COMENTARIO')
-                    NOT NULL DEFAULT 'INCIDENTE',
-  Severidad      ENUM('BAJA','MEDIA','ALTA','CRITICA')
-                    NOT NULL DEFAULT 'MEDIA',
-  Titulo         VARCHAR(160) NOT NULL,
-  Detalle        TEXT NULL,
-  Estado         ENUM('ABIERTA','EN_PROCESO','CERRADA')
-                    NOT NULL DEFAULT 'ABIERTA',
-  Creada_At      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY IX_SAC_Incident_Reserva (Codigo_Reserva),
-  KEY IX_SAC_Incident_Estado  (Estado)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS SAC_Feedback (
-  Id             INT AUTO_INCREMENT PRIMARY KEY,
-  Codigo_Reserva INT NOT NULL,
-  NPS            TINYINT NULL,
-  Comentario     TEXT NULL,
-  Registrada_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY IX_SAC_Feedback_Reserva (Codigo_Reserva)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-INSERT INTO SAC_Config (Clave, Valor) VALUES
-  ('checkin_inicio','12:00'),
-  ('checkin_fin','00:00'),
-  ('checkout_limite','12:00'),
-  ('contacto_recepcion_email','recepcion@hotel.test')
-ON DUPLICATE KEY UPDATE Valor = VALUES(Valor);
-
--- (Opcional) disparador: al crear reserva, agendar recordatorios 48h/24h por canal preferido (si existe)
+/* Triggers SAC */
 DELIMITER $$
+
+/* Al crear reserva: agendar recordatorios por canal preferido (si existe) */
 CREATE TRIGGER trg_sac_reserva_after_ins
 AFTER INSERT ON Reserva
 FOR EACH ROW
 BEGIN
   DECLARE cli_email VARCHAR(120);
   DECLARE cli_tel   VARCHAR(25);
-  DECLARE canal     VARCHAR(10);
+  DECLARE canal_pref VARCHAR(10);
 
-  SELECT c.Correo, c.Telefono
-    INTO cli_email, cli_tel
-  FROM Cliente c
-  WHERE c.Codigo_Cliente = NEW.Codigo_Cliente
-  LIMIT 1;
+  SELECT c.Correo, c.Telefono INTO cli_email, cli_tel
+  FROM Cliente c WHERE c.Codigo_Cliente = NEW.Codigo_Cliente LIMIT 1;
 
-  SELECT COALESCE(p.Canal,'email')
-    INTO canal
+  SELECT COALESCE(p.Canal,'email') INTO canal_pref
   FROM SAC_NotifPref p
   WHERE p.Codigo_Cliente = NEW.Codigo_Cliente
   LIMIT 1;
 
-  -- Notificaciones por email
-  IF canal IN ('email','ambos') AND cli_email IS NOT NULL THEN
-    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado,
-                            Programado_At, Ref_Entidad, Ref_Id)
+  IF canal_pref IN ('email','ambos') AND cli_email IS NOT NULL THEN
+    INSERT INTO SAC_Outbox (Tipo, To_Addr, Subject, Payload_JSON, Estado, Programado_At, Ref_Entidad, Ref_Id, Canal, Para, Asunto, Cuerpo)
     VALUES (
-      'email',
+      'EMAIL',
       cli_email,
       'Recordatorio de reserva',
-      CONCAT(
-        'Su reserva ', COALESCE(NEW.Numero_Comprobante,''), ' se acerca. ',
-        'Check-in desde ',
-        (SELECT Valor FROM SAC_Config
-          WHERE Clave='checkin_inicio' LIMIT 1),
-        '. Check-out hasta ',
-        (SELECT Valor FROM SAC_Config
-          WHERE Clave='checkout_limite' LIMIT 1), '.'
-      ),
+      JSON_OBJECT('reserva', NEW.Codigo_Reserva, 'comprobante', COALESCE(NEW.Numero_Comprobante,'')),
       'PENDIENTE',
-      DATE_SUB(NEW.Fecha_Entrada, INTERVAL 48 HOUR),
-      'Reserva',
-      NEW.Codigo_Reserva
+      DATE_SUB(CONCAT(NEW.Fecha_Entrada,' 00:00:00'), INTERVAL 48 HOUR),
+      'Reserva', NEW.Codigo_Reserva,
+      'email', cli_email, 'Recordatorio de reserva',
+      CONCAT('Su reserva ', COALESCE(NEW.Numero_Comprobante,''), ' se acerca. ',
+             'Check-in desde ', (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1),
+             '. Check-out hasta ', (SELECT Valor FROM SAC_Config WHERE Clave='checkout_limite' LIMIT 1), '.')
     );
 
-    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado,
-                            Programado_At, Ref_Entidad, Ref_Id)
+    INSERT INTO SAC_Outbox (Tipo, To_Addr, Subject, Payload_JSON, Estado, Programado_At, Ref_Entidad, Ref_Id, Canal, Para, Asunto, Cuerpo)
     VALUES (
-      'email',
+      'EMAIL',
       cli_email,
       'Recordatorio de reserva',
-      CONCAT(
-        'Le esperamos mañana. Check-in desde ',
-        (SELECT Valor FROM SAC_Config
-          WHERE Clave='checkin_inicio' LIMIT 1), '.'
-      ),
+      JSON_OBJECT('reserva', NEW.Codigo_Reserva, 'comprobante', COALESCE(NEW.Numero_Comprobante,'')),
       'PENDIENTE',
-      DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),
-      'Reserva',
-      NEW.Codigo_Reserva
+      DATE_SUB(CONCAT(NEW.Fecha_Entrada,' 00:00:00'), INTERVAL 24 HOUR),
+      'Reserva', NEW.Codigo_Reserva,
+      'email', cli_email, 'Recordatorio de reserva',
+      CONCAT('Le esperamos mañana. Check-in desde ',
+             (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1), '.')
     );
   END IF;
 
-  -- Notificación SMS (si aplica)
-  IF canal IN ('sms','ambos') AND cli_tel IS NOT NULL THEN
-    INSERT INTO SAC_Outbox (Canal, Para, Asunto, Cuerpo, Estado,
-                            Programado_At, Ref_Entidad, Ref_Id)
+  IF canal_pref IN ('sms','ambos') AND cli_tel IS NOT NULL THEN
+    INSERT INTO SAC_Outbox (Tipo, To_Addr, Payload_JSON, Estado, Programado_At, Ref_Entidad, Ref_Id, Canal, Para, Cuerpo)
     VALUES (
-      'sms',
+      'SYSTEM',
       cli_tel,
-      NULL,
-      CONCAT(
-        'Villa Grace: su reserva ',
-        COALESCE(NEW.Numero_Comprobante,''), 
-        '. Check-in ',
-        (SELECT Valor FROM SAC_Config
-          WHERE Clave='checkin_inicio' LIMIT 1)
+      JSON_OBJECT('sms',
+        CONCAT('Villa Grace: su reserva ', COALESCE(NEW.Numero_Comprobante,''),
+               '. Check-in ', (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1))
       ),
       'PENDIENTE',
-      DATE_SUB(NEW.Fecha_Entrada, INTERVAL 24 HOUR),
-      'Reserva',
-      NEW.Codigo_Reserva
+      DATE_SUB(CONCAT(NEW.Fecha_Entrada,' 00:00:00'), INTERVAL 24 HOUR),
+      'Reserva', NEW.Codigo_Reserva,
+      'sms', cli_tel,
+      CONCAT('Villa Grace: su reserva ', COALESCE(NEW.Numero_Comprobante,''),
+             '. Check-in ', (SELECT Valor FROM SAC_Config WHERE Clave='checkin_inicio' LIMIT 1))
     );
+  END IF;
+END$$
+
+/* Al insertar mensaje: actualizar última actividad y estado agente */
+CREATE TRIGGER trg_sac_convmsg_after_ins
+AFTER INSERT ON SAC_ConversationMsg
+FOR EACH ROW
+BEGIN
+  UPDATE SAC_Conversation
+  SET Last_Msg_At = NEW.Creada_At,
+      Last_Msg_Role = NEW.Rol,
+      Actualizada_At = CURRENT_TIMESTAMP
+  WHERE Id = NEW.Conversation_Id;
+
+  IF NEW.Rol = 'agent' THEN
+    UPDATE SAC_Conversation
+    SET Needs_Agent = 1,
+        Requiere_Agente = 1,
+        Estado = 'EN_ATENCION'
+    WHERE Id = NEW.Conversation_Id;
+  END IF;
+END$$
+
+DELIMITER ;
+
+
+/* ===================================================================== */
+/* Fidelización (ACE-01-009)                                              */
+/* ===================================================================== */
+CREATE TABLE ClienteLoyaltyMov (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Codigo_Cliente   INT NOT NULL,
+  Codigo_Reserva   INT NOT NULL,
+  Puntos           INT NOT NULL,
+  Monto_Base       DECIMAL(12,2) NOT NULL,
+  Noches           INT NOT NULL,
+  Creado_En        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  UNIQUE KEY UQ_LoyaltyMov_Reserva (Codigo_Reserva),
+  KEY IX_LoyaltyMov_Cliente (Codigo_Cliente),
+  CONSTRAINT FK_LoyaltyMov_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT FK_LoyaltyMov_Reserva
+    FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DELIMITER $$
+CREATE FUNCTION loyalty_level(p INT)
+RETURNS VARCHAR(10)
+DETERMINISTIC
+BEGIN
+  RETURN (CASE
+    WHEN p >= 700 THEN 'VIP'
+    WHEN p >= 300 THEN 'Gold'
+    WHEN p >= 100 THEN 'Silver'
+    ELSE 'Ninguno'
+  END);
+END$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER trg_reserva_loyalty_after_upd
+AFTER UPDATE ON Reserva
+FOR EACH ROW
+BEGIN
+  DECLARE v_noches INT;
+  DECLARE v_pts    INT;
+
+  IF NEW.Estado='Confirmada'
+     AND NEW.Fecha_Salida <= CURDATE()
+     AND NOT EXISTS (SELECT 1 FROM ClienteLoyaltyMov WHERE Codigo_Reserva = NEW.Codigo_Reserva) THEN
+
+    SET v_noches = GREATEST(DATEDIFF(NEW.Fecha_Salida, NEW.Fecha_Entrada), 0);
+    SET v_pts    = v_noches + ROUND(NEW.Monto_Total / 1000);
+
+    INSERT INTO ClienteLoyaltyMov (Codigo_Cliente, Codigo_Reserva, Puntos, Monto_Base, Noches)
+    VALUES (NEW.Codigo_Cliente, NEW.Codigo_Reserva, v_pts, NEW.Monto_Total, v_noches);
+
+    UPDATE Cliente
+      SET Puntos = Puntos + v_pts,
+          Nivel  = loyalty_level(Puntos + v_pts),
+          Descuento_Porc = CASE
+            WHEN (Puntos + v_pts) >= 700 THEN 15.00
+            WHEN (Puntos + v_pts) >= 300 THEN 7.50
+            WHEN (Puntos + v_pts) >= 100 THEN 3.00
+            ELSE 0.00
+          END
+      WHERE Codigo_Cliente = NEW.Codigo_Cliente;
   END IF;
 END$$
 DELIMITER ;
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-/* --------------------------------------------------------------Alters:----------------------------------------------*/
 
-ALTER TABLE SAC_Solicitud
-  MODIFY Codigo_Reserva INT NULL;
+/* ===================================================================== */
+/* Vistas                                                                 */
+/* ===================================================================== */
+CREATE OR REPLACE VIEW v_reservas_ext AS
+SELECT
+  r.Codigo_Reserva,
+  r.Numero_Comprobante,
+  r.Estado,
+  r.Canal,
+  r.Fecha_Entrada,
+  r.Fecha_Salida,
+  r.Monto_Total,
+  r.Fecha_Registro,
+  r.Observaciones,
+  r.Huespedes,
+  c.Codigo_Cliente,
+  c.Correo AS ClienteCorreo,
+  CONCAT(c.Nombre,' ',c.Apellido) AS ClienteNombre,
+  h.Codigo_Habitacion,
+  h.Numero_Habitacion,
+  h.Tipo AS Tipo_Habitacion,
+  h.Precio_Noche
+FROM Reserva r
+JOIN Cliente c    ON r.Codigo_Cliente    = c.Codigo_Cliente
+JOIN Habitacion h ON r.Codigo_Habitacion = h.Codigo_Habitacion;
 
--- Alinear estados con el endpoint PUT /sac/solicitudes/<id> (admite EN_PROCESO)
-ALTER TABLE SAC_Solicitud
-  MODIFY Estado ENUM('NUEVA','VISTA','EN_PROCESO','ATENDIDA','RECHAZADA') NOT NULL DEFAULT 'NUEVA';
+CREATE OR REPLACE VIEW v_reserva_pagos_pos AS
+SELECT
+  t.reserva_id,
+  SUM(CASE WHEN l.debit > 0 THEN l.debit ELSE 0 END) AS total_pagado_pos
+FROM fin_ledger_tx t
+JOIN fin_ledger_line l ON l.id_tx = t.id_tx
+WHERE t.status = 'posted'
+GROUP BY t.reserva_id;
 
+CREATE OR REPLACE VIEW v_fin_caja_resumen AS
+SELECT
+  s.id_session,
+  s.fecha,
+  s.opening_cash,
+  IFNULL(r.ingresos_efectivo, 0.00) AS ingresos_efectivo,
+  IFNULL(m.egresos_efectivo, 0.00)  AS egresos_efectivo,
+  IFNULL(m.ajustes_mas, 0.00)       AS ajustes_mas,
+  IFNULL(m.ajustes_menos, 0.00)     AS ajustes_menos,
+  (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
+    + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0)) AS efectivo_esperado,
+  s.closing_cash_counted AS efectivo_contado,
+  (IFNULL(s.closing_cash_counted,0) -
+   (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
+     + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0))) AS descuadre
+FROM fin_cash_session s
+LEFT JOIN (
+  SELECT DATE(creado_en) AS fecha, SUM(monto) AS ingresos_efectivo
+  FROM fin_receipts
+  WHERE estado='Emitido' AND metodo='Efectivo'
+  GROUP BY DATE(creado_en)
+) r ON r.fecha = s.fecha
+LEFT JOIN (
+  SELECT DATE(created_at) AS fecha,
+         SUM(CASE WHEN tipo='Egreso' AND metodo='Efectivo' AND estado='Aplicado' THEN monto ELSE 0 END) AS egresos_efectivo,
+         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto >= 0 AND tipo IN ('Ingreso','Ajuste') THEN monto ELSE 0 END) AS ajustes_mas,
+         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto < 0  AND tipo='Ajuste' THEN -monto ELSE 0 END) AS ajustes_menos
+  FROM fin_cash_movement
+  GROUP BY DATE(created_at)
+) m ON m.fecha = s.fecha;
 
+CREATE OR REPLACE VIEW v_hist_reservas AS
+SELECT
+  r.Codigo_Reserva,
+  r.Estado,
+  r.Fecha_Entrada, r.Fecha_Salida,
+  r.Monto_Total, r.Monto_Pagado, r.Monto_Total_Acumulado, r.Monto_Pagado_Acumulado,
+  r.Numero_Comprobante, r.Canal, r.Fuente, r.Observaciones,
+  c.Codigo_Cliente, c.Cedula, c.Correo, CONCAT(c.Nombre,' ',c.Apellido) AS Cliente,
+  h.Numero_Habitacion, h.Tipo AS Tipo_Habitacion
+FROM Reserva r
+JOIN Cliente c    ON c.Codigo_Cliente = r.Codigo_Cliente
+JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion;
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-/* --------------------------------------------------------------Notas:----------------------------------------------*/
-/* ----------------------------------------------------------------------------------------------------------------- */
-/* --------------------------------------------------------------Notas:----------------------------------------------*/
-/* 1) EvtSalon.Nombre, EvtRecurso.Nombre y EvtPlantilla.Nombre deben ser UNIQUE para que ON DUPLICATE funcione.---- */
-/* 2) Si deseas vincular EvtRecurso con inventario (InvInsumo_Id), reemplaza NULL por el Id correcto, por ejemplo:--*/
-/*    -UPDATE EvtRecurso SET InvInsumo_Id = (SELECT Id FROM InvInsumo WHERE Nombre='Cloro piscina' LIMIT 1)-------- */
-/*    -WHERE Nombre='Consola Audio 8ch' AND InvInsumo_Id IS NULL;-------------------------------------------------- */
-/* 3) El evento demo queda en BORRADOR para que pruebes moverlo en el calendario y luego CONFIRMAR desde la UI.----*/
-/* ----------------------------------------------------------------------------------------------------------------*/
-
-/* ===========================================================
-   HRM — 03-Módulo de Recursos Humanos
-   MySQL 8.x • InnoDB • utf8mb4
-   Cumple HU: HRM-08-005..013
-   =========================================================== */
-
-/* -------------------------------------------
-   Configuración de cargas sociales / legales
-   ------------------------------------------- */
-CREATE TABLE HRM_ConfigSocial (
-  Id                INT NOT NULL AUTO_INCREMENT,
-  Vigente_Desde     DATE NOT NULL,
-  CCSS_Pct          DECIMAL(6,3) NOT NULL DEFAULT 10.670,  -- % colaborador
-  IVM_Pct           DECIMAL(6,3) NOT NULL DEFAULT 2.670,   -- % colaborador
-  BP_Pct            DECIMAL(6,3) NOT NULL DEFAULT 1.000,   -- Banco Popular (colaborador)
-  Renta_Pct         DECIMAL(6,3) NOT NULL DEFAULT 10.000,  -- simplificado
-  Activa            TINYINT(1) NOT NULL DEFAULT 1,
-  CONSTRAINT PK_HRM_ConfigSocial PRIMARY KEY (Id),
-  KEY IX_HRM_ConfigSocial_Vigente (Vigente_Desde)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Ausencias sin goce (por día u horas)
-   ------------------------------------------- */
-CREATE TABLE HRM_Absence (
-  Id                 INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario INT NOT NULL,
-  Tipo               ENUM('SIN_GOCE') NOT NULL DEFAULT 'SIN_GOCE',
-  Fecha              DATE NOT NULL,
-  Horas              DECIMAL(5,2) NULL,  -- si es parcial
-  Motivo             VARCHAR(255) NULL,
-  Registrado_Por     INT NULL,
-  Registrado_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_HRM_Absence PRIMARY KEY (Id),
-  KEY IX_HRM_Abs_Func (Codigo_Funcionario, Fecha),
-  CONSTRAINT FK_HRM_Abs_Func FOREIGN KEY (Codigo_Funcionario)
-    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Vacaciones (flujo aprobación)
-   ------------------------------------------- */
-CREATE TABLE HRM_VacationRequest (
-  Id                 INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario INT NOT NULL,
-  Fecha_Desde        DATE NOT NULL,
-  Fecha_Hasta        DATE NOT NULL,
-  Dias               DECIMAL(5,2) NOT NULL,
-  Estado             ENUM('PENDIENTE','APROBADA','RECHAZADA') NOT NULL DEFAULT 'PENDIENTE',
-  Comentario         VARCHAR(255) NULL,
-  Aprobado_Por       INT NULL,
-  Aprobado_En        DATETIME NULL,
-  Creado_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_HRM_Vac PRIMARY KEY (Id),
-  KEY IX_HRM_Vac_Func (Codigo_Funcionario),
-  KEY IX_HRM_Vac_Estado (Estado),
-  CONSTRAINT FK_HRM_Vac_Func FOREIGN KEY (Codigo_Funcionario)
-    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Amonestaciones (flujo y notificación)
-   ------------------------------------------- */
-CREATE TABLE HRM_Warning (
-  Id                 INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario INT NOT NULL,
-  Severidad          ENUM('LEVE','MEDIA','GRAVE') NOT NULL DEFAULT 'LEVE',
-  Motivo             VARCHAR(500) NOT NULL,
-  Estado             ENUM('REGISTRADA','NOTIFICADA','ANULADA') NOT NULL DEFAULT 'REGISTRADA',
-  Registrada_Por     INT NULL,
-  Registrada_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Notificada_En      DATETIME NULL,
-  CONSTRAINT PK_HRM_Warn PRIMARY KEY (Id),
-  KEY IX_HRM_Warn_Func (Codigo_Funcionario),
-  KEY IX_HRM_Warn_Estado (Estado),
-  CONSTRAINT FK_HRM_Warn_Func FOREIGN KEY (Codigo_Funcionario)
-    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Deducciones voluntarias
-   ------------------------------------------- */
-CREATE TABLE HRM_VoluntaryDed (
-  Id                 INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario INT NOT NULL,
-  Tipo               ENUM('PENSION_ALIMENTARIA','PRESTAMO','OTRA') NOT NULL,
-  Monto_Fijo         DECIMAL(12,2) NULL,
-  Porcentaje         DECIMAL(6,3) NULL, -- sobre salario bruto quincenal
-  Activa             TINYINT(1) NOT NULL DEFAULT 1,
-  Observacion        VARCHAR(255) NULL,
-  Creada_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_HRM_Vol PRIMARY KEY (Id),
-  KEY IX_HRM_Vol_Func (Codigo_Funcionario),
-  CONSTRAINT FK_HRM_Vol_Func FOREIGN KEY (Codigo_Funcionario)
-    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Incapacidades (CCSS / INS)
-   ------------------------------------------- */
-CREATE TABLE HRM_Incapacity (
-  Id                 INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario INT NOT NULL,
-  Fuente             ENUM('CCSS','INS') NOT NULL,
-  Porcentaje_Rebajo  DECIMAL(6,3) NOT NULL, -- % a rebajar del salario en periodo afectado
-  Fecha_Desde        DATE NOT NULL,
-  Fecha_Hasta        DATE NOT NULL,
-  Comprobante        VARCHAR(120) NULL,
-  Observacion        VARCHAR(255) NULL,
-  Registrada_En      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_HRM_Inc PRIMARY KEY (Id),
-  KEY IX_HRM_Inc_Func (Codigo_Funcionario),
-  KEY IX_HRM_Inc_Rango (Fecha_Desde, Fecha_Hasta),
-  CONSTRAINT FK_HRM_Inc_Func FOREIGN KEY (Codigo_Funcionario)
-    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Cuentas bancarias (histórico)
-   ------------------------------------------- */
-CREATE TABLE HRM_BankAccount (
-  Id                 INT NOT NULL AUTO_INCREMENT,
-  Codigo_Funcionario INT NOT NULL,
-  Banco              VARCHAR(60) NOT NULL,
-  IBAN               VARCHAR(40) NOT NULL,
-  Predeterminada     TINYINT(1) NOT NULL DEFAULT 1,
-  Activa             TINYINT(1) NOT NULL DEFAULT 1,
-  Creada_En          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_HRM_Bank PRIMARY KEY (Id),
-  UNIQUE KEY UQ_HRM_Bank_Unique (Codigo_Funcionario, IBAN),
-  KEY IX_HRM_Bank_Func (Codigo_Funcionario),
-  CONSTRAINT FK_HRM_Bank_Func FOREIGN KEY (Codigo_Funcionario)
-    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Periodos de nómina (quincenal)
-   ------------------------------------------- */
-CREATE TABLE HRM_PayrollPeriod (
-  Id          INT NOT NULL AUTO_INCREMENT,
-  Periodo_Key CHAR(7) NOT NULL,      -- p.ej. 2025-11
-  Quincena    ENUM('Q1','Q2') NOT NULL,
-  Fecha_Desde DATE NOT NULL,
-  Fecha_Hasta DATE NOT NULL,
-  Estado      ENUM('ABIERTO','CALCULADO','PAGADO','CERRADO') NOT NULL DEFAULT 'ABIERTO',
-  Creado_En   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_HRM_Period PRIMARY KEY (Id),
-  UNIQUE KEY UQ_HRM_Period (Periodo_Key, Quincena)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Nómina por colaborador (cabecera)
-   ------------------------------------------- */
-CREATE TABLE HRM_Payroll (
-  Id                 INT NOT NULL AUTO_INCREMENT,
-  Period_Id          INT NOT NULL,
-  Codigo_Funcionario INT NOT NULL,
-  Salario_Base_Mensual DECIMAL(12,2) NOT NULL,
-  Bruto_Quincena     DECIMAL(12,2) NOT NULL,
-  Rebajo_Ausencias   DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Rebajo_Incap       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Deduccion_CCSS     DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Deduccion_IVM      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Deduccion_BP       DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Deduccion_Renta    DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Deduccion_Vol      DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-  Neto_Pagar         DECIMAL(12,2) NOT NULL,
-  PDF_Path           VARCHAR(255) NULL,
-  Email_Enviado      TINYINT(1) NOT NULL DEFAULT 0,
-  Generado_En        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT PK_HRM_Payroll PRIMARY KEY (Id),
-  UNIQUE KEY UQ_HRM_Payroll (Period_Id, Codigo_Funcionario),
-  KEY IX_HRM_Payroll_Period (Period_Id),
-  CONSTRAINT FK_HRM_Payroll_Period FOREIGN KEY (Period_Id)
-    REFERENCES HRM_PayrollPeriod(Id) ON UPDATE CASCADE ON DELETE CASCADE,
-  CONSTRAINT FK_HRM_Payroll_Func FOREIGN KEY (Codigo_Funcionario)
-    REFERENCES Funcionario(Codigo_Funcionario) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Detalle de deducciones / rubros
-   ------------------------------------------- */
-CREATE TABLE HRM_PayrollDetail (
-  Id          INT NOT NULL AUTO_INCREMENT,
-  Payroll_Id  INT NOT NULL,
-  Tipo        ENUM('AUSENCIA','INCAPACIDAD','VOLUNTARIA','LEGAL','OTRA') NOT NULL,
-  Clave       VARCHAR(60) NOT NULL,
-  Monto       DECIMAL(12,2) NOT NULL,
-  CONSTRAINT PK_HRM_PayDet PRIMARY KEY (Id),
-  KEY IX_HRM_PayDet_Pay (Payroll_Id),
-  CONSTRAINT FK_HRM_PayDet_Pay FOREIGN KEY (Payroll_Id)
-    REFERENCES HRM_Payroll(Id) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-/* -------------------------------------------
-   Registro de pagos (depósito/comprobante)
-   ------------------------------------------- */
-CREATE TABLE HRM_PaymentRecord (
-  Id               INT NOT NULL AUTO_INCREMENT,
-  Payroll_Id       INT NOT NULL,
-  Fecha_Pago       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  Comprobante      VARCHAR(80)  NULL,
-  Banco            VARCHAR(60)  NULL,
-  Cuenta_Destino   VARCHAR(40)  NULL,
-  Emitido_Por      INT NULL,
-  CONSTRAINT PK_HRM_PayRec PRIMARY KEY (Id),
-  KEY IX_HRM_PayRec_Pay (Payroll_Id),
-  CONSTRAINT FK_HRM_PayRec_Pay FOREIGN KEY (Payroll_Id)
-    REFERENCES HRM_Payroll(Id) ON UPDATE CASCADE ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE OR REPLACE VIEW v_hist_pagos AS
+SELECT
+  'RECIBO' AS origen, fr.id_receipt AS id_origen,
+  fr.creado_en AS fecha,
+  fr.reserva_id AS Codigo_Reserva,
+  fr.metodo, fr.currency AS moneda, fr.monto, fr.numero AS ref,
+  fr.estado
+FROM fin_receipts fr
+UNION ALL
+SELECT
+  'LEDGER' AS origen, t.id_tx AS id_origen,
+  t.created_at AS fecha,
+  t.reserva_id AS Codigo_Reserva,
+  COALESCE(JSON_UNQUOTE(JSON_EXTRACT(t.meta,'$.metodo')),'POS') AS metodo,
+  t.currency, t.total, t.external_id AS ref,
+  t.status AS estado
+FROM fin_ledger_tx t;
 
 
+/* ===================================================================== */
+/* SEEDS                                                                 */
+/* ===================================================================== */
 
-/* ------------------------------------------------------------------------- */
-/* Seeds                                                                     */
-/* ------------------------------------------------------------------------- */
+SET FOREIGN_KEY_CHECKS = 0;
 
-
--- HRM_ConfigSocial
-INSERT INTO HRM_ConfigSocial (Vigente_Desde, CCSS_Pct, IVM_Pct, BP_Pct, Renta_Pct, Activa)
-VALUES (DATE_FORMAT(CURDATE(),'%Y-01-01'), 10.670, 2.670, 1.000, 10.000, 1)
-ON DUPLICATE KEY UPDATE CCSS_Pct=VALUES(CCSS_Pct), IVM_Pct=VALUES(IVM_Pct), BP_Pct=VALUES(BP_Pct), Renta_Pct=VALUES(Renta_Pct), Activa=VALUES(Activa);
-
--- Banco de ejemplo para el funcionario 1 (ajusta si no existe)
-INSERT INTO HRM_BankAccount (Codigo_Funcionario, Banco, IBAN, Predeterminada, Activa)
-SELECT f.Codigo_Funcionario, 'BNCR', 'CR05010200000000000001', 1, 1
-FROM Funcionario f
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM HRM_BankAccount ba
-    WHERE ba.Codigo_Funcionario = f.Codigo_Funcionario
-)
-ORDER BY f.Codigo_Funcionario
-LIMIT 1;
-
--- Deducción voluntaria demo
-INSERT INTO HRM_VoluntaryDed (Codigo_Funcionario, Tipo, Monto_Fijo, Porcentaje, Activa, Observacion)
-SELECT f.Codigo_Funcionario, 'PRESTAMO', 15000.00, NULL, 1, 'Préstamo personal'
-FROM Funcionario f
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM HRM_VoluntaryDed vd
-    WHERE vd.Codigo_Funcionario = f.Codigo_Funcionario
-      AND vd.Tipo = 'PRESTAMO'
-)
-ORDER BY f.Codigo_Funcionario
-LIMIT 1;
-
--- Ausencia sin goce demo (2 horas hoy) usando el PRIMER funcionario que exista
-INSERT INTO HRM_Absence (Codigo_Funcionario, Fecha, Horas, Motivo, Registrado_Por)
-SELECT f.Codigo_Funcionario, CURDATE(), 2.00, 'Gestión personal', 1
-FROM (
-    SELECT Codigo_Funcionario
-    FROM Funcionario
-    ORDER BY Codigo_Funcionario
-    LIMIT 1
-) AS f
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM HRM_Absence a
-    WHERE a.Codigo_Funcionario = f.Codigo_Funcionario
-      AND a.Fecha = CURDATE()
-);
-
--- Vacaciones PENDIENTE usando el SEGUNDO funcionario (si existe)
-INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado)
-SELECT f.Codigo_Funcionario,
-       CURDATE() + INTERVAL 7 DAY,
-       CURDATE() + INTERVAL 10 DAY,
-       3.00,
-       'PENDIENTE'
-FROM (
-    SELECT Codigo_Funcionario
-    FROM Funcionario
-    ORDER BY Codigo_Funcionario
-    LIMIT 1 OFFSET 1    -- segundo funcionario
-) AS f
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM HRM_VacationRequest v
-    WHERE v.Codigo_Funcionario = f.Codigo_Funcionario
-      AND v.Estado = 'PENDIENTE'
-);
-
--- Vacaciones APROBADA demo usando el TERCER funcionario (si existe)
-INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado, Aprobado_Por, Aprobado_En)
-SELECT f.Codigo_Funcionario,
-       CURDATE() - INTERVAL 15 DAY,
-       CURDATE() - INTERVAL 12 DAY,
-       3.00,
-       'APROBADA',
-       1,
-       NOW()
-FROM (
-    SELECT Codigo_Funcionario
-    FROM Funcionario
-    ORDER BY Codigo_Funcionario
-    LIMIT 1 OFFSET 2    -- tercer funcionario
-) AS f
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM HRM_VacationRequest v
-    WHERE v.Codigo_Funcionario = f.Codigo_Funcionario
-      AND v.Estado = 'APROBADA'
-);
-
--- Amonestación demo usando el PRIMER funcionario
-INSERT INTO HRM_Warning (Codigo_Funcionario, Severidad, Motivo)
-SELECT f.Codigo_Funcionario, 'LEVE', 'Uso inapropiado del uniforme'
-FROM (
-    SELECT Codigo_Funcionario
-    FROM Funcionario
-    ORDER BY Codigo_Funcionario
-    LIMIT 1
-) AS f
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM HRM_Warning w
-    WHERE w.Codigo_Funcionario = f.Codigo_Funcionario
-);
-
--- Incapacidad demo 50% rebajo en esta quincena usando el PRIMER funcionario
-INSERT INTO HRM_Incapacity (Codigo_Funcionario, Fuente, Porcentaje_Rebajo, Fecha_Desde, Fecha_Hasta, Observacion)
-SELECT f.Codigo_Funcionario,
-       'CCSS',
-       50.000,
-       CURDATE() - INTERVAL 3 DAY,
-       CURDATE(),
-       'Resfrío'
-FROM (
-    SELECT Codigo_Funcionario
-    FROM Funcionario
-    ORDER BY Codigo_Funcionario
-    LIMIT 1
-) AS f
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM HRM_Incapacity i
-    WHERE i.Codigo_Funcionario = f.Codigo_Funcionario
-      AND i.Fecha_Desde = CURDATE() - INTERVAL 3 DAY
-);
-
--- Habitaciones
 INSERT INTO Habitacion (Numero_Habitacion, Tipo, Precio_Noche, Estado) VALUES
  ('101','Sencilla', 15000.00,'Disponible'),
  ('102','Doble',    30000.00,'Disponible'),
@@ -1974,7 +2303,6 @@ ON DUPLICATE KEY UPDATE
   Precio_Noche = VALUES(Precio_Noche),
   Estado = VALUES(Estado);
 
--- Roles
 INSERT INTO Rol (Nombre, Descripcion, Estado) VALUES
  ('Administrador','Rol Administrador','Activo'),
  ('Recepcionista','Rol Recepción','Activo'),
@@ -1982,36 +2310,30 @@ INSERT INTO Rol (Nombre, Descripcion, Estado) VALUES
  ('Cliente','Rol Cliente','Activo')
 ON DUPLICATE KEY UPDATE Descripcion = VALUES(Descripcion), Estado = VALUES(Estado);
 
--- Funcionarios  (AJUSTE ÚNICO: se añade un 4.º registro para garantizar Codigo_Funcionario=4)
-INSERT INTO Funcionario (Cedula,Nombre,Apellido,Puesto,Fecha_Nacimiento) VALUES
- ('305410583','Juan','Jiménez','Recepcionista','1998-03-21'),
- ('107720872','María','Jimenez','Administrador','1991-04-11'),
- ('105440693','Ana','Coto','Limpieza','1993-02-22'),
- ('209990001','Carlos','Arce','Seguridad','1985-07-15');
+INSERT INTO Funcionario (Cedula,Nombre,Apellido,Puesto,Departamento,Fecha_Nacimiento,Fecha_Ingreso,Salario_Base_Mensual,Estado_Empleado,Tipo_Contrato,Banco,Cuenta_Bancaria) VALUES
+ ('305410583','Juan','Jiménez','Recepcionista','Recepción','1998-03-21',CURDATE(), 0.00,'Activo','Tiempo completo',NULL,NULL),
+ ('107720872','María','Jimenez','Administrador','Administración','1991-04-11',CURDATE(), 0.00,'Activo','Tiempo completo',NULL,NULL),
+ ('105440693','Ana','Coto','Limpieza','Housekeeping','1993-02-22',CURDATE(), 0.00,'Activo','Tiempo completo',NULL,NULL),
+ ('209990001','Carlos','Arce','Seguridad','Seguridad','1985-07-15',CURDATE(), 0.00,'Activo','Tiempo completo',NULL,NULL);
 
--- Clientes
 INSERT INTO Cliente (Cedula,Nombre,Apellido,Telefono,Correo,Fecha_Nacimiento) VALUES
  ('407550891','Rosa','Coto','88889999','rosa@mail.com','1994-04-01'),
  ('308220992','Ana','Porras','88776655','ana@mail.com','1998-06-01'),
- ('507660893','Catalina','Rojas','88112233','cata@mail.com','2001-05-15');
+ ('507660893','Catalina','Rojas','88112233','cata@mail.com','2001-05-15')
+ON DUPLICATE KEY UPDATE Telefono=VALUES(Telefono), Correo=VALUES(Correo);
 
--- Usuarios
 INSERT INTO Usuario (Nombre, Cedula_Pasaporte, Correo, Telefono, Contrasena, Rol_Id, Estado)
 VALUES ('Admin General','ADM001','admin@hotel.test','00000000','PBKDF2_HASH_AQUI',
-        (SELECT Codigo_Rol FROM Rol WHERE Nombre='Administrador'),'Activo');
+        (SELECT Codigo_Rol FROM Rol WHERE Nombre='Administrador' LIMIT 1),'Activo')
+ON DUPLICATE KEY UPDATE Nombre=VALUES(Nombre), Telefono=VALUES(Telefono), Estado=VALUES(Estado);
 
 INSERT INTO Usuario (Nombre, Cedula_Pasaporte, Correo, Telefono, Rol_Id, Estado, Contrasena)
 SELECT
-  'Laura Recepción',
-  'R-001',
-  'recepcion@hotel.test',
-  '+506 6000 0000',
-  (SELECT Codigo_Rol FROM Rol WHERE Nombre = 'Recepcionista' LIMIT 1),
-  'Activo',
-  'Recep1234!'
+  'Laura Recepción','R-001','recepcion@hotel.test','+506 6000 0000',
+  (SELECT Codigo_Rol FROM Rol WHERE Nombre='Recepcionista' LIMIT 1),
+  'Activo','Recep1234!'
 WHERE NOT EXISTS (SELECT 1 FROM Usuario WHERE LOWER(Correo)=LOWER('recepcion@hotel.test'));
 
--- KPI inicial
 INSERT INTO KPI_Stats (Periodo, Clave, Total_Reservas, Total_Monto, Revenue_SinImpuesto, Total_Noches) VALUES
  ('day',   DATE_FORMAT(CURDATE(), '%Y-%m-%d'), 0, 0, 0, 0),
  ('week',  DATE_FORMAT(CURDATE(), '%x-W%v'),   0, 0, 0, 0),
@@ -2022,7 +2344,6 @@ ON DUPLICATE KEY UPDATE
   Revenue_SinImpuesto=VALUES(Revenue_SinImpuesto),
   Total_Noches=VALUES(Total_Noches);
 
--- Inventario básico
 INSERT INTO InvCategoria (Nombre, Descripcion, Activa)
 VALUES ('General', 'Categoría por defecto para insumos generales', 1)
 ON DUPLICATE KEY UPDATE Descripcion=VALUES(Descripcion), Activa=VALUES(Activa);
@@ -2048,11 +2369,9 @@ VALUES (
   'AJUSTE', 'Carga inicial', 50.000
 );
 
--- Mantenimiento de ejemplo
 INSERT INTO MantenimientoSolicitud (Codigo_Habitacion, Titulo, Descripcion, Prioridad, Estado)
 VALUES (1, 'A/C con ruido', 'Vibración fuerte por la noche', 'Alta', 'Abierta');
 
--- Reglas de asignación / preferencias
 INSERT INTO PreferenciaHuesped (Codigo_Cliente, Clave, Valor) VALUES
  (2,'piso_alto','true'),
  (2,'cuna','true'),
@@ -2064,7 +2383,6 @@ VALUES
  ('Capacidad suficiente',     20, 1.5, 1, JSON_OBJECT('campo','Capacidad','operador','>=','valor','(pax)')),
  ('Evitar mantenimiento',     30, 3.0, 1, JSON_OBJECT('campo','Estado','operador','neq','valor','Mantenimiento'));
 
--- Reservas demo
 INSERT INTO Reserva (
   Codigo_Cliente, Codigo_Habitacion, Habitacion_Id, Codigo_Funcionario,
   Fecha_Entrada, Fecha_Salida, Monto_Total, Estado, Canal, Numero_Comprobante,
@@ -2077,7 +2395,6 @@ INSERT INTO Reserva (
  (3, 4, 4, 1, '2025-11-10','2025-11-12', 90000.00,'Confirmada','Web','VG-20251110-0001',
   'Late checkout','2 adultos','Web','48h antes sin costo');
 
--- Decisión + estancia ejemplo (para reserva 2)
 INSERT INTO AsignacionDecision (Codigo_Reserva, Tipo, Resultado, Score_Total, Detalle_JSON)
 VALUES (2, 'Auto', 'OK', 4.50, JSON_OBJECT('candidatos', JSON_ARRAY(101,102,202), 'seleccion', 102));
 
@@ -2088,13 +2405,14 @@ VALUES (2, 2, '2025-10-01','2025-10-05','Automatico',
         JSON_OBJECT('tipo','match','capacidad','ok','mantenimiento','ok'),
         JSON_OBJECT('piso_alto','true','cuna','true'));
 
--- Datos de POS/finanzas demo
 INSERT INTO fin_invoices (numero, cliente_nombre, cliente_email, moneda, monto_total, descripcion, id_usuario, estado)
-VALUES ('VG-TEST-0001','Cliente Demo','demo@mail.com','CRC',12345.67,'Factura de prueba', 1, 'Emitida');
+VALUES ('VG-TEST-0001','Cliente Demo','demo@mail.com','CRC',12345.67,'Factura de prueba',
+        (SELECT Codigo_Usuario FROM Usuario WHERE Correo='admin@hotel.test' LIMIT 1),
+        'Emitida');
 
--- Cliente extra + reserva Pendiente (para pruebas POS)
 INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
-VALUES ('208990123', 'Carlos', 'Mora', '88887777', 'carlos@test.com', '1990-05-15');
+VALUES ('208990123', 'Carlos', 'Mora', '88887777', 'carlos@test.com', '1990-05-15')
+ON DUPLICATE KEY UPDATE Telefono=VALUES(Telefono), Correo=VALUES(Correo);
 
 INSERT INTO Reserva (
   Codigo_Cliente, Codigo_Habitacion, Habitacion_Id, Codigo_Funcionario,
@@ -2105,7 +2423,6 @@ INSERT INTO Reserva (
   'Web', '48h antes sin costo', 'Reserva generada para prueba POS', '2 adultos'
 );
 
--- Waitlist & Cupones demo
 INSERT INTO Waitlist (Correo, Nombre, Tipo_Solicitado, Fecha_Entrada, Fecha_Salida, Huespedes, Preferir_Superior)
 VALUES ('demo@cliente.com','Cliente Demo','Doble','2025-10-01','2025-10-03',2,1);
 
@@ -2113,12 +2430,6 @@ INSERT INTO Coupon (Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, A
 VALUES ('ACME10','porcentaje',10,CURDATE(),DATE_ADD(CURDATE(),INTERVAL 30 DAY),100,1)
 ON DUPLICATE KEY UPDATE Valor=VALUES(Valor), Valido_Desde=VALUES(Valido_Desde), Valido_Hasta=VALUES(Valido_Hasta), Max_Usos=VALUES(Max_Usos), Activo=VALUES(Activo);
 
-
-/* ===========================================================
-   SEEDS — Analítica y Reportes Administrativos (AREP)
-   =========================================================== */
-
--- Preferencia de visualización por defecto
 INSERT INTO ArepViewConfig (Codigo_Usuario, Nombre_Reporte, Encabezado_JSON, Columnas_JSON, Filtros_JSON)
 SELECT
   (SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1),
@@ -2135,7 +2446,6 @@ WHERE NOT EXISTS (
     AND Codigo_Usuario=(SELECT Codigo_Usuario FROM Usuario WHERE LOWER(Correo)=LOWER('admin@hotel.test') LIMIT 1)
 );
 
--- Muestras de tiempos de atención
 INSERT INTO ArepAtencion (Codigo_Funcionario, Area, Inicio_Atencion, Fin_Atencion, Origen, Ref_Id)
 SELECT
   (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='305410583' LIMIT 1),
@@ -2154,7 +2464,6 @@ SELECT
   'Ticket','MNT-2001'
 WHERE NOT EXISTS (SELECT 1 FROM ArepAtencion WHERE Origen='Ticket' AND Ref_Id='MNT-2001');
 
--- Muestras de satisfacción (NPS)
 INSERT INTO ArepSatisfaccion (Codigo_Funcionario, Puntaje, Comentario, Fuente)
 SELECT
   (SELECT Codigo_Funcionario FROM Funcionario WHERE Cedula='105440693' LIMIT 1),
@@ -2171,12 +2480,7 @@ WHERE NOT EXISTS (
   SELECT 1 FROM ArepSatisfaccion WHERE Comentario='Check-in rápido pero estacionamiento lleno'
 );
 
-
--- ==========================================
--- Seeds de EVT – Gestión de Eventos y Actividades 
--- ==========================================
-
--- Salones
+/* EVT seeds */
 INSERT INTO EvtSalon (Nombre, Capacidad, Ubicacion, Activo, ColorHex) VALUES
  ('Salón Pacífico',  80, 'Edificio Principal', 1, '#6f42c1'),
  ('Salón Montezuma', 40, 'Edificio Principal', 1, '#0d6efd'),
@@ -2187,7 +2491,6 @@ ON DUPLICATE KEY UPDATE
   Activo    = VALUES(Activo),
   ColorHex  = VALUES(ColorHex);
 
--- Recursos
 INSERT INTO EvtRecurso (Nombre, Tipo, InvInsumo_Id, Activo) VALUES
  ('Proyector Epson',      'AV',         NULL, 1),
  ('Consola Audio 8ch',    'AV',         NULL, 1),
@@ -2198,7 +2501,6 @@ ON DUPLICATE KEY UPDATE
   InvInsumo_Id = VALUES(InvInsumo_Id),
   Activo       = VALUES(Activo);
 
--- Plantillas
 INSERT INTO EvtPlantilla (Nombre, Descripcion, Duracion_Min) VALUES
  ('Boda',        'Ceremonia + recepción básica',        240),
  ('Congreso',    'Ponencias, paneles y coffee break',   480),
@@ -2207,7 +2509,6 @@ ON DUPLICATE KEY UPDATE
   Descripcion  = VALUES(Descripcion),
   Duracion_Min = VALUES(Duracion_Min);
 
--- Evento demo
 INSERT INTO EvtEvento (Titulo, Estado, Inicio, Fin, TZ, Organizador, Notas, Salon_Id)
 SELECT
   'Demo: Visita de inspección',
@@ -2223,7 +2524,6 @@ WHERE NOT EXISTS (
   WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE()
 );
 
--- Recursos del evento demo
 INSERT INTO EvtEventoRecurso (Evento_Id, Recurso_Id, Cantidad)
 SELECT
   (SELECT Id FROM EvtEvento WHERE Titulo='Demo: Visita de inspección' AND DATE(Inicio)=CURDATE() LIMIT 1),
@@ -2246,86 +2546,316 @@ WHERE NOT EXISTS (
     AND Recurso_Id = (SELECT Id FROM EvtRecurso WHERE Nombre='Sillas plegables' LIMIT 1)
 );
 
-/* -------------------------------------------
-   Verificaciones EVT (opcional)
-   ------------------------------------------- */
-SELECT DATABASE() AS db_actual;
-SHOW TABLES LIKE 'Evt%';
-SELECT * FROM EvtSalon;
-SELECT e.Id, e.Titulo, e.Estado, e.Inicio, s.Nombre AS Salon
-FROM EvtEvento e LEFT JOIN EvtSalon s ON s.Id=e.Salon_Id
-ORDER BY e.Inicio DESC;
+/* HRM seeds */
+INSERT INTO HRM_ConfigSocial (Vigente_Desde, CCSS_Pct, IVM_Pct, BP_Pct, Renta_Pct, Activa)
+VALUES (DATE_FORMAT(CURDATE(),'%Y-01-01'), 10.670, 2.670, 1.000, 10.000, 1)
+ON DUPLICATE KEY UPDATE CCSS_Pct=VALUES(CCSS_Pct), IVM_Pct=VALUES(IVM_Pct), BP_Pct=VALUES(BP_Pct), Renta_Pct=VALUES(Renta_Pct), Activa=VALUES(Activa);
 
-
-/* ------------------------------------------------------------------------- */
-/* Verificaciones rápidas                                                    */
-/* ------------------------------------------------------------------------- */
-SELECT DATABASE() AS db_actual;
-SHOW TABLES;
-
--- Muestras
-SELECT * FROM Habitacion;
-SELECT * FROM Usuario;
-SELECT * FROM Cliente;
-SELECT * FROM Reserva;
-SELECT * FROM InvCategoria;
-SELECT * FROM InvInsumo;
-SELECT * FROM InvMovimiento;
-SELECT * FROM KPI_Stats;
-SELECT * FROM Coupon;
-SELECT * FROM Waitlist;
-SELECT * FROM ArepViewConfig;
-SELECT * FROM sac_conversation;
-SELECT Codigo_ArepAtencion, Area, Duracion_Seg FROM ArepAtencion ORDER BY Codigo_ArepAtencion DESC;
-SELECT Codigo_ArepSatisfaccion, Puntaje FROM ArepSatisfaccion ORDER BY Codigo_ArepSatisfaccion DESC;
-
-SELECT period_key, status, locked_at
-FROM fin_period_lock
-ORDER BY period_key;
-
-DESC fin_cash_movement;
-DESC fin_payment;
-DESC Reserva;
-DESC fin_ledger;
-
-INSERT INTO Marcacion (
-  Codigo_Funcionario, Fecha, Hora_Entrada, Hora_Salida,
-  Horas_Regulares, Estado, Observaciones
+INSERT INTO HRM_BankAccount (Codigo_Funcionario, Banco, IBAN, Predeterminada, Activa)
+SELECT f.Codigo_Funcionario, 'BNCR', 'CR05010200000000000001', 1, 1
+FROM Funcionario f
+WHERE NOT EXISTS (
+    SELECT 1 FROM HRM_BankAccount ba
+    WHERE ba.Codigo_Funcionario = f.Codigo_Funcionario
 )
-VALUES (
-  1,
-  '2025-11-01',
-  '2025-11-01 08:00:00',
-  '2025-11-01 17:00:00',
-  ROUND(
-    TIMESTAMPDIFF(
-      MINUTE,
-      '2025-11-01 08:00:00',
-      '2025-11-01 17:00:00'
-    ) / 60,
-    2
-  ),
-  'Pendiente',
-  'Carga de prueba HU-08-003'
+ORDER BY f.Codigo_Funcionario
+LIMIT 1;
+
+INSERT INTO HRM_VoluntaryDed (Codigo_Funcionario, Tipo, Monto_Fijo, Porcentaje, Activa, Observacion)
+SELECT f.Codigo_Funcionario, 'PRESTAMO', 15000.00, NULL, 1, 'Préstamo personal'
+FROM Funcionario f
+WHERE NOT EXISTS (
+    SELECT 1 FROM HRM_VoluntaryDed vd
+    WHERE vd.Codigo_Funcionario = f.Codigo_Funcionario
+      AND vd.Tipo = 'PRESTAMO'
+)
+ORDER BY f.Codigo_Funcionario
+LIMIT 1;
+
+INSERT INTO HRM_Absence (Codigo_Funcionario, Fecha, Horas, Motivo, Registrado_Por)
+SELECT f.Codigo_Funcionario, CURDATE(), 2.00, 'Gestión personal', 1
+FROM (SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario LIMIT 1) AS f
+WHERE NOT EXISTS (
+    SELECT 1 FROM HRM_Absence a
+    WHERE a.Codigo_Funcionario = f.Codigo_Funcionario
+      AND a.Fecha = CURDATE()
 );
 
--- Verifica qué quedó grabado (si usaste otro funcionario, ajusta el WHERE)
-SELECT Id, Codigo_Funcionario, Fecha, Hora_Entrada, Hora_Salida
-FROM Marcacion
-WHERE Codigo_Funcionario = 4
-ORDER BY Fecha DESC, Id DESC;
+INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado)
+SELECT f.Codigo_Funcionario,
+       CURDATE() + INTERVAL 7 DAY,
+       CURDATE() + INTERVAL 10 DAY,
+       3.00,
+       'PENDIENTE'
+FROM (SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario LIMIT 1 OFFSET 1) AS f
+WHERE NOT EXISTS (
+    SELECT 1 FROM HRM_VacationRequest v
+    WHERE v.Codigo_Funcionario = f.Codigo_Funcionario
+      AND v.Estado = 'PENDIENTE'
+);
 
-UPDATE Marcacion
-SET Fecha = '2025-11-01'
-WHERE Codigo_Funcionario = 4
-  AND Fecha = '2025-10-31';
+INSERT INTO HRM_VacationRequest (Codigo_Funcionario, Fecha_Desde, Fecha_Hasta, Dias, Estado, Aprobado_Por, Aprobado_En)
+SELECT f.Codigo_Funcionario,
+       CURDATE() - INTERVAL 15 DAY,
+       CURDATE() - INTERVAL 12 DAY,
+       3.00,
+       'APROBADA',
+       1,
+       NOW()
+FROM (SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario LIMIT 1 OFFSET 2) AS f
+WHERE NOT EXISTS (
+    SELECT 1 FROM HRM_VacationRequest v
+    WHERE v.Codigo_Funcionario = f.Codigo_Funcionario
+      AND v.Estado = 'APROBADA'
+);
 
-SELECT Fecha, Hora_Entrada, Hora_Salida
-FROM Marcacion
-WHERE Codigo_Funcionario = 4
-  AND Fecha >= CURDATE() - INTERVAL 30 DAY
-ORDER BY Fecha DESC, Id DESC;
+INSERT INTO HRM_Warning (Codigo_Funcionario, Severidad, Motivo)
+SELECT f.Codigo_Funcionario, 'LEVE', 'Uso inapropiado del uniforme'
+FROM (SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario LIMIT 1) AS f
+WHERE NOT EXISTS (
+    SELECT 1 FROM HRM_Warning w
+    WHERE w.Codigo_Funcionario = f.Codigo_Funcionario
+);
+
+INSERT INTO HRM_Incapacity (Codigo_Funcionario, Fuente, Porcentaje_Rebajo, Fecha_Desde, Fecha_Hasta, Observacion)
+SELECT f.Codigo_Funcionario,
+       'CCSS',
+       50.000,
+       CURDATE() - INTERVAL 3 DAY,
+       CURDATE(),
+       'Resfrío'
+FROM (SELECT Codigo_Funcionario FROM Funcionario ORDER BY Codigo_Funcionario LIMIT 1) AS f
+WHERE NOT EXISTS (
+    SELECT 1 FROM HRM_Incapacity i
+    WHERE i.Codigo_Funcionario = f.Codigo_Funcionario
+      AND i.Fecha_Desde = CURDATE() - INTERVAL 3 DAY
+);
+
+/* SAC seeds */
+INSERT INTO SAC_Config (Clave, Valor) VALUES
+('checkin_inicio','12:00'),
+('checkin_fin','00:00'),
+('checkout_limite','12:00'),
+('contacto_recepcion_email','recepcion@hotel.test')
+ON DUPLICATE KEY UPDATE Valor=VALUES(Valor);
+
+SET FOREIGN_KEY_CHECKS = 1;
 
 
 
 
+/* =========================================================
+   PARCHE SIN IF (idempotente con CASE + INFORMATION_SCHEMA)
+   - No usa: CREATE TABLE IF NOT EXISTS
+   - No usa: ADD COLUMN IF NOT EXISTS
+   ========================================================= */
+
+SET @db := DATABASE();
+
+/* =========================================================
+   1) TABLA FALTANTE EN SCRIPT 2 (existe en Script 1)
+   ========================================================= */
+
+SELECT
+  CASE
+    WHEN (
+      SELECT COUNT(*)
+      FROM information_schema.tables
+      WHERE table_schema = @db
+        AND table_name = 'SAC_KB_Unanswered'
+    ) = 0
+    THEN
+'CREATE TABLE SAC_KB_Unanswered (
+  Id INT NOT NULL AUTO_INCREMENT,
+  Question TEXT NOT NULL,
+  Asked_By VARCHAR(150) DEFAULT NULL,
+  Context_JSON JSON DEFAULT NULL,
+  Status ENUM(''Pendiente'',''Clasificada'',''Resuelta'',''Ignorada'') NOT NULL DEFAULT ''Pendiente'',
+  Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Reviewed_By INT DEFAULT NULL,
+  Reviewed_At DATETIME DEFAULT NULL,
+  Resolution_Note TEXT DEFAULT NULL,
+  PRIMARY KEY (Id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    ELSE 'SELECT 1'
+  END
+INTO @sql;
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+
+/* =========================================================
+   2) COLUMNAS FALTANTES (compatibilidad hacia atrás)
+   ========================================================= */
+
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_patch_sac_compat_20251230()
+BEGIN
+  /* =========================================================
+     Handlers para hacer el script idempotente SIN usar IF
+     - 1050: Table already exists
+     - 1060: Duplicate column name
+     - 1061: Duplicate key name
+     ========================================================= */
+  DECLARE CONTINUE HANDLER FOR 1050 BEGIN END;
+  DECLARE CONTINUE HANDLER FOR 1060 BEGIN END;
+  DECLARE CONTINUE HANDLER FOR 1061 BEGIN END;
+
+  /* =========================================================
+     0) Guardar y desactivar Safe Updates (evita Error 1175)
+     ========================================================= */
+  SET @__old_sql_safe_updates := @@SQL_SAFE_UPDATES;
+  SET SQL_SAFE_UPDATES = 0;
+
+  /* =========================================================
+     1) TABLA FALTANTE (sin CREATE TABLE IF NOT EXISTS)
+     ========================================================= */
+  CREATE TABLE SAC_KB_Unanswered (
+    Id INT NOT NULL AUTO_INCREMENT,
+    Question TEXT NOT NULL,
+    Asked_By VARCHAR(150) DEFAULT NULL,
+    Context_JSON JSON DEFAULT NULL,
+    Status ENUM('Pendiente','Clasificada','Resuelta','Ignorada') NOT NULL DEFAULT 'Pendiente',
+    Created_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Reviewed_By INT DEFAULT NULL,
+    Reviewed_At DATETIME DEFAULT NULL,
+    Resolution_Note TEXT DEFAULT NULL,
+    PRIMARY KEY (Id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+  /* =========================================================
+     2) COLUMNAS FALTANTES / COMPATIBILIDAD BIDIRECCIONAL
+     - Agrego columnas legacy y “modernas” para evitar:
+       - error por columna inexistente en backfill
+       - divergencias entre Script 1 y Script 2
+     ========================================================= */
+
+  /* SAC_Config */
+  ALTER TABLE SAC_Config ADD COLUMN Actualizado DATETIME NULL;
+  ALTER TABLE SAC_Config ADD COLUMN Actualizada_At DATETIME NULL;
+
+  /* SAC_NotifPref */
+  ALTER TABLE SAC_NotifPref ADD COLUMN Actualizado DATETIME NULL;
+  ALTER TABLE SAC_NotifPref ADD COLUMN Actualizada_At DATETIME NULL;
+
+  /* SAC_KB_Doc */
+  ALTER TABLE SAC_KB_Doc ADD COLUMN SubidoEn DATETIME NULL;
+  ALTER TABLE SAC_KB_Doc ADD COLUMN Created_At DATETIME NULL;
+
+  /* SAC_KB_QA */
+  ALTER TABLE SAC_KB_QA ADD COLUMN Creada_En DATETIME NULL;
+  ALTER TABLE SAC_KB_QA ADD COLUMN Created_At DATETIME NULL;
+  ALTER TABLE SAC_KB_QA ADD COLUMN Usos INT NOT NULL DEFAULT 0;
+  ALTER TABLE SAC_KB_QA ADD COLUMN Votos_Util INT NOT NULL DEFAULT 0;
+
+  /* SAC_Incident */
+  ALTER TABLE SAC_Incident ADD COLUMN Titulo VARCHAR(200) NULL;
+  ALTER TABLE SAC_Incident ADD COLUMN Detalle TEXT NULL;
+  ALTER TABLE SAC_Incident ADD COLUMN Descripcion TEXT NULL;
+
+  /* SAC_ConversationMsg */
+  ALTER TABLE SAC_ConversationMsg ADD COLUMN Enviada_Por ENUM('Cliente','Agente','Sistema') NULL;
+  ALTER TABLE SAC_ConversationMsg ADD COLUMN Texto TEXT NULL;
+  ALTER TABLE SAC_ConversationMsg ADD COLUMN Creada_En DATETIME NULL;
+
+  ALTER TABLE SAC_ConversationMsg ADD COLUMN Rol ENUM('Cliente','Agente','Sistema') NULL;
+  ALTER TABLE SAC_ConversationMsg ADD COLUMN Msg_Text TEXT NULL;
+  ALTER TABLE SAC_ConversationMsg ADD COLUMN Creada_At DATETIME NULL;
+
+  /* SAC_Feedback */
+  ALTER TABLE SAC_Feedback ADD COLUMN Codigo_Conversation INT NULL;
+  ALTER TABLE SAC_Feedback ADD COLUMN Codigo_Reserva INT NULL;
+  ALTER TABLE SAC_Feedback ADD COLUMN NPS TINYINT NULL;
+  ALTER TABLE SAC_Feedback ADD COLUMN Registrada_At DATETIME NULL;
+
+  ALTER TABLE SAC_Feedback ADD COLUMN Conversation_Id INT NULL;
+  ALTER TABLE SAC_Feedback ADD COLUMN Creada_At DATETIME NULL;
+  ALTER TABLE SAC_Feedback ADD COLUMN Rating TINYINT NULL;
+
+  /* =========================================================
+     3) BACKFILL (sin romper Safe Updates)
+     - Ya desactivamos SQL_SAFE_UPDATES en esta sesión.
+     - COALESCE únicamente (sin IF / sin IFNULL).
+     ========================================================= */
+
+  /* SAC_Config */
+  UPDATE SAC_Config
+     SET Actualizado = COALESCE(Actualizado, Actualizada_At);
+  UPDATE SAC_Config
+     SET Actualizada_At = COALESCE(Actualizada_At, Actualizado);
+
+  /* SAC_NotifPref */
+  UPDATE SAC_NotifPref
+     SET Actualizado = COALESCE(Actualizado, Actualizada_At);
+  UPDATE SAC_NotifPref
+     SET Actualizada_At = COALESCE(Actualizada_At, Actualizado);
+
+  /* SAC_KB_Doc */
+  UPDATE SAC_KB_Doc
+     SET SubidoEn = COALESCE(SubidoEn, Created_At);
+  UPDATE SAC_KB_Doc
+     SET Created_At = COALESCE(Created_At, SubidoEn);
+
+  /* SAC_KB_QA */
+  UPDATE SAC_KB_QA
+     SET Creada_En = COALESCE(Creada_En, Created_At);
+  UPDATE SAC_KB_QA
+     SET Created_At = COALESCE(Created_At, Creada_En);
+
+  /* SAC_Incident */
+  UPDATE SAC_Incident
+     SET Detalle = COALESCE(Detalle, Descripcion),
+         Titulo  = COALESCE(Titulo, LEFT(COALESCE(Descripcion, Detalle), 200));
+
+  /* SAC_ConversationMsg */
+  UPDATE SAC_ConversationMsg
+     SET Enviada_Por = COALESCE(Enviada_Por, Rol),
+         Rol        = COALESCE(Rol, Enviada_Por),
+         Texto      = COALESCE(Texto, Msg_Text),
+         Msg_Text   = COALESCE(Msg_Text, Texto),
+         Creada_En  = COALESCE(Creada_En, Creada_At),
+         Creada_At  = COALESCE(Creada_At, Creada_En);
+
+  /* SAC_Feedback */
+  UPDATE SAC_Feedback
+     SET Codigo_Conversation = COALESCE(Codigo_Conversation, Conversation_Id),
+         Conversation_Id    = COALESCE(Conversation_Id, Codigo_Conversation),
+         Registrada_At      = COALESCE(Registrada_At, Creada_At),
+         Creada_At          = COALESCE(Creada_At, Registrada_At),
+         NPS                = COALESCE(NPS, Rating),
+         Rating             = COALESCE(Rating, NPS);
+
+  /* =========================================================
+     4) Restaurar Safe Updates a como estaba
+     ========================================================= */
+  SET SQL_SAFE_UPDATES = @__old_sql_safe_updates;
+
+END$$
+
+DELIMITER ;
+
+CALL sp_patch_sac_compat_20251230();
+
+
+
+
+
+/* ------------------------------------------------------------------------- */
+/* Verificaciones rápidas (opcional; descomentar si se requiere)             */
+/* ------------------------------------------------------------------------- */
+-- SELECT DATABASE() AS db_actual;
+-- SHOW TABLES;
+-- SELECT * FROM Habitacion;
+SELECT * FROM Usuario;
+SELECT * FROM Cliente;
+-- SELECT * FROM Reserva;
+-- SELECT * FROM InvCategoria;
+-- SELECT * FROM InvInsumo;
+-- SELECT * FROM InvMovimiento;
+-- SELECT * FROM KPI_Stats;
+-- SELECT * FROM Coupon;
+-- SELECT * FROM EvtSalon;
