@@ -8,8 +8,10 @@
   <title>{% block title %}Hotel Villa Grace{% endblock %}</title>
 
   <!-- Meta SEO (puedes sobreescribir por página si quieres) -->
-  <meta name="description" content="{% block meta_description %}Hotel Villa Grace en Cóbano, Puntarenas. Piscina, restaurante, Wi-Fi y parqueo gratis.{% endblock %}" />
-  <meta name="keywords" content="{% block meta_keywords %}Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa{% endblock %}" />
+  <meta name="description"
+    content="{% block meta_description %}Hotel Villa Grace en Cóbano, Puntarenas. Piscina, restaurante, Wi-Fi y parqueo gratis.{% endblock %}" />
+  <meta name="keywords"
+    content="{% block meta_keywords %}Hotel Villa Grace, Cóbano, Puntarenas, Montezuma, Santa Teresa{% endblock %}" />
 
   <!-- Favicons -->
   <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
@@ -73,10 +75,15 @@
               <li><a href="{{ url_for('sac.faq_html') }}">FAQ y horarios</a></li>
               {% if session.get('user_role') == 'Cliente' %}
               <li><a href="{{ url_for('sac.preferencias_html') }}">Preferencias de notificación</a></li>
+              <!--<li><a href="{{ url_for('sac.solicitud_nueva_html') }}">Solicitudes especiales</a></li> -->
+              {% if session.get('user_role') == 'Cliente' %}
               <li><a href="{{ url_for('sac.solicitud_nueva_html') }}">Solicitudes especiales</a></li>
               {% endif %}
+              {% endif %}
               {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
-              <li><hr class="dropdown-divider"></li>
+              <li>
+                <hr class="dropdown-divider">
+              </li>
               <li><a href="{{ url_for('sac.panel_solicitudes') }}">Panel de solicitudes</a></li>
               <li><a href="{{ url_for('sac.incidentes_html') }}">Incidentes / comentarios</a></li>
               <li><a href="{{ url_for('sac.conversaciones_html') }}">Historial de conversaciones</a></li>
@@ -176,15 +183,41 @@
 
   <!-- CSS que tenías inline en index (lo dejamos aquí porque afecta al header) -->
   <style>
-    .header .navmenu>ul>li { margin: 0 8px; }
-    .header .navmenu a { white-space: nowrap; }
-    .header .navmenu .dropdown>ul { width: 260px; }
-    .header .navmenu .dropdown .dropdown>ul { left: 100%; top: 0; width: 240px; }
-    .header .btn-getstarted { padding: 8px 16px; border-radius: 999px; }
-    .header .sitename { font-size: 1.4rem; line-height: 1; margin-left: .5rem; }
-    @media (max-width: 1199.98px) {
-      .header .navmenu>ul>li { margin: 0 6px; }
+    .header .navmenu>ul>li {
+      margin: 0 8px;
     }
+
+    .header .navmenu a {
+      white-space: nowrap;
+    }
+
+    .header .navmenu .dropdown>ul {
+      width: 260px;
+    }
+
+    .header .navmenu .dropdown .dropdown>ul {
+      left: 100%;
+      top: 0;
+      width: 240px;
+    }
+
+    .header .btn-getstarted {
+      padding: 8px 16px;
+      border-radius: 999px;
+    }
+
+    .header .sitename {
+      font-size: 1.4rem;
+      line-height: 1;
+      margin-left: .5rem;
+    }
+
+    @media (max-width: 1199.98px) {
+      .header .navmenu>ul>li {
+        margin: 0 6px;
+      }
+    }
+
     .fx-widget {
       display: inline-flex;
       align-items: center;
@@ -194,8 +227,14 @@
       background: rgba(0, 0, 0, 0.35);
       backdrop-filter: blur(4px);
     }
-    .fx-widget .badge { font-size: 0.75rem; }
-    .fx-widget span { font-size: 0.8rem; }
+
+    .fx-widget .badge {
+      font-size: 0.75rem;
+    }
+
+    .fx-widget span {
+      font-size: 0.8rem;
+    }
   </style>
 
   <!-- Breadcrumbs (solo si se envían desde Flask) -->
@@ -204,11 +243,11 @@
     <div class="container">
       <ol class="breadcrumb mb-0">
         {% for item in breadcrumbs %}
-          {% if loop.last or item.url is none %}
-            <li class="breadcrumb-item active" aria-current="page">{{ item.label }}</li>
-          {% else %}
-            <li class="breadcrumb-item"><a href="{{ item.url }}">{{ item.label }}</a></li>
-          {% endif %}
+        {% if loop.last or item.url is none %}
+        <li class="breadcrumb-item active" aria-current="page">{{ item.label }}</li>
+        {% else %}
+        <li class="breadcrumb-item"><a href="{{ item.url }}">{{ item.label }}</a></li>
+        {% endif %}
         {% endfor %}
       </ol>
     </div>
@@ -280,7 +319,7 @@
                 <a href="https://www.facebook.com/HotelVillaGrace" target="_blank" rel="noopener">Facebook</a>
               </li>
               <li><a href="{{ url_for('contact_html') }}">Contacto rápido</a></li>
-              <li><a href="#">Mapa</a></li>
+              <!--<li><a href="#">Mapa</a></li>-->
             </ul>
           </div>
         </div>

@@ -7,15 +7,8 @@
 {% block body_class %}about-page{% endblock %}
 {% block nav_about %}active{% endblock %}
 
-{# Breadcrumbs usando tu sistema del base (si lo estás usando) #}
-{% set breadcrumbs = [
-  {"label":"Inicio", "url": url_for("index_html")},
-  {"label":"Sobre nosotros", "url": None}
-] %}
-
 {% block content %}
 
-  <!-- Page Title -->
   <div class="page-title dark-background" data-aos="fade"
     style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
     <div class="container position-relative">
@@ -31,9 +24,7 @@
       </nav>
     </div>
   </div>
-  <!-- End Page Title -->
 
-  <!-- About Section -->
   <section id="about" class="about section">
     <div class="container" data-aos="fade-up" data-aos-delay="100">
 
@@ -124,7 +115,6 @@
         </div>
       </div>
 
-      <!-- Por qué elegirnos -->
       <div class="row awards-section">
         <div class="col-12">
           <div class="section-header text-center" data-aos="fade-up" data-aos-delay="100">
@@ -167,9 +157,7 @@
 
     </div>
   </section>
-  <!-- /About Section -->
 
-  <!-- Rooms Showcase About Section -->
   <section id="rooms-showcase-about" class="rooms-showcase-about section">
 
     <div class="container section-title" data-aos="fade-up">
@@ -182,8 +170,6 @@
 
         {# OJO: aquí te recomiendo cambiar room-details.html por tu ruta real en Flask #}
         {# Ej: url_for('room_detail', room_id=...) #}
-
-        <!-- (Dejé tus cards igual; lo importante es cambiar href a url_for cuando exista) -->
 
       </div>
 

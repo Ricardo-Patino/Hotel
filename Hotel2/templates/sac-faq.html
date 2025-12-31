@@ -1,24 +1,149 @@
 {% extends "sac/_layout.html" %}
 {% block title %}FAQ | Hotel Villa Grace{% endblock %}
 {% block page_h1 %}Preguntas frecuentes{% endblock %}
-{% block crumb %}SAC · FAQ{% endblock %}
-{% block content %}
-<section class="section" data-aos="fade-up">
-  <div class="container">
-    <div class="vg-card p-4">
-      <h5>Horarios</h5>
-      <ul>
-        <li>Check-in: {{ checkin_ini }}–{{ checkin_fin }}</li>
-        <li>Check-out: hasta {{ checkout }}</li>
-      </ul>
-      <h5 class="mt-3">Servicios</h5>
-      <ul>
-        <li>Restaurante y bar</li>
-        <li>Piscina 8:00–21:00</li>
-        <li>Wi-Fi gratis, parqueo gratuito</li>
-      </ul>
-      <a class="btn btn-outline-primary" href="/sac/solicitudes/nueva">Enviar una solicitud</a>
+{% block crumb %}FAQ y horarios{% endblock %}
+
+{% block sac_content %}
+
+<div class="vg-card p-4" data-aos="fade-up">
+
+  <p class="mb-4 text-muted">
+    Aquí encontrarás respuestas a las preguntas más comunes sobre tu estadía en
+    <strong>Hotel Villa Grace</strong>.
+    Si necesitas ayuda adicional, puedes enviarnos una solicitud desde esta misma sección.
+  </p>
+
+  <div class="accordion" id="faqAccordion">
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+          ¿Cómo puedo realizar una reserva?
+        </button>
+      </h2>
+      <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Puedes realizar tu reserva directamente desde nuestro sitio web en la sección
+          <strong>Habitaciones</strong>.
+          Solo debes consultar disponibilidad y seguir los pasos indicados.
+        </div>
+      </div>
     </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+          ¿Cuál es el horario de check-in y check-out?
+        </button>
+      </h2>
+      <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          <ul class="mb-0">
+            <li><strong>Check-in:</strong> {{ checkin_ini }} – {{ checkin_fin }}</li>
+            <li><strong>Check-out:</strong> hasta {{ checkout }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+          ¿Puedo cancelar o modificar una reserva?
+        </button>
+      </h2>
+      <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Sí. Las cancelaciones o modificaciones dependen del tipo de tarifa seleccionada.
+          Te recomendamos revisar los detalles de tu reserva o contactarnos para recibir asistencia.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+          ¿Qué servicios incluye la estadía?
+        </button>
+      </h2>
+      <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Todos nuestros huéspedes cuentan con:
+          <ul>
+            <li>Wi-Fi gratuito</li>
+            <li>Parqueo gratuito</li>
+            <li>Piscina (8:00 am – 9:00 pm)</li>
+            <li>Áreas verdes y zonas comunes</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+          ¿El hotel cuenta con restaurante?
+        </button>
+      </h2>
+      <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Sí. Contamos con restaurante y bar donde podrás disfrutar de comidas y bebidas
+          durante el día. Los horarios pueden variar según la temporada.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
+          ¿Se permiten mascotas?
+        </button>
+      </h2>
+      <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Actualmente no se permiten mascotas dentro de las habitaciones,
+          excepto animales de asistencia debidamente identificados.
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq7">
+          ¿Dónde está ubicado el hotel?
+        </button>
+      </h2>
+      <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Estamos ubicados en <strong>Cóbano, Puntarenas</strong>, a pocos minutos en carro de
+          Montezuma y Santa Teresa, en una zona tranquila y segura.
+        </div>
+      </div>
+    </div>
+
+
+    <div class="accordion-item">
+      <h2 class="accordion-header">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq8">
+          ¿Cómo puedo contactar al hotel?
+        </button>
+      </h2>
+      <div id="faq8" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+        <div class="accordion-body">
+          Puedes contactarnos por teléfono, correo electrónico o enviarnos una solicitud
+          desde esta plataforma para recibir atención personalizada.
+        </div>
+      </div>
+    </div>
+
   </div>
-</section>
+
+  <div class="mt-4 text-center">
+    <a class="btn btn-outline-accent" href="{{ url_for('sac.solicitud_nueva_html') }}">
+      ¿No encontraste tu respuesta? Envíanos una solicitud
+    </a>
+  </div>
+
+</div>
+
 {% endblock %}

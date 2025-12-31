@@ -2,19 +2,48 @@
 {% block title %}Nueva solicitud | Hotel Villa Grace{% endblock %}
 {% block page_h1 %}Nueva solicitud{% endblock %}
 {% block crumb %}SAC · Solicitudes{% endblock %}
-{% block content %}
+
+{% block sac_content %}
 <section class="section" data-aos="fade-up">
   <div class="container">
+
     <div class="vg-card p-4 p-md-5">
-      <form id="frm" class="row g-3">
+
+      <div class="mb-4">
+        <h2 class="mb-1">Formulario de atención</h2>
+        <p class="small text-muted mb-0">
+          Envíanos tu consulta, incidente o solicitud especial. Nuestro equipo te responderá a la brevedad.
+        </p>
+      </div>
+
+      {% if session.get('user_role') != 'Cliente' %}
+      <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" role="alert">
+        <i class="bi bi-info-circle mt-1"></i>
+        <div>
+          <strong>Formulario para clientes.</strong>
+          Aquí los huéspedes registran consultas, incidentes o solicitudes relacionadas a su estadía.
+          {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
+          <div class="mt-2">
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('sac.panel_solicitudes') }}">
+              Ir al Panel de solicitudes
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <form id="frm" class="row g-4">
+
         <div class="col-12">
           <label class="form-label">¿Sobre una reserva en específico? (opcional)</label>
           <select name="Codigo_Reserva" id="Codigo_Reserva" class="form-select">
             <option value="">— Sin reserva específica —</option>
             {% for r in reservas %}
-              <option value="{{ r.Codigo_Reserva }}">
-                #{{ r.Codigo_Reserva }} • {{ r.Fecha_Entrada }} → {{ r.Fecha_Salida }} • Hab {{ r.Habitacion }} ({{ r.Estado }})
-              </option>
+            <option value="{{ r.Codigo_Reserva }}">
+              #{{ r.Codigo_Reserva }} • {{ r.Fecha_Entrada }} → {{ r.Fecha_Salida }} • Hab {{ r.Habitacion }} ({{
+              r.Estado }})
+            </option>
             {% endfor %}
           </select>
           <div class="form-text">Se listan sólo tus reservas.</div>
@@ -32,28 +61,104 @@
 
         <div class="col-12">
           <label class="form-label">Detalle</label>
-          <textarea name="Valor" class="form-control" rows="4" placeholder="Cuéntenos su consulta o solicitud…" required></textarea>
+          <textarea name="Valor" class="form-control" rows="5" placeholder="Cuéntenos su consulta o solicitud…"
+            required></textarea>
         </div>
 
-        <div class="col-12 d-flex gap-2">
-          <button class="btn btn-primary" type="submit">Enviar</button>
-          <span id="msg" class="small text-muted"></span>
+        <div class="col-12">
+          <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
+
+          <div class="d-flex align-items-center gap-3">
+            <button id="btnSend" class="btn btn-outline-accent" type="submit">
+              Enviar solicitud
+            </button>
+            <span id="msg" class="small text-muted"></span>
+          </div>
         </div>
+
       </form>
+
     </div>
+
   </div>
 </section>
+
 <script>
-document.getElementById('frm').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const fd = new FormData(e.currentTarget);
-  const res = await fetch('/sac/solicitudes', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(Object.fromEntries(fd.entries()))
+  const frm = document.getElementById('frm');
+  const msg = document.getElementById('msg');
+  const alertBox = document.getElementById('alertBox');
+  const btnSend = document.getElementById('btnSend');
+
+  function showAlert(type, html, autoHideMs = 5000) {
+    alertBox.className = `alert alert-${type} d-block mb-3`;
+    alertBox.innerHTML = html;
+    if (autoHideMs) {
+      window.clearTimeout(showAlert._t);
+      showAlert._t = window.setTimeout(() => {
+        alertBox.classList.add('d-none');
+        alertBox.classList.remove('d-block');
+      }, autoHideMs);
+    }
+  }
+
+  frm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    msg.textContent = '';
+    btnSend.disabled = true;
+    btnSend.textContent = 'Enviando…';
+
+    try {
+      const fd = new FormData(frm);
+      const res = await fetch('/sac/solicitudes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(fd.entries()))
+      });
+
+      const out = await res.json();
+
+      if (out.ok) {
+        showAlert(
+          'success',
+          `<div class="d-flex align-items-start gap-2">
+           <i class="bi bi-check-circle-fill"></i>
+           <div>
+             <div class="fw-semibold">¡Listo! Tu solicitud fue enviada.</div>
+             <div class="small">Te responderemos lo antes posible. Gracias por contactarnos.</div>
+           </div>
+         </div>`
+        );
+        frm.reset();
+      } else {
+        showAlert(
+          'danger',
+          `<div class="d-flex align-items-start gap-2">
+           <i class="bi bi-exclamation-triangle-fill"></i>
+           <div>
+             <div class="fw-semibold">No se pudo enviar.</div>
+             <div class="small">${(out.error || 'Intenta de nuevo en unos minutos.')}</div>
+           </div>
+         </div>`,
+          7000
+        );
+      }
+    } catch (err) {
+      showAlert(
+        'danger',
+        `<div class="d-flex align-items-start gap-2">
+         <i class="bi bi-exclamation-triangle-fill"></i>
+         <div>
+           <div class="fw-semibold">Error de conexión.</div>
+           <div class="small">Revisa tu internet e intenta nuevamente.</div>
+         </div>
+       </div>`,
+        7000
+      );
+    } finally {
+      btnSend.disabled = false;
+      btnSend.textContent = 'Enviar solicitud';
+    }
   });
-  const out = await res.json();
-  document.getElementById('msg').textContent = out.ok ? 'Enviado. Gracias.' : ('Error: '+(out.error||''));  
-  if(out.ok){ e.currentTarget.reset(); }
-});
 </script>
 {% endblock %}
