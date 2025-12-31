@@ -257,9 +257,12 @@
                 <div class="mini mt-2">Los importes incluyen impuestos y pueden variar por normativa local.</div>
 
                 <div class="d-grid d-md-flex gap-2 justify-content-center mt-4 no-print">
-                  <a class="btn btn-primary" href="portal-reserva-detalle.html">
+                  <a class="btn btn-primary ${reservaId ? '' : 'disabled'}"
+                     ${reservaId ? `href="portal-reserva-detalle.html?id=${encodeURIComponent(reservaId)}"` : 'href="portal-reservas.html" aria-disabled="true"'}
+                  >
                     <i class="bi bi-person-badge me-1"></i> Ver detalle en Portal
                   </a>
+                  
                   <button class="btn btn-outline" onclick="window.print()">
                     <i class="bi bi-printer me-1"></i> Imprimir/Guardar PDF
                   </button>

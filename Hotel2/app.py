@@ -3241,11 +3241,10 @@ def create_app() -> Flask:
             "children": request.args.get("children"),
             "room": request.args.get("room"),
             "price": request.args.get("price"),
-            "reservation_code": request.args.get(
-                "code", "VG-" + datetime.now().strftime("%Y%m%d-%H%M%S")
-            ),
+            "reservation_code": request.args.get("code", "VG-" + datetime.now().strftime("%Y%m%d-%H%M%S")),
+            "reservation_id": request.args.get("id") or request.args.get("reserva_id"),
         }
-
+    
         # --- NUEVO (GRR-01-004): recordatorio del documento con el que se creó el perfil
         identity_notice = None
         try:
@@ -3265,6 +3264,7 @@ def create_app() -> Flask:
                     if row and row[0]:
                         doc_value = row[0]
                         doc_label = "cédula"
+    
             if data.get("checkin") and doc_value:
                 identity_notice = (
                     f"El día {data['checkin']} debe presentar el {doc_label} "
@@ -3272,8 +3272,9 @@ def create_app() -> Flask:
                 )
         except Exception:
             pass
-
+    
         return render_template("booking-confirmation.html", identity_notice=identity_notice, **data)
+    
 
     # ---------------------- API Portal Reservas (solo Cliente) ----------------------
     @app.route("/api/portal/reservas", methods=["GET"])
