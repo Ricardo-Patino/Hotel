@@ -503,7 +503,14 @@
 
           sessionStorage.setItem("villaGrace.confirm", JSON.stringify(payloadConfirm));
           $("#alert-ok").classList.remove("d-none");
-          setTimeout(() => (location.href = "booking-confirmation.html"), 900);
+          setTimeout(() => {
+            const url = new URL("booking-confirmation.html", location.href);
+            url.searchParams.set("id", reservaId);
+            // opcional: si querés conservar el número/código:
+            if (payloadConfirm?.numero) url.searchParams.set("code", payloadConfirm.numero);
+            location.href = url.toString();
+          }, 900);
+          
         } catch (err) {
           btn.disabled = false;
           btn.innerHTML = original;
