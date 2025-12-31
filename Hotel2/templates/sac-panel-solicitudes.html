@@ -1,64 +1,287 @@
 {% extends "sac/_layout.html" %}
 {% block title %}Panel de solicitudes | Hotel Villa Grace{% endblock %}
 {% block page_h1 %}Solicitudes de huéspedes{% endblock %}
-{% block crumb %}SAC · Panel{% endblock %}
-{% block content %}
-<section class="section" data-aos="fade-up">
-  <div class="container">
-    <div class="vg-card p-3 p-md-4">
-      <div class="d-flex gap-2 align-items-center mb-3">
-        <select id="fEstado" class="form-select" style="max-width:240px">
-          <option value="">— Todas —</option>
-          <option value="NUEVA">NUEVA</option>
-          <option value="EN_PROCESO">EN_PROCESO</option>
-          <option value="ATENDIDA">ATENDIDA</option>
-          <option value="RECHAZADA">RECHAZADA</option>
-        </select>
-        <button id="btnReload" class="btn btn-outline-primary">Actualizar</button>
+{% block crumb %}Panel de solicitudes{% endblock %}
+
+{% block sac_content %}
+<div class="vg-card p-4 p-md-5">
+
+  <div class="d-flex flex-column flex-md-row gap-2 gap-md-3 align-items-md-center justify-content-between mb-3">
+    <div>
+      <h5 class="mb-1">Bandeja de solicitudes</h5>
+      <p class="small text-muted mb-0">Haz clic en una solicitud para ver el detalle y actualizar su estado.</p>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center">
+      <select id="fEstado" class="form-select" style="max-width:260px">
+        <option value="">— Todas —</option>
+        <option value="NUEVA">NUEVA</option>
+        <option value="EN_PROCESO">EN_PROCESO</option>
+        <option value="ATENDIDA">ATENDIDA</option>
+      </select>
+      <button id="btnReload" class="btn btn-outline-success">Actualizar</button>
+    </div>
+  </div>
+
+  <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th style="width:80px">Id</th>
+          <th style="width:160px">Cliente</th>
+          <th>Detalle</th>
+          <th style="width:110px">Reserva</th>
+          <th style="width:140px">Estado</th>
+          <th style="width:170px">Fecha</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="modal fade" id="solModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0">Solicitud <span id="mId"></span></h5>
+          <div class="small text-muted">Cliente: <span id="mCliente"></span> · Reserva: <span id="mReserva"></span></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
-      <div class="table-responsive">
-        <table class="table table-sm align-middle">
-          <thead>
-            <tr>
-              <th>Id</th>
-              <th>Cliente</th>
-              <th>Detalle</th>
-              <th>Reserva</th>
-              <th>Estado</th>
-              <th>Fecha</th>
-            </tr>
-          </thead>
-          <tbody id="rows"></tbody>
-        </table>
+
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Detalle</label>
+            <div class="p-3 rounded border bg-light" id="mDetalle" style="white-space:pre-wrap;"></div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Estado</label>
+            <select id="mEstado" class="form-select">
+              <option value="NUEVA">NUEVA</option>
+              <option value="EN_PROCESO">EN_PROCESO</option>
+              <option value="ATENDIDA">ATENDIDA</option>
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Fecha</label>
+            <input id="mFecha" class="form-control" readonly>
+          </div>
+        </div>
+
+        <div id="mAlert" class="alert d-none mt-3 mb-0" role="alert"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" id="btnSave" class="btn btn-success">Guardar cambios</button>
       </div>
     </div>
   </div>
-</section>
+</div>
+
 <script>
-async function load(){
-  const est = document.getElementById('fEstado').value || '';
-  const url = '/sac/solicitudes' + (est ? ('?estado='+encodeURIComponent(est)) : '');
-  const res = await fetch(url);
-  const j = await res.json();
-  const tbody = document.getElementById('rows'); tbody.innerHTML='';
-  (j.items||[]).forEach(it=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${it.Id}</td>
-      <td>${it.Cliente||'-'}</td>
-      <td>${it.Detalle||'-'}</td>
-      <td>${it.Codigo_Reserva||''}</td>
-      <td>
-        <span class="badge text-bg-${it.Estado==='ATENDIDA'?'success':(it.Estado==='EN_PROCESO'?'warning':'secondary')}">
-          ${it.Estado}
-        </span>
-      </td>
-      <td>${it.Fecha_modificacion||''}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-document.getElementById('btnReload').onclick = load;
-document.getElementById('fEstado').onchange = load;
-load();
+  const fEstado = document.getElementById('fEstado');
+  const btnReload = document.getElementById('btnReload');
+  const tbody = document.getElementById('rows');
+  const alertBox = document.getElementById('alertBox');
+
+  const solModalEl = document.getElementById('solModal');
+  let solModal = null;
+
+  const mId = document.getElementById('mId');
+  const mCliente = document.getElementById('mCliente');
+  const mReserva = document.getElementById('mReserva');
+  const mDetalle = document.getElementById('mDetalle');
+  const mEstado = document.getElementById('mEstado');
+  const mFecha = document.getElementById('mFecha');
+  const mAlert = document.getElementById('mAlert');
+  const btnSave = document.getElementById('btnSave');
+
+  let currentItem = null;
+
+  function showAlert(type, html, autoHideMs = 6000) {
+    alertBox.className = `alert alert-${type} d-block mb-3`;
+    alertBox.innerHTML = html;
+    if (autoHideMs) {
+      window.clearTimeout(showAlert._t);
+      showAlert._t = window.setTimeout(() => {
+        alertBox.classList.add('d-none');
+        alertBox.classList.remove('d-block');
+      }, autoHideMs);
+    }
+  }
+
+  function showModalAlert(type, html) {
+    mAlert.className = `alert alert-${type} d-block mt-3 mb-0`;
+    mAlert.innerHTML = html;
+  }
+
+  function clearModalAlert() {
+    mAlert.classList.add('d-none');
+    mAlert.classList.remove('d-block');
+    mAlert.innerHTML = '';
+  }
+
+  function badgeHtml(estado) {
+    const e = (estado || '').toUpperCase();
+    if (e === 'ATENDIDA') return `<span class="badge text-bg-success">ATENDIDA</span>`;
+    if (e === 'EN_PROCESO') return `<span class="badge text-bg-warning">EN PROCESO</span>`;
+    return `<span class="badge text-bg-secondary">${e || 'NUEVA'}</span>`;
+  }
+
+  function ensureModal() {
+    if (!solModal) solModal = new bootstrap.Modal(solModalEl);
+  }
+
+  function openModal(item) {
+    ensureModal();
+    currentItem = item;
+    clearModalAlert();
+
+    mId.textContent = `#${item.Id ?? ''}`;
+    mCliente.textContent = item.Cliente || '-';
+    mReserva.textContent = item.Codigo_Reserva || '—';
+    mDetalle.textContent = item.Detalle || '-';
+    mEstado.value = (item.Estado || 'NUEVA').toUpperCase();
+    mFecha.value = item.Fecha_modificacion || '';
+
+    solModal.show();
+  }
+
+  async function load() {
+    tbody.innerHTML = '';
+    btnReload.disabled = true;
+    btnReload.textContent = 'Actualizando…';
+
+    try {
+      const est = fEstado.value || '';
+      const url = '/sac/solicitudes' + (est ? ('?estado=' + encodeURIComponent(est)) : '');
+      const res = await fetch(url);
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+
+      if (!ct.includes('application/json')) {
+        const txt = await res.text();
+        showAlert('danger', `<div class="d-flex align-items-start gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <div>
+            <div class="fw-semibold">La respuesta no fue JSON.</div>
+            <div class="small">Probablemente hubo redirect o error del servidor.</div>
+          </div>
+        </div>`, 7000);
+        return;
+      }
+
+      const j = await res.json();
+
+      if (!j.ok) {
+        showAlert('danger', `<div class="d-flex align-items-start gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <div>
+            <div class="fw-semibold">No se pudo cargar el panel.</div>
+            <div class="small">${(j.error || 'Intenta de nuevo.')}</div>
+          </div>
+        </div>`, 7000);
+        return;
+      }
+
+      const items = j.items || [];
+      if (!items.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No hay solicitudes para mostrar.</td></tr>`;
+        return;
+      }
+
+      items.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.innerHTML = `
+          <td class="fw-semibold">${it.Id ?? ''}</td>
+          <td>${it.Cliente || '-'}</td>
+          <td>${it.Detalle || '-'}</td>
+          <td>${it.Codigo_Reserva || ''}</td>
+          <td>${badgeHtml(it.Estado)}</td>
+          <td class="text-muted">${it.Fecha_modificacion || ''}</td>
+        `;
+        tr.addEventListener('click', () => openModal(it));
+        tbody.appendChild(tr);
+      });
+
+    } catch (e) {
+      showAlert('danger', `<div class="d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <div>
+          <div class="fw-semibold">Error de conexión.</div>
+          <div class="small">Intenta nuevamente.</div>
+        </div>
+      </div>`, 7000);
+    } finally {
+      btnReload.disabled = false;
+      btnReload.textContent = 'Actualizar';
+    }
+  }
+
+  async function saveEstado() {
+    if (!currentItem?.Id) return;
+
+    clearModalAlert();
+    btnSave.disabled = true;
+    btnSave.textContent = 'Guardando…';
+
+    try {
+      const nuevo = (mEstado.value || '').toUpperCase();
+      const res = await fetch(`/sac/solicitudes/${currentItem.Id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Estado: nuevo })
+      });
+
+      const out = await res.json();
+
+      if (out.ok) {
+        showModalAlert('success', `<div class="d-flex align-items-start gap-2">
+          <i class="bi bi-check-circle-fill"></i>
+          <div>
+            <div class="fw-semibold">Estado actualizado.</div>
+            <div class="small">Se guardaron los cambios correctamente.</div>
+          </div>
+        </div>`);
+        await load();
+        window.setTimeout(() => solModal.hide(), 700);
+      } else {
+        showModalAlert('danger', `<div class="d-flex align-items-start gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <div>
+            <div class="fw-semibold">No se pudo actualizar.</div>
+            <div class="small">${(out.error || 'Intenta nuevamente.')}</div>
+          </div>
+        </div>`);
+      }
+    } catch (e) {
+      showModalAlert('danger', `<div class="d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <div>
+          <div class="fw-semibold">Error de conexión.</div>
+          <div class="small">Intenta nuevamente.</div>
+        </div>
+      </div>`);
+    } finally {
+      btnSave.disabled = false;
+      btnSave.textContent = 'Guardar cambios';
+    }
+  }
+
+  btnReload.addEventListener('click', load);
+  fEstado.addEventListener('change', load);
+  btnSave.addEventListener('click', saveEstado);
+
+  document.addEventListener('DOMContentLoaded', load);
 </script>
+
 {% endblock %}

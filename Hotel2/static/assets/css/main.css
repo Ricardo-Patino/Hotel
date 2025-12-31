@@ -7640,3 +7640,36 @@ section,
   text-decoration: underline;
 }
 
+/* FAQ – acordeón integrado al estilo del sitio */
+.accordion-button {
+  font-family: var(--heading-font);
+  color: var(--heading-color);
+  background-color: transparent;
+}
+
+.accordion-button:not(.collapsed) {
+  color: var(--accent-color);
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.accordion-body {
+  font-family: var(--default-font);
+  color: var(--default-color);
+}
+
+.accordion-item {
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--default-color), transparent 85%);
+}
+
+.btn-outline-accent {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.btn-outline-accent:hover {
+  background-color: var(--accent-color);
+  color: #fff;
+}
+
