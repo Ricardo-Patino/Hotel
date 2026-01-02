@@ -1915,64 +1915,6 @@ def create_app() -> Flask:
     @app.route("/contact.html")
     def contact_html():
         return render_template("contact.html")
-    
-    # ---------------------- Contacto (formulario público) ----------------------
-# Endpoint para usarse con el script
-# static/assets/vendor/php-email-form/validate.js, el cual espera texto "OK".
-@app.post("/contact/send")
-def contact_send():
-    """Recibe el formulario de Contáctenos y envía un correo a hotelvillagrace@gmail.com."""
-
-    data = request.form or {}
-
-    name = (data.get("name") or "").strip()
-    email = (data.get("email") or "").strip()
-    phone = (data.get("phone") or "").strip()
-    subject = (data.get("subject") or "").strip()
-    message = (data.get("message") or "").strip()
-
-    # Validación mínima (frontend ya valida, pero no confiamos en el cliente)
-    if not name or not email or not subject or not message:
-        return "Por favor complete los campos requeridos.", 200
-
-    # Límites defensivos
-    if len(name) > 120 or len(email) > 200 or len(phone) > 50 or len(subject) > 200:
-        return "Algunos campos exceden el límite permitido.", 200
-    if len(message) > 5000:
-        return "El mensaje es demasiado largo.", 200
-
-    # Cuerpo del correo
-    body = (
-        "Nuevo mensaje desde el formulario de contacto (sitio web)\n\n"
-        f"Nombre: {name}\n"
-        f"Correo: {email}\n"
-        f"Teléfono/WhatsApp: {phone or '-'}\n"
-        f"Asunto: {subject}\n"
-        "\n"
-        "Mensaje:\n"
-        f"{message}\n"
-    )
-
-    mail_to = current_app.config.get("CONTACT_EMAIL") or "hotelvillagrace@gmail.com"
-    mail_subject = f"[Contacto Web] {subject}"
-
-    try:
-        from services.grr.notification_service import NotificationService
-
-        # Enviar a correo del hotel (no depende de preferencias del cliente)
-        NotificationService().route_and_queue(
-            email=mail_to,
-            subject=mail_subject,
-            body=body,
-            ref_entidad="ContactoWeb",
-            ref_id="-",
-        )
-        return "OK", 200
-    except Exception as e:
-        current_app.logger.warning(f"[CONTACT] No se pudo enviar correo: {type(e).__name__}: {e}")
-        # Se retorna 200 para que validate.js muestre el texto como error amigable.
-        return "No se pudo enviar el mensaje en este momento. Intente más tarde.", 200
-
 
     @app.route("/about.html")
     def about_html():
