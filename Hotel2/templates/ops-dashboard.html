@@ -36,6 +36,13 @@
     .ops-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.06) }
     .ops-item i { font-size: 1.25rem }
     .ops-item .txt small{ color:#6c757d }
+    .ops-badge{
+      position:absolute;
+      top:10px;
+      right:10px;
+      font-size:.75rem;
+    }
+    .ops-item{ position:relative; }   
   </style>
 </head>
 <body class="inner-page">
@@ -187,6 +194,19 @@
                     <i class="bi bi-tag text-secondary"></i>
                     <div class="txt"><div class="fw-semibold">Cupones</div><small>GRR-01-015</small></div>
                   </a>
+                  <a class="ops-item text-decoration-none" href="ops-approvals.html" id="ops-approvals-btn">
+                    <span
+                      class="badge rounded-pill bg-danger d-none ops-badge"
+                      id="badge-approvals"
+                      data-initial="{{ pending_approvals_count or 0 }}"
+                    >0</span>
+                    <i class="bi bi-patch-check text-primary"></i>
+                    <div class="txt">
+                      <div class="fw-semibold">Aprobaciones pendientes</div>
+                      <small>Validar pagos SINPE y confirmar reservas</small>
+                    </div>
+                  </a>
+                  
                 </div>
               </div>
             </div>
@@ -373,5 +393,32 @@
     loadKpis();
     loadRooms();
   </script>
+  <script>
+    (function(){
+      const badge = document.getElementById('badge-approvals');
+      if(!badge) return;
+  
+      const setCount = (n) => {
+        const v = Math.max(0, Number(n || 0));
+        badge.textContent = String(v);
+        badge.classList.toggle('d-none', v === 0);
+      };
+  
+      setCount(badge.dataset.initial);
+  
+      async function refresh(){
+        try{
+          const r = await fetch('/api/ops/approvals/count', { headers: { 'Accept':'application/json' } });
+          if(!r.ok) return;
+          const j = await r.json();
+          if(j && j.ok) setCount(j.count);
+        }catch(_){}
+      }
+  
+      refresh();
+      setInterval(refresh, 30000);
+    })();
+  </script>
+  
 </body>
 </html>
