@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aprobaciones pendientes | Hotel Villa Grace</title>
+  <meta name="description" content="Validación de pagos SINPE y confirmación de reservas.">
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .pill-count{ font-size:.85rem }
+    .table td, .table th{ vertical-align: middle; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .muted-mini{ font-size:.875rem; color:#6c757d; }
+    .action-col{ white-space: nowrap; }
+  </style>
+</head>
+
+<body class="inner-page">
+
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="ops-dashboard.html">Tablero</a></li>
+        <li><a href="ops-approvals.html" class="active">Aprobaciones</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+
+    <a class="btn-getstarted d-none d-sm-block" href="ops-dashboard.html">Volver</a>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title dark-background" data-aos="fade"
+       style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
+    <div class="container position-relative">
+      <h1>Aprobaciones pendientes</h1>
+      <p class="mb-0">Confirma pagos SINPE antes de aprobar reservas</p>
+    </div>
+  </div>
+
+  <section class="section pt-3">
+    <div class="container" data-aos="fade-up">
+
+      <div class="alert alert-info d-flex align-items-start gap-2">
+        <i class="bi bi-info-circle fs-5"></i>
+        <div>
+          <div class="fw-semibold">Flujo recomendado</div>
+          <div class="muted-mini">
+            1) Verifica el SINPE en tu canal bancario. 2) Presiona <strong>Aprobar</strong> para confirmar la reserva y disparar la notificación según <code>/sac/preferencias</code>.
+            3) Si no se pagó, usa <strong>Rechazar</strong> e indica el motivo.
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12">
+
+          <!-- Pendientes -->
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h5 class="card-title mb-0">
+                  Reservas pendientes
+                  <span class="badge bg-danger pill-count ms-2" id="pendingCount">0</span>
+                </h5>
+                <button class="btn btn-outline-secondary btn-sm" id="btnRefresh">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+                </button>
+              </div>
+
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-hover align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>ID</th>
+                      <th>Cliente</th>
+                      <th>Fechas</th>
+                      <th>Habitación</th>
+                      <th>Total</th>
+                      <th class="action-col text-end">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pendingTbody">
+                    <tr><td colspan="6" class="text-muted">Cargando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="muted-mini">
+                <i class="bi bi-shield-check me-1"></i> Al aprobar se genera el comprobante y se envía notificación de confirmación.
+              </div>
+            </div>
+          </div>
+
+          <!-- Confirmadas -->
+          <div class="card shadow-sm border-0 mt-4">
+            <div class="card-body">
+              <h5 class="card-title mb-0">
+                Reservas confirmadas
+                <span class="badge bg-success pill-count ms-2" id="confirmedCount">0</span>
+              </h5>
+
+              <div class="table-responsive mt-3">
+                <table class="table table-sm table-hover align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>ID</th>
+                      <th>Cliente</th>
+                      <th>Fechas</th>
+                      <th>Habitación</th>
+                      <th>Total</th>
+                      <th class="action-col text-end">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="confirmedTbody">
+                    <tr><td colspan="6" class="text-muted">Cargando…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="muted-mini">
+                <i class="bi bi-exclamation-triangle me-1"></i> <strong>Retractar</strong> devuelve la reserva a <strong>Pendiente</strong> (no notifica automáticamente).
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<!-- Modal Rechazo -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i>Rechazar reserva</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 text-muted">
+          Reserva <span class="mono" id="rejectId">—</span>
+        </div>
+        <label class="form-label">Motivo del rechazo</label>
+        <textarea class="form-control" id="rejectReason" rows="3" placeholder="Ej. No se recibió el pago SINPE dentro del plazo."></textarea>
+        <div class="muted-mini mt-2">Este motivo se guardará en Observaciones (recortado a 255 caracteres).</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btnRejectConfirm">
+          <i class="bi bi-x-circle me-1"></i>Rechazar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmación OPS (reemplazo de window.confirm) -->
+<div class="modal fade" id="opsConfirmModal" tabindex="-1" aria-labelledby="opsConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="opsConfirmModalLabel">
+          <i class="bi bi-shield-exclamation me-2 text-warning"></i>
+          Confirmación
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <div id="opsConfirmModalBody" class="small text-muted"></div>
+
+        <div class="alert alert-warning mt-3 mb-0 small">
+          <i class="bi bi-info-circle me-1"></i>
+          Esta acción impacta el estado de la reserva y las notificaciones.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-success" id="opsConfirmModalOk">
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Modal Confirmación OPS -->
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+  <div id="opsToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <i class="bi bi-bell me-2"></i>
+      <strong class="me-auto">Operaciones</strong>
+      <small id="toastTime">Ahora</small>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+    </div>
+    <div class="toast-body" id="toastMsg">—</div>
+  </div>
+</div>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+<div id="preloader"></div>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+/**
+ * Helper: confirmación estética con Bootstrap Modal (Promise<boolean>)
+ */
+function opsConfirm({ title, bodyHtml, okText = "Confirmar", okClass = "btn-success" }) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("opsConfirmModal");
+    const titleEl = document.getElementById("opsConfirmModalLabel");
+    const bodyEl  = document.getElementById("opsConfirmModalBody");
+    const okBtn   = document.getElementById("opsConfirmModalOk");
+
+    // UI
+    titleEl.innerHTML = title || "Confirmación";
+    bodyEl.innerHTML  = bodyHtml || "";
+    okBtn.textContent = okText;
+
+    // Reset clases del botón OK
+    okBtn.className = "btn " + (okClass || "btn-success");
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: "static", keyboard: false });
+
+    const onOk = () => {
+      cleanup();
+      modal.hide();
+      resolve(true);
+    };
+
+    const onHide = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    function cleanup() {
+      okBtn.removeEventListener("click", onOk);
+      modalEl.removeEventListener("hidden.bs.modal", onHide);
+    }
+
+    okBtn.addEventListener("click", onOk, { once: true });
+    modalEl.addEventListener("hidden.bs.modal", onHide, { once: true });
+
+    modal.show();
+  });
+}
+
+(function(){
+  const money = (n) => new Intl.NumberFormat("es-CR", { style:"currency", currency:"CRC", minimumFractionDigits:2 }).format(Number(n||0));
+
+  const fmt = (d) => {
+    if (!d) return "—";
+
+    const s = String(d).trim();
+    // Extrae YYYY-MM-DD incluso si viene en RFC (Thu, 02 Jan 2026...)
+    const m = s.match(/\d{4}-\d{2}-\d{2}/);
+    const iso = m ? m[0] : (s.length >= 10 ? s.slice(0, 10) : s);
+
+    const dt = new Date(iso + "T00:00:00");
+    if (Number.isNaN(dt.getTime())) {
+      // Evita RangeError "Invalid time value"
+      return iso || "—";
+    }
+
+    return new Intl.DateTimeFormat("es-CR", { day: "2-digit", month: "short", year: "numeric" })
+      .format(dt)
+      .replace(".", "");
+  };
+
+  const pendingTbody = document.getElementById('pendingTbody');
+  const confirmedTbody = document.getElementById('confirmedTbody');
+  const pendingCount = document.getElementById('pendingCount');
+  const confirmedCount = document.getElementById('confirmedCount');
+
+  const toastEl = document.getElementById('opsToast');
+  const toastMsg = document.getElementById('toastMsg');
+  const toast = new bootstrap.Toast(toastEl, { delay: 3200 });
+
+  const rejectModalEl = document.getElementById('rejectModal');
+  const rejectModal = new bootstrap.Modal(rejectModalEl);
+  const rejectIdEl = document.getElementById('rejectId');
+  const rejectReasonEl = document.getElementById('rejectReason');
+  const btnRejectConfirm = document.getElementById('btnRejectConfirm');
+
+  let rejectTargetId = null;
+
+  function showToast(msg){
+    toastMsg.textContent = msg;
+    toast.show();
+  }
+
+  function rowHtml(r, mode){
+    const id = r.id ?? "—";
+    const cliente = (r.cliente_nombre || "—");
+    const correo = (r.cliente_correo || "");
+    const tel = (r.cliente_telefono || "");
+    const fechas = `${fmt(r.checkin)} – ${fmt(r.checkout)}`;
+    const hab = `${r.habitacion_numero || "—"} · ${r.habitacion_tipo || "—"}`;
+    const total = money(r.total);
+
+    let actions = '';
+    if(mode === 'pending'){
+      actions = `
+        <button class="btn btn-success btn-sm me-2" data-act="approve" data-id="${id}">
+          <i class="bi bi-check2-circle me-1"></i>Aprobar
+        </button>
+        <button class="btn btn-outline-danger btn-sm" data-act="reject" data-id="${id}">
+          <i class="bi bi-x-circle me-1"></i>Rechazar
+        </button>
+      `;
+    } else {
+      actions = `
+        <button class="btn btn-outline-warning btn-sm" data-act="retract" data-id="${id}">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Retractar
+        </button>
+      `;
+    }
+
+    const contact = (correo || tel) ? `<div class="muted-mini">${correo ? correo : ""}${correo && tel ? " · " : ""}${tel ? tel : ""}</div>` : "";
+
+    return `
+      <tr>
+        <td class="mono">${id}</td>
+        <td>
+          <div class="fw-semibold">${cliente}</div>
+          ${contact}
+        </td>
+        <td>${fechas}</td>
+        <td>${hab}</td>
+        <td class="fw-semibold">${total}</td>
+        <td class="text-end action-col">${actions}</td>
+      </tr>
+    `;
+  }
+
+  async function load(){
+    try{
+      pendingTbody.innerHTML = `<tr><td colspan="6" class="text-muted">Cargando…</td></tr>`;
+      confirmedTbody.innerHTML = `<tr><td colspan="6" class="text-muted">Cargando…</td></tr>`;
+
+      const r = await fetch('/api/ops/approvals?limit=200', { headers:{ 'Accept':'application/json' } });
+      const j = await r.json().catch(()=> ({}));
+      if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+
+      const p = Array.isArray(j.pending) ? j.pending : [];
+      const c = Array.isArray(j.confirmed) ? j.confirmed : [];
+
+      pendingCount.textContent = String(p.length);
+      confirmedCount.textContent = String(c.length);
+
+      pendingTbody.innerHTML = p.length ? p.map(x => rowHtml(x,'pending')).join('') :
+        `<tr><td colspan="6" class="text-muted">No hay reservas pendientes.</td></tr>`;
+
+      confirmedTbody.innerHTML = c.length ? c.map(x => rowHtml(x,'confirmed')).join('') :
+        `<tr><td colspan="6" class="text-muted">No hay reservas confirmadas.</td></tr>`;
+    }catch(e){
+      pendingTbody.innerHTML = `<tr><td colspan="6" class="text-danger">Error cargando pendientes: ${String(e.message||e)}</td></tr>`;
+      confirmedTbody.innerHTML = `<tr><td colspan="6" class="text-danger">Error cargando confirmadas: ${String(e.message||e)}</td></tr>`;
+    }
+  }
+
+  async function post(url, body){
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Accept':'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    const j = await r.json().catch(()=> ({}));
+    if(!r.ok || j.ok === false) throw new Error(j.error || j.msg || `HTTP ${r.status}`);
+    return j;
+  }
+
+  pendingTbody.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('button[data-act]');
+    if(!btn) return;
+    const act = btn.dataset.act;
+    const id = btn.dataset.id;
+
+    if(act === 'approve'){
+      const ok = await opsConfirm({
+        title: `<i class="bi bi-check2-circle me-2 text-success"></i>Aprobar reserva`,
+        bodyHtml: `
+          <div class="fw-semibold mb-2">¿Confirmas aprobar la reserva <span class="text-success">#${id}</span>?</div>
+          <div class="text-muted small">Asegúrate de haber verificado el pago SINPE antes de continuar.</div>
+        `,
+        okText: "Aprobar",
+        okClass: "btn-success"
+      });
+      if(!ok) return;
+
+      try{
+        btn.disabled = true;
+        await post(`/api/ops/approvals/${encodeURIComponent(id)}/approve`, {});
+        showToast(`Reserva ${id} aprobada y confirmada.`);
+        await load();
+      }catch(e){
+        showToast(`No se pudo aprobar: ${String(e.message||e)}`);
+      }finally{
+        btn.disabled = false;
+      }
+    }
+
+    if(act === 'reject'){
+      rejectTargetId = id;
+      rejectIdEl.textContent = id;
+      rejectReasonEl.value = '';
+      rejectModal.show();
+    }
+  });
+
+  confirmedTbody.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('button[data-act]');
+    if(!btn) return;
+    const act = btn.dataset.act;
+    const id = btn.dataset.id;
+
+    if(act === 'retract'){
+      const ok = await opsConfirm({
+        title: `<i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Retractar reserva`,
+        bodyHtml: `
+          <div class="fw-semibold mb-2">¿Confirmas retractar la reserva <span class="text-warning">#${id}</span>?</div>
+          <div class="text-muted small">La reserva volverá a estado <strong>PENDIENTE</strong>.</div>
+        `,
+        okText: "Retractar",
+        okClass: "btn-warning"
+      });
+      if(!ok) return;
+
+      try{
+        btn.disabled = true;
+        await post(`/api/ops/approvals/${encodeURIComponent(id)}/retract`, {});
+        showToast(`Reserva ${id} retractada (Pendiente).`);
+        await load();
+      }catch(e){
+        showToast(`No se pudo retractar: ${String(e.message||e)}`);
+      }finally{
+        btn.disabled = false;
+      }
+    }
+  });
+
+  btnRejectConfirm.addEventListener('click', async () => {
+    const id = rejectTargetId;
+    const reason = (rejectReasonEl.value || '').trim();
+    if(!reason){
+      rejectReasonEl.focus();
+      return;
+    }
+    try{
+      btnRejectConfirm.disabled = true;
+      await post(`/api/ops/approvals/${encodeURIComponent(id)}/reject`, { reason });
+      rejectModal.hide();
+      showToast(`Reserva ${id} rechazada.`);
+      await load();
+    }catch(e){
+      showToast(`No se pudo rechazar: ${String(e.message||e)}`);
+    }finally{
+      btnRejectConfirm.disabled = false;
+    }
+  });
+
+  document.getElementById('btnRefresh').addEventListener('click', load);
+
+  load();
+})();
+</script>
+
+</body>
+</html>

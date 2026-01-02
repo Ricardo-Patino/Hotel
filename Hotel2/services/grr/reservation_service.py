@@ -140,6 +140,81 @@ def marcar_checkout(reserva_id: int):
     return r
 
 
+# ---------------------------------------------------------------------
+# Helpers de fecha (Paso 1 / robustez)
+# ---------------------------------------------------------------------
+from datetime import datetime, date
+
+def _parse_date(value) -> date:
+    """
+    Acepta:
+      - 'YYYY-MM-DD'
+      - 'YYYY-MM-DDTHH:MM:SS'
+      - 'YYYY-MM-DD HH:MM:SS'
+      - datetime/date
+    Retorna: datetime.date
+    Lanza ValueError si no puede parsear.
+    """
+    if value is None:
+        raise ValueError("Fecha requerida")
+
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+
+    if isinstance(value, datetime):
+        return value.date()
+
+    s = str(value).strip()
+    if not s:
+        raise ValueError("Fecha vacía")
+
+    # Si viene con hora (ISO o espacio), recortamos la parte de fecha
+    if "T" in s:
+        s = s.split("T", 1)[0].strip()
+    if " " in s:
+        s = s.split(" ", 1)[0].strip()
+
+    # Normaliza YYYY-M-D -> YYYY-MM-DD
+    parts = s.split("-")
+    if len(parts) == 3:
+        y, m, d = parts[0], parts[1].zfill(2), parts[2].zfill(2)
+        s = f"{y}-{m}-{d}"
+
+    return date.fromisoformat(s)
+
+
+# =========================
+# Disponibilidad (helper interno)
+# =========================
+class _AvailabilityService:
+    """
+    Implementa la verificación de disponibilidad para una habitación en un rango.
+    Bloquean el rango: reservas en Estado ('Confirmada', 'Pendiente').
+    Solape: (Fecha_Entrada < salida) AND (Fecha_Salida > entrada)
+    """
+    def __init__(self, reserva_model=Reserva):
+        self.R = reserva_model
+
+    def is_room_available(
+        self,
+        habitacion_id: int,
+        entrada: date,
+        salida: date,
+        exclude_reserva_id: int | None = None,
+    ) -> bool:
+        q = (
+            self.R.query
+            .filter(self.R.Codigo_Habitacion == habitacion_id)
+            .filter(self.R.Estado.in_(("Confirmada", "Pendiente")))
+            .filter(and_(self.R.Fecha_Entrada < salida, self.R.Fecha_Salida > entrada))
+        )
+
+        if exclude_reserva_id:
+            q = q.filter(self.R.Codigo_Reserva != exclude_reserva_id)
+
+        return q.count() == 0
+
+
 # =========================
 # Servicio principal
 # =========================
@@ -153,6 +228,8 @@ class ReservationService:
         self.audit = _Audit()
         self.notify = _Notify()
         self.hk = _HK()
+        self.availability = _AvailabilityService(self.R)
+
 
     # ---------- Utilidades ----------
     @staticmethod
@@ -180,19 +257,49 @@ class ReservationService:
         """Solape: [entrada, salida) con [r.Fecha_Entrada, r.Fecha_Salida)"""
         R = self.R
         return and_(R.Fecha_Entrada < salida, R.Fecha_Salida > entrada)
+    
 
     @staticmethod
     def _parse_dates(payload: Dict[str, Any]) -> Tuple[date, date] | None:
+        """
+        Acepta:
+        - 'YYYY-MM-DD'
+        - 'YYYY-MM-DDTHH:MM:SS...'
+        - 'YYYY-MM-DD HH:MM:SS'
+        - 'YYYY-M-D' (normaliza ceros)
+        """
         try:
             ent = payload["Fecha_Entrada"]
             sal = payload["Fecha_Salida"]
-            if isinstance(ent, str):
-                ent = date.fromisoformat(ent)
-            if isinstance(sal, str):
-                sal = date.fromisoformat(sal)
-            return ent, sal
+
+            def to_date(v):
+                if isinstance(v, date):
+                    return v
+                if v is None:
+                    raise ValueError("Fecha requerida")
+
+                s = str(v).strip()
+
+                # Si viene como datetime ISO o con espacio, tomar solo la parte de fecha
+                if "T" in s:
+                    s = s.split("T", 1)[0]
+                if " " in s:
+                    s = s.split(" ", 1)[0]
+
+                # Normalizar YYYY-M-D -> YYYY-MM-DD
+                parts = s.split("-")
+                if len(parts) == 3:
+                    y, m, d = parts[0], parts[1].zfill(2), parts[2].zfill(2)
+                    s = f"{y}-{m}-{d}"
+
+                return date.fromisoformat(s)
+
+            return to_date(ent), to_date(sal)
+
         except Exception:
             return None
+
+
 
     # ---------- Disponibilidad ----------
     def _find_available_rooms(
@@ -204,8 +311,12 @@ class ReservationService:
     ) -> List[Habitacion]:
         subq: Query = (
             self.R.query.with_entities(self.R.Codigo_Habitacion)
-            .filter(self._overlap_clause(entrada, salida))
+            .filter(
+                self._overlap_clause(entrada, salida),
+                self.R.Estado.in_(("Confirmada", "Pendiente")),
+            )
         )
+
         if excluir_reserva_id:
             subq = subq.filter(self.R.Codigo_Reserva != excluir_reserva_id)
 
@@ -224,100 +335,109 @@ class ReservationService:
 
     # ---------- Crear ----------
     def create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Requiere:
-          - Codigo_Cliente (int)
-          - Codigo_Funcionario (int)
-          - Fecha_Entrada (YYYY-MM-DD)
-          - Fecha_Salida  (YYYY-MM-DD)
-          - Tipo (str) o Codigo_Habitacion (int)
-        Opcionales:
-          - Canal, Huespedes, Codigo_Descuento, Observaciones
-        """
-        base_required = ["Codigo_Cliente", "Codigo_Funcionario", "Fecha_Entrada", "Fecha_Salida"]
-        missing = [k for k in base_required if k not in payload or payload[k] in (None, "")]
-        if not payload.get("Codigo_Habitacion") and not payload.get("Tipo"):
-            missing.append("Tipo")
-        if missing:
-            return {"ok": False, "error": f"Faltan campos: {', '.join(missing)}"}
-
-        parsed = self._parse_dates(payload)
-        if not parsed:
-            return {"ok": False, "error": "Formato de fecha inválido. Use YYYY-MM-DD"}
-        entrada, salida = parsed
-        if salida <= entrada:
-            return {"ok": False, "error": "Fecha_Salida debe ser mayor que Fecha_Entrada"}
-
-        canal = payload.get("Canal", "Web")
-        descuento = payload.get("Codigo_Descuento")
-        huespedes = int(payload.get("Huespedes", 1))
-        observaciones = payload.get("Observaciones")
-
-        # Determinar habitación
-        if payload.get("Codigo_Habitacion"):
-            habitacion = self.H.query.get(int(payload["Codigo_Habitacion"]))
+        try:
+            # ------------------ Validaciones base ------------------
+            required = [
+                "Codigo_Cliente", "Codigo_Habitacion",
+                "Fecha_Entrada", "Fecha_Salida",
+                "Huespedes"
+            ]
+            missing = [k for k in required if not payload.get(k)]
+            if missing:
+                return {"ok": False, "error": f"Faltan campos: {', '.join(missing)}"}
+    
+            parsed = self._parse_dates(payload)
+            if not parsed:
+                return {"ok": False, "error": "Formato de fecha inválido. Use YYYY-MM-DD"}
+            entrada, salida = parsed
+            
+    
+            if salida <= entrada:
+                return {"ok": False, "error": "Fecha_Salida debe ser mayor que Fecha_Entrada"}
+    
+            canal = (payload.get("Canal") or "Web").strip() or "Web"
+    
+            # ------------------ Estado (Paso 1) ------------------
+            estado = (payload.get("Estado") or "").strip()
+            if not estado:
+                estado = "Pendiente" if canal.lower() == "web" else "Confirmada"
+    
+            estados_validos = {"Confirmada", "Pendiente", "Cancelada", "Check-in", "Check-out"}
+            if estado not in estados_validos:
+                estado = "Pendiente" if canal.lower() == "web" else "Confirmada"
+    
+            # ------------------ Habitacion / disponibilidad ------------------
+            hid = int(payload.get("Codigo_Habitacion"))
+            habitacion: Habitacion | None = self.H.query.get(hid)
             if not habitacion:
                 return {"ok": False, "error": "Habitación no encontrada"}
-
-            # Validar solapes
-            existe_solape = (
-                self.R.query.filter(
-                    self.R.Codigo_Habitacion == habitacion.Codigo_Habitacion,
-                    self._overlap_clause(entrada, salida)
-                ).first()
-            )
-            if existe_solape:
+    
+            # Evitar colisiones de reserva en rango
+            if not self.availability.is_room_available(hid, entrada, salida):
                 return {"ok": False, "error": "La habitación indicada no está disponible en esas fechas"}
-        else:
-            tipo = str(payload["Tipo"])
-            disponibles = self._find_available_rooms(entrada, salida, tipo)
-            if not disponibles:
-                return {"ok": False, "error": "Sin disponibilidad para el rango solicitado"}
-            habitacion = disponibles[0]
-
-        noches = (salida - entrada).days
-        precio_noche = self._coalesce_price(habitacion)
-        total = (precio_noche * noches).quantize(Decimal("0.01"))
-
-        r = self.R(
-            Codigo_Cliente=int(payload["Codigo_Cliente"]),
-            Codigo_Habitacion=habitacion.Codigo_Habitacion,
-            Codigo_Funcionario=int(payload["Codigo_Funcionario"]),
-            Fecha_Entrada=entrada,
-            Fecha_Salida=salida,
-            Monto_Total=total,
-            Estado="Confirmada",
-            Canal=canal,
-            Descuento_Id=descuento,
-            Observaciones=observaciones,
-        )
-
-        try:
+    
+            noches = max(1, (salida - entrada).days)
+            huespedes = int(payload.get("Huespedes") or 1)
+    
+            # ------------------ Precio (tu lógica actual) ------------------
+            # Precio_Base_Noche: por persona/noche (según tu front)
+            precio_base_noche = float(payload.get("Precio_Base_Noche") or getattr(habitacion, "Precio_Noche", 0) or 0)
+            subtotal = precio_base_noche * noches * max(1, huespedes)
+    
+            # Impuesto: tu sistema usa 13%
+            tax_rate = 0.13
+            impuestos = subtotal * tax_rate
+    
+            total = subtotal + impuestos
+    
+            # Cupón ya se aplica en endpoint apply-coupon; aquí mantenemos el total base
+            # (tu ruta /grr/reservas luego actualiza Monto_Total y Huespedes)
+    
+            # ------------------ Crear Reserva ------------------
+            r = Reserva(
+                Codigo_Cliente=int(payload.get("Codigo_Cliente")),
+                Codigo_Funcionario=int(payload.get("Codigo_Funcionario") or 1),
+                Codigo_Habitacion=hid,
+                Fecha_Entrada=entrada,
+                Fecha_Salida=salida,
+                Estado=estado,
+                Monto_Total=float(total),
+                Canal=canal,
+                Fuente=(payload.get("Fuente") or "Web"),
+                Politica_Cancelacion=(payload.get("Politica_Cancelacion") or None),
+                Observaciones=(payload.get("Observaciones") or ""),
+                # Si querés guardar el cupón “seleccionado” como referencia (opcional):
+                Descuento_Id=(payload.get("CouponCode") or payload.get("Descuento_Id") or None),
+            )
             db.session.add(r)
-
-            # Hint de estado para operación (si existe la columna)
-            try:
-                if hasattr(habitacion, "Estado"):
-                    habitacion.Estado = "Ocupada"
-            except Exception:
-                pass
-
-            db.session.flush()  # obtener PK
+            db.session.flush()  # para PK
+            
+    
+            # Numero comprobante interno (lo seguimos generando como identificador)
             r.Numero_Comprobante = f"R-{r.Codigo_Reserva:08d}"
-
-            # Documento de comprobante (opcional)
-            try:
-                blob, pdf_path, mime = _save_pdf_reserva(r, habitacion)
-                doc = Documento(Tipo="Comprobante", Ruta=pdf_path, MimeType=mime, TamanoBytes=len(blob))
-                db.session.add(doc)
-                db.session.flush()
-                db.session.add(ReservaDocumento(Codigo_Reserva=r.Codigo_Reserva, Documento_Id=doc.Id))
-            except Exception as e_doc:
-                print(f"[WARN] No se pudo registrar comprobante: {e_doc}")
-
+    
+            # ------------------ SOLO si Confirmada: marcar habitación + comprobante ------------------
+            if estado == "Confirmada":
+                # Mantener tu comportamiento previo solo para confirmadas
+                try:
+                    if hasattr(habitacion, "Estado"):
+                        habitacion.Estado = "Ocupada"
+                except Exception:
+                    pass
+    
+                # Documento PDF / comprobante (solo confirmada)
+                try:
+                    blob, pdf_path, mime = _save_pdf_reserva(r, habitacion)
+                    doc = Documento(Tipo="Comprobante", Ruta=pdf_path, MimeType=mime, TamanoBytes=len(blob))
+                    db.session.add(doc)
+                    db.session.flush()
+                    db.session.add(ReservaDocumento(Codigo_Reserva=r.Codigo_Reserva, Documento_Id=doc.Id))
+                except Exception as e_doc:
+                    print(f"[WARN] No se pudo registrar comprobante: {e_doc}")
+    
             db.session.commit()
-
-            # Post-commit no críticos
+    
+            # ------------------ Post-commit no críticos ------------------
             try:
                 self.audit.log(
                     payload.get("Usuario"),
@@ -326,30 +446,22 @@ class ReservationService:
                     "CREATE",
                     {
                         "canal": canal,
+                        "estado": estado,
                         "noches": noches,
-                        "monto": float(total),
+                        "monto": float(r.Monto_Total),
                         "habitacion": getattr(habitacion, "Numero_Habitacion", habitacion.Codigo_Habitacion),
                         "huespedes": huespedes,
                     },
                 )
             except Exception:
                 pass
-
-            try:
-                cli = self.C.query.get(r.Codigo_Cliente)
-                self.notify.send_confirmation(
-                    getattr(cli, "Correo", None),
-                    getattr(cli, "Telefono", None),
-                    r.Numero_Comprobante
-                )
-            except Exception:
-                pass
-
+    
             try:
                 self.hk.publish(
                     "reservation_created",
                     {
                         "reserva_id": r.Codigo_Reserva,
+                        "estado": estado,
                         "habitacion": getattr(habitacion, "Numero_Habitacion", habitacion.Codigo_Habitacion),
                         "entrada": entrada.isoformat(),
                         "salida": salida.isoformat(),
@@ -357,17 +469,19 @@ class ReservationService:
                 )
             except Exception:
                 pass
-
+    
             return {
                 "ok": True,
                 "reserva_id": r.Codigo_Reserva,
                 "numero": r.Numero_Comprobante,
                 "monto": float(r.Monto_Total),
+                "estado": estado,
                 "habitacion": getattr(habitacion, "Numero_Habitacion", habitacion.Codigo_Habitacion),
             }
         except Exception as e:
             db.session.rollback()
             return {"ok": False, "error": f"Error al crear reserva: {e}"}
+    
 
     # ---------- Obtener ----------
     def get(self, reserva_id: int) -> Dict[str, Any]:
