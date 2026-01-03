@@ -2841,6 +2841,10 @@ DELIMITER ;
 CALL sp_patch_sac_compat_20251230();
 
 
+INSERT INTO SAC_Config (Clave, Valor) VALUES
+('sinpe_mobile', '8343 9451'),
+('sinpe_beneficiary', 'Hotel Villa Grace')
+ON DUPLICATE KEY UPDATE Valor = VALUES(Valor);
 
 
 
@@ -2853,7 +2857,7 @@ CALL sp_patch_sac_compat_20251230();
 SELECT * FROM Usuario;
 SELECT * FROM Cliente;
 -- SELECT * FROM Reserva;
--- SELECT * FROM InvCategoria;
+ SELECT * FROM SAC_Config;
 -- SELECT * FROM InvInsumo;
 -- SELECT * FROM InvMovimiento;
 -- SELECT * FROM KPI_Stats;
