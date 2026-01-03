@@ -51,7 +51,9 @@ sac_bp = Blueprint("sac", __name__, url_prefix="/sac")
 MAX_CONV_AGE_HOURS = 24
 
 
-def _get_active_conversation(session_id: str, create_if_missing: bool = True) -> SACConversation | None:
+def _get_active_conversation(
+    session_id: str, create_if_missing: bool = True
+) -> SACConversation | None:
     """
     Devuelve la conversación activa para un session_id.
     - Si la última conversación está cerrada o expirada (>24h) → se ignora.
@@ -66,8 +68,7 @@ def _get_active_conversation(session_id: str, create_if_missing: bool = True) ->
 
     # Última conversación por Session_Id
     conv = (
-        SACConversation.query
-        .filter_by(Session_Id=session_id)
+        SACConversation.query.filter_by(Session_Id=session_id)
         .order_by(SACConversation.Creada_At.desc())
         .first()
     )
@@ -82,7 +83,9 @@ def _get_active_conversation(session_id: str, create_if_missing: bool = True) ->
         if abierta == 0 or estado == "CERRADA":
             conv = None
         # Si tiene última actividad muy antigua → expirada
-        elif last_msg_at is not None and last_msg_at < now - timedelta(hours=MAX_CONV_AGE_HOURS):
+        elif last_msg_at is not None and last_msg_at < now - timedelta(
+            hours=MAX_CONV_AGE_HOURS
+        ):
             conv = None
 
     if conv is None and create_if_missing:
@@ -117,7 +120,6 @@ def _get_active_conversation(session_id: str, create_if_missing: bool = True) ->
     return conv
 
 
-
 # ---------------------------------------------------------------------
 # Utilidad de configuración
 # ---------------------------------------------------------------------
@@ -132,9 +134,7 @@ def cfg(key: str, default: str = "") -> str:
 def _norm(s: str) -> str:
     s = (s or "").strip().lower()
     s = "".join(
-        c
-        for c in unicodedata.normalize("NFD", s)
-        if unicodedata.category(c) != "Mn"
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
     )
     return re.sub(r"\s+", " ", s)
 
@@ -157,9 +157,7 @@ def _is_greeting(qn: str) -> bool:
         "aloha",
     )
     return any(
-        qn == g
-        or qn.startswith(g + " ")
-        or (" " + g + " ") in (" " + qn + " ")
+        qn == g or qn.startswith(g + " ") or (" " + g + " ") in (" " + qn + " ")
         for g in GREET
     )
 
@@ -220,9 +218,8 @@ def _noinfo_answer() -> str:
         "adivinar una respuesta incorrecta.\n\n"
         "¿Desea que transfiera esta conversación a un agente humano de recepción?"
     )
-    
-    
-    
+
+
 def _looks_like_noinfo(text: str) -> bool:
     """
     Detecta respuestas genéricas de “no tengo información / no hay información”
@@ -242,7 +239,6 @@ def _looks_like_noinfo(text: str) -> bool:
         "no tengo informacion especifica",
         "no tengo información sobre",
         "no tengo informacion sobre",
-
         # No hay datos
         "no hay información",
         "no hay informacion",
@@ -253,12 +249,10 @@ def _looks_like_noinfo(text: str) -> bool:
         "no cuento con información",
         "no cuento con informacion",
         "no tengo datos",
-
         # Formulaciones frecuentes en respuestas “no sé”
         "no se indica",
         "no se encuentra registrada",
         "no se menciona",
-
         # Muy importante: frases como la que estás viendo ahora
         "no está disponible en nuestra base de conocimiento",
         "no esta disponible en nuestra base de conocimiento",
@@ -266,8 +260,6 @@ def _looks_like_noinfo(text: str) -> bool:
         "no esta disponible en la base de conocimiento",
     ]
     return any(p in t for p in patterns)
-
-
 
 
 def _default_suggestions(cid: Optional[int]) -> List[str]:
@@ -350,9 +342,10 @@ def _reservas_del_cliente(limit: Optional[int] = None) -> List[Dict[str, Any]]:
         "email": (email or ""),
     }
     lim_sql = f"LIMIT {int(limit)}" if (limit and limit > 0) else ""
-    rows = db.session.execute(
-        text(
-            f"""
+    rows = (
+        db.session.execute(
+            text(
+                f"""
         SELECT
             r.Codigo_Reserva                  AS Codigo_Reserva,
             r.Fecha_Entrada                   AS Fecha_Entrada,
@@ -369,9 +362,12 @@ def _reservas_del_cliente(limit: Optional[int] = None) -> List[Dict[str, Any]]:
         ORDER BY r.Fecha_Entrada DESC, r.Codigo_Reserva DESC
         {lim_sql}
     """
-        ),
-        params,
-    ).mappings().all()
+            ),
+            params,
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
@@ -506,14 +502,17 @@ def chat_history():
 
     # Si quieres aplicar la regla de 24h también aquí (por seguridad)
     from datetime import datetime, timedelta
+
     now = datetime.utcnow()
-    if conv.Last_Msg_At and conv.Last_Msg_At < now - timedelta(hours=MAX_CONV_AGE_HOURS):
+    if conv.Last_Msg_At and conv.Last_Msg_At < now - timedelta(
+        hours=MAX_CONV_AGE_HOURS
+    ):
         return jsonify(ok=True, conv_id=None, messages=[], last_msg_at=None)
 
     since_raw = request.args.get("since")
-    q = (SACConversationMsg.query
-         .filter_by(Conv_Id=conv.Id)
-         .order_by(SACConversationMsg.Creada_At.asc()))
+    q = SACConversationMsg.query.filter_by(Conv_Id=conv.Id).order_by(
+        SACConversationMsg.Creada_At.asc()
+    )
 
     if since_raw:
         try:
@@ -529,26 +528,26 @@ def chat_history():
         ts = m.Creada_At
         if last_ts is None or ts > last_ts:
             last_ts = ts
-        msgs.append({
-            "id": m.Id,
-            "role": m.Rol,          # 'user' | 'bot' | 'agent'
-            "text": m.Texto,
-            "created_at": ts.isoformat(sep=" ", timespec="seconds"),
-        })
+        msgs.append(
+            {
+                "id": m.Id,
+                "role": m.Rol,  # 'user' | 'bot' | 'agent'
+                "text": m.Texto,
+                "created_at": ts.isoformat(sep=" ", timespec="seconds"),
+            }
+        )
 
     return jsonify(
         ok=True,
         conv_id=conv.Id,
         messages=msgs,
         last_msg_at=(
-            last_ts.isoformat(sep=" ", timespec="seconds")
-            if last_ts else None
+            last_ts.isoformat(sep=" ", timespec="seconds") if last_ts else None
         ),
         status=getattr(conv, "Status", None),
         needs_agent=getattr(conv, "Needs_Agent", None),
         abierta=conv.Abierta,
     )
-
 
 
 @sac_bp.post("/chat/escalar")
@@ -567,8 +566,7 @@ def chatbot_escalar():
     conv = None
     if sid:
         conv = (
-            SACConversation.query
-            .filter_by(Session_Id=sid, Abierta=True)
+            SACConversation.query.filter_by(Session_Id=sid, Abierta=True)
             .order_by(SACConversation.Id.asc())
             .first()
         )
@@ -590,7 +588,7 @@ def chatbot_escalar():
         # Registrar un mensaje de sistema/bot indicando la derivación
         msg = SACConversationMsg(
             Conv_Id=conv.Id,
-            Rol="bot", 
+            Rol="bot",
             Texto="La conversación ha sido derivada a un agente humano de recepción.",
             Creada_At=datetime.utcnow(),
         )
@@ -613,7 +611,6 @@ def chatbot_escalar():
 
     db.session.commit()
     return jsonify({"ok": True})
-
 
 
 # ====================== SOLICITUDES ======================
@@ -667,9 +664,7 @@ def registrar_solicitud():
         )
         db.session.commit()
     except Exception as e:
-        current_app.logger.warning(
-            f"[SAC] No se pudo notificar solicitud {s.Id}: {e}"
-        )
+        current_app.logger.warning(f"[SAC] No se pudo notificar solicitud {s.Id}: {e}")
 
     return jsonify({"ok": True, "id": s.Id})
 
@@ -685,9 +680,10 @@ def solicitudes_list():
         where = "WHERE s.Estado = :estado"
         params["estado"] = estado
 
-    rows = db.session.execute(
-        text(
-            f"""
+    rows = (
+        db.session.execute(
+            text(
+                f"""
         SELECT
           s.Id, s.Codigo_Reserva, s.Codigo_Cliente, s.Clave, s.Valor, s.Estado,
           DATE_FORMAT(s.Creada_At, '%Y-%m-%d %H:%i') AS Fecha_modificacion,
@@ -699,17 +695,19 @@ def solicitudes_list():
         ORDER BY s.Creada_At DESC
         LIMIT 500
     """
-        ),
-        params,
-    ).mappings().all()
+            ),
+            params,
+        )
+        .mappings()
+        .all()
+    )
 
     items = [
         {
             "Id": r["Id"],
             "Codigo_Reserva": r["Codigo_Reserva"],
             "Codigo_Cliente": r["Codigo_Cliente"],
-            "Detalle": (r["Clave"] or "")
-            + (": " + r["Valor"] if r["Valor"] else ""),
+            "Detalle": (r["Clave"] or "") + (": " + r["Valor"] if r["Valor"] else ""),
             "Estado": r["Estado"],
             "Fecha_modificacion": r["Fecha_modificacion"],
             "Cliente": (
@@ -746,8 +744,6 @@ def panel_solicitudes():
 
 
 # ====================== CONVERSACIONES – PANEL SEGUIMIENTO NUEVO ======================
-
-
 
 
 @sac_bp.get("/conversaciones")
@@ -870,11 +866,7 @@ def conversations_list():
         needs_agent = bool(r.get("Needs_Agent"))
         requires_attention = needs_agent or status.lower() == "agent_pending"
 
-        guest_label = (
-            r.get("Guest_Name")
-            or r.get("Guest_Email")
-            or "Visitante web"
-        )
+        guest_label = r.get("Guest_Name") or r.get("Guest_Email") or "Visitante web"
         snippet = (r.get("Last_Snippet") or "").replace("\n", " ")
         if len(snippet) > 160:
             snippet = snippet[:157] + "..."
@@ -893,9 +885,7 @@ def conversations_list():
     return jsonify({"ok": True, "items": items})
 
 
-@sac_bp.get(
-    "/conversations/<int:conversation_id>", endpoint="conversation_detail"
-)
+@sac_bp.get("/conversations/<int:conversation_id>", endpoint="conversation_detail")
 @role_required("Recepcionista", "Administrador")
 def conversation_detail(conversation_id: int):
     """
@@ -993,7 +983,6 @@ def conversation_detail(conversation_id: int):
     )
 
 
-
 @sac_bp.post(
     "/conversations/<int:conversation_id>/agent-reply",
     endpoint="conversation_agent_reply",
@@ -1050,9 +1039,12 @@ def conversation_agent_reply(conversation_id: int):
             db.session.rollback()
         except Exception:
             pass
-        return jsonify(
-            {"ok": False, "error": "Error al registrar la respuesta del agente."}
-        ), 500
+        return (
+            jsonify(
+                {"ok": False, "error": "Error al registrar la respuesta del agente."}
+            ),
+            500,
+        )
 
     return jsonify({"ok": True})
 
@@ -1075,9 +1067,10 @@ def conversaciones_data():
         )
         params["q"] = f"%{q}%"
 
-    rows = db.session.execute(
-        text(
-            f"""
+    rows = (
+        db.session.execute(
+            text(
+                f"""
         SELECT
           c.Id AS Id,
           DATE_FORMAT(c.Actualizada_At,'%Y-%m-%d %H:%i') AS Fecha,
@@ -1098,9 +1091,12 @@ def conversaciones_data():
         ORDER BY c.Actualizada_At DESC
         LIMIT 500
     """
-        ),
-        params,
-    ).mappings().all()
+            ),
+            params,
+        )
+        .mappings()
+        .all()
+    )
 
     return jsonify({"ok": True, "items": [dict(r) for r in rows]})
 
@@ -1129,9 +1125,9 @@ def conversaciones_messages(conv_id: int):
                 "id": m.Id,
                 "role": m.Rol,
                 "text": m.Texto or "",
-                "created_at": created.isoformat()
-                if hasattr(created, "isoformat")
-                else None,
+                "created_at": (
+                    created.isoformat() if hasattr(created, "isoformat") else None
+                ),
             }
         )
 
@@ -1140,72 +1136,142 @@ def conversaciones_messages(conv_id: int):
         "cliente_id": getattr(conv, "Codigo_Cliente", None),
         "session_id": getattr(conv, "Session_Id", None),
         "abierta": bool(getattr(conv, "Abierta", True)),
-        "actualizada_at": conv.Actualizada_At.isoformat()
-        if getattr(conv, "Actualizada_At", None)
-        else None,
+        "actualizada_at": (
+            conv.Actualizada_At.isoformat()
+            if getattr(conv, "Actualizada_At", None)
+            else None
+        ),
     }
 
     return jsonify({"ok": True, "items": items, "meta": meta})
 
 
-# ====================== INCIDENTES ======================
+#  INCIDENTES
 @sac_bp.get("/incidentes", endpoint="incidentes_html")
 @role_required("Recepcionista", "Administrador")
 def incidentes_html():
     return render_template("sac-incidentes.html")
 
 
-@sac_bp.get("/incidentes/data")
+# @sac_bp.get("/incidentes/data")
+# @role_required("Recepcionista", "Administrador")
+# def incidentes_data():
+#    rows = db.session.execute(
+#        text(
+#           """
+#        SELECT i.Id, i.Codigo_Reserva, i.Codigo_Cliente, i.Tipo, i.Severidad,
+#              i.Titulo, i.Detalle, i.Estado,
+#              DATE_FORMAT(i.Creada_At,'%Y-%m-%d %H:%i') AS Fecha
+#       FROM SAC_Incident i
+#       ORDER BY i.Creada_At DESC
+#       LIMIT 300
+#   """
+#       )
+#   ).mappings().all()
+#   return jsonify({"ok": True, "items": [dict(r) for r in rows]})
+
+
+@sac_bp.get("/incidentes/data", endpoint="incidentes_data")
 @role_required("Recepcionista", "Administrador")
 def incidentes_data():
-    rows = db.session.execute(
-        text(
-            """
-        SELECT i.Id, i.Codigo_Reserva, i.Codigo_Cliente, i.Tipo, i.Severidad,
-               i.Titulo, i.Detalle, i.Estado,
+    tipo = (request.args.get("tipo") or "").strip().upper()
+    estado = (request.args.get("estado") or "").strip().upper()
+
+    try:
+        page = int(request.args.get("page") or 1)
+    except Exception:
+        page = 1
+    if page < 1:
+        page = 1
+
+    try:
+        page_size = int(request.args.get("page_size") or 20)
+    except Exception:
+        page_size = 20
+
+    if page_size < 5:
+        page_size = 5
+    if page_size > 100:
+        page_size = 100
+
+    valid_tipo = {"INCIDENTE", "COMENTARIO"}
+    valid_estado = {"ABIERTA", "EN_PROCESO", "CERRADA"}
+
+    where = []
+    params = {}
+
+    if tipo in valid_tipo:
+        where.append("i.Tipo = :tipo")
+        params["tipo"] = tipo
+
+    if estado in valid_estado:
+        where.append("i.Estado = :estado")
+        params["estado"] = estado
+
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+
+    offset = (page - 1) * page_size
+
+    rows = (
+        db.session.execute(
+            text(
+                f"""
+        SELECT i.Id, i.Codigo_Reserva, i.Codigo_Cliente,
+               i.Reportado_Por, i.Asignado_A,
+               i.Tipo, i.Severidad, i.Titulo, i.Detalle, i.Estado,
                DATE_FORMAT(i.Creada_At,'%Y-%m-%d %H:%i') AS Fecha
         FROM SAC_Incident i
+        {where_sql}
         ORDER BY i.Creada_At DESC
-        LIMIT 300
-    """
+        LIMIT :lim OFFSET :off
+        """
+            ),
+            {**params, "lim": page_size + 1, "off": offset},
         )
-    ).mappings().all()
-    return jsonify({"ok": True, "items": [dict(r) for r in rows]})
+        .mappings()
+        .all()
+    )
+
+    items = [dict(r) for r in rows]
+    has_next = len(items) > page_size
+    if has_next:
+        items = items[:page_size]
+
+    return jsonify({"ok": True, "items": items, "has_next": has_next})
 
 
 @sac_bp.post("/incidentes", endpoint="incidentes_new")
 @role_required("Recepcionista", "Administrador")
 def incidentes_new():
     data = request.get_json(silent=True) or request.form or {}
+
     try:
         rid = data.get("Codigo_Reserva")
         rid = int(rid) if rid not in (None, "", "0") else None
     except Exception:
         rid = None
 
-    try:
-        cid = data.get("Codigo_Cliente")
-        cid = int(cid) if cid not in (None, "", "0") else None
-    except Exception:
-        cid = None
+    cid = None
 
-    if cid is None and rid is not None:
-        r = (
-            db.session.execute(
-                text(
-                    "SELECT Codigo_Cliente FROM Reserva "
-                    "WHERE Codigo_Reserva=:r LIMIT 1"
-                ),
-                {"r": rid},
-            )
-            .mappings()
-            .first()
-        )
-        cid = int(r["Codigo_Cliente"]) if r and r.get("Codigo_Cliente") else None
+    asignado = (data.get("Asignado_A") or "").strip()
+    valid_asignado = {
+        "Recepcionista",
+        "Mantenimiento",
+        "Limpieza",
+        "Administración",
+        "Otro",
+    }
+    asignado = asignado if asignado in valid_asignado else None
+
+    reportado = (
+        session.get("user_name") or session.get("user_email") or ""
+    ).strip() or None
 
     i = SACIncident(
         Codigo_Reserva=rid,
         Codigo_Cliente=cid,
+        Reportado_Por=reportado,
+        Asignado_A=asignado,
         Tipo=(data.get("Tipo") or "INCIDENTE"),
         Severidad=(data.get("Severidad") or "MEDIA"),
         Titulo=(data.get("Titulo") or "Sin título"),
@@ -1214,6 +1280,50 @@ def incidentes_new():
     db.session.add(i)
     db.session.commit()
     return jsonify({"ok": True, "id": i.Id})
+
+
+@sac_bp.put("/incidentes/<int:iid>", endpoint="incidentes_update")
+@role_required("Recepcionista", "Administrador")
+def incidentes_update(iid: int):
+    data = request.get_json(silent=True) or {}
+
+    nuevo_estado = (data.get("Estado") or "").strip().upper()
+    valid_estado = {"ABIERTA", "EN_PROCESO", "CERRADA"}
+    if nuevo_estado and nuevo_estado not in valid_estado:
+        return jsonify({"ok": False, "error": "Estado inválido"}), 400
+
+    asignado = (data.get("Asignado_A") or "").strip()
+    valid_asignado = {
+        "Recepcionista",
+        "Mantenimiento",
+        "Limpieza",
+        "Administración",
+        "Otro",
+        "",
+    }
+    if asignado not in valid_asignado:
+        return jsonify({"ok": False, "error": "Asignado inválido"}), 400
+    asignado = asignado or None
+
+    sets = []
+    params = {"id": iid}
+
+    if nuevo_estado:
+        sets.append("Estado = :estado")
+        params["estado"] = nuevo_estado
+
+    sets.append("Asignado_A = :asignado")
+    params["asignado"] = asignado
+
+    if not sets:
+        return jsonify({"ok": True})
+
+    db.session.execute(
+        text(f"UPDATE SAC_Incident SET {', '.join(sets)} WHERE Id = :id"),
+        params,
+    )
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 # ====================== INDICADORES ======================
@@ -1261,9 +1371,10 @@ def indicadores_kpis():
 @sac_bp.get("/indicadores/flujo")
 @role_required("Administrador")
 def indicadores_flujo():
-    rows = db.session.execute(
-        text(
-            """
+    rows = (
+        db.session.execute(
+            text(
+                """
         SELECT
           DATE_FORMAT(Programado_At,'%Y-%m-%d %H:%i') AS Fecha,
           Canal, Estado,
@@ -1273,8 +1384,11 @@ def indicadores_flujo():
         ORDER BY Programado_At DESC
         LIMIT 200
     """
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     return jsonify({"ok": True, "items": [dict(r) for r in rows]})
 
 
@@ -1319,9 +1433,7 @@ def sac_kb_upload():
     # Reindex rápido: leemos todas las filas activas
     with db.engine.begin() as conn:
         rows = (
-            conn.execute(
-                text("SELECT Id, FileName FROM SAC_KB_Doc WHERE Activo=1")
-            )
+            conn.execute(text("SELECT Id, FileName FROM SAC_KB_Doc WHERE Activo=1"))
             .mappings()
             .all()
         )
@@ -1356,7 +1468,6 @@ def sac_kb_debug_search():
             "rag_answer": ans,
         }
     )
-
 
 
 @sac_bp.get("/kb")
@@ -1441,9 +1552,7 @@ def sac_kb_docs():
                 "source_type": None,  # se puede ampliar en DB si lo requieres
                 "lang": None,
                 "is_active": bool(r["Activo"]),
-                "created_at": r["SubidoEn"].isoformat()
-                if r.get("SubidoEn")
-                else None,
+                "created_at": r["SubidoEn"].isoformat() if r.get("SubidoEn") else None,
                 "size_bytes": int(r["Bytes"] or 0),
             }
         )
@@ -1530,9 +1639,7 @@ def sac_chat_admin():
             .all()
         )
     for r in rows:
-        popular_questions.append(
-            {"text": r["pregunta"], "count": int(r["veces"] or 0)}
-        )
+        popular_questions.append({"text": r["pregunta"], "count": int(r["veces"] or 0)})
 
     kb_stats = {"docs": 0, "unanswered": 0}
     with db.engine.begin() as conn:
@@ -1750,9 +1857,7 @@ def sac_chat_stats():
         .all()
     )
 
-    items = [
-        {"question": r["pregunta"], "count": int(r["veces"] or 0)} for r in rows
-    ]
+    items = [{"question": r["pregunta"], "count": int(r["veces"] or 0)} for r in rows]
     return jsonify({"ok": True, "items": items, "total_counted": total_counted})
 
 
@@ -1769,7 +1874,6 @@ def _get_conversation_history(session_id: str, limit: int = 6) -> List[Dict[str,
     conv = _get_active_conversation(session_id, create_if_missing=False)
     if not conv:
         return []
-
 
     msgs = (
         SACConversationMsg.query.filter_by(Conv_Id=conv.Id)
@@ -1813,7 +1917,6 @@ def _get_or_create_conversation(
             db.session.rollback()
 
     return conv
-
 
 
 def _log_conversation_turn(
@@ -1910,10 +2013,7 @@ def _call_ai_chat(
             if resp.ok:
                 js = resp.json()
                 txt = (
-                    js.get("answer")
-                    or js.get("output")
-                    or js.get("message")
-                    or ""
+                    js.get("answer") or js.get("output") or js.get("message") or ""
                 ).strip()
                 if txt:
                     conf = float(js.get("confidence") or 0.7)
@@ -2079,7 +2179,11 @@ def sac_ask():
     # ---------- Estado ya escalado a agente ----------
     if conv_status in ("agent_pending", "agent_active"):
         # Si el agente aún no ha respondido, seguimos mostrando el estado pendiente.
-        msgs = SACConversationMsg.query.filter_by(Conv_Id=conv.Id).order_by(SACConversationMsg.Id.asc()).all()
+        msgs = (
+            SACConversationMsg.query.filter_by(Conv_Id=conv.Id)
+            .order_by(SACConversationMsg.Id.asc())
+            .all()
+        )
         # Si ya existe un mensaje de Rol='agent' → mostrar ese texto y reactivar el bot.
         last_agent_msg = next((m for m in reversed(msgs) if m.Rol == "agent"), None)
         if last_agent_msg:
@@ -2096,7 +2200,7 @@ def sac_ask():
             result["source"] = "HANDOFF_PENDING"
             result["need_handoff"] = True
             result["handoff_state"] = "PENDING"
-    
+
         _log_conversation_turn(
             session_id=sess,
             cid=cid,
@@ -2108,7 +2212,6 @@ def sac_ask():
         )
         db.session.commit()
         return jsonify(result)
-    
 
     # ---------- Usuario responde a una oferta de transferencia ----------
     if conv_status == "handoff_offer":
@@ -2231,7 +2334,11 @@ def sac_ask():
                     KB_DOCS_CONF_THRESHOLD = 0.15
 
                     conf = float(ans.get("confidence", 0.0) or 0.0)
-                    if ans.get("ok") and conf >= KB_DOCS_CONF_THRESHOLD and ans.get("answer"):
+                    if (
+                        ans.get("ok")
+                        and conf >= KB_DOCS_CONF_THRESHOLD
+                        and ans.get("answer")
+                    ):
                         # ans ya incluye 'answer', 'confidence', etc.
                         result.update(ans)
                         result["source"] = "KB_DOCS"
@@ -2338,8 +2445,6 @@ def sac_ask():
                     result["handoff_state"] = "OFFER"
                     conv_status = "handoff_offer"
                     conv_needs_agent = False
-                    
-                    
 
     # ---------- 7) Capa de IA conversacional (n8n / Ollama) ----------
     base_answer = (result.get("answer") or "").strip()
@@ -2348,7 +2453,7 @@ def sac_ask():
     # Nunca usar IA para reescribir cuando:
     #   - No hay información (NO_INFO) y se está ofreciendo agente.
     #   - Podría inducir a inventar datos en un caso 'sin respuesta'.
-    skip_ai = (result.get("source") in ("NO_INFO",) or bool(result.get("need_handoff")))
+    skip_ai = result.get("source") in ("NO_INFO",) or bool(result.get("need_handoff"))
 
     if base_answer and not skip_ai:
         try:
@@ -2371,14 +2476,16 @@ def sac_ask():
                         base_conf = 0.0
                     result["confidence"] = max(base_conf, ai_conf)
         except Exception as e:
-            current_app.logger.warning(
-                f"[SAC-AI] Error al reescribir respuesta: {e}"
-            )
-            
+            current_app.logger.warning(f"[SAC-AI] Error al reescribir respuesta: {e}")
+
         # ---------- 7-bis) Normalización final de respuestas "no tengo información" ----------
     final_answer = (result.get("answer") or "").strip()
-    
-    if final_answer and _looks_like_noinfo(final_answer) and result.get("source") != "NO_INFO":
+
+    if (
+        final_answer
+        and _looks_like_noinfo(final_answer)
+        and result.get("source") != "NO_INFO"
+    ):
         # Forzamos el flujo estándar de "no sé" + oferta de agente humano
         result["answer"] = _noinfo_answer()
         result["confidence"] = 0.0
@@ -2387,7 +2494,6 @@ def sac_ask():
         result["handoff_state"] = "OFFER"
         conv_status = "handoff_offer"
         conv_needs_agent = False
-
 
     # ---------- 8) Registrar conversación (último paso) ----------
     try:

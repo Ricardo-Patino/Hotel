@@ -135,6 +135,8 @@ class SACIncident(db.Model):
     Id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     Codigo_Reserva = db.Column(db.Integer, nullable=True)
     Codigo_Cliente = db.Column(db.Integer, nullable=True)
+    Reportado_Por = db.Column(db.String(80), nullable=True)
+    Asignado_A = db.Column(db.String(30), nullable=True)
     Tipo = db.Column(db.String(20), nullable=False, default="INCIDENTE")
     Severidad = db.Column(db.String(10), nullable=False, default="MEDIA")
     Titulo = db.Column(db.String(160), nullable=False)

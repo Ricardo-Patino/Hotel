@@ -7673,3 +7673,27 @@ section,
   color: #fff;
 }
 
+/* Paginación SAC*/
+.sac-pager .page-link{
+  color: var(--accent-color);
+  border-color: color-mix(in srgb, var(--accent-color), transparent 65%);
+  font-family: var(--default-font);
+}
+
+.sac-pager .page-link:hover{
+  background-color: color-mix(in srgb, var(--accent-color), transparent 88%);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.sac-pager .page-item.active .page-link{
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--contrast-color);
+}
+
+.sac-pager .page-item.disabled .page-link{
+  color: color-mix(in srgb, var(--default-color), transparent 55%);
+}
+
+

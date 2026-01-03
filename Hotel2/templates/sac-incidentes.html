@@ -1,99 +1,536 @@
 {% extends "sac/_layout.html" %}
 {% block title %}Incidentes | Hotel Villa Grace{% endblock %}
 {% block page_h1 %}Incidentes / Comentarios{% endblock %}
-{% block crumb %}SAC · Incidentes{% endblock %}
-{% block content %}
-<section class="section" data-aos="fade-up">
-  <div class="container">
-    <div class="row g-3">
-      <div class="col-lg-5">
-        <div class="vg-card p-3">
-          <h5 class="mb-3">Registrar incidente</h5>
-          <form id="fInc">
-            <div class="mb-2">
-              <label class="form-label">Código Reserva (opcional)</label>
-              <input name="Codigo_Reserva" type="number" class="form-control" placeholder="Ej. 1024">
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Código Cliente (opcional)</label>
-              <input name="Codigo_Cliente" type="number" class="form-control" placeholder="Ej. 5">
-            </div>
-            <div class="row">
-              <div class="col-md-6 mb-2">
-                <label class="form-label">Tipo</label>
-                <select name="Tipo" class="form-select">
-                  <option>INCIDENTE</option>
-                  <option>COMENTARIO</option>
-                </select>
-              </div>
-              <div class="col-md-6 mb-2">
-                <label class="form-label">Severidad</label>
-                <select name="Severidad" class="form-select">
-                  <option>MEDIA</option><option>BAJA</option><option>ALTA</option><option>CRITICA</option>
-                </select>
-              </div>
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Título</label>
-              <input name="Titulo" class="form-control" required>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Detalle</label>
-              <textarea name="Detalle" rows="4" class="form-control"></textarea>
-            </div>
-            <div class="d-flex gap-2">
-              <button class="btn btn-primary" type="submit">Guardar</button>
-              <span id="msg" class="small text-muted"></span>
-            </div>
-          </form>
+{% block crumb %}Incidentes{% endblock %}
+
+{% block sac_content %}
+<div class="row g-4">
+
+  <!-- TABLA FULL WIDTH -->
+  <div class="col-12">
+    <div class="vg-card p-4 p-md-5">
+
+      <div class="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
+        <div>
+          <h5 class="mb-1">Últimos registros</h5>
+          <p class="small text-muted mb-0">Filtra y revisa incidentes/comentarios internos registrados por el personal.
+          </p>
+        </div>
+
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <select id="fTipo" class="form-select" style="max-width:180px">
+            <option value="">— Todos —</option>
+            <option value="INCIDENTE">INCIDENTE</option>
+            <option value="COMENTARIO">COMENTARIO</option>
+          </select>
+
+          <select id="fEstado" class="form-select" style="max-width:180px">
+            <option value="">— Todos —</option>
+            <option value="ABIERTA">ABIERTA</option>
+            <option value="EN_PROCESO">EN_PROCESO</option>
+            <option value="CERRADA">CERRADA</option>
+          </select>
+
+          <!-- usa el verde del sitio -->
+          <button id="btnReload" class="btn btn-outline-accent">
+            <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+          </button>
         </div>
       </div>
-      <div class="col-lg-7">
-        <div class="vg-card p-3">
-          <h5 class="mb-3">Últimos registros</h5>
-          <div class="table-responsive">
-            <table class="table table-sm align-middle">
-              <thead>
-                <tr><th>Id</th><th>Cliente</th><th>Reserva</th><th>Título</th><th>Tipo</th><th>Severidad</th><th>Estado</th><th>Fecha</th></tr>
-              </thead>
-              <tbody id="rows"><tr><td colspan="8">Cargando…</td></tr></tbody>
-            </table>
+
+      <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th style="width:70px">Id</th>
+              <!--<th style="width:90px">Cliente</th>-->
+              <th style="width:90px">Reserva</th>
+              <th>Título</th>
+              <th style="width:130px">Asignado</th>
+              <th style="width:160px">Reportado</th>
+              <th style="width:110px">Tipo</th>
+              <th style="width:110px">Severidad</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:60px" class="text-end">Ver</th>
+              <th style="width:170px">Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr>
+              <td colspan="10" class="text-muted">Cargando…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- paginación alineada a la derecha -->
+      <div class="d-flex justify-content-end mt-3">
+        <nav aria-label="Paginación incidentes">
+          <ul id="pager" class="pagination sac-pager mb-0">
+            <li class="page-item disabled">
+              <a class="page-link" href="#" data-page="prev">Anterior</a>
+            </li>
+            <li class="page-item active">
+              <a class="page-link" href="#" data-page="p1">1</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="#" data-page="next">Siguiente</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FORMULARIO + INSTRUCCIONES JUNTOS -->
+  <div class="col-lg-8">
+    <div class="vg-card p-4 p-md-5">
+      <h5 class="mb-3">Registrar incidente</h5>
+
+      <form id="fInc" class="row g-3">
+
+        <div class="col-md-6">
+          <label class="form-label">Código Reserva (opcional)</label>
+          <input name="Codigo_Reserva" type="number" class="form-control" placeholder="Ej. 1024">
+        </div>
+
+        <!--<div class="col-md-6">
+          <label class="form-label">Código Cliente (opcional)</label>
+          <input name="Codigo_Cliente" type="number" class="form-control" placeholder="Ej. 5">
+          <div class="form-text">Si indicas Reserva y dejas Cliente vacío, el sistema intentará inferirlo.</div>
+        </div>-->
+
+        <div class="col-md-3">
+          <label class="form-label">Tipo</label>
+          <select name="Tipo" class="form-select">
+            <option value="INCIDENTE" selected>INCIDENTE</option>
+            <option value="COMENTARIO">COMENTARIO</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Severidad</label>
+          <select name="Severidad" class="form-select">
+            <option value="MEDIA" selected>MEDIA</option>
+            <option value="BAJA">BAJA</option>
+            <option value="ALTA">ALTA</option>
+            <option value="CRITICA">CRITICA</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Asignado a</label>
+          <select name="Asignado_A" class="form-select">
+            <option value="" selected>— Sin asignar —</option>
+            <option value="Recepcionista">Recepcionista</option>
+            <option value="Mantenimiento">Mantenimiento</option>
+            <option value="Limpieza">Limpieza</option>
+            <option value="Administración">Administración</option>
+            <option value="Otro">Otro</option>
+          </select>
+          <div class="form-text">Este campo se asigna manualmente.</div>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Reportado por</label>
+          <input class="form-control" value="Automático (según sesión)" readonly>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Título</label>
+          <input name="Titulo" class="form-control" required>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Detalle</label>
+          <textarea name="Detalle" rows="5" class="form-control"
+            placeholder="Describe el incidente o comentario…"></textarea>
+        </div>
+
+        <div class="col-12 d-flex align-items-center gap-3">
+          <!-- usa el verde del sitio -->
+          <button id="btnSave" class="btn btn-outline-accent" type="submit">
+            <i class="bi bi-check2-circle me-1"></i> Guardar
+          </button>
+          <span id="msg" class="small text-muted"></span>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="vg-card p-4">
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-info-circle"></i>
+        <div>
+          <h6 class="mb-2">Instrucciones</h6>
+          <ul class="small text-muted mb-0">
+            <li>Esta sección es para <strong>incidentes/comentarios internos</strong> del personal.</li>
+            <li>Las <strong>solicitudes</strong> del huésped se gestionan desde el <strong>Panel de
+                solicitudes</strong>.</li>
+            <li>Se recomienda completar <strong>Asignado a</strong> para dar seguimiento.</li>
+            <li>El campo <strong>Reportado por</strong> se registra automáticamente según la sesión.</li>
+          </ul>
+
+          <div class="mt-3 d-grid gap-2">
+            <a class="btn btn-outline-accent" href="{{ url_for('sac.panel_solicitudes') }}">
+              <i class="bi bi-inbox me-1"></i> Ir a Panel de solicitudes
+            </a>
           </div>
         </div>
       </div>
     </div>
   </div>
-</section>
+
+</div>
+
+<div class="modal fade" id="incModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Detalle del incidente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="mId">
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Título</label>
+            <input id="mTitulo" class="form-control">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Asignado a</label>
+            <select id="mAsignado" class="form-select">
+              <option value="">— Sin asignar —</option>
+              <option value="Recepcionista">Recepcionista</option>
+              <option value="Mantenimiento">Mantenimiento</option>
+              <option value="Limpieza">Limpieza</option>
+              <option value="Administración">Administración</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Estado</label>
+            <select id="mEstado" class="form-select">
+              <option value="ABIERTA">ABIERTA</option>
+              <option value="EN_PROCESO">EN_PROCESO</option>
+              <option value="CERRADA">CERRADA</option>
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Detalle</label>
+            <textarea id="mDetalle" class="form-control" rows="6"></textarea>
+          </div>
+
+          <div class="col-12">
+            <div id="mMsg" class="small text-muted"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-accent" data-bs-dismiss="modal">Cerrar</button>
+        <button id="mSave" type="button" class="btn btn-outline-accent">
+          <i class="bi bi-check2-circle me-1"></i> Guardar cambios
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-async function load() {
-  const res = await fetch('/sac/incidentes/data');
-  const j = await res.json();
-  const tb = document.getElementById('rows'); tb.innerHTML='';
-  (j.items||[]).forEach(x=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${x.Id}</td>
-      <td>${x.Codigo_Cliente??''}</td>
-      <td>${x.Codigo_Reserva??''}</td>
-      <td>${x.Titulo||''}</td>
-      <td>${x.Tipo||''}</td>
-      <td>${x.Severidad||''}</td>
-      <td>${x.Estado||''}</td>
-      <td>${x.Fecha||''}</td>`;
-    tb.appendChild(tr);
+  console.log("sac-incidentes script cargó");
+  const rows = document.getElementById('rows');
+  const btnReload = document.getElementById('btnReload');
+  const frm = document.getElementById('fInc');
+  const msg = document.getElementById('msg');
+  const alertBox = document.getElementById('alertBox');
+  const btnSave = document.getElementById('btnSave');
+
+  const fTipo = document.getElementById('fTipo');
+  const fEstado = document.getElementById('fEstado');
+  const pager = document.getElementById('pager');
+
+  let page = 1;
+  const pageSize = 20;
+
+  const incModalEl = document.getElementById('incModal');
+  let incModal = null;
+
+  const mId = document.getElementById('mId');
+  const mTitulo = document.getElementById('mTitulo');
+  const mAsignado = document.getElementById('mAsignado');
+  const mEstado = document.getElementById('mEstado');
+  const mDetalle = document.getElementById('mDetalle');
+  const mSave = document.getElementById('mSave');
+  const mMsg = document.getElementById('mMsg');
+
+  function showAlert(type, html, autoHideMs = 6000) {
+    alertBox.className = `alert alert-${type} d-block mb-3`;
+    alertBox.innerHTML = html;
+    if (autoHideMs) {
+      window.clearTimeout(showAlert._t);
+      showAlert._t = window.setTimeout(() => {
+        alertBox.classList.add('d-none');
+        alertBox.classList.remove('d-block');
+      }, autoHideMs);
+    }
+  }
+
+  function clearAlert() {
+    window.clearTimeout(showAlert._t);
+    alertBox.classList.add('d-none');
+    alertBox.classList.remove('d-block');
+    alertBox.innerHTML = '';
+  }
+
+  function badgeEstado(e) {
+    const x = (e || '').toUpperCase();
+    if (x === 'CERRADA') return `<span class="badge text-bg-success">CERRADA</span>`;
+    if (x === 'EN_PROCESO') return `<span class="badge text-bg-warning">EN PROCESO</span>`;
+    return `<span class="badge text-bg-secondary">${x || 'ABIERTA'}</span>`;
+  }
+
+  function badgeSev(s) {
+    const x = (s || '').toUpperCase();
+    if (x === 'CRITICA') return `<span class="badge text-bg-danger">CRITICA</span>`;
+    if (x === 'ALTA') return `<span class="badge text-bg-warning">ALTA</span>`;
+    if (x === 'BAJA') return `<span class="badge text-bg-info">BAJA</span>`;
+    return `<span class="badge text-bg-secondary">MEDIA</span>`;
+  }
+
+  function setPager(hasPrev, hasNext) {
+    const items = Array.from(pager.querySelectorAll('.page-item'));
+    const prev = items[0];
+    const p1 = items[1];
+    const next = items[2];
+
+    prev.classList.toggle('disabled', !hasPrev);
+    next.classList.toggle('disabled', !hasNext);
+
+    p1.querySelector('.page-link').textContent = String(page);
+  }
+
+  async function load() {
+    rows.innerHTML = `<tr><td colspan="10" class="text-muted">Cargando…</td></tr>`;
+    btnReload.disabled = true;
+    btnReload.textContent = 'Actualizando…';
+
+    try {
+      const tipo = fTipo.value || '';
+      const estado = fEstado.value || '';
+
+      const qs = new URLSearchParams();
+      if (tipo) qs.set('tipo', tipo);
+      if (estado) qs.set('estado', estado);
+      qs.set('page', String(page));
+      qs.set('page_size', String(pageSize));
+
+      const res = await fetch('/sac/incidentes/data?' + qs.toString());
+      const j = await res.json();
+
+      if (!j.ok) {
+        rows.innerHTML = `<tr><td colspan="10" class="text-muted">No se pudo cargar.</td></tr>`;
+        return;
+      }
+
+      clearAlert();
+
+      const items = j.items || [];
+
+      window.__incItems = items;
+
+      if (!items.length) {
+        rows.innerHTML = `<tr><td colspan="10" class="text-muted">Sin registros.</td></tr>`;
+        setPager(page > 1, false);
+        return;
+      }
+
+      rows.innerHTML = '';
+      items.forEach(x => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="fw-semibold">${x.Id ?? ''}</td>
+          
+          <td>${x.Codigo_Reserva ?? ''}</td>
+          <td>${x.Titulo || ''}</td>
+          <td>${x.Asignado_A || '—'}</td>
+          <td>${x.Reportado_Por || '—'}</td>
+          <td>${x.Tipo || ''}</td>
+          <td>${badgeSev(x.Severidad)}</td>
+          <td>${badgeEstado(x.Estado)}</td>
+          <td class="text-muted">${x.Fecha || ''}</td>
+          <td class="text-end">
+            <button type="button"
+                    class="btn btn-sm btn-outline-accent"
+                    title="Ver detalle / Editar"
+                    data-action="open"
+                    data-id="${x.Id}">
+              <i class="bi bi-eye"></i>
+            </button>
+          </td>
+        `;
+        rows.appendChild(tr);
+      });
+
+      setPager(page > 1, Boolean(j.has_next));
+
+    } catch (e) {
+      rows.innerHTML = `<tr><td colspan="10" class="text-muted">Error de conexión.</td></tr>`;
+      setPager(page > 1, false);
+    } finally {
+      btnReload.disabled = false;
+      btnReload.textContent = 'Actualizar';
+    }
+  }
+
+  frm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    btnSave.disabled = true;
+    btnSave.textContent = 'Guardando…';
+
+    try {
+      const fd = new FormData(e.currentTarget);
+      const res = await fetch('/sac/incidentes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.fromEntries(fd.entries()))
+      });
+
+      let out = null;
+      try {
+        out = await res.json();
+      } catch (e) {
+        out = { ok: res.ok };
+      }
+      if (!out) out = { ok: res.ok };
+
+      if (out.ok) {
+        clearAlert();
+        showAlert('success', `<div class="d-flex align-items-start gap-2">
+          <i class="bi bi-check-circle-fill"></i>
+          <div>
+            <div class="fw-semibold">Guardado correctamente.</div>
+            <div class="small">Id del registro: #${out.id}</div>
+          </div>
+        </div>`);
+        e.currentTarget.reset();
+        page = 1;
+        await load();
+      } else {
+        showAlert('danger', `<div class="d-flex align-items-start gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <div>
+            <div class="fw-semibold">No se pudo guardar.</div>
+            <div class="small">${out.error || 'Intenta nuevamente.'}</div>
+          </div>
+        </div>`, 7000);
+      }
+    } catch (err) {
+      showAlert('danger', `<div class="d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <div>
+          <div class="fw-semibold">Error de conexión.</div>
+          <div class="small">Intenta nuevamente.</div>
+        </div>
+      </div>`, 7000);
+    } finally {
+      btnSave.disabled = false;
+      btnSave.textContent = 'Guardar';
+    }
   });
-}
-document.getElementById('fInc').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const fd = new FormData(e.currentTarget);
-  const res = await fetch('/sac/incidentes', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(Object.fromEntries(fd.entries()))
+
+  pager.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (!a) return;
+
+    if (a.closest('.page-item')?.classList.contains('disabled')) return;
+
+    e.preventDefault();
+    const key = a.getAttribute('data-page');
+    if (key === 'prev' && page > 1) page -= 1;
+    if (key === 'next') page += 1;
+    load();
   });
-  const out = await res.json();
-  document.getElementById('msg').textContent = out.ok ? 'Guardado (#'+out.id+').' : 'Error';
-  if(out.ok){ e.currentTarget.reset(); load(); }
-});
-load();
+
+  btnReload.addEventListener('click', () => { page = 1; load(); });
+  fTipo.addEventListener('change', () => { page = 1; load(); });
+  fEstado.addEventListener('change', () => { page = 1; load(); });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.bootstrap && incModalEl) {
+      incModal = new window.bootstrap.Modal(incModalEl);
+    }
+    load();
+  });
+
+  rows.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action="open"]');
+    if (!btn) return;
+
+    const id = Number(btn.getAttribute('data-id'));
+    const items = window.__incItems || [];
+    const x = items.find(it => Number(it.Id) === id);
+    if (!x) return;
+
+    mMsg.textContent = '';
+    mId.value = x.Id ?? '';
+    mTitulo.value = x.Titulo || '';
+    mAsignado.value = x.Asignado_A || '';
+    mEstado.value = (x.Estado || 'ABIERTA');
+    mDetalle.value = x.Detalle || '';
+
+    incModal?.show();
+  });
+
+  mSave.addEventListener('click', async () => {
+    const id = mId.value;
+    if (!id) return;
+
+    mSave.disabled = true;
+    mMsg.textContent = 'Guardando…';
+
+    try {
+      const payload = {
+        Titulo: mTitulo.value.trim(),
+        Asignado_A: mAsignado.value || null,
+        Estado: mEstado.value,
+        Detalle: (mDetalle.value || '').trim()
+      };
+
+      const res = await fetch(`/sac/incidentes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      let out = null;
+      try { out = await res.json(); } catch { out = { ok: res.ok }; }
+      if (!out) out = { ok: res.ok };
+
+      if (out.ok) {
+        mMsg.textContent = 'Actualizado.';
+        incModal?.hide();
+        await load();
+      } else {
+        mMsg.textContent = out.error || 'No se pudo actualizar.';
+      }
+    } catch (e) {
+      mMsg.textContent = 'Error de conexión.';
+    } finally {
+      mSave.disabled = false;
+    }
+  });
+
 </script>
 {% endblock %}
