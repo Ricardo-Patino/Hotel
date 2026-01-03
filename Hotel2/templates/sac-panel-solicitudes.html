@@ -4,41 +4,95 @@
 {% block crumb %}Panel de solicitudes{% endblock %}
 
 {% block sac_content %}
-<div class="vg-card p-4 p-md-5">
+<div class="row g-4">
 
-  <div class="d-flex flex-column flex-md-row gap-2 gap-md-3 align-items-md-center justify-content-between mb-3">
-    <div>
-      <h5 class="mb-1">Bandeja de solicitudes</h5>
-      <p class="small text-muted mb-0">Haz clic en una solicitud para ver el detalle y actualizar su estado.</p>
-    </div>
+  <div class="col-lg-8">
+    <div class="vg-card p-4 p-md-5">
 
-    <div class="d-flex gap-2 align-items-center">
-      <select id="fEstado" class="form-select" style="max-width:260px">
-        <option value="">— Todas —</option>
-        <option value="NUEVA">NUEVA</option>
-        <option value="EN_PROCESO">EN_PROCESO</option>
-        <option value="ATENDIDA">ATENDIDA</option>
-      </select>
-      <button id="btnReload" class="btn btn-outline-success">Actualizar</button>
+      <div class="d-flex flex-column flex-md-row gap-2 gap-md-3 align-items-md-center justify-content-between mb-3">
+        <div>
+          <h5 class="mb-1">Bandeja de solicitudes</h5>
+          <p class="small text-muted mb-0">Haz clic en una solicitud para ver el detalle y actualizar su estado.</p>
+        </div>
+
+        <div class="d-flex gap-2 align-items-center">
+          <select id="fEstado" class="form-select" style="max-width:260px">
+            <option value="">— Todas —</option>
+            <option value="NUEVA">NUEVA</option>
+            <option value="EN_PROCESO">EN_PROCESO</option>
+            <option value="ATENDIDA">ATENDIDA</option>
+          </select>
+          <button id="btnReload" class="btn btn-outline-success">Actualizar</button>
+        </div>
+      </div>
+
+      <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th style="width:80px">Id</th>
+              <th style="width:160px">Cliente</th>
+              <th>Detalle</th>
+              <th style="width:110px">Reserva</th>
+              <th style="width:140px">Estado</th>
+              <th style="width:170px">Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+
     </div>
   </div>
 
-  <div id="alertBox" class="alert d-none mb-3" role="alert"></div>
+  <div class="col-lg-4">
 
-  <div class="table-responsive">
-    <table class="table align-middle">
-      <thead>
-        <tr>
-          <th style="width:80px">Id</th>
-          <th style="width:160px">Cliente</th>
-          <th>Detalle</th>
-          <th style="width:110px">Reserva</th>
-          <th style="width:140px">Estado</th>
-          <th style="width:170px">Fecha</th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
+    <aside class="vg-card p-3 p-md-4" data-aos="fade-left">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-info-circle"></i>
+        <h6 class="mb-0">Consejos</h6>
+      </div>
+      <ul class="mb-0 small">
+        <li>Usa el filtro para ver solo NUEVAS o EN PROCESO.</li>
+        <li>Abre una fila para ver el detalle completo.</li>
+        <li>Cambia el estado a <strong>EN PROCESO</strong> cuando esté asignada.</li>
+        <li>Marca como <strong>ATENDIDA</strong> solo cuando ya se resolvió.</li>
+        <li class="mt-2">
+          <i class="bi bi-exclamation-circle me-1"></i>
+          <strong>Importante:</strong> este panel muestra solicitudes creadas por
+          <strong>huéspedes</strong>.
+          Los incidentes internos del personal deben registrarse en
+          <a href="{{ url_for('sac.incidentes_html') }}" class="fw-semibold">
+            Incidentes
+          </a>.
+        </li>
+
+      </ul>
+    </aside>
+
+    <aside class="vg-card p-3 p-md-4 mt-3" data-aos="fade-left" data-aos-delay="100">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <i class="bi bi-lightning-charge"></i>
+        <h6 class="mb-0">Atajos</h6>
+      </div>
+      <div class="d-grid gap-2">
+        <button type="button" class="btn btn-outline-success"
+          onclick="document.getElementById('fEstado').value='NUEVA'; load();">
+          <i class="bi bi-inbox me-1"></i> Ver NUEVAS
+        </button>
+        <button type="button" class="btn btn-outline-success"
+          onclick="document.getElementById('fEstado').value='EN_PROCESO'; load();">
+          <i class="bi bi-hourglass-split me-1"></i> Ver EN PROCESO
+        </button>
+        <button type="button" class="btn btn-outline-success"
+          onclick="document.getElementById('fEstado').value='ATENDIDA'; load();">
+          <i class="bi bi-check-circle me-1"></i> Ver atendidas
+        </button>
+      </div>
+    </aside>
+
   </div>
 
 </div>
@@ -49,7 +103,8 @@
       <div class="modal-header">
         <div>
           <h5 class="modal-title mb-0">Solicitud <span id="mId"></span></h5>
-          <div class="small text-muted">Cliente: <span id="mCliente"></span> · Reserva: <span id="mReserva"></span></div>
+          <div class="small text-muted">Cliente: <span id="mCliente"></span> · Reserva: <span id="mReserva"></span>
+          </div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
@@ -168,7 +223,6 @@
       const ct = (res.headers.get('content-type') || '').toLowerCase();
 
       if (!ct.includes('application/json')) {
-        const txt = await res.text();
         showAlert('danger', `<div class="d-flex align-items-start gap-2">
           <i class="bi bi-exclamation-triangle-fill"></i>
           <div>
@@ -283,5 +337,4 @@
 
   document.addEventListener('DOMContentLoaded', load);
 </script>
-
 {% endblock %}

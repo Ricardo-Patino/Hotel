@@ -135,6 +135,8 @@ class SACIncident(db.Model):
     Id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     Codigo_Reserva = db.Column(db.Integer, nullable=True)
     Codigo_Cliente = db.Column(db.Integer, nullable=True)
+    Reportado_Por = db.Column(db.String(80), nullable=True)
+    Asignado_A = db.Column(db.String(30), nullable=True)
     Tipo = db.Column(db.String(20), nullable=False, default="INCIDENTE")
     Severidad = db.Column(db.String(10), nullable=False, default="MEDIA")
     Titulo = db.Column(db.String(160), nullable=False)
@@ -145,6 +147,14 @@ class SACIncident(db.Model):
     def __repr__(self) -> str:
         return f"<SACIncident {self.Id} tipo={self.Tipo} sev={self.Severidad}>"
 
+class SACIncidentComment(db.Model):
+    __tablename__ = "sac_incident_comment"
+
+    Id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Incident_Id = db.Column(db.Integer, nullable=False)
+    Autor = db.Column(db.String(120), nullable=True)
+    Comentario = db.Column(db.Text, nullable=False)
+    Creada_At = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 class SACFeedback(db.Model):
     __tablename__ = "SAC_Feedback"
