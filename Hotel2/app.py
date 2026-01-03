@@ -886,39 +886,89 @@ def _validate_no_overbooking(ci: str, co: str, rooms: int = 1, tipo: Optional[st
 
 
 def ensure_cliente_for_email(
-    nombre: str, correo: str, telefono: Optional[str] = None
+    nombre: str,
+    correo: str,
+    telefono: Optional[str] = None,
+    doc_num: Optional[str] = None
 ) -> Optional[int]:
+    """
+    Asegura un Cliente por correo y sincroniza Cedula cuando venga doc_num.
+    - No hace commit() aquí: el commit lo maneja el caller (registro).
+    - Cedula se guarda como string (cédula/DIMEX numérica o pasaporte alfanum).
+    """
     if not correo:
         return None
-    correo = correo.strip().lower()
+
+    correo = (correo or "").strip().lower()
+    tel = (telefono or "").strip()[:20] if telefono else ""
+    if not tel:
+        tel = "00000000"
+
+    # Normalizar documento con la misma lógica del registro
+    doc_norm = None
+    if doc_num:
+        try:
+            doc_norm = _normalize_document(doc_num)
+        except Exception:
+            doc_norm = (doc_num or "").strip() or None
+
+    # ¿Existe Cliente por correo?
     row = db.session.execute(
-        text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
+        text("SELECT Codigo_Cliente, Cedula FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
         {"e": correo},
     ).first()
-    if row:
-        return row[0]
+
+    # Parsear nombre/apellido desde "nombre completo"
     nombre = (nombre or "").strip() or "Cliente Web"
     partes = nombre.split(" ", 1)
     nom = partes[0][:50]
     ape = (partes[1] if len(partes) > 1 else "").strip()[:50]
-    tel = (telefono or "").strip()[:20] or "00000000"
 
+    if row:
+        cid = int(row[0])
+        ced_actual = row[1]
+
+        # Solo sobrescribimos Cedula si:
+        # - viene doc_norm
+        # - y en Cliente está vacía/NULL/0
+        set_ced = ""
+        params = {"id": cid, "n": nom, "a": ape, "t": tel, "e": correo}
+
+        if doc_norm and (ced_actual is None or str(ced_actual).strip() in ("", "0", "000000000")):
+            set_ced = ", Cedula = :ced"
+            params["ced"] = doc_norm
+
+        db.session.execute(
+            text(f"""
+                UPDATE Cliente
+                   SET Nombre = :n,
+                       Apellido = :a,
+                       Telefono = COALESCE(NULLIF(:t,''), Telefono),
+                       Correo = :e
+                       {set_ced}
+                 WHERE Codigo_Cliente = :id
+            """),
+            params
+        )
+        return cid
+
+    # Si no existe Cliente, crear uno
+    # Cedula: si no hay doc_norm, insert NULL (la columna ya la hicimos NULL en SQL)
     db.session.execute(
-        text(
-            """
-        INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
-        VALUES (0, :n, :a, :t, :e, '1990-01-01')
-    """
-        ),
-        {"n": nom, "a": ape, "t": tel, "e": correo},
+        text("""
+            INSERT INTO Cliente (Cedula, Nombre, Apellido, Telefono, Correo, Fecha_Nacimiento)
+            VALUES (:ced, :n, :a, :t, :e, '1990-01-01')
+        """),
+        {"ced": doc_norm, "n": nom, "a": ape, "t": tel, "e": correo},
     )
-    db.session.commit()
 
-    row2 = db.session.execute(
+    new_id = db.session.execute(
         text("SELECT Codigo_Cliente FROM Cliente WHERE LOWER(Correo)=:e LIMIT 1"),
         {"e": correo},
-    ).first()
-    return row2[0] if row2 else None
+    ).scalar()
+
+    return int(new_id) if new_id else None
+
 
 
 # =========================
@@ -1094,67 +1144,310 @@ def _write_minimal_pdf(path: Path, title: str, lines: list[str]) -> None:
 def _create_comprobante_pdf(reserva: dict) -> Path:
     """
     Crea el PDF de comprobante y devuelve la ruta.
-    También inserta registros en Documento y ReservaDocumento.
+    También inserta/relaciona registros en Documento y ReservaDocumento.
+    Diseño: estético y acorde al hotel (usa reportlab si está disponible).
     """
-    numero = (
-        reserva.get("Numero")
-        or reserva.get("Numero_Comprobante")
-        or reserva.get("numero")
-    )
-    rid = int(reserva.get("Codigo_Reserva") or reserva.get("id"))
-    cliente_email = reserva.get("Usuario", "")
-    checkin = reserva.get("Fecha_Entrada") or reserva.get("checkin")
-    checkout = reserva.get("Fecha_Salida") or reserva.get("checkout")
-    tipo = reserva.get("Tipo") or "Habitación"
+    from datetime import datetime
+    import math
+
+    def _to_iso_date(v) -> str:
+        if not v:
+            return ""
+        if hasattr(v, "strftime"):
+            return v.strftime("%Y-%m-%d")
+        s = str(v)
+        return s[:10]
+
+    def _fmt_crc(n: float) -> str:
+        s = f"{float(n or 0.0):,.2f}"
+        s = s.replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"₡ {s}"
+
+    # Datos base
+    rid = int(reserva.get("Codigo_Reserva") or reserva.get("id") or 0)
+    if not rid:
+        raise ValueError("Reserva inválida para generar comprobante (sin Codigo_Reserva/id).")
+
+    checkin = _to_iso_date(reserva.get("Fecha_Entrada") or reserva.get("checkin"))
+    checkout = _to_iso_date(reserva.get("Fecha_Salida") or reserva.get("checkout"))
+    estado = (reserva.get("Estado") or reserva.get("estado") or "").strip() or "Confirmada"
+    canal = (reserva.get("Canal") or reserva.get("canal") or "Web").strip()
     monto = float(reserva.get("Monto_Total") or reserva.get("monto") or 0.0)
 
+    # Intentar enriquecer: huésped + habitación desde DB (sin depender del dict)
+    cliente_nombre = ""
+    cliente_apellido = ""
+    cliente_tel = ""
+    cliente_email = str(reserva.get("Usuario") or reserva.get("email") or "").strip()
+    hab_numero = ""
+    hab_tipo = str(reserva.get("Tipo") or "Habitación").strip()
+
+    try:
+        row = db.session.execute(
+            text(
+                """
+                SELECT
+                  C.Nombre AS Cliente_Nombre,
+                  C.Apellido AS Cliente_Apellido,
+                  C.Telefono AS Cliente_Telefono,
+                  C.Correo AS Cliente_Correo,
+                  H.Numero_Habitacion AS Habitacion_Numero,
+                  H.Tipo AS Habitacion_Tipo
+                FROM Reserva R
+                JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
+                JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+                WHERE R.Codigo_Reserva = :id
+                LIMIT 1
+                """
+            ),
+            {"id": rid},
+        ).mappings().first()
+
+        if row:
+            cliente_nombre = str(row.get("Cliente_Nombre") or "").strip()
+            cliente_apellido = str(row.get("Cliente_Apellido") or "").strip()
+            cliente_tel = str(row.get("Cliente_Telefono") or "").strip()
+            if not cliente_email:
+                cliente_email = str(row.get("Cliente_Correo") or "").strip()
+            hab_numero = str(row.get("Habitacion_Numero") or "").strip()
+            if row.get("Habitacion_Tipo"):
+                hab_tipo = str(row.get("Habitacion_Tipo")).strip()
+    except Exception:
+        # No bloquear el PDF si el enriquecimiento falla
+        pass
+
+    cliente_full = (f"{cliente_nombre} {cliente_apellido}").strip() or (cliente_email or "-")
+
+    # Número comprobante: si no existe, generarlo y persistirlo
+    numero = reserva.get("Numero") or reserva.get("Numero_Comprobante") or reserva.get("numero")
+    numero = str(numero).strip() if numero is not None else ""
+    if not numero or numero.lower() == "none":
+        numero = _make_unique_number(rid, checkin or datetime.now().strftime("%Y-%m-%d"))
+        try:
+            db.session.execute(
+                text(
+                    """
+                    UPDATE Reserva
+                    SET Numero_Comprobante = COALESCE(Numero_Comprobante, :n)
+                    WHERE Codigo_Reserva = :r
+                    """
+                ),
+                {"n": numero, "r": rid},
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    COMPROBANTES_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{numero}.pdf"
     out_path = COMPROBANTES_DIR / filename
 
-    title = "Comprobante de Reserva — Hotel Villa Grace"
-    lines = [
-        f"Número:        {numero}",
-        f"Reserva ID:    {rid}",
-        f"Cliente:       {cliente_email or '-'}",
-        f"Check-in:      {checkin}",
-        f"Check-out:     {checkout}",
-        f"Habitación:    {tipo}",
-        f"Monto total:   ₡ {monto:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-        f"Canal:         {reserva.get('Canal') or reserva.get('canal') or 'Web'}",
-        f"Estado:        {reserva.get('Estado') or reserva.get('estado') or 'Confirmada'}",
-        "",
-        "Gracias por su preferencia.",
-    ]
-    _write_minimal_pdf(out_path, title, lines)
+    # Cálculo de noches (si se puede)
+    noches = ""
+    try:
+        if checkin and checkout:
+            d1 = datetime.strptime(checkin, "%Y-%m-%d")
+            d2 = datetime.strptime(checkout, "%Y-%m-%d")
+            n = max(1, int(round((d2 - d1).total_seconds() / 86400.0)))
+            noches = str(n)
+    except Exception:
+        noches = ""
 
-    # Registrar en tablas Documento / ReservaDocumento (si existen)
+    # =========================
+    # PDF ESTÉTICO (reportlab)
+    # =========================
+    try:
+        from reportlab.lib.pagesizes import LETTER  # type: ignore
+        from reportlab.pdfgen import canvas  # type: ignore
+        from reportlab.lib import colors  # type: ignore
+        from reportlab.lib.units import inch  # type: ignore
+
+        W, H = LETTER
+        c = canvas.Canvas(str(out_path), pagesize=LETTER)
+
+        primary = colors.HexColor("#1b7a4e")   # verde corporativo
+        dark = colors.HexColor("#1f2937")
+        muted = colors.HexColor("#6b7280")
+        panel = colors.HexColor("#f3f4f6")
+        white = colors.white
+
+        # Header
+        c.setFillColor(primary)
+        c.rect(0, H - 1.05 * inch, W, 1.05 * inch, stroke=0, fill=1)
+
+        c.setFillColor(white)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawString(0.75 * inch, H - 0.70 * inch, "Hotel Villa Grace")
+        c.setFont("Helvetica", 10)
+        c.drawString(0.75 * inch, H - 0.93 * inch, "Tu hogar fuera de casa")
+
+        # Datos hotel (derecha)
+        c.setFont("Helvetica", 8.5)
+        c.drawRightString(W - 0.75 * inch, H - 0.62 * inch, "Cóbano, Puntarenas, Costa Rica")
+        c.drawRightString(W - 0.75 * inch, H - 0.80 * inch, "Tel: +506 2642 0225")
+        c.drawRightString(W - 0.75 * inch, H - 0.98 * inch, "Email: hotelvillagrace@gmail.com")
+
+        # Título
+        y = H - 1.35 * inch
+        c.setFillColor(dark)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(0.75 * inch, y, "Comprobante de Reserva")
+        c.setStrokeColor(colors.HexColor("#e5e7eb"))
+        c.setLineWidth(1)
+        c.line(0.75 * inch, y - 10, W - 0.75 * inch, y - 10)
+
+        # Panel principal
+        panel_x = 0.75 * inch
+        panel_w = W - 1.5 * inch
+        panel_h = 4.05 * inch
+        panel_y = y - 0.25 * inch - panel_h
+
+        c.setFillColor(panel)
+        c.roundRect(panel_x, panel_y, panel_w, panel_h, 12, stroke=0, fill=1)
+
+        # helper para filas
+        def draw_kv(x, y, k, v):
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 9)
+            c.drawString(x, y, k)
+            c.setFillColor(dark)
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(x, y - 14, v if v else "-")
+            return y - 34
+
+        # Columna izquierda
+        left_x = panel_x + 0.35 * inch
+        top_y = panel_y + panel_h - 0.45 * inch
+
+        yy = top_y
+        yy = draw_kv(left_x, yy, "Número de comprobante", numero)
+        yy = draw_kv(left_x, yy, "Reserva ID", str(rid))
+        yy = draw_kv(left_x, yy, "Estado", estado)
+        yy = draw_kv(left_x, yy, "Canal", canal)
+
+        # Columna derecha
+        right_x = panel_x + panel_w/2 + 0.15 * inch
+        yy2 = top_y
+        yy2 = draw_kv(right_x, yy2, "Check-in", checkin)
+        yy2 = draw_kv(right_x, yy2, "Check-out", checkout)
+        if noches:
+            yy2 = draw_kv(right_x, yy2, "Noches", noches)
+        yy2 = draw_kv(right_x, yy2, "Habitación", f"{hab_tipo}" + (f" (#{hab_numero})" if hab_numero else ""))
+
+        # Bloque huésped + total (debajo del panel)
+        y2 = panel_y - 0.45 * inch
+        c.setFillColor(dark)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawString(0.75 * inch, y2, "Huésped:")
+        c.setFont("Helvetica", 11)
+        c.drawString(1.55 * inch, y2, cliente_full)
+
+        if cliente_email:
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 9)
+            c.drawString(0.75 * inch, y2 - 16, f"Correo: {cliente_email}")
+        if cliente_tel:
+            c.setFillColor(muted)
+            c.setFont("Helvetica", 9)
+            c.drawString(0.75 * inch, y2 - 30, f"Teléfono: {cliente_tel}")
+
+        # Total destacado (derecha)
+        c.setFillColor(primary)
+        box_w = 2.65 * inch
+        box_h = 0.75 * inch
+        box_x = W - 0.75 * inch - box_w
+        box_y = y2 - 0.55 * inch
+        c.roundRect(box_x, box_y, box_w, box_h, 12, stroke=0, fill=1)
+        c.setFillColor(white)
+        c.setFont("Helvetica", 9.5)
+        c.drawString(box_x + 0.25 * inch, box_y + box_h - 0.28 * inch, "Total pagado / total de reserva")
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(box_x + 0.25 * inch, box_y + 0.22 * inch, _fmt_crc(monto))
+
+        # Pie
+        c.setFillColor(muted)
+        c.setFont("Helvetica", 8.5)
+        c.drawString(0.75 * inch, 0.70 * inch, f"Emitido: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        c.drawRightString(W - 0.75 * inch, 0.70 * inch, "Este documento corresponde únicamente a la reserva indicada.")
+        c.setStrokeColor(colors.HexColor("#e5e7eb"))
+        c.line(0.75 * inch, 0.62 * inch, W - 0.75 * inch, 0.62 * inch)
+
+        c.save()
+
+    except Exception:
+        # Fallback (si reportlab no está disponible por alguna razón)
+        title = "Comprobante de Reserva — Hotel Villa Grace"
+        lines = [
+            f"Número:        {numero}",
+            f"Reserva ID:    {rid}",
+            f"Cliente:       {cliente_full or '-'}",
+            f"Check-in:      {checkin}",
+            f"Check-out:     {checkout}",
+            f"Habitación:    {hab_tipo}" + (f" (#{hab_numero})" if hab_numero else ""),
+            f"Monto total:   {_fmt_crc(monto)}",
+            f"Canal:         {canal}",
+            f"Estado:        {estado}",
+            "",
+            "Gracias por su preferencia.",
+        ]
+        _write_minimal_pdf(out_path, title, lines)
+
+    # =========================
+    # Registrar Documento / ReservaDocumento
+    # =========================
     try:
         ruta = f"/storage/comprobantes/{filename}"
-        res = db.session.execute(
-            text("""
-                INSERT INTO Documento (Tipo, Ruta, MimeType, TamanoBytes)
-                VALUES ('Comprobante', :ruta, 'application/pdf', :sz)
-            """),
-            {"ruta": ruta, "sz": out_path.stat().st_size}
-        )
-        
-        doc_id = res.lastrowid
 
-        db.session.execute(
+        # 1) Documento (evitar duplicados por ruta)
+        doc_id = db.session.execute(
+            text("SELECT Id FROM Documento WHERE Ruta=:ruta LIMIT 1"),
+            {"ruta": ruta},
+        ).scalar()
+
+        if not doc_id:
+            res = db.session.execute(
+                text(
+                    """
+                    INSERT INTO Documento (Tipo, Ruta, MimeType, TamanoBytes)
+                    VALUES ('Comprobante', :ruta, 'application/pdf', :sz)
+                    """
+                ),
+                {"ruta": ruta, "sz": out_path.stat().st_size},
+            )
+            doc_id = res.lastrowid
+
+        # 2) Relación con reserva (evitar duplicados)
+        exists_rel = db.session.execute(
             text(
                 """
-            INSERT INTO ReservaDocumento (Codigo_Reserva, Documento_Id)
-            VALUES (:r, :d)
-        """
+                SELECT 1
+                FROM ReservaDocumento
+                WHERE Codigo_Reserva=:r AND Documento_Id=:d
+                LIMIT 1
+                """
             ),
-            {"r": rid, "d": doc_id},
-        )
+            {"r": rid, "d": int(doc_id)},
+        ).scalar()
+
+        if not exists_rel:
+            db.session.execute(
+                text(
+                    """
+                    INSERT INTO ReservaDocumento (Codigo_Reserva, Documento_Id)
+                    VALUES (:r, :d)
+                    """
+                ),
+                {"r": rid, "d": int(doc_id)},
+            )
+
         db.session.commit()
+
     except Exception as e:
         current_app.logger.warning(f"[COMPROBANTE] No se pudo registrar documento: {e}")
         db.session.rollback()
 
     return out_path
+
 
 
 def _reserva_basic_row(r: dict) -> dict:
@@ -1487,8 +1780,20 @@ def create_app() -> Flask:
                 # Evitar doble envío en el flujo público sin sesión (/api/reservas/anon),
                 # ya que ese endpoint realiza su propio correo de confirmación.
                 try:
-                    if "/api/reservas/anon" not in path:
-                        _notify_reserva_success(int(rid))
+                    # Notificación SOLO para creación de reserva desde checkout (GRR), no en /api/reservas/anon
+                    if "/api/reservas/anon" not in request.path:
+                        try:
+                            r = _get_reserva_by_id(int(rid)) or {}
+                            est = (r.get("Estado") or "").strip()
+                    
+                            if est == "Confirmada":
+                                _notify_reserva_success(int(rid))
+                            elif est == "Pendiente":
+                                _notify_reserva_pending(int(rid))
+                        except Exception:
+                            pass
+                    
+                    
                 except Exception as e:
                     current_app.logger.warning(f"[GRR-01-009] Notificación omitida: {e}")
     
@@ -1524,15 +1829,37 @@ def create_app() -> Flask:
 
 
     # ---------------------- Helpers de sesión para plantillas ----------------------
+        # ---------------------- Helpers de sesión para plantillas ----------------------
     @app.context_processor
     def inject_session_flags():
         def is_logged_in():
             return bool(session.get("user_id"))
+
+        # Paso 1 (SINPE): datos para mostrar en plantillas (booking-checkout.html, etc.)
+        # Se leen de variables de entorno (.env o sistema):
+        #  - SINPE_MOBILE / SINPE_NUMERO / SINPE_PHONE
+        #  - SINPE_BENEFICIARIO / SINPE_NOMBRE
+        sinpe_mobile = (
+            os.getenv("SINPE_MOBILE")
+            or os.getenv("SINPE_NUMERO")
+            or os.getenv("SINPE_PHONE")
+            or ""
+        )
+        sinpe_beneficiary = (
+            os.getenv("SINPE_BENEFICIARIO")
+            or os.getenv("SINPE_NOMBRE")
+            or "Hotel Villa Grace"
+        )
+
         return {
             "is_logged_in": is_logged_in,
             "current_user_name": session.get("user_name"),
             "current_user_role": session.get("user_role"),
+            # Paso 1 (SINPE)
+            "sinpe_mobile": sinpe_mobile,
+            "sinpe_beneficiary": sinpe_beneficiary,
         }
+
 
     # ---------------------- Proteger rutas de reserva si no hay sesión -------------
     PROTECTED_BOOKING_PATHS = {
@@ -1614,6 +1941,7 @@ def create_app() -> Flask:
         uid = session.get("user_id")
         u = Usuario.query.filter_by(Codigo_Usuario=uid).first() if uid else None
         return render_template("anon-reserva.html", is_recepcionista=es_recepcionista(u))
+    
 
 
     # ---------------------- Portal / Ops / Admin (protegidas por rol) ------------
@@ -1641,12 +1969,22 @@ def create_app() -> Flask:
     @app.route("/portal-reservas.html")
     @role_required("Cliente")
     def portal_reservas_html():
-        uid = session.get("user_id")  # o como lo guardes en sesión
+        uid = session.get("user_id")
+        if not uid:
+            # Si por alguna razón llega aquí sin sesión, redirige a login (consistente con el resto)
+            return redirect(url_for("login_html", next=request.path))
+    
         current_user = {
-            "id": int(uid) if uid is not None else None,
-            "is_authenticated": bool(uid)
+            "id": int(uid),
+            "is_authenticated": True
         }
-        return render_template("portal-reservas.html", user_id=session.get("user_id", 1))
+    
+        # Pasá explícitamente lo que el template use (idealmente current_user)
+        return render_template(
+            "portal-reservas.html",
+            user_id=int(uid),
+            current_user=current_user
+        )
     
 
     @app.route("/portal-reserva-detalle.html")
@@ -1658,7 +1996,32 @@ def create_app() -> Flask:
     @app.route("/ops-dashboard.html")
     @role_required("Administrador", "Recepcionista")
     def ops_dashboard_html():
-        return render_template("ops-dashboard.html")
+        pending_approvals_count = 0
+        try:
+            pending_approvals_count = int(
+                db.session.execute(
+                    text("SELECT COUNT(*) FROM Reserva WHERE Estado='Pendiente'")
+                ).scalar() or 0
+            )
+        except Exception as e:
+            try:
+                current_app.logger.warning(f"[OPS] No se pudo calcular pendientes: {e}")
+            except Exception:
+                pass
+            pending_approvals_count = 0
+
+        return render_template(
+            "ops-dashboard.html",
+            pending_approvals_count=pending_approvals_count
+        )
+        
+    
+    @app.route("/ops-approvals.html")
+    @role_required("Administrador", "Recepcionista")
+    def ops_approvals_html():
+        return render_template("ops-approvals.html")
+
+
 
     @app.route("/ops-housekeeping.html")
     @role_required("Administrador", "Limpieza")
@@ -2455,6 +2818,82 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.warning(f"[MAIL ERROR] {e}. Fallback consola:")
             current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n{body}")
+            
+            
+    def send_reserva_pending(self, reserva_id: int) -> Dict[str, object]:
+        """
+        Notificación: Reserva creada pero pendiente de confirmación (SINPE).
+        Respeta preferencias del cliente (/sac/preferencias) vía route_and_queue.
+        """
+        payload = _fetch_reserva_payload(int(reserva_id))
+        if not payload:
+            return {"ok": False, "error": "not_found"}
+    
+        rid   = payload.get("rid")
+        cid   = payload.get("cid")
+        f_in  = str(payload.get("f_entrada") or "")
+        f_out = str(payload.get("f_salida") or "")
+        total = payload.get("total")
+    
+        hotel_nom  = _cfg("hotel_nombre", "Hotel Villa Grace")
+        hotel_tel  = _cfg("hotel_tel", "+506 2642 0225")
+        base_url   = _cfg("site_base_url", "https://hotelvillagrace.test")
+        moneda_sym = _cfg("moneda_simbolo", "₡")
+    
+        # Config SINPE (si no existen, el email igual sale sin ese detalle)
+        sinpe_num = _cfg("sinpe_mobile", "")
+        sinpe_ben = _cfg("sinpe_beneficiary", hotel_nom)
+    
+        total_txt = _fmt_currency(total, symbol=moneda_sym) if total is not None else ""
+    
+        subject = f"Reserva pendiente de confirmación #{rid} – {hotel_nom}"
+    
+        lines = [
+            (payload.get("cliente_nombre") or "Estimado/a") + ",",
+            "",
+            "Hemos registrado tu solicitud de reserva, pero está pendiente de confirmación.",
+            "La confirmación se realizará cuando el hotel valide el pago por SINPE.",
+            "",
+            f"• Nº reserva: #{rid}",
+            f"• Entrada: {f_in}",
+            f"• Salida : {f_out}",
+            (f"• Total  : {total_txt}" if total_txt else None),
+            "",
+        ]
+        if sinpe_num:
+            lines.extend([
+                "Pago por SINPE Móvil:",
+                f"• Número: {sinpe_num}",
+                f"• Beneficiario: {sinpe_ben}",
+                "",
+                "Recomendación: en el detalle del SINPE indica tu correo y fechas para facilitar la verificación.",
+                "",
+            ])
+    
+        lines.extend([
+            f"Teléfono: {hotel_tel}",
+            f"Portal del huésped: {base_url}/portal/reservas",
+            "",
+            f"{hotel_nom} — \"Tu hogar fuera de casa\".",
+        ])
+    
+        body = "\n".join([x for x in lines if x is not None])
+    
+        # SMS compacto (GSM-7)
+        sms_raw = f"VG Reserva #{rid} PENDIENTE. {f_in}->{f_out}. Total {total_txt}. Se confirma al validar SINPE. Tel {hotel_tel}"
+        sms = _truncate_for_trial(_to_gsm7_approx(sms_raw))
+    
+        return self.route_and_queue(
+            cliente_id=cid,
+            email=payload.get("cliente_email"),
+            phone=payload.get("cliente_tel"),
+            subject=subject,
+            body=body,
+            sms=sms,
+            ref_entidad="RESERVA",
+            ref_id=str(rid),
+        )
+
     
     
     def _ensure_reserva_numero(reserva_id: int, fecha_entrada: Optional[str]) -> str:
@@ -2589,6 +3028,18 @@ def create_app() -> Flask:
 
     
     
+    def _notify_reserva_pending(reserva_id: int):
+        """
+        Envía notificación de 'pendiente de confirmación' respetando preferencias (/sac/preferencias).
+        """
+        try:
+            from services.grr.notification_service import NotificationService
+            NotificationService().send_reserva_pending(int(reserva_id))
+        except Exception as e:
+            try:
+                current_app.logger.warning(f"[NOTIFY] Pendiente fallo reserva_id={reserva_id}: {e}")
+            except Exception:
+                pass
     
     
 
@@ -3154,9 +3605,20 @@ def create_app() -> Flask:
         }
         return render_template("booking-details.html", **params)
 
-    @app.route("/booking-checkout", methods=["GET", "POST"])
-    @app.route("/booking-checkout.html", methods=["GET", "POST"])
+    @app.route("/booking-checkout", methods=["GET"])
+    @app.route("/booking-checkout.html", methods=["GET"])
     def booking_checkout_html():
+        def _sac_cfg(clave: str, default=None):
+            try:
+                row = db.session.execute(
+                    text("SELECT Valor FROM SAC_Config WHERE Clave=:c LIMIT 1"),
+                    {"c": clave}
+                ).first()
+                val = row[0] if row else None
+                return val if val not in (None, "") else default
+            except Exception:
+                return default
+    
         ctx = {
             "checkin": request.values.get("checkin"),
             "checkout": request.values.get("checkout"),
@@ -3167,8 +3629,12 @@ def create_app() -> Flask:
             "full_name": request.values.get("full_name"),
             "email": request.values.get("email"),
             "phone": request.values.get("phone"),
+            # SINPE (Paso 1)
+            "sinpe_mobile": _sac_cfg("sinpe_mobile", None),
+            "sinpe_beneficiary": _sac_cfg("sinpe_beneficiary", "Hotel Villa Grace"),
         }
         return render_template("booking-checkout.html", **ctx)
+    
 
     @app.route("/booking-confirmation", methods=["GET"])
     @app.route("/booking-confirmation.html", methods=["GET"])
@@ -3180,11 +3646,10 @@ def create_app() -> Flask:
             "children": request.args.get("children"),
             "room": request.args.get("room"),
             "price": request.args.get("price"),
-            "reservation_code": request.args.get(
-                "code", "VG-" + datetime.now().strftime("%Y%m%d-%H%M%S")
-            ),
+            "reservation_code": request.args.get("code", "VG-" + datetime.now().strftime("%Y%m%d-%H%M%S")),
+            "reservation_id": request.args.get("id") or request.args.get("reserva_id"),
         }
-
+    
         # --- NUEVO (GRR-01-004): recordatorio del documento con el que se creó el perfil
         identity_notice = None
         try:
@@ -3204,6 +3669,7 @@ def create_app() -> Flask:
                     if row and row[0]:
                         doc_value = row[0]
                         doc_label = "cédula"
+    
             if data.get("checkin") and doc_value:
                 identity_notice = (
                     f"El día {data['checkin']} debe presentar el {doc_label} "
@@ -3211,8 +3677,9 @@ def create_app() -> Flask:
                 )
         except Exception:
             pass
-
+    
         return render_template("booking-confirmation.html", identity_notice=identity_notice, **data)
+    
 
     # ---------------------- API Portal Reservas (solo Cliente) ----------------------
     @app.route("/api/portal/reservas", methods=["GET"])
@@ -3694,42 +4161,80 @@ def create_app() -> Flask:
     @app.post("/api/portal/reservas/<int:reserva_id>/send-confirmation")
     @role_required("Cliente")
     def api_portal_reserva_send_confirmation(reserva_id: int):
-        if not session.get("user_id"):
-            return jsonify({"ok": False, "error": "auth_required"}), 401
-        email = _current_user_email()
-        if not _reserva_belongs_to_email(reserva_id, email or ""):
-            return jsonify({"ok": False, "error": "forbidden"}), 403
         try:
-            _notify_reserva_success(int(reserva_id))
-            return jsonify({"ok": True, "message": "Confirmación reenviada."})
+            r = _get_reserva_by_id(reserva_id)
+            if not r:
+                return jsonify({"ok": False, "error": "not_found"}), 404
+    
+            # Cliente solo puede accionar sobre su propia reserva
+            email = _current_user_email()
+            if not email or not _reserva_belongs_to_email(reserva_id, email):
+                return jsonify({"ok": False, "error": "forbidden"}), 403
+    
+            estado = (r.get("Estado") or "").strip()
+    
+            # Paso 1: si no está confirmada, NO se puede enviar confirmación
+            if estado != "Confirmada":
+                # opcional: re-enviar aviso de pendiente si aplica
+                if estado == "Pendiente":
+                    try:
+                        _notify_reserva_pending(reserva_id)
+                    except Exception:
+                        pass
+                return jsonify({"ok": False, "error": "not_confirmed", "estado": estado}), 409
+    
+            _notify_reserva_success(reserva_id)
+            return jsonify({"ok": True})
+    
         except Exception as e:
-            current_app.logger.warning(f"[PORTAL] Reenvío fallo: {e}")
-            return jsonify({"ok": False, "error": "send_failed"}), 500
+            current_app.logger.exception(f"[SEND_CONFIRMATION] error reserva={reserva_id}: {e}")
+            return jsonify({"ok": False, "error": "server_error"}), 500
+    
 
 
 
-    # ---------------------- RUTA descarga comprobante ----------------------
+        # ---------------------- RUTA descarga comprobante ----------------------
     @app.route("/api/reservas/<int:reserva_id>/comprobante", methods=["GET"])
     @role_required("Cliente", "Administrador", "Recepcionista")
     def api_reserva_comprobante(reserva_id: int):
+        # 1) Buscar reserva (primero, para no usar "r" antes de asignarlo)
         r = _get_reserva_by_id(reserva_id)
         if not r:
             return jsonify({"ok": False, "error": "not_found"}), 404
 
-        if _user_role().lower() == "cliente":
+        # 2) Validar estado (solo confirmadas deben permitir comprobante)
+        estado = (r.get("Estado") or "").strip()
+        if estado not in ("Confirmada", "Check-in", "Check-out"):
+            return jsonify({"ok": False, "error": "not_confirmed"}), 409
+
+        # 3) Seguridad: si es Cliente, solo puede descargar sus propias reservas
+        if (_user_role() or "").lower() == "cliente":
             email = _current_user_email()
             if not _reserva_belongs_to_email(reserva_id, email or ""):
                 return jsonify({"ok": False, "error": "forbidden"}), 403
 
-        numero = r.get("Numero") or _make_unique_number(
-            reserva_id, _normalize_date_like(r.get("Fecha_Entrada")) or ""
-        )
+        # 4) Garantizar número de comprobante
+        fecha_entrada_norm = _normalize_date_like(r.get("Fecha_Entrada")) or ""
+        numero = r.get("Numero") or _ensure_reserva_numero(reserva_id, fecha_entrada_norm)
+
+        # 5) Generar PDF si no existe
         pdf_path = COMPROBANTES_DIR / f"{numero}.pdf"
         if not pdf_path.exists():
-            _create_comprobante_pdf(dict(r))
+            r2 = dict(r)
+            r2["Numero"] = numero
+            _create_comprobante_pdf(r2)
+
         if not pdf_path.exists():
             return jsonify({"ok": False, "error": "not_available"}), 404
-        return send_file(str(pdf_path), as_attachment=True, download_name=f"{numero}.pdf")
+
+        return send_file(
+            str(pdf_path),
+            as_attachment=True,
+            download_name=f"{numero}.pdf",
+            mimetype="application/pdf",
+        )
+
+    
 
     
     
@@ -4097,12 +4602,14 @@ def create_app() -> Flask:
             db.session.add(u)
     
             try:
-                # Crear/asegurar Cliente consistente (reusa tu helper existente)
-                cliente_id = ensure_cliente_for_email(full_name, email, phone_norm)
+                # 1) Asegurar Cliente con documento
+                cliente_id = ensure_cliente_for_email(full_name, email, phone_norm, doc_num=national_id)
                 if cliente_id:
                     u.Codigo_Cliente = cliente_id
-    
+                
+                # 2) Commit único (Usuario + Cliente) = consistencia total
                 db.session.commit()
+                
             except IntegrityError:
                 db.session.rollback()
                 flash("Ya existe un usuario con ese correo o cédula/pasaporte.", "danger")
@@ -5921,6 +6428,295 @@ def create_app() -> Flask:
             estado          = db.Column(db.Enum("Emitida", "Anulada", name="fin_invoice_estado"), server_default="Emitida")
     
     
+    
+        # =========================
+    # OPS — Aprobaciones SINPE
+    # =========================
+
+    def _ops_list_reservas_by_estado(estado: str, limit: int = 200):
+        """
+        Devuelve reservas para OPS con valores 100% JSON-serializables:
+        - checkin/checkout: 'YYYY-MM-DD'
+        - total: float
+        """
+        import re
+        from decimal import Decimal
+    
+        rows = (
+            db.session.execute(
+                text(
+                    """
+                    SELECT
+                        r.Codigo_Reserva        AS id,
+                        r.Numero_Comprobante    AS numero,
+                        r.Estado                AS estado,
+                        r.Canal                 AS canal,
+                        r.Fecha_Entrada         AS checkin,
+                        r.Fecha_Salida          AS checkout,
+                        r.Monto_Total           AS total,
+                        r.Huespedes             AS huespedes,
+                        r.Observaciones         AS observaciones,
+                        CONCAT(c.Nombre,' ',c.Apellido) AS cliente_nombre,
+                        c.Correo                AS cliente_correo,
+                        c.Telefono              AS cliente_telefono,
+                        h.Numero_Habitacion     AS habitacion_numero,
+                        h.Tipo                  AS habitacion_tipo
+                    FROM Reserva r
+                    JOIN Cliente c    ON c.Codigo_Cliente    = r.Codigo_Cliente
+                    JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion
+                    WHERE r.Estado = :estado
+                    ORDER BY r.Fecha_Registro DESC, r.Codigo_Reserva DESC
+                    LIMIT :lim
+                    """
+                ),
+                {"estado": estado, "lim": int(limit)},
+            )
+            .mappings()
+            .all()
+        )
+    
+        out = []
+        for x in rows:
+            d = dict(x)
+    
+            # 1) Normaliza fechas para que el frontend reciba YYYY-MM-DD
+            for k in ("checkin", "checkout"):
+                v = d.get(k)
+                if v is None:
+                    continue
+                try:
+                    # date/datetime -> isoformat
+                    if hasattr(v, "isoformat"):
+                        d[k] = v.isoformat()[:10]  # YYYY-MM-DD
+                    else:
+                        # si viniera como string raro, intentar extraer YYYY-MM-DD
+                        s = str(v).strip()
+                        m = re.search(r"(\d{4}-\d{2}-\d{2})", s)
+                        if m:
+                            d[k] = m.group(1)
+                        else:
+                            d[k] = s[:10] if len(s) >= 10 else s
+                except Exception:
+                    # Si algo falla, no rompemos la respuesta
+                    try:
+                        s = str(v).strip()
+                        d[k] = s[:10] if len(s) >= 10 else s
+                    except Exception:
+                        pass
+    
+            # 2) Normaliza total para evitar TypeError: Decimal is not JSON serializable
+            tv = d.get("total")
+            if tv is None:
+                d["total"] = 0.0
+            elif isinstance(tv, Decimal):
+                d["total"] = float(tv)
+            else:
+                # por si viniera como string/otro numérico
+                try:
+                    d["total"] = float(tv)
+                except Exception:
+                    # último recurso: dejarlo como string (serializable)
+                    d["total"] = str(tv)
+    
+            out.append(d)
+    
+        return out
+    
+    
+
+    @app.get("/api/ops/approvals/count")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_approvals_count():
+        try:
+            cnt = int(
+                db.session.execute(
+                    text("SELECT COUNT(*) FROM Reserva WHERE Estado='Pendiente'")
+                ).scalar() or 0
+            )
+            return jsonify({"ok": True, "count": cnt})
+        except Exception as e:
+            try:
+                current_app.logger.warning(f"[OPS] approvals/count error: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "count": 0, "error": "count_failed"}), 500
+
+    @app.get("/api/ops/approvals")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_approvals_overview():
+        limit = request.args.get("limit", "200")
+        try:
+            limit_i = max(1, min(500, int(limit)))
+        except Exception:
+            limit_i = 200
+
+        try:
+            pending = _ops_list_reservas_by_estado("Pendiente", limit_i)
+            confirmed = _ops_list_reservas_by_estado("Confirmada", limit_i)
+            return jsonify(
+                {
+                    "ok": True,
+                    "pending_count": len(pending),
+                    "pending": pending,
+                    "confirmed": confirmed,
+                }
+            )
+        except Exception as e:
+            try:
+                current_app.logger.warning(f"[OPS] approvals overview error: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "overview_failed"}), 500
+
+    @app.post("/api/ops/approvals/<int:reserva_id>/approve")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_approvals_approve(reserva_id: int):
+        try:
+            row = (
+                db.session.execute(
+                    text("SELECT Estado, Fecha_Entrada FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"),
+                    {"r": reserva_id},
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return jsonify({"ok": False, "error": "not_found"}), 404
+
+            estado_actual = (row.get("Estado") or "").strip()
+            if estado_actual != "Pendiente":
+                return jsonify({"ok": False, "error": "invalid_state", "estado": estado_actual}), 409
+
+            db.session.execute(
+                text("UPDATE Reserva SET Estado='Confirmada' WHERE Codigo_Reserva=:r"),
+                {"r": reserva_id},
+            )
+            db.session.commit()
+
+            # Asegurar número de comprobante (si está vacío)
+            try:
+                fecha_in = str(row.get("Fecha_Entrada") or "")
+                numero = _ensure_reserva_numero(reserva_id, fecha_in)
+            except Exception:
+                numero = None
+
+            # Generar comprobante PDF + Documento/ReservaDocumento (si aún no existe)
+            try:
+                exists = db.session.execute(
+                    text("SELECT 1 FROM ReservaDocumento WHERE Codigo_Reserva=:r LIMIT 1"),
+                    {"r": reserva_id},
+                ).scalar()
+                if not exists:
+                    rdet = _get_reserva_by_id(reserva_id)
+                    if rdet:
+                        _create_comprobante_pdf(dict(rdet))
+            except Exception as e2:
+                try:
+                    current_app.logger.warning(f"[OPS] No se pudo generar comprobante R={reserva_id}: {e2}")
+                except Exception:
+                    pass
+
+            # Notificación de CONFIRMACIÓN (respeta /sac/preferencias)
+            try:
+                _notify_reserva_success(reserva_id)
+            except Exception as e3:
+                try:
+                    current_app.logger.warning(f"[OPS] Notificación confirmación falló R={reserva_id}: {e3}")
+                except Exception:
+                    pass
+
+            return jsonify({"ok": True, "id": reserva_id, "estado": "Confirmada", "numero": numero})
+        except Exception as e:
+            db.session.rollback()
+            try:
+                current_app.logger.warning(f"[OPS] approve error R={reserva_id}: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "approve_failed"}), 500
+
+    @app.post("/api/ops/approvals/<int:reserva_id>/reject")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_approvals_reject(reserva_id: int):
+        data = request.get_json(silent=True) or {}
+        reason = (data.get("reason") or data.get("motivo") or "").strip()
+        if not reason:
+            return jsonify({"ok": False, "error": "reason_required"}), 400
+
+        try:
+            row = (
+                db.session.execute(
+                    text("SELECT Estado, Observaciones FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"),
+                    {"r": reserva_id},
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return jsonify({"ok": False, "error": "not_found"}), 404
+
+            estado_actual = (row.get("Estado") or "").strip()
+            if estado_actual != "Pendiente":
+                return jsonify({"ok": False, "error": "invalid_state", "estado": estado_actual}), 409
+
+            prev_obs = (row.get("Observaciones") or "").strip()
+            stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            new_line = f"[RECHAZO SINPE {stamp}] {reason}"
+            obs_final = (prev_obs + "\n" + new_line).strip() if prev_obs else new_line
+
+            # Observaciones es VARCHAR(255) en tu script: recortamos para evitar error
+            if len(obs_final) > 255:
+                obs_final = obs_final[:252] + "..."
+
+            db.session.execute(
+                text("UPDATE Reserva SET Estado='Cancelada', Observaciones=:o WHERE Codigo_Reserva=:r"),
+                {"o": obs_final, "r": reserva_id},
+            )
+            db.session.commit()
+            return jsonify({"ok": True, "id": reserva_id, "estado": "Cancelada"})
+        except Exception as e:
+            db.session.rollback()
+            try:
+                current_app.logger.warning(f"[OPS] reject error R={reserva_id}: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "reject_failed"}), 500
+
+    @app.post("/api/ops/approvals/<int:reserva_id>/retract")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_approvals_retract(reserva_id: int):
+        try:
+            row = (
+                db.session.execute(
+                    text("SELECT Estado FROM Reserva WHERE Codigo_Reserva=:r LIMIT 1"),
+                    {"r": reserva_id},
+                )
+                .mappings()
+                .first()
+            )
+            if not row:
+                return jsonify({"ok": False, "error": "not_found"}), 404
+
+            estado_actual = (row.get("Estado") or "").strip()
+            if estado_actual != "Confirmada":
+                return jsonify({"ok": False, "error": "invalid_state", "estado": estado_actual}), 409
+
+            db.session.execute(
+                text("UPDATE Reserva SET Estado='Pendiente' WHERE Codigo_Reserva=:r"),
+                {"r": reserva_id},
+            )
+            db.session.commit()
+
+            # Nota: NO enviamos notificación aquí por defecto (para evitar confusión al cliente).
+            return jsonify({"ok": True, "id": reserva_id, "estado": "Pendiente"})
+        except Exception as e:
+            db.session.rollback()
+            try:
+                current_app.logger.warning(f"[OPS] retract error R={reserva_id}: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "retract_failed"}), 500
+
+    
 
     # ------------------------------------------------------------
     # UI — Lista de facturas
@@ -6237,10 +7033,11 @@ app = create_app()
 # EJECUCIÓN
 # =========================
 # al final de app.py
-# if __name__ == "__main__":
-#     app.run(
-#         host="127.0.0.1",
-#         port=int(os.getenv("PORT", 5000)),
-#         debug=True,
-#         use_reloader=True,   # <-- clave para quitar ese error
-#     )
+#if __name__ == "__main__":
+#    app.run(
+#        host="127.0.0.1",
+#        port=int(os.getenv("PORT", 5000)),
+#        debug=True,
+#        use_reloader=True,   # <-- clave para quitar ese error
+#    )
+#

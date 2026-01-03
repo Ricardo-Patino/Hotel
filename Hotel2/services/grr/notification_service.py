@@ -514,6 +514,82 @@ class NotificationService:
             ref_entidad="Reserva",
             ref_id=str(reserva_id),
         )
+        
+        
+    def send_reserva_pending(self, reserva_id: int) -> Dict[str, object]:
+        """
+        Notificación: Reserva creada pero pendiente de confirmación (SINPE).
+        Respeta preferencias del cliente (/sac/preferencias) vía route_and_queue.
+        """
+        payload = _fetch_reserva_payload(int(reserva_id))
+        if not payload:
+            return {"ok": False, "error": "not_found"}
+    
+        rid   = payload.get("rid")
+        cid   = payload.get("cid")
+        f_in  = str(payload.get("f_entrada") or "")
+        f_out = str(payload.get("f_salida") or "")
+        total = payload.get("total")
+    
+        hotel_nom  = _cfg("hotel_nombre", "Hotel Villa Grace")
+        hotel_tel  = _cfg("hotel_tel", "+506 2642 0225")
+        base_url   = _cfg("site_base_url", "https://hotelvillagrace.test")
+        moneda_sym = _cfg("moneda_simbolo", "₡")
+    
+        # Config SINPE (si no existen, el email igual sale sin ese detalle)
+        sinpe_num = _cfg("sinpe_mobile", "")
+        sinpe_ben = _cfg("sinpe_beneficiary", hotel_nom)
+    
+        total_txt = _fmt_currency(total, symbol=moneda_sym) if total is not None else ""
+    
+        subject = f"Reserva pendiente de confirmación #{rid} – {hotel_nom}"
+    
+        lines = [
+            (payload.get("cliente_nombre") or "Estimado/a") + ",",
+            "",
+            "Hemos registrado tu solicitud de reserva, pero está pendiente de confirmación.",
+            "La confirmación se realizará cuando el hotel valide el pago por SINPE.",
+            "",
+            f"• Nº reserva: #{rid}",
+            f"• Entrada: {f_in}",
+            f"• Salida : {f_out}",
+            (f"• Total  : {total_txt}" if total_txt else None),
+            "",
+        ]
+        if sinpe_num:
+            lines.extend([
+                "Pago por SINPE Móvil:",
+                f"• Número: {sinpe_num}",
+                f"• Beneficiario: {sinpe_ben}",
+                "",
+                "Recomendación: en el detalle del SINPE indica tu correo y fechas para facilitar la verificación.",
+                "",
+            ])
+    
+        lines.extend([
+            f"Teléfono: {hotel_tel}",
+            f"Portal del huésped: {base_url}/portal/reservas",
+            "",
+            f"{hotel_nom} — \"Tu hogar fuera de casa\".",
+        ])
+    
+        body = "\n".join([x for x in lines if x is not None])
+    
+        # SMS compacto (GSM-7)
+        sms_raw = f"VG Reserva #{rid} PENDIENTE. {f_in}->{f_out}. Total {total_txt}. Se confirma al validar SINPE. Tel {hotel_tel}"
+        sms = _truncate_for_trial(_to_gsm7_approx(sms_raw))
+    
+        return self.route_and_queue(
+            cliente_id=cid,
+            email=payload.get("cliente_email"),
+            phone=payload.get("cliente_tel"),
+            subject=subject,
+            body=body,
+            sms=sms,
+            ref_entidad="RESERVA",
+            ref_id=str(rid),
+        )
+    
 
     # *** Alias de compatibilidad esperado por app.py ***
     # app.py invoca ns.send_reserva_confirmation(rid); mapeamos a send_reserva_details.

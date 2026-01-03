@@ -810,6 +810,10 @@ def crear_reserva():
         payload["Monto_Total"] = float(calc["total"])   # TOTAL CON IMPUESTO
         payload["Tarifa"]      = calc["rate_code"]
 
+        # Paso 1: todas las reservas creadas desde booking-checkout (Canal Web) deben iniciar como Pendiente
+        payload["Canal"] = "Web"
+        payload["Estado"] = "Pendiente"
+        
         # 5) Crear con el servicio
         res = _res_service.create(payload)
 

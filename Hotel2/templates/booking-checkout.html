@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Finalizar reserva | Hotel Villa Grace</title>
-  <meta name="description" content="Datos del huésped, políticas y pago seguro." />
+  <meta name="description" content="Datos del huésped, políticas y pago por SINPE." />
 
   <!-- Favicons -->
   <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
@@ -64,7 +64,7 @@
 
       <!-- Mensajes -->
       <div id="alert-ok" class="alert alert-success d-none" role="alert">
-        ¡Reserva confirmada! Redirigiendo…
+        ¡Reserva registrada como pendiente! Redirigiendo…
       </div>
       <div id="alert-err" class="alert alert-danger d-none" role="alert">
         <span id="err-txt"></span>
@@ -131,18 +131,25 @@
                 </div>
               </div>
 
-              <!-- UI simulada de tarjeta -->
-              <form class="row g-3">
-                <div class="col-12"><label class="form-label">Tarjeta</label>
-                  <input class="form-control" placeholder="**** **** **** 4242" />
+              <!-- SINPE (Paso 1) -->
+              <div class="border rounded-3 p-3 bg-light">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-phone-vibrate fs-4 text-primary"></i>
+                  <div>
+                    <div class="fw-semibold">Pago únicamente por SINPE Móvil</div>
+                    <div class="small text-muted">
+                      Al finalizar verás las instrucciones de pago y el monto exacto a depositar.
+                      La reserva se registrará como <strong>pendiente de confirmación</strong> hasta que el hotel valide el pago.
+                    </div>
+                    <div class="mt-2 small">
+                      <span class="text-muted">SINPE:</span>
+                      <span class="fw-semibold" id="sinpe-inline-number">{{ sinpe_mobile or '—' }}</span>
+                      <span class="text-muted ms-2">Beneficiario:</span>
+                      <span class="fw-semibold">{{ sinpe_beneficiary or 'Hotel Villa Grace' }}</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="col-md-6"><label class="form-label">Vencimiento</label>
-                  <input class="form-control" placeholder="MM/AA" />
-                </div>
-                <div class="col-md-6"><label class="form-label">CVC</label>
-                  <input class="form-control" placeholder="***" />
-                </div>
-              </form>
+              </div>
 
               <div class="d-grid mt-3">
                 <button id="btn-finalize" class="btn btn-success">
@@ -150,8 +157,9 @@
                 </button>
               </div>
               <small class="text-muted d-block mt-2">
-                <i class="bi bi-lock me-1"></i> Pago seguro (demostración). El cargo puede procesarse en recepción.
+                <i class="bi bi-info-circle me-1"></i> No se procesa tarjeta en línea. El pago se valida manualmente.
               </small>
+
             </div>
           </div>
         </div>
@@ -223,6 +231,63 @@
   </div>
 </footer>
 
+<!-- Modal SINPE (Paso 1) -->
+<div class="modal fade" id="sinpeModal" tabindex="-1" aria-labelledby="sinpeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sinpeModalLabel">
+          <i class="bi bi-info-circle me-2"></i>Instrucciones de pago (SINPE)
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="p-3 rounded-3 bg-light border">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <div class="text-muted small">SINPE Móvil</div>
+              <div class="fs-4 fw-semibold" id="sinpeModalNumber">{{ sinpe_mobile or '—' }}</div>
+              <div class="text-muted small mt-1">
+                Beneficiario: <span class="fw-semibold">{{ sinpe_beneficiary or 'Hotel Villa Grace' }}</span>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-copy-sinpe">
+              <i class="bi bi-clipboard me-1"></i> Copiar
+            </button>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="text-muted">Monto total a depositar</div>
+            <div class="fs-5 fw-semibold" id="sinpeModalAmount">—</div>
+          </div>
+
+          <div class="small text-muted mt-2">
+            En el detalle del SINPE indica tu <strong>correo</strong> y las <strong>fechas</strong>
+            para facilitar la verificación del pago.
+          </div>
+        </div>
+
+        <div class="alert alert-warning mt-3 mb-0">
+          Tu reserva quedará <strong>pendiente de confirmación</strong> hasta que el hotel valide el pago.
+          Te enviaremos una notificación cuando el estado cambie.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button>
+        <button type="button" class="btn btn-success" id="btn-sinpe-done">
+          <i class="bi bi-check2-circle me-1"></i> Listo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /Modal SINPE -->
+
 <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
 <div id="preloader"></div>
 
@@ -288,9 +353,14 @@
       return sel;
     }
 
-    // ---------- render resumen ----------
-    const state = { coupon: { code: '', amount: 0, type: 'none' } };
+    // ---------- state ----------
+    const state = {
+      coupon: { code: '', amount: 0, type: 'none' },
+      summary: { subtotal: 0, tax: 0, coupon: 0, total: 0, totalPax: 1 },
+      _pendingGuest: null
+    };
 
+    // ---------- render resumen ----------
     function renderSummary(sel) {
       const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
       $("#hdr-sub").textContent = `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${sel.nights>1?"s":""})`;
@@ -322,6 +392,9 @@
       $("#sum-tax").textContent = money(tax);
       $("#sum-coupon").textContent = coupon ? `- ${money(coupon)}` : money(0);
       $("#sum-total").textContent = money(total);
+
+      // Guardar resumen para el modal SINPE y para fallback de total si backend no lo retorna
+      state.summary = { subtotal, tax, coupon, total, totalPax };
     }
 
     // ---------- cupón (preview opcional, sin scope leak) ----------
@@ -341,7 +414,27 @@
     }
 
     // ---------- crear cliente mínimo (dummy/backoffice) ----------
+    // Nota: en tu proyecto actual esto está "mockeado". Se respeta tal cual.
     async function ensureClient(fullName, email, phone) { return 1; }
+
+
+    const isoDate = (v) => {
+      if (!v) return "";
+      let s = String(v).trim();
+    
+      // cortar si viene con hora
+      if (s.includes("T")) s = s.split("T")[0];
+      if (s.includes(" ")) s = s.split(" ")[0];
+    
+      // normalizar YYYY-M-D -> YYYY-MM-DD
+      const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (m) {
+        const y = m[1], mm = m[2].padStart(2, "0"), dd = m[3].padStart(2, "0");
+        return `${y}-${mm}-${dd}`;
+      }
+      return s; // si ya viene correcto
+    };
+    
 
     // ---------- POST /grr/reservas ----------
     async function createReservation(sel, guest) {
@@ -351,8 +444,8 @@
         Codigo_Funcionario: 1,
         Codigo_Habitacion: sel.roomCode ? Number(sel.roomCode) : undefined,
         Tipo: sel.tipo || "Sencilla",
-        Fecha_Entrada: sel.checkin,
-        Fecha_Salida: sel.checkout,
+        Fecha_Entrada: isoDate(sel.checkin),
+        Fecha_Salida: isoDate(sel.checkout),
         Huespedes: String(totalPax),
         Adults: String(sel.adults || "2"),
         Children: String(sel.children || "0"),
@@ -360,10 +453,11 @@
         Precio_Base_Noche: Number(sel.priceNight || 0), // por persona / noche
         CouponCode: state.coupon.code || '',
         Canal: "Web",
+        Estado: "Pendiente", // ✅ Paso 1: siempre Pendiente para Web (pago por SINPE)
         Observaciones: guest.notes || "",
         Usuario: guest.email || undefined,
       };
-
+      console.log("DEBUG fechas:", sel.checkin, sel.checkout, isoDate(sel.checkin), isoDate(sel.checkout));
       const res = await fetch("/grr/reservas", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -393,6 +487,23 @@
 
     // ---------- bind ----------
     function bind(sel) {
+      // Modal SINPE
+      const sinpeModalEl = document.getElementById('sinpeModal');
+      const sinpeModal = sinpeModalEl ? new bootstrap.Modal(sinpeModalEl) : null;
+
+      // Copiar SINPE
+      const btnCopy = document.getElementById('btn-copy-sinpe');
+      if (btnCopy) {
+        btnCopy.addEventListener('click', async () => {
+          try {
+            const txt = (document.getElementById('sinpeModalNumber')?.textContent || '').trim();
+            if (txt && navigator.clipboard) await navigator.clipboard.writeText(txt);
+            btnCopy.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado';
+            setTimeout(() => (btnCopy.innerHTML = '<i class="bi bi-clipboard me-1"></i> Copiar'), 1200);
+          } catch { /* noop */ }
+        });
+      }
+
       // Cupón: preview y pre-cálculo visual
       $("#btn-apply-coupon").addEventListener('click', async () => {
         const code = ($("#coupon-code").value || '').trim();
@@ -430,14 +541,17 @@
         renderSummary(sel);
       });
 
-      // Finalizar
-      $("#btn-finalize").addEventListener("click", async () => {
+      // Finalizar compra -> SOLO muestra modal SINPE (no crea reserva aquí)
+      $("#btn-finalize").addEventListener("click", async (e) => {
+        e.preventDefault();
+
         const form = $("#guest-form");
         if (!form.checkValidity()) {
           form.reportValidity();
           return;
         }
-        const btn = $("#btn-finalize");
+
+        // Guardar temporalmente datos del huésped para el commit al presionar "Listo"
         const guest = {
           fname: $("#fname").value.trim(),
           lname: $("#lname").value.trim(),
@@ -445,73 +559,100 @@
           phone: $("#phone").value.trim(),
           notes: $("#notes").value.trim(),
         };
+        state._pendingGuest = guest;
 
-        const payloadConfirm = {
-          name: `${guest.fname} ${guest.lname}`.trim(),
-          roomName: sel.roomName || "Habitación",
-          plan: sel.rateName || (sel.rateCode==='nrb'?'No Reembolsable':'Tarifa Flexible'),
-          dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
-          guests: { adults: sel.adults || "2", children: sel.children || "0" },
-          priceNight: sel.priceNight || 0,
-          coupon: state.coupon
-        };
+        // Actualizar monto en el modal con el total del resumen
+        const amountEl = document.getElementById('sinpeModalAmount');
+        if (amountEl) amountEl.textContent = money(state.summary.total || 0);
 
-        btn.disabled = true;
-        const original = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando…';
-        $("#alert-err").classList.add("d-none");
-
-        try {
-          // 1) Crear reserva
-          const result = await createReservation(sel, guest);
-
-          // Detectar ID con tolerancia a nombres
-          const reservaId =
-            (result.id ?? result.reserva_id ?? result.Codigo_Reserva ??
-             result.Reserva_Id ?? result.CodigoReserva ?? result.Codigo) || null;
-
-          if(!reservaId) throw new Error('Reserva creada, pero no se pudo obtener el ID.');
-
-          // 2) Total inicial (si viene)
-          let totalFinal = Number(
-            result.total ?? result.total_monto ?? result.monto ?? result.Monto_Total ?? 0
-          );
-          let descuento  = 0;
-
-          // 3) Aplicar cupón (real) si el cliente ingresó uno
-          if (state.coupon && state.coupon.code) {
-            try{
-              const ap = await applyCouponToReservation(reservaId, state.coupon.code);
-              if (ap && ap.ok) {
-                const previo   = totalFinal || Number(result.Monto_Total || 0);
-                totalFinal     = Number(ap.monto ?? ap.total ?? previo);
-                descuento      = Math.max(0, +(previo - totalFinal).toFixed(2));
-                state.coupon.amount = descuento;
-              }
-            }catch(err){
-              console.warn('apply-coupon error:', err);
-              $("#coupon-msg").textContent = "Cupón no aplicable o inválido. Se cobrará sin descuento.";
-            }
-          }
-
-          // 4) Guardar datos para confirmation y redirigir
-          payloadConfirm.reservaId = reservaId;
-          payloadConfirm.numero    = result.numero ?? result.Numero ?? result.Numero_Comprobante ?? `VG-${reservaId}`;
-          payloadConfirm.total     = totalFinal;
-          payloadConfirm.habitacion= result.habitacion || null;
-          payloadConfirm.observaciones = guest.notes || "";
-
-          sessionStorage.setItem("villaGrace.confirm", JSON.stringify(payloadConfirm));
-          $("#alert-ok").classList.remove("d-none");
-          setTimeout(() => (location.href = "booking-confirmation.html"), 900);
-        } catch (err) {
-          btn.disabled = false;
-          btn.innerHTML = original;
-          const msg = String(err?.message || err || 'No se pudo completar la operación.');
-          $("#err-txt").textContent = msg;
-          $("#alert-err").classList.remove("d-none");
-        }
+        // Mostrar modal
+        if (sinpeModal) sinpeModal.show();
       });
+
+      // "Listo" -> aquí SÍ se crea la reserva como Pendiente y se redirige
+      const btnDone = document.getElementById('btn-sinpe-done');
+      if (btnDone) {
+        btnDone.addEventListener('click', async () => {
+          const guest = state._pendingGuest || {};
+
+          btnDone.disabled = true;
+          const original = btnDone.innerHTML;
+          btnDone.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando…';
+          $("#alert-err").classList.add("d-none");
+
+          try {
+            // 1) Crear reserva (Pendiente)
+            const result = await createReservation(sel, guest);
+
+            // Detectar ID con tolerancia a nombres
+            const reservaId =
+              (result.id ?? result.reserva_id ?? result.Codigo_Reserva ??
+               result.Reserva_Id ?? result.CodigoReserva ?? result.Codigo) || null;
+
+            if(!reservaId) throw new Error('Reserva creada, pero no se pudo obtener el ID.');
+
+            // 2) Total inicial (si viene). Si no viene, usar total calculado en el resumen.
+            let totalFinal = Number(
+              result.total ?? result.total_monto ?? result.monto ?? result.Monto_Total ?? 0
+            );
+            if (!totalFinal || totalFinal <= 0) totalFinal = Number(state.summary.total || 0);
+
+            // 3) Aplicar cupón (real) si el cliente ingresó uno
+            if (state.coupon && state.coupon.code) {
+              try{
+                const ap = await applyCouponToReservation(reservaId, state.coupon.code);
+                if (ap && ap.ok) {
+                  const previo   = totalFinal;
+                  totalFinal     = Number(ap.monto ?? ap.total ?? previo);
+                  const descuento = Math.max(0, +(previo - totalFinal).toFixed(2));
+                  state.coupon.amount = descuento;
+                }
+              }catch(err){
+                console.warn('apply-coupon error:', err);
+                $("#coupon-msg").textContent = "Cupón no aplicable o inválido. Se cobrará sin descuento.";
+              }
+            }
+
+            // 4) Guardar datos para confirmation y redirigir
+            const payloadConfirm = {
+              name: `${guest.fname || ''} ${guest.lname || ''}`.trim(),
+              roomName: sel.roomName || "Habitación",
+              plan: sel.rateName || (sel.rateCode==='nrb'?'No Reembolsable':'Tarifa Flexible'),
+              dates: { ini: sel.checkin, fin: sel.checkout, nights: sel.nights },
+              guests: { adults: sel.adults || "2", children: sel.children || "0" },
+              priceNight: sel.priceNight || 0,
+              coupon: state.coupon,
+              estado: "Pendiente",
+              reservaId: reservaId,
+              numero: result.numero ?? result.Numero ?? result.Numero_Comprobante ?? `VG-${reservaId}`,
+              total: totalFinal,
+              habitacion: result.habitacion || null,
+              observaciones: guest.notes || ""
+            };
+
+            sessionStorage.setItem("villaGrace.confirm", JSON.stringify(payloadConfirm));
+
+            // UI ok + cerrar modal
+            $("#alert-ok").classList.remove("d-none");
+            try { if (sinpeModal) sinpeModal.hide(); } catch(_){}
+
+            // Redirigir a confirmation (Paso 1: seguirá mostrando "pendiente" en esa página)
+            setTimeout(() => {
+              const url = new URL("booking-confirmation.html", location.href);
+              url.searchParams.set("id", reservaId);
+              if (payloadConfirm?.numero) url.searchParams.set("code", payloadConfirm.numero);
+              location.href = url.toString();
+            }, 650);
+
+          } catch (err) {
+            btnDone.disabled = false;
+            btnDone.innerHTML = original;
+            const msg = String(err?.message || err || 'No se pudo completar la operación.');
+            $("#err-txt").textContent = msg;
+            $("#alert-err").classList.remove("d-none");
+          }
+        });
+      }
     }
 
     // ---------- init ----------

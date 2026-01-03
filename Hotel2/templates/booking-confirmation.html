@@ -1,288 +1,298 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reserva confirmada | Hotel Villa Grace</title>
-  <meta name="description" content="Confirmación de reserva con número y detalles.">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reserva pendiente | Hotel Villa Grace</title>
+  <meta name="description" content="Detalle de tu reserva pendiente de confirmación." />
 
   <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-
-  <!-- Fuentes -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
 
   <!-- Vendors -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet" />
 
-  <!-- Estilos -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-
+  <!-- Styles -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet" />
   <style>
-    .conf-check{width:64px;height:64px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#e8f5ef;color:#1b7a4a}
-    .conf-row{border-bottom:1px solid rgba(0,0,0,.06);padding:.6rem 0}
-    .conf-row span:first-child{color:#5f6b77}
-    .mini{font-size:.875rem;color:#6c757d}
-    @media print{.no-print{display:none!important}}
+    .badge-soft { background: rgba(255,193,7,.15); color:#b58100; border:1px solid rgba(255,193,7,.35); }
+    .card-summary img{width:88px;height:88px;object-fit:cover;border-radius:.5rem;border:1px solid #e9ecef}
+    .muted-mini{font-size:.875rem;color:#6c757d}
   </style>
 </head>
+
 <body class="privacy-page">
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <h1 class="sitename">Hotel Villa Grace</h1>
-      </a>
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li><a href="booking-search.html">Reservar</a></li>
-          <li><a href="portal-dashboard.html">Portal</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
-      <a class="btn-getstarted d-none d-sm-block no-print" href="portal-reservas.html">Mis reservas</a>
-    </div>
-  </header>
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="booking-search.html">Buscar</a></li>
+        <li><a href="booking-results.html">Disponibilidad</a></li>
+        <li><a href="booking-details.html">Detalle</a></li>
+        <li><a href="booking-checkout.html">Finalizar</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+    <a class="btn-getstarted d-none d-sm-block" href="portal-dashboard.html">Portal Huésped</a>
+  </div>
+</header>
 
-  <main class="main">
-    <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-      <div class="container position-relative">
-        <h1>¡Reserva confirmada!</h1>
-        <p>Gracias por reservar directamente con nosotros.</p>
+<main class="main">
+  <div class="page-title dark-background" data-aos="fade"
+       style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
+    <div class="container position-relative">
+      <h1 id="hdr-title">Reserva pendiente de confirmación</h1>
+      <p id="hdr-sub">Revisaremos el pago por SINPE y te notificaremos.</p>
+      <nav class="breadcrumbs"><ol>
+        <li><a href="booking-search.html">Buscar</a></li>
+        <li><a href="booking-results.html">Disponibilidad</a></li>
+        <li><a href="booking-details.html">Detalle</a></li>
+        <li class="current">Confirmación</li>
+      </ol></nav>
+    </div>
+  </div>
+
+  <section class="section pt-3">
+    <div class="container" data-aos="fade-up">
+
+      <div id="alert-ok" class="alert alert-warning d-none" role="alert">
+        <i class="bi bi-clock-history me-1"></i>
+        Reserva registrada. Estado: <strong>pendiente de confirmación</strong>.
       </div>
-    </div>
-
-    <section class="section">
-      <div class="container" data-aos="fade-up" id="content">
-        <!-- Rellenado por JS -->
+      <div id="alert-err" class="alert alert-danger d-none" role="alert">
+        <span id="err-txt"></span>
       </div>
-    </section>
-  </main>
 
-  <footer id="footer" class="footer position-relative dark-background">
-    <div class="copyright text-center">
-      <div class="container">© <strong><span>Hotel Villa Grace</span></strong> · Cóbano, Puntarenas</div>
-    </div>
-  </footer>
-
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-    <i class="bi bi-arrow-up-short"></i>
-  </a>
-  <div id="preloader"></div>
-
-  <!-- JS -->
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-
-  <script>
-    // ---------- Utilidades ----------
-    const TAX_RATE = 0.13;
-
-    function moneyCRC(n){
-      return new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC',minimumFractionDigits:2}).format(Number(n||0));
-    }
-    function fmtLong(iso){
-      try{
-        const d = new Date(String(iso)+'T00:00:00');
-        return new Intl.DateTimeFormat('es-CR',{day:'2-digit',month:'short',year:'numeric'}).format(d).replace('.','');
-      }catch(_){ return String(iso||''); }
-    }
-    function nightsDiff(a,b){
-      if(!(a&&b)) return 1;
-      const d1 = new Date(a+'T00:00:00'), d2 = new Date(b+'T00:00:00');
-      return Math.max(1, Math.round((d2-d1)/86400000));
-    }
-    function readConfirm(){
-      let raw = sessionStorage.getItem('villaGrace.confirm');
-      if(!raw) raw = sessionStorage.getItem('villaGrace.confirmation');
-      try{ return JSON.parse(raw || 'null'); }catch(_){ return null; }
-    }
-    function safeInt(v, def=0){ const n = parseInt(v,10); return Number.isFinite(n)? n : def; }
-    function safeNum(v, def=0){ const n = Number(v); return Number.isFinite(n)? n : def; }
-
-    // ---------- Preferir total del backend si existe ----------
-    async function fetchReservaTotals(reservaId){
-      const paths = [
-        `/api/reservas/${reservaId}`,
-        `/grr/reservas/${reservaId}`,
-        `/api/portal/reservas/${reservaId}`
-      ];
-      for (const url of paths){
-        try{
-          const r = await fetch(url,{headers:{Accept:'application/json'}});
-          if(!r.ok) continue;
-          const j = await r.json();
-          // Intentar mapear nombres comunes
-          const total = j.Monto_Total ?? j.total ?? j.Total ?? j.Monto ?? j.monto ?? null;
-          const subtotal = j.Subtotal ?? j.subtotal ?? null;
-          const impuesto = j.Impuesto ?? j.impuesto ?? j.Tax ?? j.tax ?? null;
-          if(total || subtotal){
-            return {
-              backend: true,
-              subtotal: safeNum(subtotal ?? (total && impuesto ? (total - impuesto) : null)),
-              tax: safeNum(impuesto ?? (subtotal ? subtotal*TAX_RATE : null)),
-              total: safeNum(total ?? (subtotal ? subtotal*(1+TAX_RATE) : null))
-            };
-          }
-        }catch(_){ /* siguiente intento */ }
-      }
-      return null;
-    }
-
-    // ---------- Recalcular total localmente si hace falta ----------
-    function computeLocalTotals(data){
-      // priceNight = precio por HUESPED por NOCHE (viene de booking-details/checkout)
-      const pricePerGuestNight = safeNum(data.priceNight, 0);
-      // huéspedes
-      const adults = safeInt(data?.guests?.adults ?? data.adults ?? 1, 1);
-      const children = safeInt(data?.guests?.children ?? data.children ?? 0, 0);
-      const guests = Math.max(1, adults + children);
-      // noches
-      const ini = (data.dates && data.dates.ini) || data.checkin || '';
-      const fin = (data.dates && data.dates.fin) || data.checkout || '';
-      const nights = safeInt(data?.dates?.nights ?? data.nights ?? nightsDiff(ini,fin), 1);
-
-      const perNightAll = pricePerGuestNight * guests;
-      const subtotal = perNightAll * nights;
-      const tax = subtotal * TAX_RATE;
-      const total = subtotal + tax;
-
-      return { guests, nights, perNightAll, pricePerGuestNight, subtotal, tax, total, ini, fin };
-    }
-
-    async function findReservaIdByNumero(numero){
-      try{
-        const r = await fetch(`/api/portal/reservas?estado=Confirmada`, {headers:{Accept:'application/json'}});
-        const j = await r.json();
-        if(!j || !j.ok || !Array.isArray(j.items)) return null;
-        const hit = j.items.find(x => String((x.numero||'')).trim() === String(numero).trim());
-        return hit ? hit.id : null;
-      }catch(_){ return null; }
-    }
-
-    async function renderConfirmation(){
-      const box = document.getElementById('content');
-      const data = readConfirm();
-
-      if(!data){
-        box.innerHTML = `
-          <div class="alert alert-warning">
-            No encontramos los datos de la reserva en este dispositivo.
-            <a href="booking-search.html" class="alert-link">Inicia una nueva búsqueda</a>.
-          </div>`;
-        return;
-      }
-
-      const code   = data.numero || data.code || 'VG-PENDIENTE';
-      const name   = data.name || '—';
-      const room   = data.roomName || (data.habitacion && (data.habitacion.Nombre || data.habitacion.Numero_Habitacion)) || '—';
-
-      // Cálculo local
-      const local = computeLocalTotals(data);
-
-      // Si tenemos id, traer total oficial
-      let reservaId = data.reservaId || null;
-      if(!reservaId && code && code !== 'VG-PENDIENTE'){
-        reservaId = await findReservaIdByNumero(code);
-      }
-
-      let official = null;
-      if(reservaId){ official = await fetchReservaTotals(reservaId); }
-
-      // Decidir total a mostrar:
-      // 1) Si hay total oficial del backend, úsalo.
-      // 2) Si no, y data.total existe pero difiere >5% del cálculo local, preferimos el cálculo local.
-      // 3) Si no, usamos data.total.
-      const savedTotal = safeNum(data.total, 0);
-      const calcTotal = local.total;
-      let showTotal = calcTotal;
-      let used = 'calc';
-      if(official && official.total){
-        showTotal = official.total;
-        used = 'backend';
-      }else if(savedTotal > 0){
-        const delta = Math.abs(savedTotal - calcTotal) / Math.max(savedTotal, calcTotal);
-        if(delta <= 0.05){ showTotal = savedTotal; used = 'saved'; }
-        else { showTotal = calcTotal; used = 'calc'; }
-      }
-
-      const datesTxt = (local.ini && local.fin) ? `${fmtLong(local.ini)} – ${fmtLong(local.fin)}` : '—';
-      const guestsTxt = `${(data.guests?.adults ?? data.adults ?? 1)} adulto(s)` +
-                        (safeInt(data.guests?.children ?? data.children ?? 0) ? ` · ${data.guests?.children ?? data.children} niño(s)` : '');
-      const plan   = data.plan || data.rateName || 'Tarifa Flexible';
-      const hasComprobante = !!reservaId;
-
-      // Nota de transparencia si el total mostrado viene del backend y difiere del cálculo local
-      let note = '';
-      if(official && official.total){
-        const delta = Math.abs(official.total - calcTotal);
-        if(delta > 50){ // umbral pequeño para evitar ruido por redondeos
-          note = `<div class="mini mt-2"><i class="bi bi-info-circle me-1"></i>
-                    El total proviene del sistema (<strong>oficial</strong>). Nuestro cálculo estimado fue ${moneyCRC(calcTotal)}.
-                  </div>`;
-        }
-      }
-
-      box.innerHTML = `
-        <div class="card shadow-sm border-0">
-          <div class="card-body text-center">
-            <div class="conf-check mb-3"><i class="bi bi-check-lg fs-3"></i></div>
-            <h3 class="mb-1">Código de reserva: <span class="fw-bold">${code}</span></h3>
-            <p class="text-muted">Tu reserva ha sido creada correctamente.</p>
-
-            <div class="row justify-content-center text-start mt-3">
-              <div class="col-md-8 col-lg-6">
-                <div class="conf-row d-flex justify-content-between"><span>Nombre</span><span>${name}</span></div>
-                <div class="conf-row d-flex justify-content-between"><span>Habitación</span><span>${room}</span></div>
-                <div class="conf-row d-flex justify-content-between"><span>Fechas</span><span>${datesTxt}</span></div>
-                <div class="conf-row d-flex justify-content-between"><span>Noches</span><span>${local.nights}</span></div>
-                <div class="conf-row d-flex justify-content-between"><span>Huéspedes</span><span>${guestsTxt}</span></div>
-                <div class="conf-row d-flex justify-content-between"><span>Plan</span><span>${plan}</span></div>
-
-                <div class="mt-3 mini">
-                  Detalle de cálculo: ${local.nights} × ${moneyCRC(local.pricePerGuestNight)} <em>(por huésped)</em> × ${local.guests} = ${moneyCRC(local.subtotal)} <span class="text-muted">(subtotal)</span><br>
-                  Impuesto (13%): ${moneyCRC(local.tax)}
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="d-flex align-items-start justify-content-between gap-3">
+                <div>
+                  <span id="ok-badge" class="badge badge-soft">Pendiente</span>
+                  <h4 class="mt-2 mb-1" id="ok-title">Reserva pendiente de confirmación</h4>
+                  <p class="text-muted mb-0" id="ok-sub">
+                    El hotel validará el pago por SINPE antes de confirmar la reserva.
+                  </p>
                 </div>
-
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                  <h4 class="mb-0">Total</h4>
-                  <h4 class="mb-0">${moneyCRC(showTotal)}</h4>
-                </div>
-                ${note}
-                <div class="mini mt-2">Los importes incluyen impuestos y pueden variar por normativa local.</div>
-
-                <div class="d-grid d-md-flex gap-2 justify-content-center mt-4 no-print">
-                  <a class="btn btn-primary" href="portal-reserva-detalle.html">
-                    <i class="bi bi-person-badge me-1"></i> Ver detalle en Portal
-                  </a>
-                  <button class="btn btn-outline" onclick="window.print()">
-                    <i class="bi bi-printer me-1"></i> Imprimir/Guardar PDF
-                  </button>
-                  <a class="btn btn-outline-secondary" href="index.html">
-                    <i class="bi bi-house me-1"></i> Inicio
-                  </a>
-                  <a class="btn btn-success ${hasComprobante?'':'disabled'}" id="btn-pdf" target="_blank"
-                     ${hasComprobante?`href="/api/reservas/${reservaId}/comprobante"`:''}>
-                    <i class="bi bi-filetype-pdf me-1"></i> Descargar comprobante
-                  </a>
-                </div>
-
-                <div class="text-muted small mt-3">
-                  ¿No recibiste el correo? Revisa spam o escríbenos a
-                  <a href="mailto:hotelvillagrace@gmail.com">hotelvillagrace@gmail.com</a>.
+                <div class="text-end">
+                  <div class="text-muted small">Nº de reserva</div>
+                  <div class="fs-5 fw-semibold" id="res-num">—</div>
                 </div>
               </div>
+
+              <hr class="my-4">
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="text-muted small">Huésped</div>
+                  <div class="fw-semibold" id="g-name">—</div>
+                  <div class="text-muted small" id="g-email">—</div>
+                </div>
+                <div class="col-md-6">
+                  <div class="text-muted small">Habitación</div>
+                  <div class="fw-semibold" id="r-room">—</div>
+                  <div class="text-muted small" id="r-plan">—</div>
+                </div>
+                <div class="col-md-6">
+                  <div class="text-muted small">Fechas</div>
+                  <div class="fw-semibold" id="r-dates">—</div>
+                  <div class="text-muted small" id="r-nights">—</div>
+                </div>
+                <div class="col-md-6">
+                  <div class="text-muted small">Huéspedes</div>
+                  <div class="fw-semibold" id="r-guests">—</div>
+                </div>
+                <div class="col-12">
+                  <div class="text-muted small">Observaciones</div>
+                  <div class="fw-semibold" id="r-notes">—</div>
+                </div>
+              </div>
+
+              {% if identity_notice %}
+              <div class="alert alert-info mt-4 mb-0">
+                <i class="bi bi-person-badge me-1"></i> {{ identity_notice }}
+              </div>
+              {% endif %}
+
+              <div class="alert alert-warning mt-4 mb-0">
+                <i class="bi bi-info-circle me-1"></i>
+                Esta reserva aún no está confirmada. Cuando el hotel valide el pago, recibirás una notificación según tus preferencias en <strong>/sac/preferencias</strong>.
+              </div>
+
+              <div class="d-flex gap-2 flex-wrap mt-4">
+                <a class="btn btn-outline-primary" href="portal-dashboard.html">
+                  <i class="bi bi-person-circle me-1"></i> Ir a mis reservas
+                </a>
+                <button class="btn btn-outline-secondary" id="btn-print" type="button">
+                  <i class="bi bi-printer me-1"></i> Imprimir
+                </button>
+              </div>
+
+              <div class="muted-mini mt-3">
+                <i class="bi bi-headset me-1"></i>
+                ¿Necesitas ayuda? Contacta recepción al teléfono del hotel.
+              </div>
+
             </div>
           </div>
-        </div>`;
+        </div>
+
+        <div class="col-lg-5">
+          <div class="card shadow-sm border-0 card-summary">
+            <div class="card-body">
+              <h5 class="card-title">Resumen</h5>
+
+              <div class="d-flex gap-3 align-items-center mb-3">
+                <img
+                  id="sum-img"
+                  alt="Habitación"
+                  src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}"
+                  data-fallback="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}"
+                />
+                <div class="flex-grow-1">
+                  <div class="fw-semibold" id="sum-room">Habitación</div>
+                  <div class="text-muted small" id="sum-room-sub">—</div>
+                </div>
+              </div>
+
+              <div class="text-muted small mb-3">
+                <div id="sum-dates"><i class="bi bi-calendar-event me-1"></i>—</div>
+                <div id="sum-guests"><i class="bi bi-people me-1"></i>—</div>
+              </div>
+
+              <div class="d-flex justify-content-between">
+                <span>Total</span><span id="sum-total">—</span>
+              </div>
+
+              <div class="alert alert-info small mt-3 mb-0">
+                <i class="bi bi-info-circle me-1"></i>
+                El comprobante estará disponible cuando la reserva sea confirmada por recepción.
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+  <i class="bi bi-arrow-up-short"></i>
+</a>
+<div id="preloader"></div>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+
+  const money = (n) =>
+    new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 })
+      .format(Number(n || 0));
+
+  const fmtLong = (iso) => {
+    if (!iso) return "";
+    const d = new Date(String(iso).slice(0,10) + "T00:00:00");
+    return new Intl.DateTimeFormat("es-CR", { day: "2-digit", month: "short", year: "numeric" })
+      .format(d).replace(".", "");
+  };
+
+  function readConfirm() {
+    try { return JSON.parse(sessionStorage.getItem("villaGrace.confirm") || "null"); }
+    catch { return null; }
+  }
+
+  async function fetchReserva(rid) {
+    try {
+      const r = await fetch(`/grr/reservas/${encodeURIComponent(rid)}`, { headers: { "Accept":"application/json" }});
+      const j = await r.json().catch(()=> ({}));
+      if (!r.ok || !j.ok) return null;
+      return j.data || null;
+    } catch { return null; }
+  }
+
+  function render(vm) {
+    $("#alert-ok").classList.remove("d-none");
+
+    $("#res-num").textContent = vm.numero || (vm.reservaId ? `#${vm.reservaId}` : "—");
+    $("#g-name").textContent = vm.name || "—";
+    $("#g-email").textContent = vm.email || "—";
+
+    $("#r-room").textContent = vm.roomName || "—";
+    $("#r-plan").textContent = vm.plan || "—";
+    $("#r-dates").textContent = vm.checkin && vm.checkout ? `${fmtLong(vm.checkin)} – ${fmtLong(vm.checkout)}` : "—";
+    $("#r-nights").textContent = vm.nights ? `${vm.nights} noche(s)` : "—";
+    $("#r-guests").textContent = `${vm.adults || 0} adulto(s)` + (Number(vm.children||0) ? ` · ${vm.children} niño(s)` : "");
+    $("#r-notes").textContent = (vm.notes && vm.notes.trim()) ? vm.notes : "—";
+
+    $("#sum-room").textContent = vm.roomName || "Habitación";
+    $("#sum-room-sub").textContent = vm.tipo || "—";
+    $("#sum-dates").innerHTML = `<i class="bi bi-calendar-event me-1"></i>${vm.checkin && vm.checkout ? `${fmtLong(vm.checkin)} – ${fmtLong(vm.checkout)}` : "—"}`;
+    $("#sum-guests").innerHTML = `<i class="bi bi-people me-1"></i>${vm.adults || 0} adulto(s)` + (Number(vm.children||0) ? ` · ${vm.children} niño(s)` : "");
+    $("#sum-total").textContent = money(vm.total || 0);
+
+    // Imagen fallback
+    const imgEl = $("#sum-img");
+    const fallback = imgEl.getAttribute("data-fallback") || imgEl.src;
+    imgEl.src = vm.img || fallback;
+
+    $("#btn-print").addEventListener("click", () => window.print());
+  }
+
+  (async function init() {
+    const qs = new URLSearchParams(location.search);
+    const confirm = readConfirm() || {};
+
+    const reservaId = qs.get("id") || confirm.reservaId || confirm.reserva_id || confirm.Codigo_Reserva || null;
+    if (!reservaId) {
+      $("#err-txt").textContent = "No se encontró el ID de la reserva.";
+      $("#alert-err").classList.remove("d-none");
+      return;
     }
 
-    renderConfirmation();
-  </script>
+    const r = await fetchReserva(reservaId);
+
+    // ViewModel
+    const vm = {
+      reservaId,
+      numero: confirm.numero || confirm.Numero || (r && r.Numero_Comprobante) || `#${reservaId}`,
+      name: confirm.name || "",
+      email: (window.__user && window.__user.email) || confirm.email || "",
+      roomName: confirm.roomName || (r && (r.Habitacion_Numero ? `Habitación ${r.Habitacion_Numero}` : null)) || "Habitación",
+      plan: confirm.plan || "",
+      tipo: (r && r.Tipo) || confirm.tipo || "",
+      checkin: (r && r.Fecha_Entrada) || confirm.dates?.ini || "",
+      checkout: (r && r.Fecha_Salida) || confirm.dates?.fin || "",
+      nights: confirm.dates?.nights || "",
+      adults: (r && r.Adults) || confirm.guests?.adults || 0,
+      children: (r && r.Children) || confirm.guests?.children || 0,
+      total: (r && r.Monto_Total) || confirm.total || 0,
+      notes: (r && r.Observaciones) || confirm.observaciones || "",
+      img: confirm.img || ""
+    };
+
+    render(vm);
+  })();
+})();
+</script>
 </body>
 </html>
