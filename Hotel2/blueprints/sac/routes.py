@@ -1219,10 +1219,10 @@ def incidentes_data():
         SELECT i.Id, i.Codigo_Reserva, i.Codigo_Cliente,
                i.Reportado_Por, i.Asignado_A,
                i.Tipo, i.Severidad, i.Titulo, i.Detalle, i.Estado,
-               DATE_FORMAT(i.Creada_At,'%Y-%m-%d %H:%i') AS Fecha
-        FROM SAC_Incident i
+               DATE_FORMAT(i.Creado_At,'%Y-%m-%d %H:%i') AS Fecha
+        FROM sac_incident i
         {where_sql}
-        ORDER BY i.Creada_At DESC
+        ORDER BY i.Creado_At DESC
         LIMIT :lim OFFSET :off
         """
             ),
