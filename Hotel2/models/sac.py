@@ -130,7 +130,7 @@ class SACConversationMsg(db.Model):
 
 
 class SACIncident(db.Model):
-    __tablename__ = "SAC_Incident"
+    __tablename__ = "sac_incident"
 
     Id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     Codigo_Reserva = db.Column(db.Integer, nullable=True)
@@ -142,7 +142,7 @@ class SACIncident(db.Model):
     Titulo = db.Column(db.String(160), nullable=False)
     Detalle = db.Column(db.Text)
     Estado = db.Column(db.String(15), nullable=False, default="ABIERTA")
-    Creada_At = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    Creada_At = db.Column("Creado_At", db.DateTime, nullable=False, default=datetime.utcnow)
 
     def __repr__(self) -> str:
         return f"<SACIncident {self.Id} tipo={self.Tipo} sev={self.Severidad}>"
