@@ -1326,6 +1326,56 @@ def incidentes_update(iid: int):
     return jsonify({"ok": True})
 
 
+@sac_bp.get("/incidentes/<int:inc_id>/comentarios", endpoint="incidentes_comments_list")
+@role_required("Recepcionista", "Administrador")
+def incidentes_comments_list(inc_id: int):
+    rows = (
+        db.session.execute(
+            text(
+                """
+            SELECT c.Id, c.Incident_Id, c.Autor, c.Comentario,
+                   DATE_FORMAT(c.Creada_At,'%Y-%m-%d %H:%i') AS Fecha
+            FROM sac_incident_comment c
+            WHERE c.Incident_Id = :id
+            ORDER BY c.Creada_At DESC
+            LIMIT 200
+        """
+            ),
+            {"id": inc_id},
+        )
+        .mappings()
+        .all()
+    )
+
+    return jsonify({"ok": True, "items": [dict(r) for r in rows]})
+
+
+@sac_bp.post("/incidentes/<int:inc_id>/comentarios", endpoint="incidentes_comments_new")
+@role_required("Recepcionista", "Administrador")
+def incidentes_comments_new(inc_id: int):
+    data = request.get_json(silent=True) or request.form or {}
+    comentario = (data.get("Comentario") or "").strip()
+
+    if not comentario:
+        return jsonify({"ok": False, "error": "Comentario requerido."}), 400
+
+    autor = (
+        session.get("user_name") or session.get("user_email") or ""
+    ).strip() or None
+
+    db.session.execute(
+        text(
+            """
+            INSERT INTO sac_incident_comment (Incident_Id, Autor, Comentario)
+            VALUES (:id, :autor, :comentario)
+        """
+        ),
+        {"id": inc_id, "autor": autor, "comentario": comentario},
+    )
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
 # ====================== INDICADORES ======================
 @sac_bp.get("/indicadores", endpoint="indicadores_html")
 @role_required("Administrador")

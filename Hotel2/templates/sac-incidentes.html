@@ -6,7 +6,7 @@
 {% block sac_content %}
 <div class="row g-4">
 
-  <!-- TABLA FULL WIDTH -->
+
   <div class="col-12">
     <div class="vg-card p-4 p-md-5">
 
@@ -31,7 +31,7 @@
             <option value="CERRADA">CERRADA</option>
           </select>
 
-          <!-- usa el verde del sitio -->
+
           <button id="btnReload" class="btn btn-outline-accent">
             <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
           </button>
@@ -65,27 +65,45 @@
         </table>
       </div>
 
-      <!-- paginación alineada a la derecha -->
-      <div class="d-flex justify-content-end mt-3">
-        <nav aria-label="Paginación incidentes">
-          <ul id="pager" class="pagination sac-pager mb-0">
-            <li class="page-item disabled">
-              <a class="page-link" href="#" data-page="prev">Anterior</a>
+
+      <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+
+        <!-- Selector de tamaño -->
+        <div class="d-flex align-items-center gap-2">
+          <span class="fw-semibold">Mostrar</span>
+          <select id="pageSizeSelect" class="form-select form-select-sm w-auto">
+            <option value="10">10</option>
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          <span>registros</span>
+        </div>
+
+        <!-- Paginación -->
+        <nav aria-label="Paginación">
+          <ul id="pager" class="pagination pagination-sm mb-0">
+            <li class="page-item" id="pgPrev">
+              <button class="page-link text-success border-success" data-page="prev">Anterior</button>
             </li>
+
             <li class="page-item active">
-              <a class="page-link" href="#" data-page="p1">1</a>
+              <span class="page-link bg-success border-success">1</span>
             </li>
-            <li class="page-item">
-              <a class="page-link" href="#" data-page="next">Siguiente</a>
+
+            <li class="page-item" id="pgNext">
+              <button class="page-link text-success border-success" data-page="next">Siguiente</button>
             </li>
           </ul>
         </nav>
+
       </div>
+
 
     </div>
   </div>
 
-  <!-- FORMULARIO + INSTRUCCIONES JUNTOS -->
+
   <div class="col-lg-8">
     <div class="vg-card p-4 p-md-5">
       <h5 class="mb-3">Registrar incidente</h5>
@@ -151,7 +169,7 @@
         </div>
 
         <div class="col-12 d-flex align-items-center gap-3">
-          <!-- usa el verde del sitio -->
+
           <button id="btnSave" class="btn btn-outline-accent" type="submit">
             <i class="bi bi-check2-circle me-1"></i> Guardar
           </button>
@@ -228,7 +246,19 @@
 
           <div class="col-12">
             <label class="form-label">Detalle</label>
-            <textarea id="mDetalle" class="form-control" rows="6"></textarea>
+            <textarea id="mDetalle" class="form-control" rows="6" readonly></textarea>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Comentario interno</label>
+            <textarea id="mComment" class="form-control" rows="3"
+              placeholder="Escribe un comentario interno para el seguimiento…"></textarea>
+          </div>
+
+          <div class="col-12">
+            <div id="mComments" class="mt-2 small">
+              <div class="text-muted">Sin comentarios.</div>
+            </div>
           </div>
 
           <div class="col-12">
@@ -241,6 +271,9 @@
         <button type="button" class="btn btn-outline-accent" data-bs-dismiss="modal">Cerrar</button>
         <button id="mSave" type="button" class="btn btn-outline-accent">
           <i class="bi bi-check2-circle me-1"></i> Guardar cambios
+        </button>
+        <button id="mAddComment" type="button" class="btn btn-outline-accent">
+          <i class="bi bi-chat-left-text me-1"></i> Agregar comentario
         </button>
       </div>
     </div>
@@ -260,8 +293,10 @@
   const fEstado = document.getElementById('fEstado');
   const pager = document.getElementById('pager');
 
+  const pageSizeSelect = document.getElementById('pageSizeSelect');
+
   let page = 1;
-  const pageSize = 20;
+  let pageSize = 20;
 
   const incModalEl = document.getElementById('incModal');
   let incModal = null;
@@ -273,6 +308,9 @@
   const mDetalle = document.getElementById('mDetalle');
   const mSave = document.getElementById('mSave');
   const mMsg = document.getElementById('mMsg');
+  const mComment = document.getElementById('mComment');
+  const mAddComment = document.getElementById('mAddComment');
+  const mComments = document.getElementById('mComments');
 
   function showAlert(type, html, autoHideMs = 6000) {
     alertBox.className = `alert alert-${type} d-block mb-3`;
@@ -451,7 +489,7 @@
   });
 
   pager.addEventListener('click', (e) => {
-    const a = e.target.closest('a');
+    const a = e.target.closest('[data-page]');
     if (!a) return;
 
     if (a.closest('.page-item')?.classList.contains('disabled')) return;
@@ -471,10 +509,22 @@
     if (window.bootstrap && incModalEl) {
       incModal = new window.bootstrap.Modal(incModalEl);
     }
+
+    if (pageSizeSelect) {
+      pageSizeSelect.value = String(pageSize);
+      pageSizeSelect.addEventListener('change', async () => {
+        pageSize = Number(pageSizeSelect.value) || 20;
+        page = 1;
+        await load();
+      });
+    }
+
     load();
+
   });
 
-  rows.addEventListener('click', (e) => {
+
+  rows.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-action="open"]');
     if (!btn) return;
 
@@ -490,6 +540,10 @@
     mEstado.value = (x.Estado || 'ABIERTA');
     mDetalle.value = x.Detalle || '';
 
+    await loadComments(mId.value);
+
+    if (mComment) mComment.value = '';
+
     incModal?.show();
   });
 
@@ -504,8 +558,7 @@
       const payload = {
         Titulo: mTitulo.value.trim(),
         Asignado_A: mAsignado.value || null,
-        Estado: mEstado.value,
-        Detalle: (mDetalle.value || '').trim()
+        Estado: mEstado.value
       };
 
       const res = await fetch(`/sac/incidentes/${id}`, {
@@ -531,6 +584,102 @@
       mSave.disabled = false;
     }
   });
+
+  mAddComment?.addEventListener('click', async () => {
+    const id = mId.value;
+    const txt = (mComment?.value || '').trim();
+    if (!id || !txt) {
+      mMsg.textContent = 'Escribe un comentario antes de guardar.';
+      return;
+    }
+
+    mAddComment.disabled = true;
+    mMsg.textContent = 'Guardando comentario…';
+
+    try {
+      const res = await fetch(`/sac/incidentes/${id}/comentarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Comentario: txt })
+      });
+
+      let out = null;
+      try { out = await res.json(); } catch { out = { ok: res.ok }; }
+      if (!out) out = { ok: res.ok };
+
+      if (out.ok) {
+        mMsg.textContent = 'Comentario agregado.';
+        mComment.value = '';
+        await load();
+        await loadComments(mId.value);
+      } else {
+        mMsg.textContent = out.error || 'No se pudo agregar el comentario.';
+      }
+    } catch (e) {
+      mMsg.textContent = 'Error de conexión.';
+    } finally {
+      mAddComment.disabled = false;
+    }
+  });
+
+  async function loadComments(id) {
+    if (!mComments) return;
+
+    mComments.innerHTML = `<div class="text-muted">Cargando…</div>`;
+
+    try {
+      const res = await fetch(`/sac/incidentes/${id}/comentarios`, { method: 'GET' });
+
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('application/json')) {
+        const txt = await res.text();
+        mComments.innerHTML = `<div class="text-danger">No se pudo cargar comentarios (respuesta no JSON). ¿Sesión expirada?</div>`;
+        return;
+      }
+
+      const out = await res.json();
+      if (!out.ok) {
+        mComments.innerHTML = `<div class="text-danger">${out.error || 'No se pudo cargar comentarios.'}</div>`;
+        return;
+      }
+
+      const items = out.items || [];
+      if (!items.length) {
+        mComments.innerHTML = `<div class="text-muted">Sin comentarios.</div>`;
+        return;
+      }
+
+      mComments.innerHTML = items.map(r => {
+        const autor = (r.Autor || '—');
+        const fecha = (r.Fecha || '');
+        const comentario = (r.Comentario || '');
+
+        return `
+        <div class="border rounded p-2 mb-2">
+          <div class="d-flex justify-content-between">
+            <strong>${escapeHtml(autor)}</strong>
+            <span class="text-muted">${escapeHtml(fecha)}</span>
+          </div>
+          <div>${escapeHtml(comentario)}</div>
+        </div>
+      `;
+      }).join('');
+
+    } catch (e) {
+      mComments.innerHTML = `<div class="text-danger">Error cargando comentarios.</div>`;
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+
 
 </script>
 {% endblock %}
