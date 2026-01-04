@@ -1287,39 +1287,47 @@ def incidentes_new():
 def incidentes_update(iid: int):
     data = request.get_json(silent=True) or {}
 
-    nuevo_estado = (data.get("Estado") or "").strip().upper()
     valid_estado = {"ABIERTA", "EN_PROCESO", "CERRADA"}
-    if nuevo_estado and nuevo_estado not in valid_estado:
-        return jsonify({"ok": False, "error": "Estado inválido"}), 400
-
-    asignado = (data.get("Asignado_A") or "").strip()
     valid_asignado = {
         "Recepcionista",
         "Mantenimiento",
         "Limpieza",
         "Administración",
         "Otro",
-        "",
     }
-    if asignado not in valid_asignado:
-        return jsonify({"ok": False, "error": "Asignado inválido"}), 400
-    asignado = asignado or None
 
     sets = []
     params = {"id": iid}
 
-    if nuevo_estado:
+    # Solo actualizar si la llave viene en el JSON
+    if "Estado" in data:
+        nuevo_estado = (data.get("Estado") or "").strip().upper()
+        if nuevo_estado and nuevo_estado not in valid_estado:
+            return jsonify({"ok": False, "error": "Estado inválido"}), 400
         sets.append("Estado = :estado")
-        params["estado"] = nuevo_estado
+        params["estado"] = (
+            nuevo_estado  # permite '' si quisieras, pero normalmente vendrá válido
+        )
 
-    sets.append("Asignado_A = :asignado")
-    params["asignado"] = asignado
+    if "Asignado_A" in data:
+        asignado = (data.get("Asignado_A") or "").strip()
+        if asignado and asignado not in valid_asignado:
+            return jsonify({"ok": False, "error": "Asignado inválido"}), 400
+        sets.append("Asignado_A = :asignado")
+        params["asignado"] = asignado or None
+
+    if "Titulo" in data:
+        titulo = (data.get("Titulo") or "").strip()
+        if not titulo:
+            return jsonify({"ok": False, "error": "Título requerido"}), 400
+        sets.append("Titulo = :titulo")
+        params["titulo"] = titulo
 
     if not sets:
         return jsonify({"ok": True})
 
     db.session.execute(
-        text(f"UPDATE SAC_Incident SET {', '.join(sets)} WHERE Id = :id"),
+        text(f"UPDATE sac_incident SET {', '.join(sets)} WHERE Id = :id"),
         params,
     )
     db.session.commit()
