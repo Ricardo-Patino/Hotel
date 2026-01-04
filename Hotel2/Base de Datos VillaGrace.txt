@@ -2288,6 +2288,144 @@ SELECT
 FROM fin_ledger_tx t;
 
 
+
+
+
+
+-- =========================================================
+-- LOGS OPERATIVOS: CHECK-IN / CHECK-OUT (alineado a app.py)
+-- =========================================================
+
+/* CHECK-IN (GuestCheckin en app.py) */
+CREATE TABLE IF NOT EXISTS guest_checkin (
+  id INT NOT NULL AUTO_INCREMENT,
+
+  reserva_id INT NOT NULL,
+  cliente_id INT NULL,
+  recep_user_id INT NOT NULL,
+
+  doc_type VARCHAR(20) DEFAULT NULL,
+  doc_number VARCHAR(64) NOT NULL,
+
+  doc_image_path VARCHAR(255) DEFAULT NULL,
+  signature_path VARCHAR(255) DEFAULT NULL,
+
+  key_activated TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  meta JSON DEFAULT NULL,
+
+  PRIMARY KEY (id),
+
+  KEY IX_gc_created_at (created_at),
+  KEY IX_gc_reserva (reserva_id),
+  KEY IX_gc_cliente (cliente_id),
+  KEY IX_gc_recep_user (recep_user_id),
+  KEY IX_gc_doc_number (doc_number),
+
+  CONSTRAINT FK_gc_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+
+  CONSTRAINT FK_gc_cliente
+    FOREIGN KEY (cliente_id) REFERENCES Cliente(Codigo_Cliente)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+
+  CONSTRAINT FK_gc_recep_user
+    FOREIGN KEY (recep_user_id) REFERENCES Usuario(Codigo_Usuario)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* ACTIVACIÓN DE LLAVE (KeyActivation en app.py) */
+CREATE TABLE IF NOT EXISTS key_activation (
+  id INT NOT NULL AUTO_INCREMENT,
+
+  reserva_id INT NOT NULL,
+  habitacion_id INT DEFAULT NULL,
+  cliente_id INT DEFAULT NULL,
+
+  activated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  status ENUM('activated','failed') NOT NULL DEFAULT 'activated',
+
+  meta JSON DEFAULT NULL,
+
+  PRIMARY KEY (id),
+
+  KEY IX_ka_activated_at (activated_at),
+  KEY IX_ka_reserva (reserva_id),
+  KEY IX_ka_habitacion (habitacion_id),
+  KEY IX_ka_cliente (cliente_id),
+
+  CONSTRAINT FK_ka_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+
+  CONSTRAINT FK_ka_habitacion
+    FOREIGN KEY (habitacion_id) REFERENCES Habitacion(Codigo_Habitacion)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+
+  CONSTRAINT FK_ka_cliente
+    FOREIGN KEY (cliente_id) REFERENCES Cliente(Codigo_Cliente)
+    ON DELETE SET NULL ON UPDATE CASCADE
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+/* CHECK-OUT (solo para “log semanal” en UI; tu /api/ops/checkout actual no lo usa aún) */
+CREATE TABLE IF NOT EXISTS guest_checkout (
+  id INT NOT NULL AUTO_INCREMENT,
+
+  reserva_id INT NOT NULL,
+  estancia_id INT DEFAULT NULL,
+  habitacion_id INT DEFAULT NULL,
+  cliente_id INT DEFAULT NULL,
+  recep_user_id INT DEFAULT NULL,
+
+  doc_number VARCHAR(64) DEFAULT NULL,
+
+  pago_final DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  metodo VARCHAR(30) DEFAULT NULL,
+
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  meta JSON DEFAULT NULL,
+
+  PRIMARY KEY (id),
+
+  KEY IX_gco_created_at (created_at),
+  KEY IX_gco_reserva (reserva_id),
+  KEY IX_gco_estancia (estancia_id),
+  KEY IX_gco_habitacion (habitacion_id),
+  KEY IX_gco_cliente (cliente_id),
+  KEY IX_gco_recep_user (recep_user_id),
+  KEY IX_gco_doc_number (doc_number),
+
+  CONSTRAINT FK_gco_reserva
+    FOREIGN KEY (reserva_id) REFERENCES Reserva(Codigo_Reserva)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+
+  CONSTRAINT FK_gco_estancia
+    FOREIGN KEY (estancia_id) REFERENCES ReservaEstancia(Id_Estancia)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+
+  CONSTRAINT FK_gco_habitacion
+    FOREIGN KEY (habitacion_id) REFERENCES Habitacion(Codigo_Habitacion)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+
+  CONSTRAINT FK_gco_cliente
+    FOREIGN KEY (cliente_id) REFERENCES Cliente(Codigo_Cliente)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+
+  CONSTRAINT FK_gco_recep_user
+    FOREIGN KEY (recep_user_id) REFERENCES Usuario(Codigo_Usuario)
+    ON DELETE SET NULL ON UPDATE CASCADE
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+
 /* ===================================================================== */
 /* SEEDS                                                                 */
 /* ===================================================================== */
@@ -2845,12 +2983,14 @@ CALL sp_patch_sac_compat_20251230();
 
 
 INSERT INTO SAC_Config (Clave, Valor) VALUES
-('sinpe_mobile', '8343 9451'),
+('sinpe_mobile', '83439451'),
 ('sinpe_beneficiary', 'Hotel Villa Grace')
 ON DUPLICATE KEY UPDATE Valor = VALUES(Valor);
 
 
-
+UPDATE SAC_Config
+SET Valor = 83439451
+WHERE Id = 5;
 /* ------------------------------------------------------------------------- */
 /* Verificaciones rápidas (opcional; descomentar si se requiere)             */
 /* ------------------------------------------------------------------------- */
