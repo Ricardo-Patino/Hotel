@@ -1945,6 +1945,131 @@ def create_app() -> Flask:
     @app.route("/contact.html")
     def contact_html():
         return render_template("contact.html")
+    
+        # -----------------------------------------------------------------------
+    # Contact Form (contact.html -> /forms/contact.php)
+    # Mantiene compatibilidad con assets/vendor/php-email-form/validate.js
+    # -----------------------------------------------------------------------
+    def _truthy(val) -> bool:
+        return str(val).strip().lower() in ("1", "true", "yes", "y", "on")
+
+    def _send_contact_form_email(
+        *,
+        name: str,
+        email: str,
+        phone: str,
+        subject_raw: str,
+        message: str,
+        ip: str = "",
+        user_agent: str = "",
+    ) -> None:
+        # Destino fijo solicitado
+        to_email = "hotelvillagrace@gmail.com"
+
+        # Tomar SMTP desde config (Config/.env) con fallback a env directo
+        host = current_app.config.get("MAIL_SERVER") or os.getenv("MAIL_SERVER")
+        port = int(current_app.config.get("MAIL_PORT") or os.getenv("MAIL_PORT") or 0)
+        user = current_app.config.get("MAIL_USERNAME") or os.getenv("MAIL_USERNAME")
+        pwd  = current_app.config.get("MAIL_PASSWORD") or os.getenv("MAIL_PASSWORD")
+
+        use_tls = _truthy(current_app.config.get("MAIL_USE_TLS", os.getenv("MAIL_USE_TLS", "0")))
+        use_ssl = _truthy(current_app.config.get("MAIL_USE_SSL", os.getenv("MAIL_USE_SSL", "0")))
+
+        sender = (
+            current_app.config.get("MAIL_DEFAULT_SENDER")
+            or os.getenv("MAIL_DEFAULT_SENDER")
+            or user
+            or "no-reply@hotel.local"
+        )
+
+        # Evitar header injection en subject
+        subject_clean = re.sub(r"[\r\n]+", " ", (subject_raw or "")).strip()
+        subject = f"[Web Contacto] {subject_clean}" if subject_clean else "[Web Contacto] Nuevo mensaje"
+
+        body = (
+            "Nuevo mensaje desde el formulario 'Escríbenos' (contact.html)\n\n"
+            f"Nombre: {name}\n"
+            f"Email: {email}\n"
+            f"Teléfono/WhatsApp: {phone or '(no indicado)'}\n"
+            f"Asunto: {subject_clean or '(sin asunto)'}\n\n"
+            "Mensaje:\n"
+            f"{message}\n\n"
+            "----\n"
+            f"IP: {ip}\n"
+            f"User-Agent: {user_agent}\n"
+            f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        )
+
+        if not (host and port and user and pwd):
+            raise RuntimeError("Configuración SMTP incompleta (MAIL_SERVER/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD).")
+
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = to_email
+        # Para que al responder, respondan al huésped
+        msg["Reply-To"] = email
+        msg.set_content(body)
+
+        if use_ssl:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
+                smtp.login(user, pwd)
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(host, port, timeout=30) as smtp:
+                if use_tls:
+                    smtp.starttls(context=ssl.create_default_context())
+                smtp.login(user, pwd)
+                smtp.send_message(msg)
+
+    @app.post("/forms/contact.php")
+    def forms_contact_php_bridge():
+        """
+        Endpoint puente para el template (contact.html -> forms/contact.php).
+        El JS del template normalmente espera un texto plano: 'OK' si todo salió bien.
+        """
+        name = (request.form.get("name") or "").strip()
+        email = (request.form.get("email") or "").strip()
+        phone = (request.form.get("phone") or "").strip()
+        subject = (request.form.get("subject") or "").strip()
+        message = (request.form.get("message") or "").strip()
+
+        # Validaciones mínimas (alineadas a required del HTML)
+        if not name or not email or not subject or not message:
+            return (
+                "Por favor completa Nombre, Email, Asunto y Mensaje.",
+                400,
+                {"Content-Type": "text/plain; charset=utf-8"},
+            )
+
+        # Validación simple de email
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            return (
+                "Email inválido. Verifica el formato.",
+                400,
+                {"Content-Type": "text/plain; charset=utf-8"},
+            )
+
+        try:
+            _send_contact_form_email(
+                name=name,
+                email=email,
+                phone=phone,
+                subject_raw=subject,
+                message=message,
+                ip=(request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip(),
+                user_agent=request.headers.get("User-Agent", ""),
+            )
+            return ("OK", 200, {"Content-Type": "text/plain; charset=utf-8"})
+        except Exception as e:
+            current_app.logger.exception(f"[CONTACT FORM] Error enviando correo: {e}")
+            return (
+                "No se pudo enviar el mensaje en este momento. Intenta más tarde.",
+                500,
+                {"Content-Type": "text/plain; charset=utf-8"},
+            )
+
 
     @app.route("/about.html")
     def about_html():
@@ -2867,7 +2992,7 @@ def create_app() -> Flask:
     
         hotel_nom  = _cfg("hotel_nombre", "Hotel Villa Grace")
         hotel_tel  = _cfg("hotel_tel", "+506 2642 0225")
-        base_url   = _cfg("site_base_url", "https://hotelvillagrace.test")
+        base_url   = _cfg("site_base_url", "https://hotelvillagrace.com")
         moneda_sym = _cfg("moneda_simbolo", "₡")
     
         # Config SINPE (si no existen, el email igual sale sin ese detalle)
