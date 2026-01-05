@@ -1,369 +1,319 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Detalle de la reserva | Hotel Villa Grace</title>
-  <meta name="description" content="Selecciona tu plan, aplica cupón y confirma detalles antes del pago.">
+{% extends "base.html" %}
 
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}Detalle de la reserva | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Selecciona tu plan, aplica cupón y confirma detalles antes del pago.{% endblock %}
 
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+{% block body_class %}booking-details-page{% endblock %}
 
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
+{% block head_extra %}
+<style>.muted-mini{font-size:.875rem;color:#6c757d}</style>
+{% endblock %}
 
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-  <style>.muted-mini{font-size:.875rem;color:#6c757d}</style>
-</head>
-<body>
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <h1 class="sitename">Hotel Villa Grace</h1>
-      </a>
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li><a href="booking-search.html">Buscar</a></li>
-          <li><a href="booking-results.html">Disponibilidad</a></li>
-          <li><a href="booking-details.html" class="active">Detalle</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
-      <button id="header-continue" class="btn-getstarted d-none d-sm-block" type="button">Continuar</button>
-    </div>
-  </header>
+{% block content %}
 
-  <main class="main">
-    <div class="page-title dark-background" data-aos="fade"
-         style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-      <div class="container position-relative">
-        <h1 id="room-title">Detalle de la habitación</h1>
-        <p id="room-subtitle" class="mb-0">—</p>
-        <nav class="breadcrumbs">
-          <ol>
-            <li><a href="booking-results.html">Disponibilidad</a></li>
-            <li class="current">Detalle</li>
-          </ol>
-        </nav>
-      </div>
-    </div>
+<div class="page-title dark-background" data-aos="fade"
+     style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1 id="room-title">Detalle de la habitación</h1>
+    <p id="room-subtitle" class="mb-0">—</p>
+    <nav class="breadcrumbs" aria-label="breadcrumbs">
+      <ol>
+        <li><a href="booking-results.html">Disponibilidad</a></li>
+        <li class="current">Detalle</li>
+      </ol>
+    </nav>
+  </div>
+</div>
 
-    <section class="section pt-3">
-      <div class="container" data-aos="fade-up">
-        <div class="row g-4">
-          <div class="col-lg-7">
-            <div class="card shadow-sm border-0 mb-3">
-              <img id="room-img"
-                   data-fallback="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}"
-                   src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}"
-                   class="card-img-top" alt="Habitación seleccionada" style="object-fit:cover; height:360px;">
-              <div class="card-body">
-                <p id="room-desc">Alojamiento cómodo con Wi-Fi, A/C y baño privado. Ideal para descansar cerca de playas y naturaleza.</p>
-                <div class="row small text-muted">
-                  <div class="col-6"><i class="bi bi-wifi me-1"></i>Wi-Fi gratis</div>
-                  <div class="col-6"><i class="bi bi-snow me-1"></i>Aire acondicionado</div>
-                  <div class="col-6"><i class="bi bi-cup-hot me-1"></i>Opciones con desayuno</div>
-                  <div class="col-6"><i class="bi bi-door-closed me-1"></i>Baño privado</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-lg-5">
-            <div class="card shadow-sm border-0">
-              <div class="card-body">
-                <div class="border rounded-3 p-3 mb-3 bg-light">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <strong>Resumen</strong>
-                    <span class="badge text-bg-secondary" id="nights-pill"></span>
-                  </div>
-                  <div class="small mt-2">
-                    <div><i class="bi bi-calendar-event me-1"></i><span id="dates-text">—</span></div>
-                    <div><i class="bi bi-people me-1"></i><span id="guests-text">—</span></div>
-                    <div class="muted-mini">
-                      <i class="bi bi-tag me-1"></i>
-                      <span>Precio por noche <em>(por huésped)</em>:</span>
-                      <strong id="price-night">₡ 0,00</strong>
-                    </div>
-                    <div class="mt-1">Total estimado: <strong id="price-total">₡ 0,00</strong></div>
-                    <div class="text-muted">Impuestos no incluidos.</div>
-                  </div>
-                </div>
-
-                <h5 class="card-title">Elige tu plan</h5>
-
-                <label class="border rounded p-3 w-100 mb-2 d-block">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                      <input class="form-check-input me-2" type="radio" name="plan" value="flex" data-name="Tarifa Flexible" checked>
-                      <strong>Tarifa Flexible</strong>
-                      <div class="small text-muted">Cancela gratis hasta 7 días antes.</div>
-                    </div>
-                    <div class="text-end">
-                      <div class="fw-semibold" id="price-flex">₡ 0,00</div>
-                      <div class="small text-muted">/noche <span class="muted-mini">(por huésped)</span></div>
-                    </div>
-                  </div>
-                </label>
-
-                <label class="border rounded p-3 w-100 d-block">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                      <input class="form-check-input me-2" type="radio" name="plan" value="nrb" data-name="No Reembolsable">
-                      <strong>No Reembolsable</strong>
-                      <div class="small text-muted">Pago inmediato. Sin cambios.</div>
-                    </div>
-                    <div class="text-end">
-                      <div class="fw-semibold" id="price-nrb">₡ 0,00</div>
-                      <div class="small text-muted">/noche <span class="muted-mini">(por huésped)</span></div>
-                    </div>
-                  </div>
-                </label>
-
-                <!-- cupón del cliente (GRR-01-015) -->
-                <div class="mt-3">
-                  <label class="form-label">¿Tienes un cupón?</label>
-                  <div class="input-group">
-                    <input id="coupon" class="form-control" placeholder="Ej. ACME10">
-                    <button class="btn btn-outline-secondary" id="coupon-btn" type="button">Validar</button>
-                  </div>
-                  <div class="small text-muted" id="coupon-note"></div>
-                </div>
-
-                <div class="d-grid gap-2 mt-3">
-                  <button id="btn-continue" class="btn btn-success">
-                    <i class="bi bi-arrow-right-circle me-1"></i> Continuar
-                  </button>
-                  <a href="booking-results.html" class="btn btn-outline-secondary">Volver a resultados</a>
-                </div>
-
-                <p class="text-muted small mt-3 mb-0">
-                  Al continuar, aceptas las <a href="terms.html">políticas de reserva</a> y la
-                  <a href="privacy.html">política de privacidad</a>.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row mt-4">
-          <div class="col-12">
-            <div class="alert alert-info small mb-0">
-              <i class="bi bi-info-circle me-1"></i>
-              Los totales son estimados; el importe final (con impuestos/cargos) se calcula en el paso de pago.
+<section class="section pt-3">
+  <div class="container" data-aos="fade-up">
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card shadow-sm border-0 mb-3">
+          <img id="room-img"
+               data-fallback="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}"
+               src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/481945002_1158853609272176_4962241400970988461_n.jpg') }}"
+               class="card-img-top" alt="Habitación seleccionada" style="object-fit:cover; height:360px;">
+          <div class="card-body">
+            <p id="room-desc">Alojamiento cómodo con Wi-Fi, A/C y baño privado. Ideal para descansar cerca de playas y naturaleza.</p>
+            <div class="row small text-muted">
+              <div class="col-6"><i class="bi bi-wifi me-1"></i>Wi-Fi gratis</div>
+              <div class="col-6"><i class="bi bi-snow me-1"></i>Aire acondicionado</div>
+              <div class="col-6"><i class="bi bi-cup-hot me-1"></i>Opciones con desayuno</div>
+              <div class="col-6"><i class="bi bi-door-closed me-1"></i>Baño privado</div>
             </div>
           </div>
         </div>
       </div>
-    </section>
-  </main>
 
-  <footer id="footer" class="footer position-relative dark-background">
-    <div class="copyright text-center">
-      <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+      <div class="col-lg-5">
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <div class="border rounded-3 p-3 mb-3 bg-light">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>Resumen</strong>
+                <span class="badge text-bg-secondary" id="nights-pill"></span>
+              </div>
+              <div class="small mt-2">
+                <div><i class="bi bi-calendar-event me-1"></i><span id="dates-text">—</span></div>
+                <div><i class="bi bi-people me-1"></i><span id="guests-text">—</span></div>
+                <div class="muted-mini">
+                  <i class="bi bi-tag me-1"></i>
+                  <span>Precio por noche <em>(por huésped)</em>:</span>
+                  <strong id="price-night">₡ 0,00</strong>
+                </div>
+                <div class="mt-1">Total estimado: <strong id="price-total">₡ 0,00</strong></div>
+                <div class="text-muted">Impuestos no incluidos.</div>
+              </div>
+            </div>
+
+            <h5 class="card-title">Elige tu plan</h5>
+
+            <label class="border rounded p-3 w-100 mb-2 d-block">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <input class="form-check-input me-2" type="radio" name="plan" value="flex" data-name="Tarifa Flexible" checked>
+                  <strong>Tarifa Flexible</strong>
+                  <div class="small text-muted">Cancela gratis hasta 7 días antes.</div>
+                </div>
+                <div class="text-end">
+                  <div class="fw-semibold" id="price-flex">₡ 0,00</div>
+                  <div class="small text-muted">/noche <span class="muted-mini">(por huésped)</span></div>
+                </div>
+              </div>
+            </label>
+
+            <label class="border rounded p-3 w-100 d-block">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <input class="form-check-input me-2" type="radio" name="plan" value="nrb" data-name="No Reembolsable">
+                  <strong>No Reembolsable</strong>
+                  <div class="small text-muted">Pago inmediato. Sin cambios.</div>
+                </div>
+                <div class="text-end">
+                  <div class="fw-semibold" id="price-nrb">₡ 0,00</div>
+                  <div class="small text-muted">/noche <span class="muted-mini">(por huésped)</span></div>
+                </div>
+              </div>
+            </label>
+
+            <div class="mt-3">
+              <label class="form-label">¿Tienes un cupón?</label>
+              <div class="input-group">
+                <input id="coupon" class="form-control" placeholder="Ej. ACME10">
+                <button class="btn btn-outline-secondary" id="coupon-btn" type="button">Validar</button>
+              </div>
+              <div class="small text-muted" id="coupon-note"></div>
+            </div>
+
+            <div class="d-grid gap-2 mt-3">
+              <button id="btn-continue" class="btn btn-success">
+                <i class="bi bi-arrow-right-circle me-1"></i> Continuar
+              </button>
+              <a href="booking-results.html" class="btn btn-outline-secondary">Volver a resultados</a>
+            </div>
+
+            <p class="text-muted small mt-3 mb-0">
+              Al continuar, aceptas las <a href="terms.html">políticas de reserva</a> y la
+              <a href="privacy.html">política de privacidad</a>.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
-  </footer>
 
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-    <i class="bi bi-arrow-up-short"></i></a>
-  <div id="preloader"></div>
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="alert alert-info small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          Los totales son estimados; el importe final (con impuestos/cargos) se calcula en el paso de pago.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+{% endblock %}
 
-  <script>
-    // ---- Config y utilidades ----
-    const PRICING = { TAX_RATE:0.13, NRB_DISCOUNT:0.10, ROUND:(n)=>Math.round((Number(n)+Number.EPSILON)*100)/100 };
-    const money = (n)=> new Intl.NumberFormat("es-CR",{style:"currency",currency:"CRC",minimumFractionDigits:2}).format(Number(n||0));
-    const nightsBetween = (a,b)=>{ const d1=new Date(a+'T00:00:00'); const d2=new Date(b+'T00:00:00'); return Math.max(1,Math.round((d2-d1)/86400000)); };
-    const fmtDateLong = (iso)=> new Intl.DateTimeFormat('es-CR',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(iso+'T00:00:00')).replace('.','');
+{% block scripts %}
+<script>
+  const PRICING = { TAX_RATE:0.13, NRB_DISCOUNT:0.10, ROUND:(n)=>Math.round((Number(n)+Number.EPSILON)*100)/100 };
+  const money = (n)=> new Intl.NumberFormat("es-CR",{style:"currency",currency:"CRC",minimumFractionDigits:2}).format(Number(n||0));
+  const nightsBetween = (a,b)=>{ const d1=new Date(a+'T00:00:00'); const d2=new Date(b+'T00:00:00'); return Math.max(1,Math.round((d2-d1)/86400000)); };
+  const fmtDateLong = (iso)=> new Intl.DateTimeFormat('es-CR',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(iso+'T00:00:00')).replace('.','');
 
-    async function fetchJSON(url){ try{ const r=await fetch(url,{headers:{'Accept':'application/json'}}); if(!r.ok) return null; return await r.json(); }catch(_){ return null; } }
+  async function fetchJSON(url){ try{ const r=await fetch(url,{headers:{'Accept':'application/json'}}); if(!r.ok) return null; return await r.json(); }catch(_){ return null; } }
 
-    (async function(){
-      const $ = (s)=>document.querySelector(s);
-      const qp = new URLSearchParams(location.search);
+  (async function(){
+    const $ = (s)=>document.querySelector(s);
+    const qp = new URLSearchParams(location.search);
 
-      // 1) Carga selección & búsqueda
-      let sel = null;
-      try { sel = JSON.parse(sessionStorage.getItem('villaGrace.selection')||'null'); } catch(_){ sel=null; }
-      const storedSearch = (()=>{ try{ return JSON.parse(sessionStorage.getItem('villaGrace.search')||'{}'); }catch(_){ return {}; }})();
+    let sel = null;
+    try { sel = JSON.parse(sessionStorage.getItem('villaGrace.selection')||'null'); } catch(_){ sel=null; }
+    const storedSearch = (()=>{ try{ return JSON.parse(sessionStorage.getItem('villaGrace.search')||'{}'); }catch(_){ return {}; }})();
 
-      sel = { ...(sel||{}),
-        roomCode:  sel?.roomCode || qp.get('room') || '',
-        priceNight: (sel?.priceNight ?? Number(qp.get('price'))) || 0,   // PRECIO POR PERSONA / NOCHE
-        checkin:   sel?.checkin || qp.get('checkin') || storedSearch.checkin,
-        checkout:  sel?.checkout || qp.get('checkout') || storedSearch.checkout,
-        adults:    sel?.adults || qp.get('adults') || storedSearch.adults || '2',
-        children:  sel?.children || qp.get('children') || storedSearch.children || '0',
-        roomName:  sel?.roomName || 'Habitación seleccionada',
-        img:       sel?.img || "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}",
-        rateName:  sel?.rateName || 'Tarifa Flexible',
-        rateCode:  sel?.rateCode || 'flex',
-        tipo:      sel?.tipo || 'Sencilla'
+    sel = { ...(sel||{}),
+      roomCode:  sel?.roomCode || qp.get('room') || '',
+      priceNight: (sel?.priceNight ?? Number(qp.get('price'))) || 0,
+      checkin:   sel?.checkin || qp.get('checkin') || storedSearch.checkin,
+      checkout:  sel?.checkout || qp.get('checkout') || storedSearch.checkout,
+      adults:    sel?.adults || qp.get('adults') || storedSearch.adults || '2',
+      children:  sel?.children || qp.get('children') || storedSearch.children || '0',
+      roomName:  sel?.roomName || 'Habitación seleccionada',
+      img:       sel?.img || "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}",
+      rateName:  sel?.rateName || 'Tarifa Flexible',
+      rateCode:  sel?.rateCode || 'flex',
+      tipo:      sel?.tipo || 'Sencilla'
+    };
+
+    if (!sel.checkin || !sel.checkout) {
+      const backQS = new URLSearchParams({
+        checkin: storedSearch.checkin || '',
+        checkout: storedSearch.checkout || '',
+        adults: storedSearch.adults || '2',
+        children: storedSearch.children || '0'
+      });
+      location.replace(`booking-results.html?${backQS.toString()}`);
+      return;
+    }
+
+    if (!sel.priceNight || sel.priceNight <= 0) {
+      const all = await fetchJSON('/grr/habitaciones');
+      if (all && all.ok && Array.isArray(all.rooms)) {
+        const r = all.rooms.find(x => String(x.Codigo_Habitacion||x.code) === String(sel.roomCode));
+        if (r) {
+          sel.roomName = sel.roomName || r.Nombre || r.name || sel.roomName;
+          sel.priceNight = Number(r.Precio_Noche ?? r.Precio_Base ?? r.price ?? 0) || sel.priceNight || 0;
+          sel.img = sel.img || r.Imagen_URL || r.img || sel.img;
+          sel.tipo = sel.tipo || r.Tipo || sel.tipo;
+        }
+      }
+    }
+
+    if (!sel.priceNight || sel.priceNight <= 0) {
+      alert('No pudimos determinar el precio de la habitación seleccionada. Por favor, vuelve a resultados y selecciona de nuevo.');
+      const backQS = new URLSearchParams({
+        checkin: sel.checkin, checkout: sel.checkout,
+        adults: String(sel.adults||'2'), children: String(sel.children||'0')
+      });
+      location.replace(`booking-results.html?${backQS.toString()}`);
+      return;
+    }
+
+    sel.nights = nightsBetween(sel.checkin, sel.checkout);
+    const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
+    const baseNight = Number(sel.priceNight || 0);
+    const priceFlex = baseNight;
+    const priceNRB  = Math.round(baseNight * (1 - PRICING.NRB_DISCOUNT) * 100) / 100;
+
+    $('#room-title').textContent = sel.roomName || 'Habitación seleccionada';
+    $('#room-subtitle').textContent = `${fmtDateLong(sel.checkin)} – ${fmtDateLong(sel.checkout)}`;
+
+    $('#nights-pill').textContent = `${sel.nights} noche(s)`;
+    $('#dates-text').textContent  = `${fmtDateLong(sel.checkin)} – ${fmtDateLong(sel.checkout)}`;
+    $('#guests-text').textContent = `${sel.adults} adulto(s)` + (parseInt(sel.children||'0',10) ? ` · ${sel.children} niño(s)` : '');
+
+    const imgEl = document.getElementById('room-img');
+    if (imgEl) {
+      const fallback = imgEl.getAttribute('data-fallback') || imgEl.src;
+      const test = new Image();
+      test.onload = () => { imgEl.src = sel.img || fallback; };
+      test.onerror = () => { imgEl.src = fallback; };
+      test.src = sel.img || fallback;
+    }
+
+    document.getElementById('price-flex').textContent = money(priceFlex);
+    document.getElementById('price-nrb').textContent  = money(priceNRB);
+
+    function setPrices(plan, overrideTotal=null){
+      const nightPP = (plan==='nrb')?priceNRB:priceFlex;
+      const subtotal = nightPP * sel.nights * totalPax;
+      document.getElementById('price-night').textContent = money(nightPP);
+      document.getElementById('price-total').textContent = money(overrideTotal ?? subtotal);
+    }
+    setPrices('flex');
+
+    document.querySelectorAll('input[name="plan"]').forEach(r=>{
+      r.addEventListener('change', ()=> {
+        const c = r.value;
+        const applied = Number(sessionStorage.getItem('villaGrace.couponTotal')||0);
+        setPrices(c, applied || null);
+      });
+    });
+
+    async function validateCoupon(code, currentTotal){
+      try{
+        const r = await fetch(`/grr/coupons/validate?code=${encodeURIComponent(code)}&total=${encodeURIComponent(currentTotal)}`, {headers:{Accept:'application/json'}});
+        if(r.ok){
+          const js = await r.json();
+          if(js && js.valid){
+            return { ok:true, total: js.total ?? currentTotal, msg: js.msg || 'Cupón válido.' };
+          }
+        }
+      }catch(_){}
+      return { ok:false, total: currentTotal, msg:'Se aplicará en el paso de pago.' };
+    }
+
+    function currentPlanNight(){
+      const r = document.querySelector('input[name="plan"]:checked');
+      return (r && r.value==='nrb') ? priceNRB : priceFlex;
+    }
+
+    document.getElementById('coupon-btn').addEventListener('click', async ()=>{
+      const code = (document.getElementById('coupon').value||'').trim();
+      const note = document.getElementById('coupon-note');
+      if(!code){ note.textContent = 'Ingresa un código.'; return; }
+      const baseNight = currentPlanNight();
+      const currentTotal = baseNight * sel.nights * totalPax;
+      note.textContent = 'Validando…';
+      const out = await validateCoupon(code, currentTotal);
+      try { sessionStorage.setItem('villaGrace.coupon', code); } catch(_){}
+      if(out.ok){
+        try { sessionStorage.setItem('villaGrace.couponTotal', String(out.total)); } catch(_){}
+        setPrices(document.querySelector('input[name="plan"]:checked')?.value || 'flex', Number(out.total));
+        note.textContent = 'Cupón aplicado a tu total estimado.';
+      }else{
+        note.textContent = out.msg || 'Se aplicará en el paso de pago.';
+      }
+    });
+
+    function proceed(){
+      const r = document.querySelector('input[name="plan"]:checked');
+      const planCode = r ? r.value : 'flex';
+      const planName = r ? (r.dataset.name||'Tarifa Flexible') : 'Tarifa Flexible';
+      const nightPP  = (planCode==='nrb') ? priceNRB : priceFlex;
+
+      const appliedTotal = Number(sessionStorage.getItem('villaGrace.couponTotal')||0) || (nightPP * sel.nights * totalPax);
+      const enrich = {
+        ...sel,
+        rateCode: planCode,
+        rateName: planName,
+        priceNight: nightPP,
+        totalPax: String(totalPax),
+        totalPP: Math.round(nightPP * sel.nights * 100)/100,
+        total:   Math.round(appliedTotal * 100)/100,
+        coupon:  (sessionStorage.getItem('villaGrace.coupon')||'')
       };
+      try { sessionStorage.setItem('villaGrace.selection', JSON.stringify(enrich)); } catch(_){}
 
-      if (!sel.checkin || !sel.checkout) {
-        const backQS = new URLSearchParams({
-          checkin: storedSearch.checkin || '',
-          checkout: storedSearch.checkout || '',
-          adults: storedSearch.adults || '2',
-          children: storedSearch.children || '0'
-        });
-        location.replace(`booking-results.html?${backQS.toString()}`);
-        return;
-      }
-
-      // 2) Si falta precio, hidratar desde backend
-      if (!sel.priceNight || sel.priceNight <= 0) {
-        const all = await fetchJSON('/grr/habitaciones');
-        if (all && all.ok && Array.isArray(all.rooms)) {
-          const r = all.rooms.find(x => String(x.Codigo_Habitacion||x.code) === String(sel.roomCode));
-          if (r) {
-            sel.roomName = sel.roomName || r.Nombre || r.name || sel.roomName;
-            sel.priceNight = Number(r.Precio_Noche ?? r.Precio_Base ?? r.price ?? 0) || sel.priceNight || 0;
-            sel.img = sel.img || r.Imagen_URL || r.img || sel.img;
-            sel.tipo = sel.tipo || r.Tipo || sel.tipo;
-          }
-        }
-      }
-
-      if (!sel.priceNight || sel.priceNight <= 0) {
-        alert('No pudimos determinar el precio de la habitación seleccionada. Por favor, vuelve a resultados y selecciona de nuevo.');
-        const backQS = new URLSearchParams({
-          checkin: sel.checkin, checkout: sel.checkout,
-          adults: String(sel.adults||'2'), children: String(sel.children||'0')
-        });
-        location.replace(`booking-results.html?${backQS.toString()}`);
-        return;
-      }
-
-      sel.nights = nightsBetween(sel.checkin, sel.checkout);
-      const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
-      const baseNight = Number(sel.priceNight || 0); // por persona / noche
-      const priceFlex = baseNight;
-      const priceNRB  = Math.round(baseNight * (1 - PRICING.NRB_DISCOUNT) * 100) / 100;
-
-      // ----- Render texto/imágenes -----
-      $('#room-title').textContent = sel.roomName || 'Habitación seleccionada';
-      $('#room-subtitle').textContent = `${fmtDateLong(sel.checkin)} – ${fmtDateLong(sel.checkout)}`;
-
-      $('#nights-pill').textContent = `${sel.nights} noche(s)`;
-      $('#dates-text').textContent  = `${fmtDateLong(sel.checkin)} – ${fmtDateLong(sel.checkout)}`;
-      $('#guests-text').textContent = `${sel.adults} adulto(s)` + (parseInt(sel.children||'0',10) ? ` · ${sel.children} niño(s)` : '');
-
-      const imgEl = document.getElementById('room-img');
-      if (imgEl) {
-        const fallback = imgEl.getAttribute('data-fallback') || imgEl.src;
-        const test = new Image();
-        test.onload = () => { imgEl.src = sel.img || fallback; };
-        test.onerror = () => { imgEl.src = fallback; };
-        test.src = sel.img || fallback;
-      }
-
-      // ----- Cálculo de precios (por persona) -----
-      document.getElementById('price-flex').textContent = money(priceFlex);
-      document.getElementById('price-nrb').textContent  = money(priceNRB);
-
-      function setPrices(plan, overrideTotal=null){
-        const nightPP = (plan==='nrb')?priceNRB:priceFlex;       // precio por persona / noche
-        const subtotal = nightPP * sel.nights * totalPax;         // multiplicar por pax
-        document.getElementById('price-night').textContent = money(nightPP);
-        document.getElementById('price-total').textContent = money(overrideTotal ?? subtotal);
-      }
-      setPrices('flex');
-
-      document.querySelectorAll('input[name="plan"]').forEach(r=>{
-        r.addEventListener('change', ()=> {
-          const c = r.value;
-          const applied = Number(sessionStorage.getItem('villaGrace.couponTotal')||0);
-          setPrices(c, applied || null);
-        });
+      const qs = new URLSearchParams({
+        checkin: enrich.checkin || '',
+        checkout: enrich.checkout || '',
+        adults: String(enrich.adults || '2'),
+        children: String(enrich.children || '0'),
+        room: enrich.roomCode || '',
+        rate: enrich.rateCode || '',
+        price: String(enrich.priceNight || ''),
+        total: String(enrich.total || ''),
+        coupon: enrich.coupon || ''
       });
+      location.href = `booking-checkout.html?${qs.toString()}`;
+    }
 
-      // ----- Validación y pre-aplicación de cupón (cliente) -----
-      async function validateCoupon(code, currentTotal){
-        // 1) intentar endpoint de validación si existe
-        try{
-          const r = await fetch(`/grr/coupons/validate?code=${encodeURIComponent(code)}&total=${encodeURIComponent(currentTotal)}`, {headers:{Accept:'application/json'}});
-          if(r.ok){
-            const js = await r.json();
-            if(js && js.valid){
-              return { ok:true, total: js.total ?? currentTotal, msg: js.msg || 'Cupón válido.' };
-            }
-          }
-        }catch(_){}
-        // 2) fallback: almacenar para aplicar en el siguiente paso
-        return { ok:false, total: currentTotal, msg:'Se aplicará en el paso de pago.' };
-      }
+    document.getElementById('btn-continue').addEventListener('click', proceed);
 
-      function currentPlanNight(){
-        const r = document.querySelector('input[name="plan"]:checked');
-        return (r && r.value==='nrb') ? priceNRB : priceFlex;
-      }
-
-      document.getElementById('coupon-btn').addEventListener('click', async ()=>{
-        const code = (document.getElementById('coupon').value||'').trim();
-        const note = document.getElementById('coupon-note');
-        if(!code){ note.textContent = 'Ingresa un código.'; return; }
-        const baseNight = currentPlanNight();
-        const currentTotal = baseNight * sel.nights * totalPax;
-        note.textContent = 'Validando…';
-        const out = await validateCoupon(code, currentTotal);
-        try { sessionStorage.setItem('villaGrace.coupon', code); } catch(_){}
-        if(out.ok){
-          try { sessionStorage.setItem('villaGrace.couponTotal', String(out.total)); } catch(_){}
-          setPrices(document.querySelector('input[name="plan"]:checked')?.value || 'flex', Number(out.total));
-          note.textContent = 'Cupón aplicado a tu total estimado.';
-        }else{
-          note.textContent = out.msg || 'Se aplicará en el paso de pago.';
-        }
-      });
-
-      function proceed(){
-        const r = document.querySelector('input[name="plan"]:checked');
-        const planCode = r ? r.value : 'flex';
-        const planName = r ? (r.dataset.name||'Tarifa Flexible') : 'Tarifa Flexible';
-        const nightPP  = (planCode==='nrb') ? priceNRB : priceFlex;
-
-        const appliedTotal = Number(sessionStorage.getItem('villaGrace.couponTotal')||0) || (nightPP * sel.nights * totalPax);
-        const enrich = {
-          ...sel,
-          rateCode: planCode,
-          rateName: planName,
-          priceNight: nightPP,                                     // por persona / noche
-          totalPax: String(totalPax),
-          totalPP: Math.round(nightPP * sel.nights * 100)/100,
-          total:   Math.round(appliedTotal * 100)/100,
-          coupon:  (sessionStorage.getItem('villaGrace.coupon')||'')
-        };
-        try { sessionStorage.setItem('villaGrace.selection', JSON.stringify(enrich)); } catch(_){}
-
-        const qs = new URLSearchParams({
-          checkin: enrich.checkin || '',
-          checkout: enrich.checkout || '',
-          adults: String(enrich.adults || '2'),
-          children: String(enrich.children || '0'),
-          room: enrich.roomCode || '',
-          rate: enrich.rateCode || '',
-          price: String(enrich.priceNight || ''),
-          total: String(enrich.total || ''),
-          coupon: enrich.coupon || ''
-        });
-        location.href = `booking-checkout.html?${qs.toString()}`;
-      }
-
-      document.getElementById('btn-continue').addEventListener('click', proceed);
-      document.getElementById('header-continue').addEventListener('click', proceed);
-    })();
-  </script>
-</body>
-</html>
+    const headerBtn = document.getElementById('header-continue');
+    if (headerBtn) headerBtn.addEventListener('click', proceed);
+  })();
+</script>
+{% endblock %}
