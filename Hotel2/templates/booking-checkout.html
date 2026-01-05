@@ -1,237 +1,196 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Finalizar reserva | Hotel Villa Grace</title>
-  <meta name="description" content="Datos del huésped, políticas y pago por SINPE." />
+{% extends "base.html" %}
 
-  <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
+{% block title %}Finalizar reserva | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Datos del huésped, políticas y pago por SINPE.{% endblock %}
 
-  <!-- Vendors -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet" />
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet" />
+{% block body_class %}privacy-page{% endblock %}
 
-  <!-- Styles -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet" />
-  <style>
-    .card-summary img{width:88px;height:88px;object-fit:cover;border-radius:.5rem;border:1px solid #e9ecef}
-    .btn-success{background:#1b7a4e;border-color:#1b7a4e}
-    .btn-success:disabled{opacity:.7}
-    .muted-mini{font-size:.875rem;color:#6c757d}
-  </style>
-</head>
-<body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="booking-search.html">Buscar</a></li>
-        <li><a href="booking-results.html">Disponibilidad</a></li>
-        <li><a href="booking-details.html">Detalle</a></li>
-        <li><a href="booking-checkout.html" class="active">Finalizar</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="portal-dashboard.html">Portal Huésped</a>
-  </div>
-</header>
+{% block head_extra %}
+<style>
+  .card-summary img{width:88px;height:88px;object-fit:cover;border-radius:.5rem;border:1px solid #e9ecef}
+  .btn-success{background:#1b7a4e;border-color:#1b7a4e}
+  .btn-success:disabled{opacity:.7}
+  .muted-mini{font-size:.875rem;color:#6c757d}
+</style>
+{% endblock %}
 
-<main class="main">
-  <!-- Hero -->
-  <div class="page-title dark-background" data-aos="fade"
-       style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
-    <div class="container position-relative">
-      <h1>Finalizar reserva</h1>
-      <p id="hdr-sub">—</p>
-      <nav class="breadcrumbs"><ol>
+{% block content %}
+
+<div class="page-title dark-background" data-aos="fade"
+     style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
+  <div class="container position-relative">
+    <h1>Finalizar reserva</h1>
+    <p id="hdr-sub">—</p>
+    <nav class="breadcrumbs" aria-label="breadcrumbs">
+      <ol>
         <li><a href="booking-results.html">Disponibilidad</a></li>
         <li><a href="booking-details.html">Detalle</a></li>
         <li class="current">Finalizar</li>
-      </ol></nav>
-    </div>
+      </ol>
+    </nav>
   </div>
+</div>
 
-  <section class="section pt-3">
-    <div class="container" data-aos="fade-up">
+<section class="section pt-3">
+  <div class="container" data-aos="fade-up">
 
-      <!-- Mensajes -->
-      <div id="alert-ok" class="alert alert-success d-none" role="alert">
-        ¡Reserva registrada como pendiente! Redirigiendo…
-      </div>
-      <div id="alert-err" class="alert alert-danger d-none" role="alert">
-        <span id="err-txt"></span>
-      </div>
+    <div id="alert-ok" class="alert alert-success d-none" role="alert">
+      ¡Reserva registrada como pendiente! Redirigiendo…
+    </div>
+    <div id="alert-err" class="alert alert-danger d-none" role="alert">
+      <span id="err-txt"></span>
+    </div>
 
-      <div class="row g-4">
-        <!-- Datos del huésped + pago -->
-        <div class="col-lg-7">
+    <div class="row g-4">
+      <div class="col-lg-7">
 
-          <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Datos del huésped</h5>
-              <form id="guest-form" class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label">Nombre</label>
-                  <input id="fname" class="form-control" autocomplete="given-name" required />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Apellidos</label>
-                  <input id="lname" class="form-control" autocomplete="family-name" required />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Correo</label>
-                  <input id="email" type="email" class="form-control" placeholder="tucorreo@ejemplo.com" required />
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Teléfono (WhatsApp)</label>
-                  <input id="phone" class="form-control" placeholder="+506 8xx xx xx" />
-                </div>
-                <div class="col-12">
-                  <label class="form-label">Observaciones</label>
-                  <textarea id="notes" class="form-control" rows="3" placeholder="Ej. llegada tarde, alergias..."></textarea>
-                </div>
-                <div class="col-12 form-check">
-                  <input class="form-check-input" type="checkbox" id="pol" required />
-                  <label class="form-check-label" for="pol">Acepto las
-                    <a href="terms.html" target="_blank">políticas y términos</a> y la
-                    <a href="privacy.html" target="_blank">política de privacidad</a>.
-                  </label>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h5 class="card-title">Pago</h5>
-
-              <!-- Cupón (GRR-01-015) -->
-              <div class="border rounded-3 p-3 mb-3 bg-light">
-                <div class="row g-2 align-items-end">
-                  <div class="col-md-8">
-                    <label class="form-label">Cupón de descuento</label>
-                    <input id="coupon-code" class="form-control" placeholder="Ej. ACME10">
-                  </div>
-                  <div class="col-md-4 d-grid">
-                    <button class="btn btn-outline-primary" id="btn-apply-coupon" type="button">
-                      Aplicar cupón
-                    </button>
-                  </div>
-                </div>
-                <div class="small text-muted mt-2" id="coupon-msg">
-                  Los cupones válidos se definen en recepción/administración y se seleccionan aquí para aplicarlos en el cobro.
-                </div>
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Datos del huésped</h5>
+            <form id="guest-form" class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Nombre</label>
+                <input id="fname" class="form-control" autocomplete="given-name" required />
               </div>
-
-              <!-- SINPE (Paso 1) -->
-              <div class="border rounded-3 p-3 bg-light">
-                <div class="d-flex align-items-start gap-2">
-                  <i class="bi bi-phone-vibrate fs-4 text-primary"></i>
-                  <div>
-                    <div class="fw-semibold">Pago únicamente por SINPE Móvil</div>
-                    <div class="small text-muted">
-                      Al finalizar verás las instrucciones de pago y el monto exacto a depositar.
-                      La reserva se registrará como <strong>pendiente de confirmación</strong> hasta que el hotel valide el pago.
-                    </div>
-                    <div class="mt-2 small">
-                      <span class="text-muted">SINPE:</span>
-                      <span class="fw-semibold" id="sinpe-inline-number">{{ sinpe_mobile or '—' }}</span>
-                      <span class="text-muted ms-2">Beneficiario:</span>
-                      <span class="fw-semibold">{{ sinpe_beneficiary or 'Hotel Villa Grace' }}</span>
-                    </div>
-                  </div>
-                </div>
+              <div class="col-md-6">
+                <label class="form-label">Apellidos</label>
+                <input id="lname" class="form-control" autocomplete="family-name" required />
               </div>
-
-              <div class="d-grid mt-3">
-                <button id="btn-finalize" class="btn btn-success">
-                  <i class="bi bi-shield-check me-1"></i> Finalizar compra
-                </button>
+              <div class="col-md-6">
+                <label class="form-label">Correo</label>
+                <input id="email" type="email" class="form-control" placeholder="tucorreo@ejemplo.com" required />
               </div>
-              <small class="text-muted d-block mt-2">
-                <i class="bi bi-info-circle me-1"></i> No se procesa tarjeta en línea. El pago se valida manualmente.
-              </small>
-
-            </div>
+              <div class="col-md-6">
+                <label class="form-label">Teléfono (WhatsApp)</label>
+                <input id="phone" class="form-control" placeholder="+506 8xx xx xx" />
+              </div>
+              <div class="col-12">
+                <label class="form-label">Observaciones</label>
+                <textarea id="notes" class="form-control" rows="3" placeholder="Ej. llegada tarde, alergias..."></textarea>
+              </div>
+              <div class="col-12 form-check">
+                <input class="form-check-input" type="checkbox" id="pol" required />
+                <label class="form-check-label" for="pol">Acepto las
+                  <a href="terms.html" target="_blank">políticas y términos</a> y la
+                  <a href="privacy.html" target="_blank">política de privacidad</a>.
+                </label>
+              </div>
+            </form>
           </div>
         </div>
 
-        <!-- Resumen -->
-        <div class="col-lg-5">
-          <div class="card shadow-sm border-0 card-summary">
-            <div class="card-body">
-              <h5 class="card-title">Resumen</h5>
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <h5 class="card-title">Pago</h5>
 
-              <div class="d-flex gap-3 align-items-center mb-3">
-                <img
-                  id="sum-img"
-                  alt="Habitación"
-                  src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}"
-                  data-fallback="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}"
-                />
-                <div class="flex-grow-1">
-                  <div class="fw-semibold" id="sum-room">Habitación</div>
-                  <div class="text-muted small" id="sum-room-sub">—</div>
+            <div class="border rounded-3 p-3 mb-3 bg-light">
+              <div class="row g-2 align-items-end">
+                <div class="col-md-8">
+                  <label class="form-label">Cupón de descuento</label>
+                  <input id="coupon-code" class="form-control" placeholder="Ej. ACME10">
+                </div>
+                <div class="col-md-4 d-grid">
+                  <button class="btn btn-outline-primary" id="btn-apply-coupon" type="button">
+                    Aplicar cupón
+                  </button>
                 </div>
               </div>
+              <div class="small text-muted mt-2" id="coupon-msg">
+                Los cupones válidos se definen en recepción/administración y se seleccionan aquí para aplicarlos en el cobro.
+              </div>
+            </div>
 
-              <div class="text-muted small mb-3">
-                <div id="sum-dates"><i class="bi bi-calendar-event me-1"></i>—</div>
-                <div id="sum-guests"><i class="bi bi-people me-1"></i>—</div>
+            <div class="border rounded-3 p-3 bg-light">
+              <div class="d-flex align-items-start gap-2">
+                <i class="bi bi-phone-vibrate fs-4 text-primary"></i>
+                <div>
+                  <div class="fw-semibold">Pago únicamente por SINPE Móvil</div>
+                  <div class="small text-muted">
+                    Al finalizar verás las instrucciones de pago y el monto exacto a depositar.
+                    La reserva se registrará como <strong>pendiente de confirmación</strong> hasta que el hotel valide el pago.
+                  </div>
+                  <div class="mt-2 small">
+                    <span class="text-muted">SINPE:</span>
+                    <span class="fw-semibold" id="sinpe-inline-number">{{ sinpe_mobile or '—' }}</span>
+                    <span class="text-muted ms-2">Beneficiario:</span>
+                    <span class="fw-semibold">{{ sinpe_beneficiary or 'Hotel Villa Grace' }}</span>
+                  </div>
+                </div>
               </div>
+            </div>
 
-              <div class="d-flex justify-content-between">
-                <span>Tarifa (<span id="sum-nights">—</span> × <span id="sum-night-price">—</span> × <span id="sum-guests-mult">—</span>)</span>
-                <span id="sum-subtotal">—</span>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span>Impuestos (13%)</span><span id="sum-tax">—</span>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span>Cupón</span><span id="sum-coupon">₡ 0,00</span>
-              </div>
-              <div class="d-flex justify-content-between">
-                <span>Cargos</span><span id="sum-fees">₡ 0,00</span>
-              </div>
-              <hr />
-              <div class="d-flex justify-content-between fw-semibold">
-                <span>Total</span><span id="sum-total">—</span>
-              </div>
+            <div class="d-grid mt-3">
+              <button id="btn-finalize" class="btn btn-success">
+                <i class="bi bi-shield-check me-1"></i> Finalizar compra
+              </button>
+            </div>
+            <small class="text-muted d-block mt-2">
+              <i class="bi bi-info-circle me-1"></i> No se procesa tarjeta en línea. El pago se valida manualmente.
+            </small>
 
-              <div class="muted-mini mt-2">
-                <i class="bi bi-info-circle me-1"></i> Precio por noche mostrado: <em>por huésped</em>.
-              </div>
+          </div>
+        </div>
+      </div>
 
-              <a class="btn btn-outline btn-sm mt-3" href="booking-details.html">Cambiar plan</a>
+      <div class="col-lg-5">
+        <div class="card shadow-sm border-0 card-summary">
+          <div class="card-body">
+            <h5 class="card-title">Resumen</h5>
 
-              <div class="alert alert-info small mt-3 mb-0">
-                <i class="bi bi-info-circle me-1"></i>
-                Los importes son estimados; el total final se calcula al confirmar la reserva.
+            <div class="d-flex gap-3 align-items-center mb-3">
+              <img
+                id="sum-img"
+                alt="Habitación"
+                src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}"
+                data-fallback="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}"
+              />
+              <div class="flex-grow-1">
+                <div class="fw-semibold" id="sum-room">Habitación</div>
+                <div class="text-muted small" id="sum-room-sub">—</div>
               </div>
+            </div>
+
+            <div class="text-muted small mb-3">
+              <div id="sum-dates"><i class="bi bi-calendar-event me-1"></i>—</div>
+              <div id="sum-guests"><i class="bi bi-people me-1"></i>—</div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+              <span>Tarifa (<span id="sum-nights">—</span> × <span id="sum-night-price">—</span> × <span id="sum-guests-mult">—</span>)</span>
+              <span id="sum-subtotal">—</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span>Impuestos (13%)</span><span id="sum-tax">—</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span>Cupón</span><span id="sum-coupon">₡ 0,00</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span>Cargos</span><span id="sum-fees">₡ 0,00</span>
+            </div>
+            <hr />
+            <div class="d-flex justify-content-between fw-semibold">
+              <span>Total</span><span id="sum-total">—</span>
+            </div>
+
+            <div class="muted-mini mt-2">
+              <i class="bi bi-info-circle me-1"></i> Precio por noche mostrado: <em>por huésped</em>.
+            </div>
+
+            <a class="btn btn-outline btn-sm mt-3" href="booking-details.html">Cambiar plan</a>
+
+            <div class="alert alert-info small mt-3 mb-0">
+              <i class="bi bi-info-circle me-1"></i>
+              Los importes son estimados; el total final se calcula al confirmar la reserva.
             </div>
           </div>
         </div>
-
       </div>
+
     </div>
-  </section>
-</main>
-
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center">
-    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
   </div>
-</footer>
+</section>
 
-<!-- Modal SINPE (Paso 1) -->
 <div class="modal fade" id="sinpeModal" tabindex="-1" aria-labelledby="sinpeModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -286,33 +245,14 @@
     </div>
   </div>
 </div>
-<!-- /Modal SINPE -->
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-<div id="preloader"></div>
+{% endblock %}
 
-<!-- JS -->
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-
-<!-- Inyecta datos de sesión disponibles (si existen) -->
-<script>
-  window.__user = {
-    id: "{{ session.get('user_id') or '' }}",
-    name: "{{ session.get('user_name') or '' }}",
-    role: "{{ session.get('user_role') or '' }}",
-    email: "{{ session.get('user_email','') if session else '' }}",
-    phone: "{{ session.get('user_phone','') if session else '' }}"
-  };
-</script>
-
-<!-- Lógica -->
+{% block scripts %}
 <script>
   (function () {
     const $ = (s) => document.querySelector(s);
 
-    // ---------- utils ----------
     const TAX_RATE = 0.13;
     const money = (n) =>
       new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", minimumFractionDigits: 2 })
@@ -328,7 +268,6 @@
       return Math.max(1, Math.round((d2 - d1) / 86400000));
     };
 
-    // ---------- carga selección ----------
     function loadSelection() {
       let sel = null;
       try { sel = JSON.parse(sessionStorage.getItem("villaGrace.selection") || "null"); } catch (_) { sel = null; }
@@ -342,7 +281,7 @@
           roomCode: p.get("room"),
           roomName: "Habitación seleccionada",
           img: "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}",
-          priceNight: Number(p.get("price") || 0),     // por persona / noche (ya con descuento si NRB)
+          priceNight: Number(p.get("price") || 0),
           rateCode: p.get("rate") || "flex",
           rateName: "Tarifa Flexible",
           tipo: p.get("tipo") || "Sencilla",
@@ -353,14 +292,12 @@
       return sel;
     }
 
-    // ---------- state ----------
     const state = {
       coupon: { code: '', amount: 0, type: 'none' },
       summary: { subtotal: 0, tax: 0, coupon: 0, total: 0, totalPax: 1 },
       _pendingGuest: null
     };
 
-    // ---------- render resumen ----------
     function renderSummary(sel) {
       const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
       $("#hdr-sub").textContent = `${fmtLong(sel.checkin)} – ${fmtLong(sel.checkout)} (${sel.nights} noche${sel.nights>1?"s":""})`;
@@ -379,7 +316,7 @@
         `<i class="bi bi-people me-1"></i>${sel.adults || 2} adulto(s)` +
         (parseInt(sel.children || "0", 10) ? ` · ${sel.children} niño(s)` : "");
 
-      const nightPP = Number(sel.priceNight || 0); // por persona / noche (con descuento si NRB)
+      const nightPP = Number(sel.priceNight || 0);
       const subtotal = nightPP * sel.nights * totalPax;
       const tax = subtotal * TAX_RATE;
       const coupon = Number(state.coupon.amount || 0);
@@ -393,11 +330,9 @@
       $("#sum-coupon").textContent = coupon ? `- ${money(coupon)}` : money(0);
       $("#sum-total").textContent = money(total);
 
-      // Guardar resumen para el modal SINPE y para fallback de total si backend no lo retorna
       state.summary = { subtotal, tax, coupon, total, totalPax };
     }
 
-    // ---------- cupón (preview opcional, sin scope leak) ----------
     async function previewCoupon(code, ctx) {
       try {
         const url = new URL('/grr/coupons/preview', location.origin);
@@ -413,30 +348,21 @@
       } catch { return null; }
     }
 
-    // ---------- crear cliente mínimo (dummy/backoffice) ----------
-    // Nota: en tu proyecto actual esto está "mockeado". Se respeta tal cual.
     async function ensureClient(fullName, email, phone) { return 1; }
-
 
     const isoDate = (v) => {
       if (!v) return "";
       let s = String(v).trim();
-    
-      // cortar si viene con hora
       if (s.includes("T")) s = s.split("T")[0];
       if (s.includes(" ")) s = s.split(" ")[0];
-    
-      // normalizar YYYY-M-D -> YYYY-MM-DD
       const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
       if (m) {
         const y = m[1], mm = m[2].padStart(2, "0"), dd = m[3].padStart(2, "0");
         return `${y}-${mm}-${dd}`;
       }
-      return s; // si ya viene correcto
+      return s;
     };
-    
 
-    // ---------- POST /grr/reservas ----------
     async function createReservation(sel, guest) {
       const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
       const payload = {
@@ -449,11 +375,11 @@
         Huespedes: String(totalPax),
         Adults: String(sel.adults || "2"),
         Children: String(sel.children || "0"),
-        RateCode: sel.rateCode || "flex",               // "flex" | "nrb"
-        Precio_Base_Noche: Number(sel.priceNight || 0), // por persona / noche
+        RateCode: sel.rateCode || "flex",
+        Precio_Base_Noche: Number(sel.priceNight || 0),
         CouponCode: state.coupon.code || '',
         Canal: "Web",
-        Estado: "Pendiente", // ✅ Paso 1: siempre Pendiente para Web (pago por SINPE)
+        Estado: "Pendiente",
         Observaciones: guest.notes || "",
         Usuario: guest.email || undefined,
       };
@@ -469,10 +395,9 @@
         const msg = json.msg || json.error || `HTTP ${res.status}`;
         throw new Error(msg);
       }
-      return json; // devuelve lo que envíe el backend
+      return json;
     }
 
-    // ---------- POST /grr/reservas/{id}/apply-coupon ----------
     async function applyCouponToReservation(reservaId, code){
       if(!reservaId || !code) return null;
       const r = await fetch(`/grr/reservas/${encodeURIComponent(reservaId)}/apply-coupon`, {
@@ -482,16 +407,13 @@
       });
       const j = await r.json().catch(()=> ({}));
       if(!r.ok || j.ok === false) throw new Error(j.msg || `HTTP ${r.status}`);
-      return j; // { ok:true, monto, descuento, ... }
+      return j;
     }
 
-    // ---------- bind ----------
     function bind(sel) {
-      // Modal SINPE
       const sinpeModalEl = document.getElementById('sinpeModal');
       const sinpeModal = sinpeModalEl ? new bootstrap.Modal(sinpeModalEl) : null;
 
-      // Copiar SINPE
       const btnCopy = document.getElementById('btn-copy-sinpe');
       if (btnCopy) {
         btnCopy.addEventListener('click', async () => {
@@ -500,11 +422,10 @@
             if (txt && navigator.clipboard) await navigator.clipboard.writeText(txt);
             btnCopy.innerHTML = '<i class="bi bi-check2 me-1"></i> Copiado';
             setTimeout(() => (btnCopy.innerHTML = '<i class="bi bi-clipboard me-1"></i> Copiar'), 1200);
-          } catch { /* noop */ }
+          } catch {}
         });
       }
 
-      // Cupón: preview y pre-cálculo visual
       $("#btn-apply-coupon").addEventListener('click', async () => {
         const code = ($("#coupon-code").value || '').trim();
         if (!code) {
@@ -514,7 +435,6 @@
           return;
         }
 
-        // Calcula el subtotal aquí (donde sí tenemos 'sel')
         const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
         const nightPP = Number(sel.priceNight || 0);
         const nights  = Number(sel.nights || 1);
@@ -541,7 +461,6 @@
         renderSummary(sel);
       });
 
-      // Finalizar compra -> SOLO muestra modal SINPE (no crea reserva aquí)
       $("#btn-finalize").addEventListener("click", async (e) => {
         e.preventDefault();
 
@@ -551,7 +470,6 @@
           return;
         }
 
-        // Guardar temporalmente datos del huésped para el commit al presionar "Listo"
         const guest = {
           fname: $("#fname").value.trim(),
           lname: $("#lname").value.trim(),
@@ -561,15 +479,12 @@
         };
         state._pendingGuest = guest;
 
-        // Actualizar monto en el modal con el total del resumen
         const amountEl = document.getElementById('sinpeModalAmount');
         if (amountEl) amountEl.textContent = money(state.summary.total || 0);
 
-        // Mostrar modal
         if (sinpeModal) sinpeModal.show();
       });
 
-      // "Listo" -> aquí SÍ se crea la reserva como Pendiente y se redirige
       const btnDone = document.getElementById('btn-sinpe-done');
       if (btnDone) {
         btnDone.addEventListener('click', async () => {
@@ -581,23 +496,19 @@
           $("#alert-err").classList.add("d-none");
 
           try {
-            // 1) Crear reserva (Pendiente)
             const result = await createReservation(sel, guest);
 
-            // Detectar ID con tolerancia a nombres
             const reservaId =
               (result.id ?? result.reserva_id ?? result.Codigo_Reserva ??
                result.Reserva_Id ?? result.CodigoReserva ?? result.Codigo) || null;
 
             if(!reservaId) throw new Error('Reserva creada, pero no se pudo obtener el ID.');
 
-            // 2) Total inicial (si viene). Si no viene, usar total calculado en el resumen.
             let totalFinal = Number(
               result.total ?? result.total_monto ?? result.monto ?? result.Monto_Total ?? 0
             );
             if (!totalFinal || totalFinal <= 0) totalFinal = Number(state.summary.total || 0);
 
-            // 3) Aplicar cupón (real) si el cliente ingresó uno
             if (state.coupon && state.coupon.code) {
               try{
                 const ap = await applyCouponToReservation(reservaId, state.coupon.code);
@@ -613,7 +524,6 @@
               }
             }
 
-            // 4) Guardar datos para confirmation y redirigir
             const payloadConfirm = {
               name: `${guest.fname || ''} ${guest.lname || ''}`.trim(),
               roomName: sel.roomName || "Habitación",
@@ -632,11 +542,9 @@
 
             sessionStorage.setItem("villaGrace.confirm", JSON.stringify(payloadConfirm));
 
-            // UI ok + cerrar modal
             $("#alert-ok").classList.remove("d-none");
             try { if (sinpeModal) sinpeModal.hide(); } catch(_){}
 
-            // Redirigir a confirmation (Paso 1: seguirá mostrando "pendiente" en esa página)
             setTimeout(() => {
               const url = new URL("booking-confirmation.html", location.href);
               url.searchParams.set("id", reservaId);
@@ -655,14 +563,13 @@
       }
     }
 
-    // ---------- init ----------
     (function init() {
       const sel = loadSelection();
       if (!sel || !sel.checkin || !sel.checkout) {
         location.href = "booking-search.html";
         return;
       }
-      // Inferir tipo si no vino
+
       if (!sel.tipo) {
         const n = (sel.roomName || "").toLowerCase();
         sel.tipo =
@@ -670,7 +577,6 @@
           (n.includes("deluxe") || n.includes("doble")) ? "Doble" : "Sencilla";
       }
 
-      // Prefill de usuario si existe sesión
       try{
         const u = window.__user || {};
         if(u.name){
@@ -682,7 +588,6 @@
         if(u.phone && !$("#phone").value) $("#phone").value = u.phone;
       }catch(_){}
 
-      // Si vino cupón en query (?coupon=ACME10)
       const qp = new URLSearchParams(location.search);
       const cupQ = (qp.get('coupon')||'').trim();
       if(cupQ){ $("#coupon-code").value = cupQ; state.coupon.code = cupQ; }
@@ -692,5 +597,4 @@
     })();
   })();
 </script>
-</body>
-</html>
+{% endblock %}

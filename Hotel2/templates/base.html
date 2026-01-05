@@ -237,22 +237,6 @@
     }
   </style>
 
-  <!-- Breadcrumbs (solo si se envían desde Flask) -->
-  {% if breadcrumbs %}
-  <nav aria-label="breadcrumb" class="py-3" style="margin-top: 90px;">
-    <div class="container">
-      <ol class="breadcrumb mb-0">
-        {% for item in breadcrumbs %}
-        {% if loop.last or item.url is none %}
-        <li class="breadcrumb-item active" aria-current="page">{{ item.label }}</li>
-        {% else %}
-        <li class="breadcrumb-item"><a href="{{ item.url }}">{{ item.label }}</a></li>
-        {% endif %}
-        {% endfor %}
-      </ol>
-    </div>
-  </nav>
-  {% endif %}
 
   <main class="main">
     {% block content %}{% endblock %}
@@ -432,6 +416,16 @@
         console.error("Error obteniendo tipo de cambio:", err);
       }
     });
+  </script>
+
+  <script>
+    window.__user = {
+      id: "{{ session.get('user_id') or '' }}",
+      name: "{{ session.get('user_name') or '' }}",
+      role: "{{ session.get('user_role') or '' }}",
+      email: "{{ session.get('user_email') or '' }}",
+      phone: "{{ session.get('user_phone') or '' }}"
+    };
   </script>
 
   {% block scripts %}{% endblock %}
