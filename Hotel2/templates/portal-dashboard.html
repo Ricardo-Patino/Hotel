@@ -1,217 +1,139 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Portal del Huésped – Dashboard | Hotel Villa Grace</title>
-  <meta name="description" content="Panel del huésped para gestionar reservas, pagos y preferencias.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-</head>
-<body class="privacy-page">
+{% extends "base.html" %}
 
-  <!-- Header -->
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <h1 class="sitename">Hotel Villa Grace</h1>
-      </a>
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li><a href="index.html">Inicio</a></li>
-          <li><a href="rooms.html">Habitaciones</a></li>
-          <li><a href="booking.html">Reservar</a></li>
-          <li class="dropdown"><a href="#" class="active"><span>Portal Huésped</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-            <ul>
-              <li><a href="portal-dashboard.html" class="active">Dashboard</a></li>
-              <li><a href="portal-reservas.html">Mis reservas</a></li>
-              <li><a href="portal-perfil.html">Perfil</a></li>
-              <li><a href="portal-pagos.html">Métodos de pago</a></li>
-              <li><a href="portal-facturas.html">Facturas</a></li>
-              <li><a href="portal-preferencias.html">Preferencias</a></li>
-              <li><a href="portal-soporte.html">Soporte</a></li>
-              <li><a href="login.html">Cerrar sesión</a></li>
-            </ul>
-          </li>
-          <li><a href="contact.html">Contacto</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
-      <a class="btn-getstarted d-none d-sm-block" href="booking.html">Reservar ahora</a>
-    </div>
-  </header>
+{% block title %}Portal del Huésped – Dashboard | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Panel del huésped para gestionar reservas, pagos y preferencias.{% endblock %}
 
-  <main class="main">
-    <!-- Title -->
-    <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-      <div class="container position-relative">
-        <h1>Portal del Huésped</h1>
-        <p>Bienvenido/a. Gestiona tus reservas y preferencias en un solo lugar.</p>
-        <nav class="breadcrumbs">
-          <ol><li><a href="index.html">Inicio</a></li><li class="current">Portal</li></ol>
-        </nav>
-      </div>
-    </div>
+{% block body_class %}privacy-page{% endblock %}
 
-    <!-- Subnav tabs -->
-    <section class="section pt-3 pb-0">
-      <div class="container" data-aos="fade-up">
-        <ul class="nav nav-pills flex-wrap gap-2 mb-4">
-          <li class="nav-item"><a class="nav-link active" href="portal-dashboard.html"><i class="bi bi-grid me-1"></i>Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="portal-reservas.html"><i class="bi bi-calendar-check me-1"></i>Mis reservas</a></li>
-          <li class="nav-item"><a class="nav-link" href="portal-perfil.html"><i class="bi bi-person me-1"></i>Perfil</a></li>
-          <li class="nav-item"><a class="nav-link" href="portal-pagos.html"><i class="bi bi-credit-card me-1"></i>Pagos</a></li>
-          <li class="nav-item"><a class="nav-link" href="portal-facturas.html"><i class="bi bi-receipt me-1"></i>Facturas</a></li>
-          <li class="nav-item"><a class="nav-link" href="portal-preferencias.html"><i class="bi bi-sliders me-1"></i>Preferencias</a></li>
-          <li class="nav-item"><a class="nav-link" href="portal-soporte.html"><i class="bi bi-life-preserver me-1"></i>Soporte</a></li>
-        </ul>
-      </div>
-    </section>
+{% block content %}
 
-    <!-- Cards -->
-    <section class="section pt-0">
-      <div class="container" data-aos="fade-up" data-aos-delay="100">
-        <div class="row g-4">
-          <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-              <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between">
-                  <h5 class="card-title mb-2">Próxima estadía</h5>
-                  <i class="bi bi-suitcase2 fs-4"></i>
-                </div>
-                <p class="mb-1"><strong>Check-in:</strong> 12 Oct 2025</p>
-                <p class="mb-1"><strong>Noches:</strong> 3</p>
-                <p class="mb-3"><strong>Habitación:</strong> Suite Junior Vista Mar</p>
-                <a href="portal-reserva-detalle.html" class="btn btn-primary btn-sm">Ver detalles</a>
-              </div>
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Portal del Huésped</h1>
+    <p>Bienvenido/a. Gestiona tus reservas y preferencias en un solo lugar.</p>
+    <nav class="breadcrumbs" aria-label="breadcrumbs">
+      <ol>
+        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+        <li class="current">Portal</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<section class="section pt-3 pb-0">
+  <div class="container" data-aos="fade-up">
+    <ul class="nav nav-pills flex-wrap gap-2 mb-4">
+      <li class="nav-item">
+        <a class="nav-link active" href="{{ url_for('portal_dashboard_html') }}">
+          <i class="bi bi-grid me-1"></i>Dashboard
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('portal_reservas_html') }}">
+          <i class="bi bi-calendar-check me-1"></i>Mis reservas
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('portal_perfil_html') }}">
+          <i class="bi bi-person me-1"></i>Perfil
+        </a>
+      </li>
+
+      <!--<li class="nav-item">
+        <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">
+          <i class="bi bi-credit-card me-1"></i>Pagos
+        </a>
+      </li>-->
+      <!--<li class="nav-item">
+        <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">
+          <i class="bi bi-receipt me-1"></i>Facturas
+        </a>
+      </li>-->
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('sac.preferencias_html') }}">
+          <i class="bi bi-sliders me-1"></i>Preferencias
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{{ url_for('sac.solicitud_nueva_html') }}">
+          <i class="bi bi-life-preserver me-1"></i>Soporte
+        </a>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section pt-0">
+  <div class="container" data-aos="fade-up" data-aos-delay="100">
+
+    <div class="row g-4">
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between">
+              <h5 class="card-title mb-2">Mis reservas</h5>
+              <i class="bi bi-suitcase2 fs-4"></i>
             </div>
+            <p class="text-muted mb-3">
+              Revisa el estado de tus reservas (pendiente/confirmada) y los detalles.
+            </p>
+            <a href="{{ url_for('portal_reservas_html') }}" class="btn btn-success btn-sm">Ver mis reservas</a>
           </div>
+        </div>
+      </div>
 
-          <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-              <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between">
-                  <h5 class="card-title mb-2">Saldo</h5>
-                  <i class="bi bi-wallet2 fs-4"></i>
-                </div>
-                <p class="display-6 mb-0">$0.00</p>
-                <small class="text-muted">No hay pagos pendientes</small>
-                <div class="mt-3">
-                  <a href="portal-pagos.html" class="btn btn-outline btn-sm">Métodos de pago</a>
-                </div>
-              </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between">
+              <h5 class="card-title mb-2">Perfil</h5>
+              <i class="bi bi-person-check fs-4"></i>
             </div>
+            <p class="text-muted mb-3">
+              Actualiza tus datos para agilizar tus próximas reservaciones.
+            </p>
+            <a href="{{ url_for('portal_perfil_html') }}" class="btn btn-outline-secondary btn-sm">Ir a perfil</a>
           </div>
+        </div>
+      </div>
 
-          <div class="col-md-6 col-lg-4">
-            <div class="card h-100 shadow-sm border-0">
-              <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between">
-                  <h5 class="card-title mb-2">Atajos</h5>
-                  <i class="bi bi-lightning fs-4"></i>
-                </div>
-                <div class="d-grid gap-2">
-                  <a class="btn btn-primary btn-sm" href="booking.html">Nueva reserva</a>
-                  <a class="btn btn-outline btn-sm" href="portal-preferencias.html">Preferencias de habitación</a>
-                  <a class="btn btn-outline btn-sm" href="portal-soporte.html">Solicitudes al hotel</a>
-                </div>
-              </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-0">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between">
+              <h5 class="card-title mb-2">Atajos</h5>
+              <i class="bi bi-lightning fs-4"></i>
+            </div>
+            <div class="d-grid gap-2">
+              <a class="btn btn-success btn-sm" href="{{ url_for('booking_search') }}">Nueva reserva</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('portal_reservas_html') }}">Ver mis
+                reservas</a>
+              <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('portal_perfil_html') }}">Actualizar
+                perfil</a>
             </div>
           </div>
         </div>
-
-        <!-- Timeline simple -->
-        <div class="row g-4 mt-1">
-          <div class="col-12">
-            <div class="card shadow-sm border-0">
-              <div class="card-body">
-                <h5 class="card-title mb-3">Actividad reciente</h5>
-                <ul class="list-group list-group-flush">
-                  <li class="list-group-item px-0 d-flex justify-content-between">
-                    <span><i class="bi bi-check-circle text-success me-2"></i>Reserva #VG-2025-104 confirmada</span>
-                    <small class="text-muted">hace 2 días</small>
-                  </li>
-                  <li class="list-group-item px-0 d-flex justify-content-between">
-                    <span><i class="bi bi-envelope-open me-2"></i>Preferencias de llegada actualizadas</span>
-                    <small class="text-muted">hace 1 semana</small>
-                  </li>
-                  <li class="list-group-item px-0 d-flex justify-content-between">
-                    <span><i class="bi bi-receipt me-2"></i>Factura #INV-24110 emitida</span>
-                    <small class="text-muted">hace 2 semanas</small>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
       </div>
-    </section>
-  </main>
+    </div>
 
-  <!-- Footer -->
-  <footer id="footer" class="footer position-relative dark-background">
-    <div class="footer-top">
-      <div class="container">
-        <div class="row gy-4">
-          <div class="col-lg-4 col-md-6 footer-about">
-            <a href="index.html" class="logo d-flex align-items-center"><span class="sitename">Hotel Villa Grace</span></a>
-            <div class="footer-contact pt-3">
-              <p>Cóbano, Puntarenas, Costa Rica</p>
-              <p>Playa Santa Teresa • 60111</p>
-              <p class="mt-3"><strong>Teléfono:</strong> <span>+506 0000 0000</span></p>
-              <p><strong>Email:</strong> <span>info@hotelvillagrace.com</span></p>
-            </div>
-          </div>
-          <div class="col-lg-2 col-md-3 footer-links">
-            <h4>Enlaces</h4>
-            <ul>
-              <li><a href="portal-dashboard.html">Portal</a></li>
-              <li><a href="portal-reservas.html">Mis reservas</a></li>
-              <li><a href="portal-perfil.html">Perfil</a></li>
-              <li><a href="terms.html">Términos</a></li>
-              <li><a href="privacy.html">Privacidad</a></li>
+    <!--<div class="row g-4 mt-1">
+      <div class="col-12">
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Actividad reciente</h5>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item px-0 d-flex justify-content-between">
+                <span class="text-muted">Aquí podrás ver eventos del portal cuando se conecte a datos reales.</span>
+                <small class="text-muted"></small>
+              </li>
             </ul>
           </div>
-          <div class="col-lg-6 col-md-3 footer-links">
-            <h4>Redes</h4>
-            <div class="social-links">
-              <a href="#"><i class="bi bi-instagram"></i></a>
-              <a href="#"><i class="bi bi-facebook"></i></a>
-              <a href="#"><i class="bi bi-twitter-x"></i></a>
-              <a href="#"><i class="bi bi-linkedin"></i></a>
-            </div>
-          </div>
         </div>
       </div>
-    </div>
-    <div class="copyright text-center">
-      <div class="container">© <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados</div>
-    </div>
-  </footer>
+    </div>-->
 
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-  <div id="preloader"></div>
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/php-email-form/validate.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/purecounter/purecounter_vanilla.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/drift-zoom/Drift.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/imagesloaded/imagesloaded.pkgd.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/isotope-layout/isotope.pkgd.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
-</html>
+  </div>
+</section>
+
+{% endblock %}
