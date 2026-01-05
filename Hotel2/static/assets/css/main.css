@@ -7696,4 +7696,56 @@ section,
   color: color-mix(in srgb, var(--default-color), transparent 55%);
 }
 
+/* === Override color primario a verde Villa Grace === */
+
+:root {
+  --bs-primary: #1b7a4e;
+  --bs-primary-rgb: 27, 122, 78;
+}
+
+.btn-primary {
+  background-color: #1b7a4e;
+  border-color: #1b7a4e;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: #156543;
+  border-color: #156543;
+}
+
+.btn-outline-primary {
+  color: #1b7a4e;
+  border-color: #1b7a4e;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  background-color: #1b7a4e;
+  border-color: #1b7a4e;
+  color: #fff;
+}
+
+/* === Portal pills: forzar verde Villa Grace === */
+.nav-pills .nav-link {
+  color: var(--accent-color) !important;
+}
+
+.nav-pills .nav-link:hover {
+  color: var(--accent-color) !important;
+  background-color: color-mix(in srgb, var(--accent-color), transparent 88%) !important;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  background-color: var(--accent-color) !important;
+  border-color: var(--accent-color) !important;
+  color: var(--contrast-color) !important;
+}
+
+.nav-pills .nav-link.active i,
+.nav-pills .show > .nav-link i {
+  color: var(--contrast-color) !important;
+}
+
 
