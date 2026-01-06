@@ -73,8 +73,6 @@ DROP TABLE IF EXISTS SAC_Solicitud;
 DROP TABLE IF EXISTS SAC_Outbox;
 DROP TABLE IF EXISTS SAC_NotifPref;
 DROP TABLE IF EXISTS SAC_Config;
-DROP TABLE IF EXISTS sac_incident;
-DROP TABLE IF EXISTS sac_incident_comment;
 
 /* AREP */
 DROP TABLE IF EXISTS ArepExportLog;
@@ -335,18 +333,6 @@ CREATE TABLE Reserva (
     ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE sac_incident_comment (
-  Id INT NOT NULL AUTO_INCREMENT,
-  Incident_Id INT NOT NULL,
-  Autor VARCHAR(120) NULL,
-  Comentario TEXT NOT NULL,
-  Creada_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (Id),
-  KEY IX_sac_incident_comment_incident (Incident_Id),
-  CONSTRAINT FK_sac_incident_comment_incident
-    FOREIGN KEY (Incident_Id) REFERENCES sac_incident (Id)
-    ON DELETE CASCADE
-);
 
 /* ------------------------------------------------------------------------- */
 /* Triggers de Reserva (CONSOLIDADOS)                                         */
@@ -1906,17 +1892,30 @@ CREATE TABLE SAC_ConversationMsg (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* Incident & Feedback */
-CREATE TABLE sac_incident (
-    Id INT AUTO_INCREMENT PRIMARY KEY,
-    Codigo_Reserva INT NOT NULL,
-    Codigo_Cliente INT NOT NULL,
-    Tipo ENUM('INCIDENTE', 'COMENTARIO') NOT NULL,
-    Severidad ENUM('BAJA', 'MEDIA', 'ALTA', 'CRITICA') NOT NULL,
-    Titulo VARCHAR(160) NOT NULL,
-    Detalle TEXT,
-    Estado ENUM('ABIERTA', 'EN_PROCESO', 'CERRADA') NOT NULL DEFAULT 'ABIERTA',
-    Creado_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+CREATE TABLE SAC_Incident (
+  Id              BIGINT NOT NULL AUTO_INCREMENT,
+  Codigo_Reserva  INT NULL,
+  Codigo_Cliente  INT NULL,
+  Conversation_Id BIGINT NULL,
+  Tipo            ENUM('OPERATIVO','SEGURIDAD','PAGO','HABITACION','OTRO') NOT NULL DEFAULT 'OPERATIVO',
+  Severidad       ENUM('BAJA','MEDIA','ALTA','CRITICA') NOT NULL DEFAULT 'MEDIA',
+  Descripcion     TEXT NOT NULL,
+  Estado          ENUM('ABIERTO','EN_PROCESO','RESUELTO','CERRADO') NOT NULL DEFAULT 'ABIERTO',
+  Creada_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Actualizada_At  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_SAC_Incident_Estado (Estado, Severidad),
+  KEY IX_SAC_Incident_Conv (Conversation_Id),
+  CONSTRAINT FK_SAC_Incident_Reserva
+    FOREIGN KEY (Codigo_Reserva) REFERENCES Reserva(Codigo_Reserva)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_Incident_Cliente
+    FOREIGN KEY (Codigo_Cliente) REFERENCES Cliente(Codigo_Cliente)
+    ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT FK_SAC_Incident_Conv
+    FOREIGN KEY (Conversation_Id) REFERENCES SAC_Conversation(Id)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE SAC_Feedback (
   Id              BIGINT NOT NULL AUTO_INCREMENT,
@@ -2427,6 +2426,36 @@ CREATE TABLE IF NOT EXISTS guest_checkout (
 
 
 /* ===================================================================== */
+/* HABITACIONES - IMÁGENES                                        */
+/*  - Se guardan archivos en disco (static/uploads/rooms/...)             */
+/*  - En BD solo se persiste la ruta + metadatos (evita inflar la BD)     */
+/* ===================================================================== */
+
+
+CREATE TABLE IF NOT EXISTS HabitacionImagen (
+  Id               INT NOT NULL AUTO_INCREMENT,
+  Codigo_Habitacion INT NOT NULL,
+  File_Path        VARCHAR(255) NOT NULL,
+  Mime_Type        VARCHAR(80) NULL,
+  Bytes            INT NULL,
+  Is_Principal     TINYINT(1) NOT NULL DEFAULT 0,
+  Sort_Order       INT NOT NULL DEFAULT 0,
+  Alt_Text         VARCHAR(200) NULL,
+  Created_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Updated_At       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_HabitacionImagen_Habitacion (Codigo_Habitacion),
+  KEY IX_HabitacionImagen_Principal (Codigo_Habitacion, Is_Principal),
+  CONSTRAINT FK_HabitacionImagen_Habitacion
+    FOREIGN KEY (Codigo_Habitacion) REFERENCES Habitacion(Codigo_Habitacion)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
+
+
+/* ===================================================================== */
 /* SEEDS                                                                 */
 /* ===================================================================== */
 
@@ -2891,16 +2920,10 @@ BEGIN
   ALTER TABLE SAC_KB_QA ADD COLUMN Usos INT NOT NULL DEFAULT 0;
   ALTER TABLE SAC_KB_QA ADD COLUMN Votos_Util INT NOT NULL DEFAULT 0;
 
-  /* sac_incident */
-  ALTER TABLE defaultdb.sac_incident
-  ADD COLUMN Reportado_Por VARCHAR(80) NULL AFTER Codigo_Cliente,
-  ADD COLUMN Asignado_A ENUM(
-    'Recepcionista',
-    'Mantenimiento',
-    'Limpieza',
-    'Administración',
-    'Otro'
-  ) NULL AFTER Reportado_Por;
+  /* SAC_Incident */
+  ALTER TABLE SAC_Incident ADD COLUMN Titulo VARCHAR(200) NULL;
+  ALTER TABLE SAC_Incident ADD COLUMN Detalle TEXT NULL;
+  ALTER TABLE SAC_Incident ADD COLUMN Descripcion TEXT NULL;
 
   /* SAC_ConversationMsg */
   ALTER TABLE SAC_ConversationMsg ADD COLUMN Enviada_Por ENUM('Cliente','Agente','Sistema') NULL;
@@ -2951,6 +2974,10 @@ BEGIN
   UPDATE SAC_KB_QA
      SET Created_At = COALESCE(Created_At, Creada_En);
 
+  /* SAC_Incident */
+  UPDATE SAC_Incident
+     SET Detalle = COALESCE(Detalle, Descripcion),
+         Titulo  = COALESCE(Titulo, LEFT(COALESCE(Descripcion, Detalle), 200));
 
   /* SAC_ConversationMsg */
   UPDATE SAC_ConversationMsg
