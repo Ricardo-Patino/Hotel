@@ -173,6 +173,8 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='assets/js/room-images.js') }}"></script>
+
 <script>
   (function () {
     const $ = (s) => document.querySelector(s);
@@ -201,6 +203,28 @@
         return j.data || null;
       } catch { return null; }
     }
+
+    async function fetchRoomImageByKey(key) {
+      if (key === undefined || key === null) return "";
+      const k = String(key).trim();
+      if (!k) return "";
+      try {
+        const r = await fetch("/grr/habitaciones", { headers: { "Accept": "application/json" } });
+        const j = await r.json().catch(() => ({}));
+        const list = (j && (j.rooms || j.data || j.habitaciones)) || [];
+        if (!Array.isArray(list)) return "";
+    
+        const room = list.find(x =>
+          String(x.Codigo_Habitacion || x.code) === k ||
+          String(x.Numero_Habitacion || x.Numero || "") === k
+        );
+        if (!room) return "";
+        return room.Imagen_URL || room.img || "";
+      } catch {
+        return "";
+      }
+    }
+    
 
     function render(vm) {
       $("#alert-ok").classList.remove("d-none");
@@ -259,6 +283,24 @@
         notes: (r && r.Observaciones) || confirm.observaciones || "",
         img: confirm.img || ""
       };
+
+
+      // Intentar resolver imagen real desde la BD (si existe) sin tocar el diseño.
+      const roomKey =
+        (r && (r.Codigo_Habitacion || r.Habitacion_Codigo || r.Habitacion_Id || r.Habitacion_Numero)) ||
+        confirm.roomCode || confirm.roomNumber || "";
+      
+      const dbImg = await fetchRoomImageByKey(roomKey);
+      if (dbImg) vm.img = dbImg;
+      else vm.img = vm.img || confirm.img || "";
+      const imgEl = document.getElementById("sum-img");
+      const fallback = (imgEl && (imgEl.getAttribute("data-fallback") || imgEl.src)) || "";
+      const roomCode = confirm.roomCode || (r && r.Codigo_Habitacion) || null;
+      
+      if (window.RoomImage && roomCode && (!vm.img || vm.img === fallback)) {
+        vm.img = await RoomImage.lookup(roomCode, { fallback });
+      }
+          
 
       render(vm);
     })();

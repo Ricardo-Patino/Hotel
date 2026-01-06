@@ -249,6 +249,8 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='assets/js/room-images.js') }}"></script>
+
 <script>
   (function () {
     const $ = (s) => document.querySelector(s);
@@ -280,7 +282,7 @@
           children: p.get("children") || "0",
           roomCode: p.get("room"),
           roomName: "Habitación seleccionada",
-          img: "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}",
+          img: "",
           priceNight: Number(p.get("price") || 0),
           rateCode: p.get("rate") || "flex",
           rateName: "Tarifa Flexible",
@@ -292,11 +294,59 @@
       return sel;
     }
 
+    let __roomsCache = null;
+    async function getRoomImageUrlByCode(roomCode) {
+      if (!roomCode) return "";
+      try {
+        if (!__roomsCache) {
+          const r = await fetch("/grr/habitaciones", { headers: { "Accept": "application/json" } });
+          const j = await r.json().catch(() => ({}));
+          __roomsCache = (j && j.rooms) ? j.rooms : [];
+        }
+        const found = __roomsCache.find(x => String(x.Codigo_Habitacion) === String(roomCode));
+        return (found && (found.Imagen_URL || found.img)) ? (found.Imagen_URL || found.img) : "";
+      } catch {
+        return "";
+      }
+    }
+    
+
     const state = {
       coupon: { code: '', amount: 0, type: 'none' },
       summary: { subtotal: 0, tax: 0, coupon: 0, total: 0, totalPax: 1 },
       _pendingGuest: null
     };
+    
+
+    async function hydrateRoomFromDB(sel) {
+      try {
+        if (!sel || !sel.roomCode) return sel;
+    
+        const j = await fetchJSON("/grr/habitaciones");
+        const list = (j && (j.rooms || j.data || j.habitaciones)) || [];
+        if (!Array.isArray(list)) return sel;
+    
+        const key = String(sel.roomCode);
+        const r = list.find(x => String(x.Codigo_Habitacion || x.code) === key);
+        if (!r) return sel;
+    
+        // Completa datos sin tocar diseño
+        sel.roomName = sel.roomName || r.Nombre || r.name || sel.roomName;
+        sel.tipo = sel.tipo || r.Tipo || r.tipo || sel.tipo;
+    
+        const dbPrice = Number(r.Precio_Noche ?? r.Precio_Base ?? r.price ?? 0) || 0;
+        if (!sel.priceNight || sel.priceNight <= 0) sel.priceNight = dbPrice || sel.priceNight;
+    
+        const dbImg = (r.Imagen_URL || r.img || "");
+        if (dbImg) sel.img = dbImg;
+    
+        return sel;
+      } catch (_) {
+        return sel;
+      }
+    }
+    
+
 
     function renderSummary(sel) {
       const totalPax = Math.max(1, Number(sel.adults||0) + Number(sel.children||0));
@@ -537,7 +587,10 @@
               numero: result.numero ?? result.Numero ?? result.Numero_Comprobante ?? `VG-${reservaId}`,
               total: totalFinal,
               habitacion: result.habitacion || null,
-              observaciones: guest.notes || ""
+              observaciones: guest.notes || "",
+              roomCode: sel.roomCode || "",
+              img: sel.img || "",
+              
             };
 
             sessionStorage.setItem("villaGrace.confirm", JSON.stringify(payloadConfirm));
@@ -563,7 +616,8 @@
       }
     }
 
-    (function init() {
+    (async function init() {
+      
       const sel = loadSelection();
       if (!sel || !sel.checkin || !sel.checkout) {
         location.href = "booking-search.html";
@@ -591,7 +645,11 @@
       const qp = new URLSearchParams(location.search);
       const cupQ = (qp.get('coupon')||'').trim();
       if(cupQ){ $("#coupon-code").value = cupQ; state.coupon.code = cupQ; }
-
+      await hydrateRoomFromDB(sel);
+      const defaultImg = "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_420013865349671_4717308762179951365_n.jpg') }}";
+      if (window.RoomImage && sel && sel.roomCode && (!sel.img || sel.img === defaultImg)) {
+        sel.img = await RoomImage.lookup(sel.roomCode, { fallback: defaultImg });
+      }      
       renderSummary(sel);
       bind(sel);
     })();

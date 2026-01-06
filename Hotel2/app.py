@@ -25,6 +25,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import check_password_hash, generate_password_hash
 from datetime import datetime, date
 from flask import session, render_template
+from blueprints.grr.routes import _precio_noche
 from models_sql import Usuario
 from blueprints.fin_kpi import fin_kpi_bp
 
@@ -2170,6 +2171,34 @@ def create_app() -> Flask:
             pending_approvals_count=pending_approvals_count
         )
         
+        
+        
+        
+        
+        
+    # =========================================================
+    # OPS - HABITACIONES 
+    # =========================================================
+    
+    @app.route("/ops-rooms.html", methods=["GET"])
+    @role_required("Administrador", "Recepcionista")
+    def ops_rooms_menu_html():
+        return render_template("ops-rooms.html")
+    
+    
+    @app.route("/ops-rooms-manage.html", methods=["GET"])
+    @role_required("Administrador")
+    def ops_rooms_manage_html():
+        return render_template("ops-rooms-manage.html")
+    
+    
+    @app.route("/ops-rooms-dashboard.html")
+    @role_required("Administrador", "Recepcionista")
+    def ops_rooms_dashboard_html():
+        return render_template("ops-rooms-dashboard.html")
+    
+    
+        
     
     @app.route("/ops-approvals.html")
     @role_required("Administrador", "Recepcionista")
@@ -2213,6 +2242,7 @@ def create_app() -> Flask:
     @role_required("Administrador", "Recepcionista")
     def ops_rooms_status_html():
         return render_template("ops-rooms-status.html")
+    
 
     # === ADMIN/OPS: vista de calendario por habitación ===
     @app.route("/admin-calendario.html")
@@ -4425,12 +4455,31 @@ def create_app() -> Flask:
     @app.route("/rooms.html")
     def rooms_html():
         try:
-            habitaciones = Habitacion.query.order_by(Habitacion.Numero_Habitacion.asc()).all()
+            q = Habitacion.query
+    
+            # Orden consistente (si existe Numero_Habitacion)
+            if hasattr(Habitacion, "Numero_Habitacion"):
+                q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
+            else:
+                q = q.order_by(Habitacion.Codigo_Habitacion.asc())
+    
+            habitaciones = q.all()
+    
+            
+            for h in habitaciones:
+                try:
+                    setattr(h, "Precio_Noche", float(_precio_noche(h) or 0))
+                except Exception:
+                    # No rompemos la vista por un caso aislado
+                    pass
+    
             print(f"[DEBUG] Se cargaron {len(habitaciones)} habitaciones desde la BD.")
         except Exception as e:
             print(f"[ERROR] Al cargar habitaciones: {e}")
             habitaciones = []
+    
         return render_template("rooms.html", habitaciones=habitaciones)
+    
 
     @app.route("/test-db")
     def test_db():
@@ -7664,11 +7713,10 @@ app = create_app()
 # EJECUCIÓN
 # =========================
 # al final de app.py
-#if __name__ == "__main__":
-#    app.run(
-#        host="127.0.0.1",
-#        port=int(os.getenv("PORT", 5000)),
-#        debug=True,
-#        use_reloader=True,   # <-- clave para quitar ese error
-#    )
-#
+if __name__ == "__main__":
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", 5000)),
+        debug=True,
+        use_reloader=True,   # <-- clave para quitar ese error
+    )
