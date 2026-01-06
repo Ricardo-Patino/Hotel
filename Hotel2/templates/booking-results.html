@@ -173,6 +173,7 @@
     };
 
     const imgURL = room.Imagen_URL || room.img || "{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/485630042_1169316618225875_2079195189444161788_n.jpg') }}";
+    payload.img = imgURL;
 
     return `
       <div class="card shadow-sm border-0 room-card ${disabled ? 'blocked' : ''}">
