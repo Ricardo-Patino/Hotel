@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recepción – Gestión de habitaciones | Hotel Villa Grace</title>
+  <meta name="description" content="Gestión de habitaciones: crear, editar, eliminar y administrar imágenes.">
+
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <!-- Fuentes -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Vendor CSS -->
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+
+  <!-- Main CSS -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .soft { color:#6c757d; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    .kpi-mini { display:flex; gap:10px; align-items:center; }
+    .kpi-mini .ic { font-size: 1.25rem; }
+    .kpi-mini .val { font-weight: 800; font-size: 1.05rem; line-height: 1; }
+    .kpi-mini .lbl { font-size: .85rem; color:#6c757d; }
+
+    .room-thumb {
+      width: 44px; height: 44px; border-radius: 10px;
+      object-fit: cover; background: #f1f3f5; border: 1px solid rgba(0,0,0,.08);
+    }
+
+    .table thead th { white-space: nowrap; }
+    .table tbody td { vertical-align: middle; }
+
+    .panel-sticky { position: sticky; top: 92px; }
+    @media (max-width: 991px) {
+      .panel-sticky { position: static; top: auto; }
+    }
+
+    .img-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap:10px; }
+    .img-card {
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+    }
+    .img-card img { width:100%; height: 86px; object-fit: cover; background:#f1f3f5; }
+    .img-card .meta { padding:10px; }
+    .img-card .meta .small { line-height: 1.2; }
+    .badge-pill { border-radius: 50rem; }
+
+    .btn-icon { display:inline-flex; align-items:center; gap:.35rem; }
+    .help-box { border: 1px dashed rgba(0,0,0,.18); border-radius: 14px; padding: 12px; background: rgba(255,255,255,.75); }
+    .form-section-title { font-weight: 800; font-size: .95rem; margin-bottom: .25rem; }
+
+    .skeleton { position: relative; overflow: hidden; background: #eef1f4; border-radius: 12px; }
+    .skeleton:after {
+      content:""; position:absolute; top:0; left:-40%;
+      width:40%; height:100%;
+      background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.65), rgba(255,255,255,0));
+      animation: shimmer 1.2s infinite;
+    }
+    @keyframes shimmer { 100% { left: 120%; } }
+
+    .toast-container { z-index: 2000; }
+  </style>
+</head>
+
+<body class="inner-page">
+
+  <!-- Header -->
+  <header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container position-relative d-flex align-items-center justify-content-between">
+      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+        <h1 class="sitename">Hotel Villa Grace</h1>
+      </a>
+
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li class="dropdown">
+            <a href="#" class="active">
+              <span>Recepción</span> <i class="bi bi-chevron-down toggle-dropdown"></i>
+            </a>
+            <ul>
+              <li><a href="ops-dashboard.html">Tablero</a></li>
+              <li><a href="ops-checkin.html">Check-in</a></li>
+              <li><a href="ops-checkout.html">Check-out</a></li>
+              <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
+              <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
+              <li><a href="ops-rooms-status.html">Estado de habitaciones</a></li>
+              <li><a href="ops-rooms.html" class="active">Habitaciones</a></li>
+              <li><a href="/ops/housekeeping">Limpieza</a></li>
+              <li><a href="/ops/coupons">Cupones</a></li>
+            </ul>
+          </li>
+          <li><a href="admin-calendario.html">Calendario</a></li>
+          <li><a href="portal-reservas.html">Reservas del huésped</a></li>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
+
+      <div class="d-flex gap-2">
+        <a class="btn btn-light d-none d-sm-inline-flex btn-icon" href="ops-rooms.html"><i class="bi bi-arrow-left"></i> Menú</a>
+        <a class="btn btn-getstarted d-none d-sm-inline-flex btn-icon" href="ops-dashboard.html"><i class="bi bi-grid"></i> Tablero</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- Page Title -->
+    <div class="page-title dark-background" data-aos="fade"
+         style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+      <div class="container position-relative">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="section-title text-white">
+            <h1>Gestión de habitaciones</h1>
+            <p class="mb-0">CRUD + imágenes por habitación (almacenadas livianas vía rutas en BD).</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-success btn-icon" id="btnNewRoom">
+              <i class="bi bi-plus-circle"></i> Nueva habitación
+            </button>
+            <button class="btn btn-outline-light btn-icon" id="btnRefresh">
+              <i class="bi bi-arrow-repeat"></i> Actualizar
+            </button>
+          </div>
+        </div>
+        <nav class="breadcrumbs mt-2">
+          <ol>
+            <li><a href="index.html">Inicio</a></li>
+            <li><a href="ops-dashboard.html">Recepción</a></li>
+            <li><a href="ops-rooms.html">Habitaciones</a></li>
+            <li class="current">Gestión</li>
+          </ol>
+        </nav>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container" data-aos="fade-up">
+
+        <!-- KPIs -->
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="kpi-mini">
+                  <div class="ic text-primary"><i class="bi bi-door-open"></i></div>
+                  <div>
+                    <div class="val" id="kpiTotal">—</div>
+                    <div class="lbl">Total habitaciones</div>
+                  </div>
+                </div>
+                <hr class="my-3">
+                <div class="kpi-mini">
+                  <div class="ic text-success"><i class="bi bi-check2-circle"></i></div>
+                  <div>
+                    <div class="val" id="kpiAvailable">—</div>
+                    <div class="lbl">Disponibles</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="kpi-mini">
+                  <div class="ic text-danger"><i class="bi bi-person-fill-lock"></i></div>
+                  <div>
+                    <div class="val" id="kpiOccupied">—</div>
+                    <div class="lbl">Ocupadas (todas)</div>
+                  </div>
+                </div>
+                <hr class="my-3">
+                <div class="kpi-mini">
+                  <div class="ic text-warning"><i class="bi bi-bucket"></i></div>
+                  <div>
+                    <div class="val" id="kpiCleaning">—</div>
+                    <div class="lbl">Limpieza</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="kpi-mini">
+                  <div class="ic text-secondary"><i class="bi bi-tools"></i></div>
+                  <div>
+                    <div class="val" id="kpiMaintenance">—</div>
+                    <div class="lbl">Mantenimiento</div>
+                  </div>
+                </div>
+                <hr class="my-3">
+                <div class="kpi-mini">
+                  <div class="ic text-info"><i class="bi bi-tags"></i></div>
+                  <div>
+                    <div class="val" id="kpiTypes">—</div>
+                    <div class="lbl">Tipos detectados</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="help-box h-100">
+              <div class="fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>Notas operativas</div>
+              <div class="small soft">
+                • La <b>imagen principal</b> es la que se usará luego en el Paso 3 para reemplazar imágenes “quemadas”.<br>
+                • Para no llenar la BD: el archivo se guarda en <span class="mono">static/uploads/rooms/&lt;id&gt;/</span> y en BD solo la ruta.<br>
+                • Recomendado: imágenes <b>WEBP</b> y máximo <b>2 MB</b>.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <!-- Listado -->
+          <div class="col-12 col-lg-7">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white border-0">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div>
+                    <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Habitaciones</h5>
+                    <div class="small soft">Selecciona una habitación para editar y administrar imágenes.</div>
+                  </div>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="input-group input-group-sm" style="min-width: 240px;">
+                      <span class="input-group-text"><i class="bi bi-search"></i></span>
+                      <input type="text" class="form-control" id="txtSearch" placeholder="Buscar por número, tipo o estado...">
+                    </div>
+                    <select class="form-select form-select-sm" id="filterState" style="min-width: 170px;">
+                      <option value="">Todos los estados</option>
+                      <option>Disponible</option>
+                      <option>Ocupada</option>
+                      <option>Ocupada-temprana</option>
+                      <option>Ocupada-extendida</option>
+                      <option>Mantenimiento</option>
+                      <option>Limpieza</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th style="width:56px;">Img</th>
+                        <th>Número</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Precio/Noche</th>
+                        <th>Estado</th>
+                        <th class="text-nowrap">Modificado</th>
+                        <th style="width:130px;" class="text-end">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="roomsTbody">
+                      <!-- JS -->
+                      <tr>
+                        <td colspan="7" class="p-4">
+                          <div class="d-flex gap-2 align-items-center">
+                            <div class="skeleton" style="width:44px;height:44px;"></div>
+                            <div class="flex-grow-1">
+                              <div class="skeleton mb-2" style="height:14px;width:60%;"></div>
+                              <div class="skeleton" style="height:12px;width:40%;"></div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="card-footer bg-white border-0">
+                <div class="small soft" id="roomsCount">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel edición -->
+          <div class="col-12 col-lg-5">
+            <div class="panel-sticky">
+              <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white border-0">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                      <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Edición</h5>
+                      <div class="small soft" id="selectedHint">Selecciona una habitación para editar.</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                      <button class="btn btn-sm btn-outline-secondary btn-icon" id="btnClearSelection" disabled>
+                        <i class="bi bi-x-circle"></i> Limpiar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card-body">
+                  <form id="editForm" autocomplete="off">
+                    <div class="row g-2">
+                      <div class="col-6">
+                        <div class="form-section-title">Código</div>
+                        <input type="text" class="form-control form-control-sm mono" id="editCodigo" disabled>
+                      </div>
+                      <div class="col-6">
+                        <div class="form-section-title">Número</div>
+                        <input type="text" class="form-control form-control-sm" id="editNumero" placeholder="Ej: 101" disabled>
+                      </div>
+
+                      <div class="col-6">
+                        <div class="form-section-title">Tipo</div>
+                        <select class="form-select form-select-sm" id="editTipo" disabled>
+                          <option value="Sencilla">Sencilla</option>
+                          <option value="Doble">Doble</option>
+                          <option value="Suite">Suite</option>
+                        </select>
+                      </div>
+                      <div class="col-6">
+                        <div class="form-section-title">Estado</div>
+                        <select class="form-select form-select-sm" id="editEstado" disabled>
+                          <option>Disponible</option>
+                          <option>Ocupada</option>
+                          <option>Ocupada-temprana</option>
+                          <option>Ocupada-extendida</option>
+                          <option>Mantenimiento</option>
+                          <option>Limpieza</option>
+                        </select>
+                      </div>
+
+                      <div class="col-12">
+                        <div class="form-section-title">Precio por noche</div>
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text">CRC</span>
+                          <input type="number" step="0.01" class="form-control" id="editPrecio" placeholder="Ej: 45000.00" disabled>
+                        </div>
+                        <div class="small soft mt-1" id="editModified">—</div>
+                      </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3">
+                      <button type="button" class="btn btn-primary btn-icon flex-grow-1" id="btnSave" disabled>
+                        <i class="bi bi-save"></i> Guardar cambios
+                      </button>
+                      <button type="button" class="btn btn-outline-danger btn-icon" id="btnDelete" disabled>
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <!-- Imágenes -->
+              <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0">
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                      <h5 class="mb-0"><i class="bi bi-images me-2"></i>Imágenes</h5>
+                      <div class="small soft">Sube imágenes, define principal y organiza el orden.</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary btn-icon" id="btnOpenUpload" disabled>
+                      <i class="bi bi-upload"></i> Subir
+                    </button>
+                  </div>
+                </div>
+
+                <div class="card-body">
+                  <div class="alert alert-light border small mb-3">
+                    <div class="d-flex align-items-start gap-2">
+                      <i class="bi bi-lightbulb text-warning fs-5"></i>
+                      <div>
+                        <div class="fw-semibold">Recomendación</div>
+                        Usa <b>.webp</b> y mantén las imágenes por debajo de <b>2 MB</b> para un sistema rápido.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="imagesEmpty" class="text-center py-4 soft">
+                    <i class="bi bi-image fs-2 d-block mb-2"></i>
+                    Selecciona una habitación para ver y administrar imágenes.
+                  </div>
+
+                  <div id="imagesWrap" class="d-none">
+                    <div class="img-grid" id="imagesGrid"><!-- JS --></div>
+                  </div>
+                </div>
+
+                <div class="card-footer bg-white border-0">
+                  <div class="small soft" id="imagesCount">—</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- Toasts -->
+  <div class="toast-container position-fixed top-0 end-0 p-3">
+    <div id="liveToast" class="toast align-items-center text-bg-dark border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body" id="toastMsg">—</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Nueva habitación -->
+  <div class="modal fade" id="modalNewRoom" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Nueva habitación</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small">Número</label>
+              <input class="form-control form-control-sm" id="newNumero" placeholder="Ej: 101">
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Tipo</label>
+              <select class="form-select form-select-sm" id="newTipo">
+                <option value="Sencilla">Sencilla</option>
+                <option value="Doble">Doble</option>
+                <option value="Suite">Suite</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Estado</label>
+              <select class="form-select form-select-sm" id="newEstado">
+                <option>Disponible</option>
+                <option>Ocupada</option>
+                <option>Ocupada-temprana</option>
+                <option>Ocupada-extendida</option>
+                <option>Mantenimiento</option>
+                <option>Limpieza</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Precio por noche</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">CRC</span>
+                <input type="number" step="0.01" class="form-control" id="newPrecio" placeholder="Ej: 45000.00">
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-light border small mt-3 mb-0">
+            Luego podrás subir imágenes y definir una <b>principal</b>.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-success btn-icon" id="btnCreateRoom"><i class="bi bi-check2-circle"></i> Crear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Subir imagen -->
+  <div class="modal fade" id="modalUploadImage" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Subir imagen</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label small">Archivo (JPG/PNG/WEBP)</label>
+            <input type="file" class="form-control form-control-sm" id="upFile" accept=".jpg,.jpeg,.png,.webp,image/*">
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small">Orden</label>
+              <input type="number" class="form-control form-control-sm" id="upSort" value="0">
+            </div>
+            <div class="col-6 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="upPrimary">
+                <label class="form-check-label small" for="upPrimary">Marcar como principal</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label small">Alt / descripción (opcional)</label>
+              <input type="text" class="form-control form-control-sm" id="upAlt" placeholder="Ej: Vista del balcón">
+            </div>
+          </div>
+
+          <div class="alert alert-light border small mt-3 mb-0">
+            Máximo recomendado: <b>2 MB</b>. Preferible <b>WEBP</b>.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary btn-icon" id="btnUploadNow"><i class="bi bi-cloud-arrow-up"></i> Subir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Editar metadata de imagen -->
+  <div class="modal fade" id="modalEditImage" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar imagen</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="imgEditId">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small">Orden</label>
+              <input type="number" class="form-control form-control-sm" id="imgEditSort">
+            </div>
+            <div class="col-6 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="imgEditPrimary">
+                <label class="form-check-label small" for="imgEditPrimary">Principal</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label small">Alt / descripción</label>
+              <input type="text" class="form-control form-control-sm" id="imgEditAlt" placeholder="Ej: Cama king size">
+            </div>
+          </div>
+          <div class="alert alert-light border small mt-3 mb-0">
+            Si marcas como principal, se desmarcarán las demás para esta habitación.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary btn-icon" id="btnSaveImgMeta"><i class="bi bi-save"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor JS -->
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+
+  <!-- Main JS -->
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <script>
+    (function(){ try { AOS.init({ once:true, duration: 350 }); } catch(_){} })();
+
+    // -----------------------------
+    // Utilidades UI
+    // -----------------------------
+    const toastEl = document.getElementById('liveToast');
+    const toast = toastEl ? new bootstrap.Toast(toastEl, { delay: 3200 }) : null;
+    const toastMsg = document.getElementById('toastMsg');
+
+    function notify(msg, type="dark") {
+      if (!toast || !toastMsg) { alert(msg); return; }
+      toastEl.className = `toast align-items-center text-bg-${type} border-0`;
+      toastMsg.textContent = msg;
+      toast.show();
+    }
+
+    function fmtCRC(value) {
+      const n = Number(value);
+      if (Number.isNaN(n)) return value ?? "—";
+      try {
+        return new Intl.NumberFormat('es-CR', { style:'currency', currency:'CRC', maximumFractionDigits: 2 }).format(n);
+      } catch(_) {
+        return `₡ ${n.toFixed(2)}`;
+      }
+    }
+
+    function fmtDate(s) {
+      if (!s) return "—";
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return String(s);
+      return d.toLocaleString('es-CR', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+
+    async function api(url, options = {}) {
+      const opt = Object.assign({
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
+      }, options);
+
+      if (opt.body && !(opt.body instanceof FormData)) {
+        opt.headers = Object.assign({}, opt.headers, { 'Content-Type': 'application/json' });
+        opt.body = JSON.stringify(opt.body);
+      }
+
+      const res = await fetch(url, opt);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || data.message || `Error HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      if (data && data.ok === false && data.error) throw new Error(data.error);
+      return data;
+    }
+
+    // -----------------------------
+    // Estado
+    // -----------------------------
+    let rooms = [];
+    let selectedRoomId = null;
+    let images = [];
+
+    // -----------------------------
+    // Elementos
+    // -----------------------------
+    const tbody = document.getElementById('roomsTbody');
+    const roomsCount = document.getElementById('roomsCount');
+    const txtSearch = document.getElementById('txtSearch');
+    const filterState = document.getElementById('filterState');
+
+    const kpiTotal = document.getElementById('kpiTotal');
+    const kpiAvailable = document.getElementById('kpiAvailable');
+    const kpiOccupied = document.getElementById('kpiOccupied');
+    const kpiCleaning = document.getElementById('kpiCleaning');
+    const kpiMaintenance = document.getElementById('kpiMaintenance');
+    const kpiTypes = document.getElementById('kpiTypes');
+
+    const selectedHint = document.getElementById('selectedHint');
+    const btnClearSelection = document.getElementById('btnClearSelection');
+
+    const editCodigo = document.getElementById('editCodigo');
+    const editNumero = document.getElementById('editNumero');
+    const editTipo = document.getElementById('editTipo');
+    const editEstado = document.getElementById('editEstado');
+    const editPrecio = document.getElementById('editPrecio');
+    const editModified = document.getElementById('editModified');
+
+    const btnSave = document.getElementById('btnSave');
+    const btnDelete = document.getElementById('btnDelete');
+
+    const imagesEmpty = document.getElementById('imagesEmpty');
+    const imagesWrap = document.getElementById('imagesWrap');
+    const imagesGrid = document.getElementById('imagesGrid');
+    const imagesCount = document.getElementById('imagesCount');
+    const btnOpenUpload = document.getElementById('btnOpenUpload');
+
+    // Modales
+    const modalNewRoom = new bootstrap.Modal(document.getElementById('modalNewRoom'));
+    const modalUploadImage = new bootstrap.Modal(document.getElementById('modalUploadImage'));
+    const modalEditImage = new bootstrap.Modal(document.getElementById('modalEditImage'));
+
+    // Inputs modal nueva
+    const newNumero = document.getElementById('newNumero');
+    const newTipo = document.getElementById('newTipo');
+    const newEstado = document.getElementById('newEstado');
+    const newPrecio = document.getElementById('newPrecio');
+
+    // Inputs subir imagen
+    const upFile = document.getElementById('upFile');
+    const upSort = document.getElementById('upSort');
+    const upPrimary = document.getElementById('upPrimary');
+    const upAlt = document.getElementById('upAlt');
+
+    // Inputs editar imagen
+    const imgEditId = document.getElementById('imgEditId');
+    const imgEditSort = document.getElementById('imgEditSort');
+    const imgEditPrimary = document.getElementById('imgEditPrimary');
+    const imgEditAlt = document.getElementById('imgEditAlt');
+
+    // -----------------------------
+    // Render
+    // -----------------------------
+    function getRoomId(r) {
+      // backend serializa a string; garantizamos int
+      return parseInt(r.Codigo_Habitacion ?? r.codigo_habitacion ?? r.id, 10);
+    }
+
+    function getPrimaryUrl(r) {
+      return r.Primary_Image_Url || null;
+    }
+
+    function stateBadgeClass(state) {
+      switch (state) {
+        case 'Disponible': return 'text-bg-success';
+        case 'Limpieza': return 'text-bg-warning';
+        case 'Mantenimiento': return 'text-bg-secondary';
+        case 'Ocupada':
+        case 'Ocupada-temprana':
+        case 'Ocupada-extendida':
+          return 'text-bg-danger';
+        default: return 'text-bg-dark';
+      }
+    }
+
+    function applyFilters(list) {
+      const q = (txtSearch.value || '').trim().toLowerCase();
+      const st = (filterState.value || '').trim();
+
+      return list.filter(r => {
+        const num = String(r.Numero_Habitacion || '').toLowerCase();
+        const tipo = String(r.Tipo || '').toLowerCase();
+        const estado = String(r.Estado || '').toLowerCase();
+        const okQ = !q || num.includes(q) || tipo.includes(q) || estado.includes(q);
+        const okS = !st || String(r.Estado || '') === st;
+        return okQ && okS;
+      });
+    }
+
+    function renderRooms() {
+      const filtered = applyFilters(rooms);
+
+      tbody.innerHTML = filtered.map(r => {
+        const id = getRoomId(r);
+        const isSelected = selectedRoomId === id;
+        const img = getPrimaryUrl(r);
+        const imgTag = img
+          ? `<img class="room-thumb" src="${img}" alt="Habitación ${r.Numero_Habitacion}">`
+          : `<div class="room-thumb d-flex align-items-center justify-content-center"><i class="bi bi-image text-secondary"></i></div>`;
+
+        return `
+          <tr class="${isSelected ? 'table-primary' : ''}">
+            <td>${imgTag}</td>
+            <td class="fw-semibold">${r.Numero_Habitacion ?? '—'}</td>
+            <td>${r.Tipo ?? '—'}</td>
+            <td class="text-end">${fmtCRC(r.Precio_Noche)}</td>
+            <td><span class="badge ${stateBadgeClass(r.Estado)} badge-pill">${r.Estado ?? '—'}</span></td>
+            <td class="text-nowrap small soft">${fmtDate(r.Fecha_modificacion)}</td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-primary btn-icon" data-action="select" data-id="${id}">
+                <i class="bi bi-cursor"></i> Seleccionar
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      roomsCount.textContent = `${filtered.length} habitaciones (filtradas) • ${rooms.length} total`;
+
+      // click handlers
+      tbody.querySelectorAll('button[data-action="select"]').forEach(b => {
+        b.addEventListener('click', () => selectRoom(parseInt(b.dataset.id, 10)));
+      });
+    }
+
+    function computeKpis() {
+      const total = rooms.length;
+      const available = rooms.filter(r => r.Estado === 'Disponible').length;
+      const cleaning = rooms.filter(r => r.Estado === 'Limpieza').length;
+      const maintenance = rooms.filter(r => r.Estado === 'Mantenimiento').length;
+      const occupied = rooms.filter(r => ['Ocupada','Ocupada-temprana','Ocupada-extendida'].includes(r.Estado)).length;
+      const typesSet = new Set(rooms.map(r => r.Tipo).filter(Boolean));
+
+      kpiTotal.textContent = total;
+      kpiAvailable.textContent = available;
+      kpiCleaning.textContent = cleaning;
+      kpiMaintenance.textContent = maintenance;
+      kpiOccupied.textContent = occupied;
+      kpiTypes.textContent = typesSet.size;
+    }
+
+    function setEditEnabled(enabled) {
+      editNumero.disabled = !enabled;
+      editTipo.disabled = !enabled;
+      editEstado.disabled = !enabled;
+      editPrecio.disabled = !enabled;
+
+      btnSave.disabled = !enabled;
+      btnDelete.disabled = !enabled;
+      btnOpenUpload.disabled = !enabled;
+      btnClearSelection.disabled = !enabled;
+    }
+
+    function clearSelection() {
+      selectedRoomId = null;
+      selectedHint.textContent = "Selecciona una habitación para editar.";
+      editCodigo.value = "";
+      editNumero.value = "";
+      editTipo.value = "Sencilla";
+      editEstado.value = "Disponible";
+      editPrecio.value = "";
+      editModified.textContent = "—";
+      setEditEnabled(false);
+
+      images = [];
+      imagesEmpty.classList.remove('d-none');
+      imagesWrap.classList.add('d-none');
+      imagesGrid.innerHTML = "";
+      imagesCount.textContent = "—";
+    }
+
+    function fillEditForm(room) {
+      setEditEnabled(true);
+      selectedHint.textContent = `Editando habitación #${room.Numero_Habitacion} (${room.Tipo})`;
+
+      editCodigo.value = getRoomId(room);
+      editNumero.value = room.Numero_Habitacion ?? "";
+      editTipo.value = room.Tipo ?? "Sencilla";
+      editEstado.value = room.Estado ?? "Disponible";
+
+      const price = Number(room.Precio_Noche);
+      editPrecio.value = Number.isNaN(price) ? "" : price;
+
+      editModified.textContent = `Última modificación: ${fmtDate(room.Fecha_modificacion)}`;
+    }
+
+    function renderImages() {
+      if (!selectedRoomId) return;
+
+      imagesEmpty.classList.add('d-none');
+      imagesWrap.classList.remove('d-none');
+
+      if (!images.length) {
+        imagesGrid.innerHTML = `
+          <div class="text-center soft py-3" style="grid-column: 1/-1;">
+            <i class="bi bi-image fs-2 d-block mb-2"></i>
+            Aún no hay imágenes para esta habitación.
+          </div>
+        `;
+        imagesCount.textContent = "0 imágenes";
+        return;
+      }
+
+      imagesCount.textContent = `${images.length} imagen(es)`;
+      imagesGrid.innerHTML = images.map(img => {
+        const principal = img.Is_Principal ? `<span class="badge text-bg-success badge-pill">Principal</span>` : '';
+        const alt = (img.Alt_Text || '').trim();
+        const altText = alt ? alt : '<span class="soft">Sin descripción</span>';
+
+        return `
+          <div class="img-card">
+            <img src="${img.Url}" alt="${alt ? alt.replaceAll('"','&quot;') : 'Imagen de habitación'}">
+            <div class="meta">
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                <div class="small">${principal}</div>
+                <div class="small soft">Ord: ${img.Sort_Order ?? 0}</div>
+              </div>
+              <div class="small mb-2">${altText}</div>
+
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary btn-icon flex-grow-1" data-action="edit-img" data-id="${img.Id}">
+                  <i class="bi bi-pencil"></i> Editar
+                </button>
+                <button class="btn btn-sm btn-outline-danger btn-icon" data-action="del-img" data-id="${img.Id}">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+
+              ${img.Is_Principal ? '' : `
+                <button class="btn btn-sm btn-outline-success btn-icon w-100 mt-2" data-action="set-primary" data-id="${img.Id}">
+                  <i class="bi bi-star"></i> Hacer principal
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      imagesGrid.querySelectorAll('button[data-action="edit-img"]').forEach(b => {
+        b.addEventListener('click', () => openEditImage(parseInt(b.dataset.id, 10)));
+      });
+      imagesGrid.querySelectorAll('button[data-action="del-img"]').forEach(b => {
+        b.addEventListener('click', () => deleteImage(parseInt(b.dataset.id, 10)));
+      });
+      imagesGrid.querySelectorAll('button[data-action="set-primary"]').forEach(b => {
+        b.addEventListener('click', () => setPrimary(parseInt(b.dataset.id, 10)));
+      });
+    }
+
+    // -----------------------------
+    // Carga datos
+    // -----------------------------
+    async function loadRooms() {
+      try {
+        const data = await api('/admin-rooms', { method: 'GET' });
+        rooms = Array.isArray(data) ? data : [];
+        computeKpis();
+        renderRooms();
+
+        // Si había seleccionada, refrescarla
+        if (selectedRoomId) {
+          const r = rooms.find(x => getRoomId(x) === selectedRoomId);
+          if (!r) {
+            clearSelection();
+          } else {
+            fillEditForm(r);
+          }
+        }
+      } catch (e) {
+        notify(e.message || 'No se pudieron cargar habitaciones.', 'danger');
+        tbody.innerHTML = `
+          <tr><td colspan="7" class="p-4">
+            <div class="alert alert-danger mb-0">
+              <div class="fw-semibold">No se pudieron cargar habitaciones</div>
+              <div class="small">${(e.message || '').replaceAll('<','&lt;')}</div>
+            </div>
+          </td></tr>
+        `;
+      }
+    }
+
+    async function loadImages(roomId) {
+      try {
+        const data = await api(`/admin-rooms/${roomId}/images`, { method: 'GET' });
+        images = Array.isArray(data) ? data : [];
+        renderImages();
+      } catch (e) {
+        notify(e.message || 'No se pudieron cargar imágenes.', 'danger');
+        images = [];
+        renderImages();
+      }
+    }
+
+    // -----------------------------
+    // Selección
+    // -----------------------------
+    async function selectRoom(id) {
+      selectedRoomId = id;
+      const room = rooms.find(r => getRoomId(r) === id);
+      if (!room) {
+        clearSelection();
+        notify('Habitación no encontrada en lista.', 'warning');
+        return;
+      }
+
+      fillEditForm(room);
+      renderRooms();
+
+      images = [];
+      imagesEmpty.classList.add('d-none');
+      imagesWrap.classList.remove('d-none');
+      imagesGrid.innerHTML = `
+        <div class="skeleton" style="height:120px; grid-column:1/-1;"></div>
+      `;
+      imagesCount.textContent = "Cargando imágenes...";
+      await loadImages(id);
+    }
+
+    // -----------------------------
+    // CRUD habitaciones
+    // -----------------------------
+    async function createRoom() {
+      const payload = {
+        Numero_Habitacion: (newNumero.value || '').trim(),
+        Tipo: newTipo.value,
+        Estado: newEstado.value,
+        Precio_Noche: (newPrecio.value || '').trim()
+      };
+
+      if (!payload.Numero_Habitacion) { notify('El número es requerido.', 'warning'); return; }
+      if (!payload.Precio_Noche) { notify('El precio por noche es requerido.', 'warning'); return; }
+
+      try {
+        await api('/admin-rooms', { method:'POST', body: payload });
+        notify('Habitación creada correctamente.', 'success');
+        modalNewRoom.hide();
+
+        newNumero.value = '';
+        newPrecio.value = '';
+        newTipo.value = 'Sencilla';
+        newEstado.value = 'Disponible';
+
+        await loadRooms();
+      } catch (e) {
+        notify(e.message || 'No se pudo crear la habitación.', 'danger');
+      }
+    }
+
+    async function saveRoom() {
+      if (!selectedRoomId) return;
+
+      const payload = {
+        Numero_Habitacion: (editNumero.value || '').trim(),
+        Tipo: editTipo.value,
+        Estado: editEstado.value,
+        Precio_Noche: (editPrecio.value || '').trim()
+      };
+
+      if (!payload.Numero_Habitacion) { notify('El número es requerido.', 'warning'); return; }
+      if (!payload.Precio_Noche) { notify('El precio por noche es requerido.', 'warning'); return; }
+
+      try {
+        await api(`/admin-rooms/${selectedRoomId}`, { method:'PUT', body: payload });
+        notify('Cambios guardados.', 'success');
+        await loadRooms();
+      } catch (e) {
+        notify(e.message || 'No se pudieron guardar los cambios.', 'danger');
+      }
+    }
+
+    async function deleteRoom() {
+      if (!selectedRoomId) return;
+      const room = rooms.find(r => getRoomId(r) === selectedRoomId);
+      const label = room ? `#${room.Numero_Habitacion} (${room.Tipo})` : `ID ${selectedRoomId}`;
+
+      if (!confirm(`¿Eliminar la habitación ${label}?\n\nEsto también eliminará sus imágenes.`)) return;
+
+      try {
+        await api(`/admin-rooms/${selectedRoomId}`, { method:'DELETE' });
+        notify('Habitación eliminada.', 'success');
+        clearSelection();
+        await loadRooms();
+      } catch (e) {
+        notify(e.message || 'No se pudo eliminar la habitación.', 'danger');
+      }
+    }
+
+    // -----------------------------
+    // Imágenes
+    // -----------------------------
+    function openUploadModal() {
+      if (!selectedRoomId) return;
+      upFile.value = '';
+      upSort.value = '0';
+      upPrimary.checked = false;
+      upAlt.value = '';
+      modalUploadImage.show();
+    }
+
+    async function uploadImage() {
+      if (!selectedRoomId) return;
+      if (!upFile.files || !upFile.files.length) { notify('Selecciona un archivo.', 'warning'); return; }
+
+      const fd = new FormData();
+      fd.append('image', upFile.files[0]);
+      fd.append('sort_order', (upSort.value || '0').trim());
+      fd.append('alt_text', (upAlt.value || '').trim());
+      fd.append('is_principal', upPrimary.checked ? '1' : '0');
+
+      try {
+        await api(`/admin-rooms/${selectedRoomId}/images`, { method:'POST', body: fd, headers: { 'Accept':'application/json' } });
+        notify('Imagen subida correctamente.', 'success');
+        modalUploadImage.hide();
+
+        await loadImages(selectedRoomId);
+        await loadRooms(); // refresca thumbnail principal en tabla
+      } catch (e) {
+        notify(e.message || 'No se pudo subir la imagen.', 'danger');
+      }
+    }
+
+    function openEditImage(imageId) {
+      const img = images.find(i => i.Id === imageId);
+      if (!img) { notify('Imagen no encontrada.', 'warning'); return; }
+
+      imgEditId.value = String(img.Id);
+      imgEditSort.value = String(img.Sort_Order ?? 0);
+      imgEditPrimary.checked = !!img.Is_Principal;
+      imgEditAlt.value = img.Alt_Text || '';
+      modalEditImage.show();
+    }
+
+    async function saveImageMeta() {
+      const id = parseInt(imgEditId.value || '0', 10);
+      if (!id) return;
+
+      const payload = {
+        Sort_Order: parseInt(imgEditSort.value || '0', 10),
+        Alt_Text: (imgEditAlt.value || '').trim(),
+        Is_Principal: imgEditPrimary.checked ? true : undefined
+      };
+
+      // limpiamos undefined para que el backend no interprete "Is_Principal": null
+      if (payload.Is_Principal === undefined) delete payload.Is_Principal;
+
+      try {
+        await api(`/admin-rooms/images/${id}`, { method:'PUT', body: payload });
+        notify('Imagen actualizada.', 'success');
+        modalEditImage.hide();
+
+        await loadImages(selectedRoomId);
+        await loadRooms();
+      } catch (e) {
+        notify(e.message || 'No se pudo actualizar la imagen.', 'danger');
+      }
+    }
+
+    async function setPrimary(imageId) {
+      try {
+        await api(`/admin-rooms/images/${imageId}`, { method:'PUT', body: { Is_Principal: true } });
+        notify('Imagen marcada como principal.', 'success');
+        await loadImages(selectedRoomId);
+        await loadRooms();
+      } catch (e) {
+        notify(e.message || 'No se pudo marcar como principal.', 'danger');
+      }
+    }
+
+    async function deleteImage(imageId) {
+      const img = images.find(i => i.Id === imageId);
+      if (!img) return;
+
+      if (!confirm('¿Eliminar esta imagen?')) return;
+
+      try {
+        await api(`/admin-rooms/images/${imageId}`, { method:'DELETE' });
+        notify('Imagen eliminada.', 'success');
+        await loadImages(selectedRoomId);
+        await loadRooms();
+      } catch (e) {
+        notify(e.message || 'No se pudo eliminar la imagen.', 'danger');
+      }
+    }
+
+    // -----------------------------
+    // Eventos
+    // -----------------------------
+    document.getElementById('btnNewRoom').addEventListener('click', () => modalNewRoom.show());
+    document.getElementById('btnRefresh').addEventListener('click', async () => {
+      notify('Actualizando...', 'secondary');
+      await loadRooms();
+      if (selectedRoomId) await loadImages(selectedRoomId);
+    });
+
+    document.getElementById('btnCreateRoom').addEventListener('click', createRoom);
+    btnSave.addEventListener('click', saveRoom);
+    btnDelete.addEventListener('click', deleteRoom);
+    btnClearSelection.addEventListener('click', clearSelection);
+
+    btnOpenUpload.addEventListener('click', openUploadModal);
+    document.getElementById('btnUploadNow').addEventListener('click', uploadImage);
+    document.getElementById('btnSaveImgMeta').addEventListener('click', saveImageMeta);
+
+    txtSearch.addEventListener('input', renderRooms);
+    filterState.addEventListener('change', renderRooms);
+
+    // Init
+    clearSelection();
+    loadRooms();
+  </script>
+
+</body>
+</html>

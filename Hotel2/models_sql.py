@@ -119,6 +119,46 @@ class Habitacion(db.Model):
         server_default=func.current_timestamp(),
         server_onupdate=func.current_timestamp()
     )
+    imagenes = db.relationship(
+        "HabitacionImagen",
+        back_populates="habitacion",
+        cascade="all, delete-orphan",
+        lazy="select"
+    )
+    
+    
+    
+    
+    
+class HabitacionImagen(db.Model):
+    __tablename__ = "HabitacionImagen"
+
+    Id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    Codigo_Habitacion = db.Column(
+        db.Integer,
+        db.ForeignKey("Habitacion.Codigo_Habitacion", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=False
+    )
+
+    # Ruta relativa a /static, ej: "uploads/rooms/12/img-uuid.webp"
+    File_Path = db.Column(db.String(255), nullable=False)
+    Mime_Type = db.Column(db.String(80), nullable=True)
+    Bytes = db.Column(db.Integer, nullable=True)
+
+    Is_Principal = db.Column(db.Boolean, nullable=False, default=False)
+    Sort_Order = db.Column(db.Integer, nullable=False, default=0)
+    Alt_Text = db.Column(db.String(200), nullable=True)
+
+    Created_At = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
+    Updated_At = db.Column(
+        db.DateTime,
+        nullable=False,
+        server_default=func.current_timestamp(),
+        server_onupdate=func.current_timestamp(),
+    )
+
+    habitacion = db.relationship("Habitacion", back_populates="imagenes")
+
 
 
 # ---------------------------

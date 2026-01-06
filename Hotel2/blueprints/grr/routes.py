@@ -8,13 +8,16 @@ from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Tuple, List, Optional
 
-from flask import Blueprint, jsonify, request, session, current_app, render_template
+
+from flask import Blueprint, jsonify, request, session, current_app, render_template, url_for
+from sqlalchemy.orm import selectinload
+
 from sqlalchemy import func, select, text, and_, or_, text as _t
 
 # Imports seguros para ejecución como paquete; con fallback en modo script
 try:
     from ...extensions import db
-    from ...models_sql import Habitacion, Reserva, Usuario, MantenimientoSolicitud
+    from ...models_sql import Habitacion, HabitacionImagen, Reserva, Usuario, MantenimientoSolicitud
     from ...services.grr.reservation_service import ReservationService
     from ...services.grr.housekeeping_sync import mark_room_to_cleaning
 except ImportError:
@@ -22,7 +25,7 @@ except ImportError:
     import os, sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     from extensions import db
-    from models_sql import Habitacion, Reserva, Usuario, MantenimientoSolicitud
+    from models_sql import Habitacion, HabitacionImagen, Reserva, Usuario, MantenimientoSolicitud
     from services.grr.reservation_service import ReservationService
     from services.grr.housekeeping_sync import mark_room_to_cleaning
 
@@ -74,6 +77,62 @@ def _precio_noche(h: Habitacion) -> float:
         except Exception:
             continue
     return 0.0
+
+
+
+def _room_image_url(h: Habitacion) -> str:
+    """
+    Devuelve la URL pública (src) de la imagen principal de una habitación,
+    basada en HabitacionImagen (imagenes). Mantiene fallback al campo legacy
+    si existiera.
+    """
+    try:
+        # 1) Nuevo modelo: relación Habitacion.imagenes
+        imgs = getattr(h, "imagenes", None) or []
+        chosen = None
+
+        # preferir principal
+        for it in imgs:
+            if getattr(it, "Is_Principal", False):
+                chosen = it
+                break
+
+        # si no hay principal, preferir menor Sort_Order, luego el primero
+        if chosen is None and imgs:
+            try:
+                chosen = sorted(
+                    imgs,
+                    key=lambda x: (
+                        (getattr(x, "Sort_Order", 0) or 0),
+                        (getattr(x, "Id", 0) or 0),
+                    ),
+                )[0]
+            except Exception:
+                chosen = imgs[0]
+
+        fp = getattr(chosen, "File_Path", None) if chosen else None
+
+        # 2) Fallback legacy (por compatibilidad)
+        if not fp:
+            fp = getattr(h, "Imagen_URL", None) or getattr(h, "img", None) or None
+
+        if not fp:
+            return ""
+
+        u = str(fp).strip().replace("\\", "/")
+
+        # si ya es URL absoluta o raíz
+        if u.startswith("http") or u.startswith("data:image") or u.startswith("/"):
+            return u
+
+        # si viene como "static/...." normalizar a url_for('static', filename=...)
+        if u.startswith("static/"):
+            u = u[len("static/") :]
+
+        return url_for("static", filename=u)
+
+    except Exception:
+        return ""
 
 
 # --- Helpers para columnas y funcionario por defecto ---
@@ -709,6 +768,11 @@ def grr_checkin_por_cedula():
 def grr_habitaciones():
     try:
         q = Habitacion.query
+
+        # Eager-load de imágenes (evita N+1) solo si la relación existe
+        if hasattr(Habitacion, "imagenes"):
+            q = q.options(selectinload(Habitacion.imagenes))
+
         # Ordenar por número si existe, si no por código
         if hasattr(Habitacion, "Numero_Habitacion"):
             q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
@@ -718,27 +782,36 @@ def grr_habitaciones():
         rooms = []
         for h in q.all():
             tipo = (getattr(h, "Tipo", None) or "Sencilla")
+
             # Derivar capacidad si la tabla no la tuviera
-            tl = tipo.lower()
-            cap = 4 if ("suite" in tl or "doble" in tl) else 2
+            tl = (tipo or "").lower()
+            cap_default = 4 if ("suite" in tl or "doble" in tl) else 2
 
             price = _precio_noche(h)
+            try:
+                price_float = float(price) if price is not None else 0.0
+            except Exception:
+                price_float = 0.0
+
+            # ✅ Fuente única de imagen: HabitacionImagen (principal) -> fallback
+            img_url = _room_image_url(h)  # debe existir en este mismo archivo
 
             item = {
                 # claves "amigables"
                 "code": int(getattr(h, "Codigo_Habitacion")),
                 "name": getattr(h, "Nombre", None) or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
                 "tipo": tipo,
-                "capacity": int(getattr(h, "Capacidad", None) or cap),
-                "price": price,
-                "img": getattr(h, "Imagen_URL", None) or "",
+                "capacity": int(getattr(h, "Capacidad", None) or cap_default),
+                "price": price_float,
+                "img": img_url,
+
                 # compatibilidad con vistas existentes:
                 "Codigo_Habitacion": int(getattr(h, "Codigo_Habitacion")),
                 "Numero_Habitacion": getattr(h, "Numero_Habitacion", None),
                 "Tipo": tipo,
-                "Capacidad": int(getattr(h, "Capacidad", None) or cap),
-                "Precio_Noche": float(price),
-                "Imagen_URL": getattr(h, "Imagen_URL", None) or "",
+                "Capacidad": int(getattr(h, "Capacidad", None) or cap_default),
+                "Precio_Noche": price_float,
+                "Imagen_URL": img_url,
                 "Estado": getattr(h, "Estado", None) or "Disponible",
             }
             rooms.append(item)
@@ -749,6 +822,7 @@ def grr_habitaciones():
         if current_app:
             current_app.logger.exception(f"[GRR] habitaciones error: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
+
 
 
 
