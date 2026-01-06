@@ -15,22 +15,6 @@
     return;
   }
 
-  // --- Gestión de sesión ---
-  function getCookie(name) {
-    const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'));
-    return match ? decodeURIComponent(match[1]) : null;
-  }
-
-  function setCookie(name, value, days) {
-    let expires = '';
-    if (days) {
-      const date = new Date();
-      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-      expires = '; expires=' + date.toUTCString();
-    }
-    document.cookie = name + '=' + encodeURIComponent(value) + expires + '; path=/';
-  }
-
   function createSessionId() {
     return 'vg-' + Math.random().toString(36).substring(2) + Date.now().toString(36);
   }
@@ -40,16 +24,18 @@
     sessionId = createSessionId();
     localStorage.setItem('vg_session', sessionId);
   }
-  
 
   let handoffOffered = false;
 
   // --- UI helpers ---
   function appendMessage(text, role) {
+    const row = document.createElement('div');
+    const bubble = document.createElement('div');
+
     let cls = 'bot';
     if (role === 'user') cls = 'user';
-    else if (role === 'agent') cls = 'bot'; // misma burbuja pero etiqueta diferente
-    
+    else if (role === 'agent') cls = 'bot';
+
     row.className = 'sac-msg-row ' + cls;
     bubble.className = 'sac-msg-bubble ' + cls;
     bubble.innerHTML = (text || '').replace(/\n/g, '<br>');
@@ -67,7 +53,8 @@
 
   function setFormDisabled(disabled) {
     input.disabled = disabled;
-    form.querySelector('button[type="submit"]').disabled = disabled;
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = disabled;
   }
 
   // --- Abrir/cerrar panel ---
@@ -75,7 +62,6 @@
     panel.classList.toggle('d-none');
     if (!panel.classList.contains('d-none')) {
       input.focus();
-      // Mensaje inicial solo una vez
       if (!messages.dataset.initialized) {
         appendMessage('Hola, soy el asistente virtual de Hotel Villa Grace. Cuéntame en qué puedo ayudarte.', 'bot');
         messages.dataset.initialized = '1';
@@ -112,7 +98,6 @@
 
       if (!res.ok) {
         appendMessage('Lo siento, hubo un problema al procesar tu mensaje. Intenta de nuevo en unos segundos.', 'bot');
-        setFormDisabled(false);
         return;
       }
 
@@ -120,12 +105,7 @@
       const answer = data.answer || 'Lo siento, no pude generar una respuesta en este momento.';
       appendMessage(answer, 'bot');
 
-      if (data.need_handoff) {
-        setHandoffVisible(true);
-      } else {
-        setHandoffVisible(false);
-      }
-
+      setHandoffVisible(!!data.need_handoff);
     } catch (e) {
       appendMessage('No he podido comunicarme con el servidor. Por favor revisa tu conexión o intenta nuevamente.', 'bot');
     } finally {
@@ -182,5 +162,4 @@
       appendMessage('Perfecto. Si en algún momento deseas hablar con un agente, solo indícamelo.', 'bot');
     });
   }
-
 })();
