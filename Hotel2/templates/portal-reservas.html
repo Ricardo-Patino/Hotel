@@ -1,813 +1,772 @@
-<!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <title>Mis reservas — Hotel Villa Grace</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+{% extends "base.html" %}
 
-    <!-- Bootstrap 5 -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
+{% block title %}Mis reservas — Hotel Villa Grace{% endblock %}
+{% block meta_description %}Consulta, administra y exporta tus reservas. El comprobante solo está disponible cuando la
+reserva esté confirmada.{% endblock %}
 
-    <!-- Bootstrap Icons (opcional, recomendado) -->
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
-    />
+{% block body_class %}privacy-page{% endblock %}
 
-    <style>
-      :root {
-        --vg-primary: #145a40;
-        --vg-primary-2: #0e3f2c;
-        --vg-accent: #1f8a5b;
-        --vg-bg: #f7f8f9;
-        --vg-card: #ffffff;
-        --vg-text: #17212b;
-        --vg-muted: #6b7a89;
-        --vg-border: #eef2f6;
-        --vg-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-      }
+{% block head_extra %}
+<style>
+  :root {
+    --vg-primary: #145a40;
+    --vg-primary-2: #0e3f2c;
+    --vg-accent: #1f8a5b;
+    --vg-bg: #f7f8f9;
+    --vg-card: #ffffff;
+    --vg-text: #17212b;
+    --vg-muted: #6b7a89;
+    --vg-border: #eef2f6;
+    --vg-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
 
-      body {
-        background: var(--vg-bg);
-        color: var(--vg-text);
-      }
+  body {
+    background: var(--vg-bg);
+    color: var(--vg-text);
+  }
 
-      /* Navbar */
-      .navbar {
-        background: linear-gradient(90deg, var(--vg-primary), var(--vg-primary-2));
-      }
-      .navbar-brand,
-      .navbar-nav .nav-link {
-        color: #fff !important;
-      }
-      .nav-pill {
-        background: rgba(255, 255, 255, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.16);
-        color: #fff !important;
-        border-radius: 999px;
-        padding: .35rem .75rem;
-        font-weight: 600;
-        text-decoration: none;
-      }
-      .nav-pill:hover {
-        background: rgba(255, 255, 255, 0.18);
-      }
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    background:
+      radial-gradient(1200px 400px at 20% -10%, rgba(31, 138, 91, 0.25), transparent 60%),
+      radial-gradient(900px 300px at 80% 10%, rgba(20, 90, 64, 0.18), transparent 55%),
+      linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.88));
+  }
 
-      /* Header */
-      .hero {
-        position: relative;
-        overflow: hidden;
-        border-bottom: 1px solid rgba(0,0,0,0.04);
-        background:
-          radial-gradient(1200px 400px at 20% -10%, rgba(31,138,91,0.25), transparent 60%),
-          radial-gradient(900px 300px at 80% 10%, rgba(20,90,64,0.18), transparent 55%),
-          linear-gradient(180deg, #ffffff, rgba(255,255,255,0.88));
-      }
-      .page-title {
-        font-weight: 800;
-        letter-spacing: -0.3px;
-        margin: 0;
-      }
-      .page-sub {
-        color: var(--vg-muted);
-        margin-top: .25rem;
-      }
+  .page-title {
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    margin: 0;
+  }
 
-      /* Cards */
-      .card-soft {
-        border: 0;
-        border-radius: 18px;
-        background: var(--vg-card);
-        box-shadow: var(--vg-shadow);
-      }
-      .card-soft .card-header {
-        background: transparent;
-        border-bottom: 1px solid var(--vg-border);
-        padding: 1rem 1.15rem;
-      }
-      .card-soft .card-body {
-        padding: 1.15rem;
-      }
+  .page-sub {
+    color: var(--vg-muted);
+    margin-top: .25rem;
+    font-weight: 300;
+  }
 
-      /* Filters */
-      .filter-card {
-        border: 0;
-        border-radius: 18px;
-        background: var(--vg-card);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
-      }
-      .filter-card .card-header {
-        border-bottom: 0;
-        background: transparent;
-        font-weight: 700;
-        color: var(--vg-text);
-        padding: 1rem 1.15rem 0.5rem;
-      }
-      .filter-card .card-body {
-        padding: 0.75rem 1.15rem 1.15rem;
-      }
+  .card-soft {
+    border: 0;
+    border-radius: 18px;
+    background: var(--vg-card);
+    box-shadow: var(--vg-shadow);
+  }
 
-      /* Reservation card */
-      .reservation-card {
-        border: 0;
-        border-radius: 18px;
-        background: var(--vg-card);
-        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.075);
-        transition: 0.18s ease;
-        overflow: hidden;
-      }
-      .reservation-card:hover {
-        transform: translateY(-2px);
-      }
-      .reservation-topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: 1rem 1.15rem;
-        border-bottom: 1px solid var(--vg-border);
-        background:
-          radial-gradient(700px 180px at 0% 0%, rgba(31,138,91,0.10), transparent 55%),
-          radial-gradient(700px 180px at 100% 0%, rgba(20,90,64,0.08), transparent 55%),
-          #fff;
-      }
-      .reservation-number {
-        font-weight: 800;
-      }
-      .reservation-meta {
-        color: var(--vg-muted);
-        font-size: 0.9rem;
-      }
+  .card-soft .card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--vg-border);
+    padding: 1rem 1.15rem;
+  }
 
-      /* Status badge */
-      .badge-status {
-        font-weight: 800;
-        letter-spacing: 0.2px;
-        border-radius: 999px;
-        padding: .42rem .68rem;
-        font-size: 0.78rem;
-      }
-      .st-confirmada { background: #d1f7e3; color: #096d46; }
-      .st-pendiente  { background: #fff4d6; color: #8a5b00; }
-      .st-cancelada  { background: #ffe0e0; color: #9c1e1e; }
-      .st-otros      { background: #e9eef5; color: #324455; }
+  .card-soft .card-body {
+    padding: 1.15rem;
+  }
 
-      .money {
-        font-weight: 900;
-        color: var(--vg-primary);
-        font-size: 1.05rem;
-      }
+  .filter-card {
+    border: 0;
+    border-radius: 18px;
+    background: var(--vg-card);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+  }
 
-      /* Payment widget */
-      .pay-box {
-        border: 1px solid var(--vg-border);
-        background: #fbfcfd;
-        border-radius: 16px;
-        padding: 1rem;
-      }
-      .pay-kpi-title {
-        font-weight: 800;
-        margin: 0;
-      }
-      .pay-kpi-sub {
-        color: var(--vg-muted);
-        font-size: 0.88rem;
-        margin: .15rem 0 0;
-      }
+  .filter-card .card-header {
+    border-bottom: 0;
+    background: transparent;
+    font-weight: 700;
+    color: var(--vg-text);
+    padding: 1rem 1.15rem 0.5rem;
+  }
 
-      .btn-vg {
-        background: var(--vg-primary);
-        border-color: var(--vg-primary);
-        color: #fff;
-        font-weight: 700;
-        border-radius: 12px;
-        padding: .6rem .9rem;
-      }
-      .btn-vg:hover {
-        background: var(--vg-primary-2);
-        border-color: var(--vg-primary-2);
-        color: #fff;
-      }
-      .btn-outline-vg {
-        color: var(--vg-primary);
-        border-color: var(--vg-primary);
-        font-weight: 700;
-        border-radius: 12px;
-        padding: .6rem .9rem;
-      }
-      .btn-outline-vg:hover {
-        color: #fff;
-        background: var(--vg-primary);
-        border-color: var(--vg-primary);
-      }
+  .filter-card .card-body {
+    padding: 0.75rem 1.15rem 1.15rem;
+  }
 
-      .empty-state {
-        border: 2px dashed #dfe5ea;
-        border-radius: 18px;
-        padding: 40px;
-        text-align: center;
-        color: var(--vg-muted);
-        background: #fff;
-      }
-      .spinner-wrap { display: none; }
+  .reservation-card {
+    border: 0;
+    border-radius: 18px;
+    background: var(--vg-card);
+    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.075);
+    transition: 0.18s ease;
+    overflow: hidden;
+  }
 
-      .list-divider {
-        height: 1px;
-        background: var(--vg-border);
-        margin: 18px 0;
-      }
+  .reservation-card:hover {
+    transform: translateY(-2px);
+  }
 
-      .mini-label {
-        color: var(--vg-muted);
-        font-size: 0.82rem;
-      }
-      .mini-value {
-        font-weight: 800;
-      }
+  .reservation-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid var(--vg-border);
+    background:
+      radial-gradient(700px 180px at 0% 0%, rgba(31, 138, 91, 0.10), transparent 55%),
+      radial-gradient(700px 180px at 100% 0%, rgba(20, 90, 64, 0.08), transparent 55%),
+      #fff;
+  }
 
-      /* Modal */
-      .modal-content {
-        border: 0;
-        border-radius: 16px;
-        box-shadow: var(--vg-shadow);
-      }
-    </style>
-  </head>
+  .reservation-number {
+    font-weight: 800;
+  }
 
-  <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg">
-      <div class="container py-2">
-        <a class="navbar-brand fw-semibold" href="/portal-dashboard.html">
-          <i class="bi bi-building me-2"></i>Hotel Villa Grace — Portal
+  .reservation-meta {
+    color: var(--vg-muted);
+    font-size: 0.9rem;
+  }
+
+  .badge-status {
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    border-radius: 999px;
+    padding: .42rem .68rem;
+    font-size: 0.78rem;
+  }
+
+  .st-confirmada {
+    background: #d1f7e3;
+    color: #096d46;
+  }
+
+  .st-pendiente {
+    background: #fff4d6;
+    color: #8a5b00;
+  }
+
+  .st-cancelada {
+    background: #ffe0e0;
+    color: #9c1e1e;
+  }
+
+  .st-otros {
+    background: #e9eef5;
+    color: #324455;
+  }
+
+  .money {
+    font-weight: 900;
+    color: var(--vg-primary);
+    font-size: 1.05rem;
+  }
+
+  .pay-box {
+    border: 1px solid var(--vg-border);
+    background: #fbfcfd;
+    border-radius: 16px;
+    padding: 1rem;
+  }
+
+  .pay-kpi-title {
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .pay-kpi-sub {
+    color: var(--vg-muted);
+    font-size: 0.88rem;
+    margin: .15rem 0 0;
+  }
+
+  .btn-vg {
+    background: var(--vg-primary);
+    border-color: var(--vg-primary);
+    color: #fff;
+    font-weight: 700;
+    border-radius: 12px;
+    padding: .6rem .9rem;
+  }
+
+  .btn-vg:hover {
+    background: var(--vg-primary-2);
+    border-color: var(--vg-primary-2);
+    color: #fff;
+  }
+
+  .btn-outline-vg {
+    color: var(--vg-primary);
+    border-color: var(--vg-primary);
+    font-weight: 700;
+    border-radius: 12px;
+    padding: .6rem .9rem;
+  }
+
+  .btn-outline-vg:hover {
+    color: #fff;
+    background: var(--vg-primary);
+    border-color: var(--vg-primary);
+  }
+
+  .empty-state {
+    border: 2px dashed #dfe5ea;
+    border-radius: 18px;
+    padding: 40px;
+    text-align: center;
+    color: var(--vg-muted);
+    background: #fff;
+  }
+
+  .spinner-wrap {
+    display: none;
+  }
+
+  .list-divider {
+    height: 1px;
+    background: var(--vg-border);
+    margin: 18px 0;
+  }
+
+  .mini-label {
+    color: var(--vg-muted);
+    font-size: 0.82rem;
+  }
+
+  .mini-value {
+    font-weight: 800;
+  }
+
+  .modal-content {
+    border: 0;
+    border-radius: 16px;
+    box-shadow: var(--vg-shadow);
+  }
+
+  .page-title.dark-background p {
+    font-weight: 400 !important;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    letter-spacing: 0;
+    opacity: 0.95;
+  }
+
+  body.privacy-page .page-title.dark-background p,
+  body.privacy-page .page-title.dark-background p * {
+    font-weight: 400 !important;
+    text-shadow: none !important;
+    filter: none !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="hero py-4 py-md-5">
+  <div class="page-title dark-background" data-aos="fade"
+    style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
+    <div class="container position-relative">
+      <h1>Mis reservas</h1>
+      <p>Consulta, administra y exporta tus reservas. El comprobante solo está disponible cuando la reserva esté
+        confirmada.</p>
+
+      <nav class="breadcrumbs" aria-label="breadcrumbs">
+        <ol>
+          <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+          <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
+          <li class="current">Mis reservas</li>
+        </ol>
+      </nav>
+
+      <div class="d-flex gap-2 flex-wrap mt-3">
+        <a class="btn btn-outline-vg" href="{{ url_for('portal_dashboard_html') }}">
+          <i class="bi bi-speedometer2 me-1"></i>Volver al portal
         </a>
 
-        <div class="ms-auto d-flex gap-2 align-items-center">
-          <a class="nav-pill" href="/portal-dashboard.html">
-            <i class="bi bi-speedometer2 me-1"></i>Tablero
-          </a>
-          <a class="nav-pill" href="/logout">
-            <i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión
-          </a>
-        </div>
+        <a class="btn btn-outline-secondary" href="{{ url_for('logout') }}">
+          <i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión
+        </a>
       </div>
-    </nav>
+    </div>
+  </div>
+</section>
 
-    <!-- Hero -->
-    <section class="hero py-4 py-md-5">
-      <div class="container">
-        <div class="d-flex align-items-end justify-content-between flex-wrap gap-3">
-          <div>
-            <h1 class="page-title">Mis reservas</h1>
-            <div class="page-sub">
-              Consulta, administra y exporta tus reservas. El comprobante solo está disponible cuando la reserva esté confirmada.
-            </div>
+<section class="section pt-0">
+  <div class="container">
+
+    <div class="card filter-card mb-4">
+      <div class="card-header">Filtros</div>
+      <div class="card-body">
+        <form id="filterForm" class="row gy-3 gx-3 align-items-end">
+          <div class="col-12 col-sm-6 col-lg-3">
+            <label class="form-label">Desde</label>
+            <input type="date" class="form-control" id="fini" />
           </div>
 
-          <div class="d-flex gap-2">
-            <button id="btn-export-hist" class="btn btn-outline-vg">
-              <i class="bi bi-box-arrow-up-right me-1"></i>Exportar historial
+          <div class="col-12 col-sm-6 col-lg-3">
+            <label class="form-label">Hasta</label>
+            <input type="date" class="form-control" id="ffin" />
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3">
+            <label class="form-label">Estado</label>
+            <select class="form-select" id="estado">
+              <option value="">Todos</option>
+              <option value="Confirmada">Confirmada</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="Cancelada">Cancelada</option>
+            </select>
+          </div>
+
+          <div class="col-12 col-sm-6 col-lg-3 d-flex gap-2">
+            <button class="btn btn-vg flex-fill" type="submit">
+              <i class="bi bi-search me-1"></i>Buscar
+            </button>
+            <button class="btn btn-outline-secondary flex-fill" type="button" id="btnClear">
+              Limpiar
             </button>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <main class="container py-4 py-md-5">
-      <!-- Filtros -->
-      <div class="card filter-card mb-4">
-        <div class="card-header">Filtros</div>
-        <div class="card-body">
-          <form id="filterForm" class="row gy-3 gx-3 align-items-end">
-            <div class="col-12 col-sm-6 col-lg-3">
-              <label class="form-label">Desde</label>
-              <input type="date" class="form-control" id="fini" />
-            </div>
-
-            <div class="col-12 col-sm-6 col-lg-3">
-              <label class="form-label">Hasta</label>
-              <input type="date" class="form-control" id="ffin" />
-            </div>
-
-            <div class="col-12 col-sm-6 col-lg-3">
-              <label class="form-label">Estado</label>
-              <select class="form-select" id="estado">
-                <option value="">Todos</option>
-                <option value="Confirmada">Confirmada</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Cancelada">Cancelada</option>
-              </select>
-            </div>
-
-            <div class="col-12 col-sm-6 col-lg-3 d-flex gap-2">
-              <button class="btn btn-vg flex-fill" type="submit">
-                <i class="bi bi-search me-1"></i>Buscar
-              </button>
-              <button class="btn btn-outline-secondary flex-fill" type="button" id="btnClear">
-                Limpiar
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Resultados -->
-      <div id="alerts"></div>
-
-      <div class="spinner-wrap text-center my-4" id="spinner">
-        <div class="spinner-border text-success" role="status"></div>
-        <div class="small text-muted mt-2">Cargando…</div>
-      </div>
-
-      <div id="reservasList" class="vstack gap-3"></div>
-
-      <div id="emptyBlock" class="empty-state mt-4" style="display: none">
-        <div class="fw-bold mb-1">No hay reservas para los filtros seleccionados.</div>
-        <div class="small">Prueba ampliando el rango de fechas o cambiando el estado.</div>
-      </div>
-    </main>
-
-    <!-- Modal: Exportar una reserva -->
-    <div class="modal fade" id="modalExportReserva" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="bi bi-download me-2"></i>Exportar reserva
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-          </div>
-          <div class="modal-body">¿En qué formato deseas exportar esta reserva?</div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" id="btn-exp-pdf" class="btn btn-primary">
-              <i class="bi bi-filetype-pdf me-1"></i>PDF
-            </button>
-            <button type="button" id="btn-exp-xls" class="btn btn-success">
-              <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
-            </button>
-          </div>
-        </div>
+        </form>
       </div>
     </div>
 
-    <!-- Modal: Exportar historial -->
-    <div class="modal fade" id="modalExportHist" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="bi bi-box-arrow-up-right me-2"></i>Exportar historial
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-          </div>
-          <div class="modal-body">
-            Elige el formato para exportar el historial (aplica los filtros actuales).
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" id="btn-hist-pdf" class="btn btn-primary">
-              <i class="bi bi-filetype-pdf me-1"></i>PDF
-            </button>
-            <button type="button" id="btn-hist-xls" class="btn btn-success">
-              <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
-            </button>
-          </div>
-        </div>
-      </div>
+    <div id="alerts"></div>
+
+    <div class="spinner-wrap text-center my-4" id="spinner">
+      <div class="spinner-border text-success" role="status"></div>
+      <div class="small text-muted mt-2">Cargando…</div>
     </div>
 
-    <!-- Modal: Confirmar cancelación -->
-    <div class="modal fade" id="modalConfirmCancel" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="bi bi-exclamation-triangle me-2 text-danger"></i>Cancelar reserva
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-2">¿Confirmas cancelar la reserva <strong id="cancelReservaNum">—</strong>?</div>
-            <div class="alert alert-warning mb-0">
-              Si la reserva ya fue confirmada, podrían aplicar políticas de cancelación.
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Volver</button>
-            <button type="button" id="btnCancelConfirm" class="btn btn-danger">
-              <i class="bi bi-x-circle me-1"></i>Cancelar reserva
-            </button>
-          </div>
-        </div>
-      </div>
+    <div id="reservasList" class="vstack gap-3"></div>
+
+    <div id="emptyBlock" class="empty-state mt-4" style="display: none">
+      <div class="fw-bold mb-1">No hay reservas para los filtros seleccionados.</div>
+      <div class="small">Prueba ampliando el rango de fechas o cambiando el estado.</div>
     </div>
 
-    <!-- Bootstrap JS (Bundle) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  </div>
+</section>
 
-    <script>
-      (function () {
-        const listEl = document.getElementById("reservasList");
-        const spinner = document.getElementById("spinner");
-        const emptyBlock = document.getElementById("emptyBlock");
-        const alerts = document.getElementById("alerts");
+<div class="modal fade" id="modalExportReserva" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-download me-2"></i>Exportar reserva</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">¿Deseas exportar esta reserva?</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-exp-pdf" class="btn btn-primary">
+          <i class="bi bi-filetype-pdf me-1"></i>PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
-        const fini = document.getElementById("fini");
-        const ffin = document.getElementById("ffin");
-        const estado = document.getElementById("estado");
+<div class="modal fade" id="modalExportHist" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-box-arrow-up-right me-2"></i>Exportar historial</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">Elige el formato para exportar el historial (aplica los filtros actuales).</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-hist-pdf" class="btn btn-primary">
+          <i class="bi bi-filetype-pdf me-1"></i>PDF
+        </button>
+        <button type="button" id="btn-hist-xls" class="btn btn-success">
+          <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
-        let currentReservaId = null;
-        let pendingCancelId = null;
-        let pendingCancelNumero = null;
+<div class="modal fade" id="modalConfirmCancel" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-exclamation-triangle me-2 text-danger"></i>Cancelar reserva
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">¿Confirmas cancelar la reserva <strong id="cancelReservaNum">—</strong>?</div>
+        <div class="alert alert-warning mb-0">
+          Si la reserva ya fue confirmada, podrían aplicar políticas de cancelación.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Volver</button>
+        <button type="button" id="btnCancelConfirm" class="btn btn-danger">
+          <i class="bi bi-x-circle me-1"></i>Cancelar reserva
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
-        const modalReserva = new bootstrap.Modal(document.getElementById("modalExportReserva"));
-        const modalHist = new bootstrap.Modal(document.getElementById("modalExportHist"));
-        const modalCancel = new bootstrap.Modal(document.getElementById("modalConfirmCancel"));
+{% endblock %}
 
-        const cancelNumEl = document.getElementById("cancelReservaNum");
-        const cancelBtnConfirm = document.getElementById("btnCancelConfirm");
+{% block scripts %}
+<script>
+  (function () {
+    const listEl = document.getElementById("reservasList");
+    const spinner = document.getElementById("spinner");
+    const emptyBlock = document.getElementById("emptyBlock");
+    const alerts = document.getElementById("alerts");
 
-        function showSpinner(show) {
-          spinner.style.display = show ? "block" : "none";
-        }
-        function showEmpty(show) {
-          emptyBlock.style.display = show ? "block" : "none";
-        }
+    const fini = document.getElementById("fini");
+    const ffin = document.getElementById("ffin");
+    const estado = document.getElementById("estado");
 
-        function alertMsg(type, msg) {
-          const el = document.createElement("div");
-          el.className = `alert alert-${type} d-flex align-items-start gap-2`;
-          el.innerHTML = `<i class="bi bi-info-circle mt-1"></i><div>${escapeHtml(msg)}</div>`;
-          alerts.innerHTML = "";
-          alerts.appendChild(el);
-          setTimeout(() => {
-            if (el && el.parentNode) el.remove();
-          }, 4500);
-        }
+    let currentReservaId = null;
+    let pendingCancelId = null;
+    let pendingCancelNumero = null;
 
-        function escapeHtml(s) {
-          return String(s ?? "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-        }
+    const modalReserva = new bootstrap.Modal(document.getElementById("modalExportReserva"));
+    const modalHist = new bootstrap.Modal(document.getElementById("modalExportHist"));
+    const modalCancel = new bootstrap.Modal(document.getElementById("modalConfirmCancel"));
 
-        // ---- Fecha robusta: extrae YYYY-MM-DD de cualquier string razonable ----
-        function normalizeISODate(raw) {
-          if (!raw) return null;
-          const s = String(raw).trim();
-          const m = s.match(/\d{4}-\d{2}-\d{2}/);
-          if (m) return m[0];
-          if (s.length >= 10) return s.slice(0, 10);
-          return s;
-        }
+    const cancelNumEl = document.getElementById("cancelReservaNum");
+    const cancelBtnConfirm = document.getElementById("btnCancelConfirm");
 
-        function fmtDateShort(raw) {
-          const iso = normalizeISODate(raw);
-          if (!iso) return "—";
-          const dt = new Date(iso + "T00:00:00");
-          if (Number.isNaN(dt.getTime())) return iso;
-          return new Intl.DateTimeFormat("es-CR", { day: "2-digit", month: "short", year: "numeric" })
-            .format(dt)
-            .replace(".", "");
-        }
+    function showSpinner(show) { spinner.style.display = show ? "block" : "none"; }
+    function showEmpty(show) { emptyBlock.style.display = show ? "block" : "none"; }
 
-        function moneyCRC(n) {
-          return new Intl.NumberFormat("es-CR", {
-            style: "currency",
-            currency: "CRC",
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }).format(Number(n || 0));
-        }
+    function alertMsg(type, msg) {
+      const el = document.createElement("div");
+      el.className = `alert alert-${type} d-flex align-items-start gap-2`;
+      el.innerHTML = `<i class="bi bi-info-circle mt-1"></i><div>${escapeHtml(msg)}</div>`;
+      alerts.innerHTML = "";
+      alerts.appendChild(el);
+      setTimeout(() => { if (el && el.parentNode) el.remove(); }, 4500);
+    }
 
-        function statusClass(estadoTxt) {
+    function escapeHtml(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function normalizeISODate(raw) {
+      if (!raw) return null;
+      const s = String(raw).trim();
+      const m = s.match(/\d{4}-\d{2}-\d{2}/);
+      if (m) return m[0];
+      if (s.length >= 10) return s.slice(0, 10);
+      return s;
+    }
+
+    function fmtDateShort(raw) {
+      const iso = normalizeISODate(raw);
+      if (!iso) return "—";
+      const dt = new Date(iso + "T00:00:00");
+      if (Number.isNaN(dt.getTime())) return iso;
+      return new Intl.DateTimeFormat("es-CR", { day: "2-digit", month: "short", year: "numeric" })
+        .format(dt).replace(".", "");
+    }
+
+    function moneyCRC(n) {
+      return new Intl.NumberFormat("es-CR", {
+        style: "currency",
+        currency: "CRC",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(Number(n || 0));
+    }
+
+    function statusClass(estadoTxt) {
+      const e = String(estadoTxt || "").trim().toLowerCase();
+      if (e === "confirmada" || e === "check-in" || e === "check-out") return "st-confirmada";
+      if (e === "pendiente") return "st-pendiente";
+      if (e === "cancelada") return "st-cancelada";
+      return "st-otros";
+    }
+
+    function canDownloadReceipt(estadoTxt) {
+      const e = String(estadoTxt || "").trim().toLowerCase();
+      return ["confirmada", "check-in", "check-out"].includes(e);
+    }
+
+    function buildPaymentModel(reserva) {
+      const est = String(reserva.estado || "").trim().toLowerCase();
+      const total = Number(reserva.monto ?? reserva.total ?? reserva.Monto_Total ?? 0);
+      const paidOk = ["confirmada", "check-in", "check-out"].includes(est);
+      const pagado = paidOk ? total : 0;
+      const saldo = paidOk ? 0 : total;
+      const pct = total > 0 ? Math.round((pagado / total) * 100) : (paidOk ? 100 : 0);
+      return { total, pagado, saldo, pct, paidOk };
+    }
+
+    function renderList(items) {
+      listEl.innerHTML = "";
+      if (!items || !items.length) { showEmpty(true); return; }
+      showEmpty(false);
+
+      items.forEach((r) => {
+        const id = r.id ?? r.Codigo_Reserva ?? r.codigo_reserva;
+        const numero = r.numero || r.Numero_Comprobante || `VG-${id}`;
+        const estadoTxt = r.estado || r.Estado || "—";
+        const createdAt = r.created_at || r.Fecha_Registro || r.fecha_registro;
+
+        const pax = r.huespedes || r.Huespedes || "-";
+        const canal = r.canal || r.Canal || "-";
+
+        const monto = Number(r.monto ?? r.total ?? r.Monto_Total ?? 0);
+        const pay = buildPaymentModel({ estado: estadoTxt, monto });
+
+        const downloadOk = canDownloadReceipt(estadoTxt);
+        const receiptBtn = downloadOk
+          ? `<a class="btn btn-vg" href="/api/reservas/${encodeURIComponent(id)}/comprobante">
+               <i class="bi bi-receipt me-1"></i>Descargar comprobante
+             </a>`
+          : "";
+
+        const infoBanner = (() => {
           const e = String(estadoTxt || "").trim().toLowerCase();
-          if (e === "confirmada" || e === "check-in" || e === "check-out") return "st-confirmada";
-          if (e === "pendiente") return "st-pendiente";
-          if (e === "cancelada") return "st-cancelada";
-          return "st-otros";
-        }
-
-        function canDownloadReceipt(estadoTxt) {
-          const e = String(estadoTxt || "").trim().toLowerCase();
-          return ["confirmada", "check-in", "check-out"].includes(e);
-        }
-
-        // Pago coherente con SINPE:
-        // - Confirmada/Check-in/Check-out => pago verificado => 100% pagado
-        // - Pendiente => 0% pagado
-        function buildPaymentModel(reserva) {
-          const est = String(reserva.estado || "").trim().toLowerCase();
-          const total = Number(reserva.monto ?? reserva.total ?? reserva.Monto_Total ?? 0);
-
-          const paidOk = ["confirmada", "check-in", "check-out"].includes(est);
-          const pagado = paidOk ? total : 0;
-          const saldo = paidOk ? 0 : total;
-          const pct = total > 0 ? Math.round((pagado / total) * 100) : (paidOk ? 100 : 0);
-
-          return { total, pagado, saldo, pct, paidOk };
-        }
-
-        function renderList(items) {
-          listEl.innerHTML = "";
-          if (!items || !items.length) {
-            showEmpty(true);
-            return;
-          }
-          showEmpty(false);
-
-          items.forEach((r) => {
-            const id = r.id ?? r.Codigo_Reserva ?? r.codigo_reserva;
-            const numero = r.numero || r.Numero_Comprobante || `VG-${id}`;
-            const estadoTxt = r.estado || r.Estado || "—";
-            const createdAt = r.created_at || r.Fecha_Registro || r.fecha_registro;
-
-            const pax = r.huespedes || r.Huespedes || "-";
-            const canal = r.canal || r.Canal || "-";
-
-            const monto = Number(r.monto ?? r.total ?? r.Monto_Total ?? 0);
-            const pay = buildPaymentModel({ estado: estadoTxt, monto });
-
-            const downloadOk = canDownloadReceipt(estadoTxt);
-            const receiptBtn = downloadOk
-              ? `<a class="btn btn-vg" href="/api/reservas/${encodeURIComponent(id)}/comprobante">
-                   <i class="bi bi-receipt me-1"></i>Descargar comprobante
-                 </a>`
-              : "";
-
-            const infoBanner = (() => {
-              const e = String(estadoTxt || "").trim().toLowerCase();
-              if (e === "pendiente") {
-                return `
-                  <div class="alert alert-info mb-0 mt-3">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Esta reserva está <strong>pendiente de confirmación</strong>. Una vez verificado el pago SINPE, recibirás la notificación según tus preferencias en <code>/sac/preferencias</code>.
-                  </div>
-                `;
-              }
-              if (downloadOk) {
-                return `
-                  <div class="alert alert-success mb-0 mt-3">
-                    <i class="bi bi-check2-circle me-1"></i>
-                    Reserva confirmada. Puedes descargar tu comprobante cuando lo necesites.
-                  </div>
-                `;
-              }
-              return "";
-            })();
-
-            const card = document.createElement("div");
-            card.className = "reservation-card";
-
-            card.innerHTML = `
-              <div class="reservation-topbar">
-                <div>
-                  <div class="reservation-number">
-                    Reserva <span class="text-muted">#</span>${escapeHtml(numero)}
-                  </div>
-                  <div class="reservation-meta">
-                    <i class="bi bi-calendar3 me-1"></i>${escapeHtml(fmtDateShort(createdAt))}
-                  </div>
-                </div>
-
-                <div class="d-flex align-items-center gap-2">
-                  <span class="badge-status ${statusClass(estadoTxt)}">${escapeHtml(estadoTxt)}</span>
-                </div>
-              </div>
-
-              <div class="p-3 p-md-4">
-                <div class="row g-3 align-items-start">
-                  <div class="col-12 col-md-3">
-                    <div class="mini-label">Check-in</div>
-                    <div class="mini-value">${escapeHtml(normalizeISODate(r.checkin || r.Fecha_Entrada) || "—")}</div>
-                    <div class="text-muted small">${escapeHtml(fmtDateShort(r.checkin || r.Fecha_Entrada))}</div>
-                  </div>
-
-                  <div class="col-12 col-md-3">
-                    <div class="mini-label">Check-out</div>
-                    <div class="mini-value">${escapeHtml(normalizeISODate(r.checkout || r.Fecha_Salida) || "—")}</div>
-                    <div class="text-muted small">${escapeHtml(fmtDateShort(r.checkout || r.Fecha_Salida))}</div>
-                  </div>
-
-                  <div class="col-6 col-md-2">
-                    <div class="mini-label">Huéspedes</div>
-                    <div class="mini-value">${escapeHtml(pax)}</div>
-                  </div>
-
-                  <div class="col-6 col-md-2">
-                    <div class="mini-label">Canal</div>
-                    <div class="mini-value">${escapeHtml(canal)}</div>
-                  </div>
-
-                  <div class="col-12 col-md-2 text-md-end">
-                    <div class="mini-label">Total</div>
-                    <div class="money">${escapeHtml(moneyCRC(monto))}</div>
-                  </div>
-                </div>
-
-                <div class="list-divider"></div>
-
-                <div class="pay-box">
-                  <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
-                    <div>
-                      <div class="pay-kpi-title">Estado de pago</div>
-                      <div class="pay-kpi-sub">${pay.paidOk ? "Pago verificado por recepción." : "Pendiente de verificación (SINPE)."}</div>
-                      <div class="mt-2">
-                        <span class="badge rounded-pill ${pay.paidOk ? "bg-success" : "bg-warning text-dark"}">
-                          ${pay.paidOk ? "Pagado" : "Pendiente"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div class="text-end">
-                      <div class="mini-label">Total reserva</div>
-                      <div class="fw-bold">${escapeHtml(moneyCRC(pay.total))}</div>
-
-                      <div class="mini-label mt-2">Pagado</div>
-                      <div class="fw-semibold">${escapeHtml(moneyCRC(pay.pagado))}</div>
-
-                      <div class="mini-label mt-2">Saldo pendiente</div>
-                      <div class="fw-bold">${escapeHtml(moneyCRC(pay.saldo))}</div>
-                    </div>
-                  </div>
-
-                  <div class="mt-3">
-                    <div class="progress" style="height: 8px;">
-                      <div
-                        class="progress-bar ${pay.paidOk ? "bg-success" : "bg-secondary"}"
-                        role="progressbar"
-                        style="width: ${pay.pct}%;"
-                        aria-valuenow="${pay.pct}"
-                        aria-valuemin="0"
-                        aria-valuemax="100"
-                      ></div>
-                    </div>
-                    <div class="d-flex justify-content-between mt-1">
-                      <small class="text-muted">0%</small>
-                      <small class="text-muted">${pay.pct}% pagado</small>
-                    </div>
-                  </div>
-                </div>
-
-                ${infoBanner}
-
-                <div class="d-flex flex-wrap gap-2 mt-3">
-                  <a class="btn btn-outline-secondary"
-                     href="/portal-reserva-detalle.html?id=${encodeURIComponent(id)}">
-                    <i class="bi bi-pencil-square me-1"></i>Solicitar cambios
-                  </a>
-
-                  ${receiptBtn}
-
-                  <button class="btn btn-outline-danger btn-cancel"
-                          data-id="${escapeHtml(id)}"
-                          data-numero="${escapeHtml(numero)}">
-                    <i class="bi bi-x-circle me-1"></i>Cancelar
-                  </button>
-
-                  <button class="btn btn-outline-vg btn-export-reserva"
-                          data-id="${escapeHtml(id)}">
-                    <i class="bi bi-download me-1"></i>Exportar
-                  </button>
-                </div>
+          if (e === "pendiente") {
+            return `
+              <div class="alert alert-info mb-0 mt-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Esta reserva está <strong>pendiente de confirmación</strong>. Una vez verificado el pago SINPE, recibirás la notificación según tus preferencias en <code>/sac/preferencias</code>.
               </div>
             `;
-
-            listEl.appendChild(card);
-          });
-        }
-
-        async function fetchList() {
-          try {
-            showSpinner(true);
-
-            const params = new URLSearchParams();
-            if (fini.value) params.set("fini", fini.value);
-            if (ffin.value) params.set("ffin", ffin.value);
-            if (estado.value) params.set("estado", estado.value);
-
-            const res = await fetch(`/api/portal/reservas?${params.toString()}`, {
-              credentials: "same-origin",
-            });
-            const data = await res.json();
-
-            if (!data.ok) throw new Error(data.message || "No se pudo cargar las reservas.");
-            renderList(data.items || []);
-          } catch (err) {
-            console.error(err);
-            alertMsg("danger", err.message || "Error al listar reservas");
-            renderList([]);
-          } finally {
-            showSpinner(false);
           }
-        }
-
-        // Eventos filtros
-        document.getElementById("filterForm").addEventListener("submit", (e) => {
-          e.preventDefault();
-          fetchList();
-        });
-
-        document.getElementById("btnClear").addEventListener("click", () => {
-          fini.value = "";
-          ffin.value = "";
-          estado.value = "";
-          fetchList();
-        });
-
-        // Clicks (export/cancel)
-        document.addEventListener("click", async (ev) => {
-          const exp = ev.target.closest(".btn-export-reserva");
-          if (exp) {
-            currentReservaId = exp.getAttribute("data-id");
-            modalReserva.show();
-            return;
+          if (downloadOk) {
+            return `
+              <div class="alert alert-success mb-0 mt-3">
+                <i class="bi bi-check2-circle me-1"></i>
+                Reserva confirmada. Puedes descargar tu comprobante cuando lo necesites.
+              </div>
+            `;
           }
+          return "";
+        })();
 
-          const del = ev.target.closest(".btn-cancel");
-          if (del) {
-            pendingCancelId = del.getAttribute("data-id");
-            pendingCancelNumero = del.getAttribute("data-numero") || `VG-${pendingCancelId}`;
+        const card = document.createElement("div");
+        card.className = "reservation-card";
 
-            cancelNumEl.textContent = pendingCancelNumero;
-            modalCancel.show();
-            return;
-          }
+        card.innerHTML = `
+          <div class="reservation-topbar">
+            <div>
+              <div class="reservation-number">
+                Reserva <span class="text-muted">#</span>${escapeHtml(numero)}
+              </div>
+              <div class="reservation-meta">
+                <i class="bi bi-calendar3 me-1"></i>${escapeHtml(fmtDateShort(createdAt))}
+              </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge-status ${statusClass(estadoTxt)}">${escapeHtml(estadoTxt)}</span>
+            </div>
+          </div>
+
+          <div class="p-3 p-md-4">
+            <div class="row g-3 align-items-start">
+              <div class="col-12 col-md-3">
+                <div class="mini-label">Check-in</div>
+                <div class="mini-value">${escapeHtml(normalizeISODate(r.checkin || r.Fecha_Entrada) || "—")}</div>
+                <div class="text-muted small">${escapeHtml(fmtDateShort(r.checkin || r.Fecha_Entrada))}</div>
+              </div>
+
+              <div class="col-12 col-md-3">
+                <div class="mini-label">Check-out</div>
+                <div class="mini-value">${escapeHtml(normalizeISODate(r.checkout || r.Fecha_Salida) || "—")}</div>
+                <div class="text-muted small">${escapeHtml(fmtDateShort(r.checkout || r.Fecha_Salida))}</div>
+              </div>
+
+              <div class="col-6 col-md-2">
+                <div class="mini-label">Huéspedes</div>
+                <div class="mini-value">${escapeHtml(pax)}</div>
+              </div>
+
+              <div class="col-6 col-md-2">
+                <div class="mini-label">Canal</div>
+                <div class="mini-value">${escapeHtml(canal)}</div>
+              </div>
+
+              <div class="col-12 col-md-2 text-md-end">
+                <div class="mini-label">Total</div>
+                <div class="money">${escapeHtml(moneyCRC(monto))}</div>
+              </div>
+            </div>
+
+            <div class="list-divider"></div>
+
+            <div class="pay-box">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+                <div>
+                  <div class="pay-kpi-title">Estado de pago</div>
+                  <div class="pay-kpi-sub">${pay.paidOk ? "Pago verificado por recepción." : "Pendiente de verificación (SINPE)."}</div>
+                  <div class="mt-2">
+                    <span class="badge rounded-pill ${pay.paidOk ? "bg-success" : "bg-warning text-dark"}">
+                      ${pay.paidOk ? "Pagado" : "Pendiente"}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="text-end">
+                  <div class="mini-label">Total reserva</div>
+                  <div class="fw-bold">${escapeHtml(moneyCRC(pay.total))}</div>
+
+                  <div class="mini-label mt-2">Pagado</div>
+                  <div class="fw-semibold">${escapeHtml(moneyCRC(pay.pagado))}</div>
+
+                  <div class="mini-label mt-2">Saldo pendiente</div>
+                  <div class="fw-bold">${escapeHtml(moneyCRC(pay.saldo))}</div>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <div class="progress" style="height: 8px;">
+                  <div
+                    class="progress-bar ${pay.paidOk ? "bg-success" : "bg-secondary"}"
+                    role="progressbar"
+                    style="width: ${pay.pct}%;"
+                    aria-valuenow="${pay.pct}"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  ></div>
+                </div>
+                <div class="d-flex justify-content-between mt-1">
+                  <small class="text-muted">0%</small>
+                  <small class="text-muted">${pay.pct}% pagado</small>
+                </div>
+              </div>
+            </div>
+
+            ${infoBanner}
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <a class="btn btn-outline-secondary" href="/portal-reserva-detalle.html?id=${encodeURIComponent(id)}">
+                <i class="bi bi-pencil-square me-1"></i>Solicitar cambios
+              </a>
+
+              ${receiptBtn}
+
+              <button class="btn btn-outline-danger btn-cancel"
+                      data-id="${escapeHtml(id)}"
+                      data-numero="${escapeHtml(numero)}">
+                <i class="bi bi-x-circle me-1"></i>Cancelar
+              </button>
+
+              <button class="btn btn-outline-vg btn-export-reserva"
+                      data-id="${escapeHtml(id)}">
+                <i class="bi bi-download me-1"></i>Exportar
+              </button>
+            </div>
+          </div>
+        `;
+
+        listEl.appendChild(card);
+      });
+    }
+
+    async function fetchList() {
+      try {
+        showSpinner(true);
+
+        const params = new URLSearchParams();
+        if (fini.value) params.set("fini", fini.value);
+        if (ffin.value) params.set("ffin", ffin.value);
+        if (estado.value) params.set("estado", estado.value);
+
+        const res = await fetch(`/api/portal/reservas?${params.toString()}`, { credentials: "same-origin" });
+        const data = await res.json();
+
+        if (!data.ok) throw new Error(data.message || "No se pudo cargar las reservas.");
+        renderList(data.items || []);
+      } catch (err) {
+        console.error(err);
+        alertMsg("danger", err.message || "Error al listar reservas");
+        renderList([]);
+      } finally {
+        showSpinner(false);
+      }
+    }
+
+    document.getElementById("filterForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      fetchList();
+    });
+
+    document.getElementById("btnClear").addEventListener("click", () => {
+      fini.value = "";
+      ffin.value = "";
+      estado.value = "";
+      fetchList();
+    });
+
+    document.addEventListener("click", async (ev) => {
+      const exp = ev.target.closest(".btn-export-reserva");
+      if (exp) {
+        currentReservaId = exp.getAttribute("data-id");
+        modalReserva.show();
+        return;
+      }
+
+      const del = ev.target.closest(".btn-cancel");
+      if (del) {
+        pendingCancelId = del.getAttribute("data-id");
+        pendingCancelNumero = del.getAttribute("data-numero") || `VG-${pendingCancelId}`;
+        cancelNumEl.textContent = pendingCancelNumero;
+        modalCancel.show();
+        return;
+      }
+    });
+
+    cancelBtnConfirm.addEventListener("click", async () => {
+      if (!pendingCancelId) return;
+      try {
+        cancelBtnConfirm.disabled = true;
+        cancelBtnConfirm.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Cancelando...`;
+
+        const resp = await fetch(`/api/portal/reservas/${pendingCancelId}`, {
+          method: "DELETE",
+          credentials: "same-origin",
         });
+        const data = await resp.json();
 
-        // Confirmar cancelación (modal)
-        cancelBtnConfirm.addEventListener("click", async () => {
-          if (!pendingCancelId) return;
-          try {
-            cancelBtnConfirm.disabled = true;
-            cancelBtnConfirm.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Cancelando...`;
+        if (!data.ok) throw new Error(data.message || "No se pudo cancelar la reserva.");
 
-            const resp = await fetch(`/api/portal/reservas/${pendingCancelId}`, {
-              method: "DELETE",
-              credentials: "same-origin",
-            });
-            const data = await resp.json();
-
-            if (!data.ok) throw new Error(data.message || "No se pudo cancelar la reserva.");
-
-            modalCancel.hide();
-            alertMsg("success", "Reserva cancelada.");
-            fetchList();
-          } catch (err) {
-            alertMsg("danger", err.message || "Error al cancelar.");
-          } finally {
-            cancelBtnConfirm.disabled = false;
-            cancelBtnConfirm.innerHTML = `<i class="bi bi-x-circle me-1"></i>Cancelar reserva`;
-            pendingCancelId = null;
-            pendingCancelNumero = null;
-          }
-        });
-
-        // Export individual
-        document.getElementById("btn-exp-pdf").addEventListener("click", () => {
-          if (!currentReservaId) return;
-          window.location.href = `/api/portal/reservas/${currentReservaId}/export?format=pdf`;
-          modalReserva.hide();
-        });
-        document.getElementById("btn-exp-xls").addEventListener("click", () => {
-          if (!currentReservaId) return;
-          window.location.href = `/api/portal/reservas/${currentReservaId}/export?format=xlsx`;
-          modalReserva.hide();
-        });
-
-        // Export historial (con filtros actuales)
-        document.getElementById("btn-export-hist").addEventListener("click", () => {
-          modalHist.show();
-        });
-
-        document.getElementById("btn-hist-pdf").addEventListener("click", () => {
-          const params = new URLSearchParams({ format: "pdf" });
-          if (fini.value) params.set("fini", fini.value);
-          if (ffin.value) params.set("ffin", ffin.value);
-          if (estado.value) params.set("estado", estado.value);
-          window.location.href = `/api/portal/reservas/export?${params.toString()}`;
-          modalHist.hide();
-        });
-
-        document.getElementById("btn-hist-xls").addEventListener("click", () => {
-          const params = new URLSearchParams({ format: "xlsx" });
-          if (fini.value) params.set("fini", fini.value);
-          if (ffin.value) params.set("ffin", ffin.value);
-          if (estado.value) params.set("estado", estado.value);
-          window.location.href = `/api/portal/reservas/export?${params.toString()}`;
-          modalHist.hide();
-        });
-
-        // Inicial
+        modalCancel.hide();
+        alertMsg("success", "Reserva cancelada.");
         fetchList();
-      })();
-    </script>
-  </body>
-</html>
+      } catch (err) {
+        alertMsg("danger", err.message || "Error al cancelar.");
+      } finally {
+        cancelBtnConfirm.disabled = false;
+        cancelBtnConfirm.innerHTML = `<i class="bi bi-x-circle me-1"></i>Cancelar reserva`;
+        pendingCancelId = null;
+        pendingCancelNumero = null;
+      }
+    });
+
+    document.getElementById("btn-exp-pdf").addEventListener("click", () => {
+      if (!currentReservaId) return;
+      window.location.href = `/api/portal/reservas/${currentReservaId}/export?format=pdf`;
+      modalReserva.hide();
+    });
+
+    document.getElementById("btn-hist-pdf").addEventListener("click", () => {
+      const params = new URLSearchParams({ format: "pdf" });
+      if (fini.value) params.set("fini", fini.value);
+      if (ffin.value) params.set("ffin", ffin.value);
+      if (estado.value) params.set("estado", estado.value);
+      window.location.href = `/api/portal/reservas/export?${params.toString()}`;
+      modalHist.hide();
+    });
+
+    document.getElementById("btn-hist-xls").addEventListener("click", () => {
+      const params = new URLSearchParams({ format: "xlsx" });
+      if (fini.value) params.set("fini", fini.value);
+      if (ffin.value) params.set("ffin", ffin.value);
+      if (estado.value) params.set("estado", estado.value);
+      window.location.href = `/api/portal/reservas/export?${params.toString()}`;
+      modalHist.hide();
+    });
+
+    fetchList();
+  })();
+</script>
+{% endblock %}

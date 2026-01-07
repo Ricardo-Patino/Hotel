@@ -1,237 +1,200 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi perfil | Hotel Villa Grace</title>
-  <meta name="description" content="Actualiza tus datos, contraseña y preferencias de comunicación.">
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-  <style>
-    .btn-outline{border:1px solid #ced4da}
-  </style>
-</head>
-<body class="privacy-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="portal-dashboard.html">Portal</a></li>
-        <li><a href="portal-reservas.html">Reservas</a></li>
-        <li><a href="portal-perfil.html" class="active">Perfil</a></li>
-        <li><a href="portal-preferencias.html">Preferencias</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+{% extends "base.html" %}
+
+{% block title %}Mi perfil | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Actualiza tus datos, contraseña y preferencias de comunicación.{% endblock %}
+
+{% block body_class %}privacy-page{% endblock %}
+
+{% block head_extra %}
+<style>
+  .btn-outline { border: 1px solid #ced4da; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Mi perfil</h1>
+    <p>Gestiona tu información personal y seguridad.</p>
+    <nav class="breadcrumbs" aria-label="breadcrumbs">
+      <ol>
+        <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
+        <li class="current">Perfil</li>
+      </ol>
     </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="{{ url_for('logout') }}">Cerrar sesión</a>
   </div>
-</header>
+</div>
 
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Mi perfil</h1>
-      <p>Gestiona tu información personal y seguridad.</p>
-      <nav class="breadcrumbs">
-        <ol>
-          <li><a href="portal-dashboard.html">Portal</a></li>
-          <li class="current">Perfil</li>
-        </ol>
-      </nav>
-    </div>
-  </div>
+<section class="section pt-3">
+  <div class="container" data-aos="fade-up">
+    <div id="alertBox" class="alert d-none" role="alert"></div>
 
-  <section class="section pt-3">
-    <div class="container" data-aos="fade-up">
-      <div id="alertBox" class="alert d-none" role="alert"></div>
+    <div class="row g-4">
 
-      <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Datos personales</h5>
 
-        <!-- Datos personales -->
-        <div class="col-lg-7">
-          <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Datos personales</h5>
-              <form id="formProfile" class="row g-3" novalidate>
-                <div class="col-md-12">
-                  <label class="form-label">Nombre completo</label>
-                  <input id="fNombre" class="form-control"
-                         required minlength="2" maxlength="80"
-                         pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'’\- ]{2,80}$"
-                         title="Solo letras y espacios (2–80)"
-                         placeholder="Tu nombre">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Correo</label>
-                  <input id="fCorreo" type="email" class="form-control"
-                         required maxlength="120"
-                         placeholder="tucorreo@dominio.com">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Cédula o pasaporte</label>
-                  <input id="fCedula"
-                         class="form-control"
-                         inputmode="text"
-                         maxlength="20"
-                         placeholder="1-2345-6789, 0123456789 o A1234567"
-                         pattern="^(?:(?:[1-9]-\d{4}-\d{4})|\d{9,12}|[A-Za-z0-9]{6,20})$"
-                         title="Usa 1-2345-6789, 9–12 dígitos sin guiones, o pasaporte alfanumérico (6–20)">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Teléfono</label>
-                  <input id="fTelefono" class="form-control"
-                         inputmode="tel" maxlength="20"
-                         placeholder="+506 8888 8888"
-                         pattern="^(?:\+?506)?\s?\d{4}\s?\d{4}$"
-                         title="Formato CR: 8888 8888 o +506 8888 8888">
-                </div>
+            <form id="formProfile" class="row g-3" novalidate>
+              <div class="col-md-12">
+                <label class="form-label">Nombre completo</label>
+                <input id="fNombre" class="form-control"
+                       required minlength="2" maxlength="80"
+                       pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'’\- ]{2,80}$"
+                       title="Solo letras y espacios (2–80)"
+                       placeholder="Tu nombre">
+              </div>
 
-                <div class="col-12 small text-muted">
-                  Tu <strong>rol</strong> es: <span id="fRol">—</span>. Si necesitas cambiarlo, por favor contacta a un administrador.
-                </div>
+              <div class="col-md-6">
+                <label class="form-label">Correo</label>
+                <input id="fCorreo" type="email" class="form-control"
+                       required maxlength="120"
+                       placeholder="tucorreo@dominio.com">
+              </div>
 
-                <div class="col-12 d-grid d-md-flex gap-2">
-                  <button class="btn btn-primary" type="submit">
-                    <i class="bi bi-check-circle me-1"></i> Guardar
-                  </button>
-                  <button id="btnReset" type="button" class="btn btn-outline">Deshacer</button>
-                </div>
-              </form>
-            </div>
-          </div>
+              <div class="col-md-6">
+                <label class="form-label">Cédula o pasaporte</label>
+                <input id="fCedula"
+                       class="form-control"
+                       inputmode="text"
+                       maxlength="20"
+                       placeholder="1-2345-6789, 0123456789 o A1234567"
+                       pattern="^(?:(?:[1-9]-\d{4}-\d{4})|\d{9,12}|[A-Za-z0-9]{6,20})$"
+                       title="Usa 1-2345-6789, 9–12 dígitos sin guiones, o pasaporte alfanumérico (6–20)">
+              </div>
 
-          <!-- Cambio de contraseña -->
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h5 class="card-title">Cambiar contraseña</h5>
-              <form id="formPwd" class="row g-3" novalidate>
-                <div class="col-md-6">
-                  <label class="form-label">Contraseña actual</label>
-                  <input id="pwdCurrent" type="password" class="form-control" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Nueva contraseña</label>
-                  <input id="pwdNew" type="password" class="form-control" required minlength="8">
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label">Confirmar nueva</label>
-                  <input id="pwdConfirm" type="password" class="form-control" required minlength="8">
-                </div>
-                <div class="col-12 d-grid d-md-flex gap-2">
-                  <button class="btn btn-primary" type="submit">
-                    <i class="bi bi-shield-lock me-1"></i> Actualizar
-                  </button>
-                </div>
-              </form>
-            </div>
+              <div class="col-md-6">
+                <label class="form-label">Teléfono</label>
+                <input id="fTelefono" class="form-control"
+                       inputmode="tel" maxlength="20"
+                       placeholder="+506 8888 8888"
+                       pattern="^(?:\+?506)?\s?\d{4}\s?\d{4}$"
+                       title="Formato CR: 8888 8888 o +506 8888 8888">
+              </div>
+
+              <div class="col-12 small text-muted">
+                Tu <strong>rol</strong> es: <span id="fRol">—</span>. Si necesitas cambiarlo, por favor contacta a un administrador.
+              </div>
+
+              <div class="col-12 d-grid d-md-flex gap-2">
+                <button class="btn btn-primary" type="submit">
+                  <i class="bi bi-check-circle me-1"></i> Guardar
+                </button>
+                <button id="btnReset" type="button" class="btn btn-outline">Deshacer</button>
+              </div>
+            </form>
           </div>
         </div>
 
-        <!-- Columna lateral -->
-        <div class="col-lg-5">
-          <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body">
-              <h5 class="card-title">Direcciones de factura</h5>
-              <p class="mb-1">Cóbano, Puntarenas, Costa Rica</p>
-              <p class="text-muted small">Usada para facturas y recibos.</p>
-              <button class="btn btn-outline btn-sm" type="button">Editar</button>
-            </div>
-          </div>
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <h5 class="card-title">Cambiar contraseña</h5>
 
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <h5 class="card-title">Comunicación</h5>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="news" checked>
-                <label class="form-check-label" for="news">Recibir novedades y ofertas</label>
+            <form id="formPwd" class="row g-3" novalidate>
+              <div class="col-md-6">
+                <label class="form-label">Contraseña actual</label>
+                <input id="pwdCurrent" type="password" class="form-control" required>
               </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="sms">
-                <label class="form-check-label" for="sms">Recibir recordatorios por SMS</label>
+
+              <div class="col-md-6">
+                <label class="form-label">Nueva contraseña</label>
+                <input id="pwdNew" type="password" class="form-control" required minlength="8">
               </div>
-              <div class="mt-2">
-                <a class="btn btn-outline btn-sm" href="portal-preferencias.html">Gestionar preferencias</a>
+
+              <div class="col-md-6">
+                <label class="form-label">Confirmar nueva</label>
+                <input id="pwdConfirm" type="password" class="form-control" required minlength="8">
               </div>
-            </div>
+
+              <div class="col-12 d-grid d-md-flex gap-2">
+                <button class="btn btn-primary" type="submit">
+                  <i class="bi bi-shield-lock me-1"></i> Actualizar
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Direcciones de factura</h5>
+            <p class="mb-1">Cóbano, Puntarenas, Costa Rica</p>
+            <p class="text-muted small">Usada para facturas y recibos.</p>
+            <button class="btn btn-outline btn-sm" type="button">Editar</button>
           </div>
         </div>
 
-      </div> <!-- row -->
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <h5 class="card-title">Comunicación</h5>
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="news" checked>
+              <label class="form-check-label" for="news">Recibir novedades y ofertas</label>
+            </div>
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="sms">
+              <label class="form-check-label" for="sms">Recibir recordatorios por SMS</label>
+            </div>
+
+            <div class="mt-2">
+              <a class="btn btn-outline btn-sm" href="{{ url_for('sac.preferencias_html') }}">Gestionar preferencias</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
-  </section>
-</main>
-
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center">
-    <div class="container">© <strong><span>Hotel Villa Grace</span></strong>. Todos los derechos reservados</div>
   </div>
-</footer>
+</section>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-  <i class="bi bi-arrow-up-short"></i>
-</a>
-<div id="preloader"></div>
+{% endblock %}
 
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-
+{% block scripts %}
 <script>
 (function(){
   const $ = s => document.querySelector(s);
   const alertBox = $("#alertBox");
 
-  // Validadores front (coinciden con pattern HTML)
   const RE_NAME   = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü'’\- ]{2,80}$/;
   const RE_PHONE  = /^(?:\+?506)?\s?\d{4}\s?\d{4}$/;
   const RE_DOC    = /^(?:(?:[1-9]-\d{4}-\d{4})|\d{9,12}|[A-Za-z0-9]{6,20})$/;
-  
 
-  // ========= SOLUCIÓN 404 =========
-  // Muchos despliegues colocan las APIs bajo un prefijo (p.ej. /portal/api/*).
-  // En lugar de hardcodear "/api/*", calculamos el "base" del módulo actual
-  // y probamos primero rutas relativas como "../api/me". Si esa no existe,
-  // caemos a "/api/me". Así evitamos el 404 que estabas recibiendo.
   function computeApiCandidates() {
-    const path = window.location.pathname.replace(/\/+$/, "");       // sin trailing slash
-    const base = path.substring(0, path.lastIndexOf("/")) || "";     // p.ej. "/portal"
-    const rel = base ? `${base}/api` : "/api";                        // p.ej. "/portal/api" o "/api"
-
-    // Candidatos ordenados: relativo al módulo primero, luego raíz
+    const path = window.location.pathname.replace(/\/+$/, "");
+    const base = path.substring(0, path.lastIndexOf("/")) || "";
+    const rel = base ? `${base}/api` : "/api";
     return {
-      me:          [ `${rel}/me`, `/api/me` ],
-      password:    [ `${rel}/me/password`, `/api/me/password` ]
+      me:       [ `${rel}/me`, `/api/me` ],
+      password: [ `${rel}/me/password`, `/api/me/password` ]
     };
   }
 
-  // -------- Utilidades UI ----------
   function showAlert(kind, msg){
     alertBox.className = "alert alert-" + kind;
     alertBox.textContent = msg;
     alertBox.classList.remove("d-none");
     setTimeout(()=>alertBox.classList.add("d-none"), 6000);
   }
+
   function startBtn(btn){
     if(!btn) return;
     btn.disabled = true; btn.dataset._txt = btn.innerHTML;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
   }
+
   function stopBtn(btn){
     if(!btn) return;
     btn.disabled = false; if(btn.dataset._txt) btn.innerHTML = btn.dataset._txt;
   }
 
-  // -------- Fetch defensivo + resolución de endpoint ----------
   async function tryFetchJSON(url, opts){
     const res = await fetch(url, {
       credentials: "same-origin",
@@ -254,26 +217,22 @@
   }
 
   async function fetchJSONWithCandidates(candidates, opts){
-    // Guarda en memoria el endpoint resuelto para siguientes llamadas
     const cacheKey = "hvga.endpoint." + candidates.join("|");
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) return tryFetchJSON(cached, opts);
 
-    // Prueba en orden para evitar 404
     for (const u of candidates){
       try{
         const json = await tryFetchJSON(u, opts && opts.method ? opts : undefined);
         sessionStorage.setItem(cacheKey, u);
         return json;
       }catch(e){
-        // solo seguimos probando si fue 404; otros errores sí se propagan
         if (!String(e.message).includes("endpoint no encontrado")) throw e;
       }
     }
     throw new Error("No se encontró un endpoint válido para esta acción.");
   }
 
-  // --------- Carga de datos del perfil ----------
   async function loadMe(){
     try{
       const c = computeApiCandidates();
@@ -290,21 +249,20 @@
     }
   }
 
-  // --------- Guardar perfil ----------
   $("#formProfile").addEventListener("submit", async (ev)=>{
     ev.preventDefault();
     const btn = ev.submitter;
+
     const payload = {
       Nombre:   $("#fNombre").value.trim(),
       Correo:   $("#fCorreo").value.trim().toLowerCase(),
       Telefono: $("#fTelefono").value.trim(),
       Cedula:   $("#fCedula").value.trim()
     };
-    
-    // Validación HTML5 y reforzada por regex
+
     const form = ev.currentTarget;
     if (!form.checkValidity()) { form.reportValidity(); return; }
-    
+
     if (!RE_NAME.test(payload.Nombre)) {
       showAlert("warning","El nombre debe tener solo letras y espacios (2–80).");
       $("#fNombre").focus(); return;
@@ -317,11 +275,11 @@
       showAlert("warning","Documento inválido. Usa 1-2345-6789, 9–12 dígitos o pasaporte (6–20).");
       $("#fCedula").focus(); return;
     }
-
     if (!payload.Nombre || !payload.Correo){
       showAlert("warning","Nombre y correo son obligatorios.");
       return;
     }
+
     try{
       startBtn(btn);
       const c = computeApiCandidates();
@@ -339,18 +297,18 @@
     }
   });
 
-  // --------- Deshacer cambios ----------
   $("#btnReset").addEventListener("click", loadMe);
 
-  // --------- Cambiar contraseña ----------
   $("#formPwd").addEventListener("submit", async (ev)=>{
     ev.preventDefault();
     const btn = ev.submitter;
+
     const payload = {
       current: $("#pwdCurrent").value,
       new:     $("#pwdNew").value,
       confirm: $("#pwdConfirm").value
     };
+
     if (!payload.current || !payload.new || !payload.confirm){
       showAlert("warning","Completa todos los campos de contraseña.");
       return;
@@ -363,6 +321,7 @@
       showAlert("warning","La confirmación no coincide.");
       return;
     }
+
     try{
       startBtn(btn);
       const c = computeApiCandidates();
@@ -381,9 +340,7 @@
     }
   });
 
-  // Inicial
   loadMe();
 })();
 </script>
-</body>
-</html>
+{% endblock %}
