@@ -2455,6 +2455,26 @@ CREATE TABLE IF NOT EXISTS HabitacionImagen (
 
 
 
+
+
+CREATE TABLE IF NOT EXISTS ReservaCambioSolicitud (
+  Id_Cambio INT NOT NULL AUTO_INCREMENT,
+  Codigo_Reserva INT NOT NULL,
+  Estado ENUM('Pendiente','Aprobado','Rechazado','Retractado') NOT NULL DEFAULT 'Pendiente',
+  Monto_Adicional DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  Solicitud_JSON JSON NOT NULL,
+  Creado_En DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Decidido_En DATETIME DEFAULT NULL,
+  Decidido_Por INT DEFAULT NULL,
+  Rechazo_Motivo TEXT DEFAULT NULL,
+  PRIMARY KEY (Id_Cambio),
+  KEY IX_RCC_Reserva (Codigo_Reserva),
+  KEY IX_RCC_Estado (Estado),
+  KEY IX_RCC_Creado (Creado_En)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
 /* ===================================================================== */
 /* SEEDS                                                                 */
 /* ===================================================================== */

@@ -181,11 +181,7 @@
                   <a class="ops-item text-decoration-none" href="ops-arrivals-departures.html">
                     <i class="bi bi-box-arrow-in-right text-secondary"></i>
                     <div class="txt"><div class="fw-semibold">Llegadas/Salidas</div><small>Listado del día</small></div>
-                  </a>
-                  <a class="ops-item text-decoration-none" href="ops-rooms-status.html">
-                    <i class="bi bi-door-closed text-secondary"></i>
-                    <div class="txt"><div class="fw-semibold">Estado habitaciones</div><small>Tablero</small></div>
-                  </a>
+                  </a>                  
                   <a class="ops-item text-decoration-none" href="ops-reservas.html">
                     <i class="bi bi-journal-text text-success"></i>
                     <div class="txt">
@@ -476,7 +472,7 @@
             td.appendChild(makeBadge('Sí', 'text-bg-success'));
             const small = document.createElement('span');
             small.className = 'ms-2 soft small';
-            small.textContent = A#${it.audit_id ?? '—'};
+            small.textContent = `A#${it.audit_id ?? '—'}`;
             td.appendChild(small);
             tr.appendChild(td);
           }
@@ -548,7 +544,7 @@
     
         meta.textContent = 'Cargando detalles…';
         try{
-          const url = /grr/jobs/noshow/recent?days=${encodeURIComponent(days)}&limit=${encodeURIComponent(limit)};
+          const url = `/grr/jobs/noshow/recent?days=${encodeURIComponent(days)}&limit=${encodeURIComponent(limit)}`;
           const r = await fetch(url, { headers:{Accept:'application/json'} });
           const j = await r.json().catch(()=>({}));
     
@@ -559,7 +555,7 @@
           }
     
           renderDetails(j.items || []);
-          meta.textContent = Actualizado: ${fmtDateTime(j.server_time_local)} · Mostrando ${Math.min((j.items||[]).length, limit)} registro(s) · Rango: ${j.days} día(s).;
+          meta.textContent = `Actualizado: ${fmtDateTime(j.server_time_local)} · Mostrando ${Math.min((j.items||[]).length, limit)} registro(s) · Rango: ${j.days} día(s).`;
           detailsLoadedOnce = true;
     
         }catch(e){
@@ -590,7 +586,7 @@
               return;
             }
     
-            out.textContent = Procesadas: ${j.processed||0}. Liberadas: ${j.liberadas||j.released||0}.;
+            out.textContent = `Procesadas: ${j.processed||0}. Liberadas: ${j.liberadas||j.released||0}.`;
     
             // Refrescos operativos
             loadRooms();
