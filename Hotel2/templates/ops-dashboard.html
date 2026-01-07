@@ -92,8 +92,7 @@
               <li><a href="ops-checkout.html">Check-out</a></li>
               <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
               <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
-              <li><a href="ops-rooms.html">Habitaciones</a></li>
-              <li><a href="/ops/housekeeping">Limpieza</a></li>
+              <li><a href="ops-rooms.html">Habitaciones</a></li>              
               <li><a href="/ops/coupons">Cupones</a></li>
             </ul>
           </li>
@@ -225,10 +224,6 @@
                   <a class="ops-item text-decoration-none" href="ops-rooms.html">
                     <i class="bi bi-door-open text-secondary"></i>
                     <div class="txt"><div class="fw-semibold">Habitaciones</div><small>Gestión y dashboard</small></div>
-                  </a>                  
-                  <a class="ops-item text-decoration-none" href="/ops/housekeeping">
-                    <i class="bi bi-bucket text-secondary"></i>
-                    <div class="txt"><div class="fw-semibold">Limpieza</div><small>Asignaciones</small></div>
                   </a>
                   <a class="ops-item text-decoration-none" href="/ops/coupons">
                     <i class="bi bi-tag text-secondary"></i>
@@ -296,13 +291,63 @@
             
             <div class="card shadow-sm border-0">
               <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
-                <h5 class="mb-0">Corte de No-Show (GRR-01-016)</h5>
-                <button id="btn-noshow" class="btn btn-warning btn-sm"><i class="bi bi-exclamation-triangle me-1"></i> Ejecutar</button>
+                <h5 class="mb-0">Corte de No-Show</h5>
+            
+                <div class="d-flex gap-2">
+                  <button
+                    id="btn-noshow-details"
+                    class="btn btn-outline-secondary btn-sm"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#noshow-details"
+                    aria-expanded="false"
+                    aria-controls="noshow-details">
+                    <i class="bi bi-table me-1"></i> Mostrar detalles
+                  </button>
+            
+                  <button id="btn-noshow" class="btn btn-warning btn-sm">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Ejecutar
+                  </button>
+                </div>
               </div>
+            
               <div class="card-body">
-                <div id="noshow-out" class="soft small">Ejecuta el job para marcar reservas sin check-in como No-Show, liberar habitación y aplicar penalización.</div>
+                <div id="noshow-out" class="soft small">
+                  Ejecuta el job para marcar reservas sin check-in como No-Show, liberar habitación y aplicar penalización.
+                </div>
+            
+                <div class="collapse mt-3" id="noshow-details">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Fecha registro</th>
+                          <th>Reserva</th>
+                          <th>Registro</th>
+                          <th>Estado reserva</th>
+                          <th>Hab.</th>
+                          <th>Estado hab.</th>
+                          <th>Penalización</th>
+                          <th>Total</th>
+                          <th>Entrada</th>
+                          <th>Salida</th>
+                        </tr>
+                      </thead>
+                      <tbody id="noshow-details-body">
+                        <tr>
+                          <td colspan="10" class="soft small">
+                            Sin datos. Presiona “Ejecutar” o “Mostrar detalles”.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+            
+                  <div id="noshow-details-meta" class="soft small mt-2"></div>
+                </div>
               </div>
             </div>
+            
 
           </div>
 
@@ -381,18 +426,221 @@
     }
 
     // Ejecutar No-Show (GRR-01-016)
-    document.getElementById('btn-noshow').addEventListener('click', async ()=>{
+    // No-Show (GRR-01-016) — UI con evidencia (registro + estados)
+    (function(){
+      const btnRun = document.getElementById('btn-noshow');
+      const detailsBox = document.getElementById('noshow-details');
+      const tbody = document.getElementById('noshow-details-body');
+      const meta = document.getElementById('noshow-details-meta');
       const out = document.getElementById('noshow-out');
-      out.textContent = 'Ejecutando corte…';
-      try{
-        const r = await fetch('/grr/jobs/run-noshow', { method:'POST' });
-        const j = await r.json().catch(()=>({}));
-        if(!j.ok){ out.textContent = 'No se pudo ejecutar el corte de No-Show.'; return; }
-        out.textContent = `Procesadas: ${j.processed||0}. Liberadas: ${j.liberadas||j.released||0}.`;
-        loadRooms();
-        loadKpis();
-      }catch(e){ out.textContent = 'Error de conexión al ejecutar el job.'; }
-    });
+    
+      let detailsLoadedOnce = false;
+    
+      function fmtDateTime(s){
+        if(!s) return '—';
+        const raw = String(s);
+        // MySQL suele venir "YYYY-MM-DD HH:MM:SS", convertimos a ISO básico
+        const iso = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+        const d = new Date(iso);
+        if(isNaN(d.getTime())) return raw;
+        try{
+          return new Intl.DateTimeFormat('es-CR',{dateStyle:'short', timeStyle:'short'}).format(d);
+        }catch(_){
+          return raw;
+        }
+      }
+    
+      function makeBadge(label, kind){
+        const s = document.createElement('span');
+        s.className = 'badge ' + kind;
+        s.textContent = label;
+        return s;
+      }
+    
+      function clearTbody(){
+        while(tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      }
+    
+      function renderDetails(items){
+        clearTbody();
+    
+        if(!items || !items.length){
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 10;
+          td.className = 'soft small';
+          td.textContent = 'No hay registros recientes de No-Show en el período consultado.';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+    
+        for(const it of items){
+          const tr = document.createElement('tr');
+    
+          const reservaEstado = String(it.reserva_estado || '');
+          const habEstado = String(it.habitacion_estado || '');
+    
+          const reservaOk = (reservaEstado === 'NoShow');
+          const habOk = (habEstado.toLowerCase() === 'disponible');
+    
+          // Fecha registro
+          {
+            const td = document.createElement('td');
+            td.textContent = fmtDateTime(it.audit_fecha);
+            tr.appendChild(td);
+          }
+    
+          // Reserva
+          {
+            const td = document.createElement('td');
+            td.textContent = it.reserva_id ?? '—';
+            tr.appendChild(td);
+          }
+    
+          // Registro (evidencia: auditoría)
+          {
+            const td = document.createElement('td');
+            td.appendChild(makeBadge('Sí', 'text-bg-success'));
+            const small = document.createElement('span');
+            small.className = 'ms-2 soft small';
+            small.textContent = `A#${it.audit_id ?? '—'}`;
+            td.appendChild(small);
+            tr.appendChild(td);
+          }
+    
+          // Estado reserva
+          {
+            const td = document.createElement('td');
+            td.appendChild(
+              reservaOk
+                ? makeBadge('NoShow', 'text-bg-success')
+                : makeBadge(reservaEstado || '—', 'text-bg-warning')
+            );
+            tr.appendChild(td);
+          }
+    
+          // Hab.
+          {
+            const td = document.createElement('td');
+            td.textContent = it.habitacion_id ?? '—';
+            tr.appendChild(td);
+          }
+    
+          // Estado hab.
+          {
+            const td = document.createElement('td');
+            td.appendChild(
+              habOk
+                ? makeBadge('Disponible', 'text-bg-success')
+                : makeBadge(habEstado || '—', 'text-bg-warning')
+            );
+            tr.appendChild(td);
+          }
+    
+          // Penalización
+          {
+            const td = document.createElement('td');
+            td.textContent = moneyCRC(it.penalizacion || 0);
+            tr.appendChild(td);
+          }
+    
+          // Total
+          {
+            const td = document.createElement('td');
+            td.textContent = moneyCRC(it.monto_total || 0);
+            tr.appendChild(td);
+          }
+    
+          // Entrada
+          {
+            const td = document.createElement('td');
+            td.textContent = it.fecha_entrada ?? '—';
+            tr.appendChild(td);
+          }
+    
+          // Salida
+          {
+            const td = document.createElement('td');
+            td.textContent = it.fecha_salida ?? '—';
+            tr.appendChild(td);
+          }
+    
+          tbody.appendChild(tr);
+        }
+      }
+    
+      async function loadDetails(opts){
+        const days = Number(opts?.days ?? 7);
+        const limit = Number(opts?.limit ?? 50);
+    
+        meta.textContent = 'Cargando detalles…';
+        try{
+          const url = `/grr/jobs/noshow/recent?days=${encodeURIComponent(days)}&limit=${encodeURIComponent(limit)}`;
+          const r = await fetch(url, { headers:{Accept:'application/json'} });
+          const j = await r.json().catch(()=>({}));
+    
+          if(!j || !j.ok){
+            meta.textContent = 'No se pudieron cargar los detalles del No-Show.';
+            renderDetails([]);
+            return;
+          }
+    
+          renderDetails(j.items || []);
+          meta.textContent = `Actualizado: ${fmtDateTime(j.server_time_local)} · Mostrando ${Math.min((j.items||[]).length, limit)} registro(s) · Rango: ${j.days} día(s).`;
+          detailsLoadedOnce = true;
+    
+        }catch(e){
+          meta.textContent = 'Error de conexión al cargar detalles.';
+          renderDetails([]);
+        }
+      }
+    
+      // Cuando el usuario abra "Mostrar detalles", cargamos si aún no se cargó
+      if(detailsBox){
+        detailsBox.addEventListener('show.bs.collapse', ()=>{
+          if(!detailsLoadedOnce) loadDetails({days:7, limit:50});
+        });
+      }
+    
+      // Ejecutar job
+      if(btnRun){
+        btnRun.addEventListener('click', async ()=>{
+          out.textContent = 'Ejecutando corte…';
+          btnRun.disabled = true;
+    
+          try{
+            const r = await fetch('/grr/jobs/run-noshow', { method:'POST' });
+            const j = await r.json().catch(()=>({}));
+    
+            if(!j || !j.ok){
+              out.textContent = 'No se pudo ejecutar el corte de No-Show.';
+              return;
+            }
+    
+            out.textContent = `Procesadas: ${j.processed||0}. Liberadas: ${j.liberadas||j.released||0}.`;
+    
+            // Refrescos operativos
+            loadRooms();
+            loadKpis();
+    
+            // Cargar evidencia desde auditoría (último día) para que la tabla pruebe lo ocurrido
+            await loadDetails({days: 1, limit: 100});
+    
+            // Si el usuario ya tiene abierto el panel, se actualiza; si no, queda listo al abrir
+            if(detailsBox && detailsBox.classList.contains('show')){
+              // ya se actualizó arriba, no hacemos nada extra
+            }
+    
+          }catch(e){
+            out.textContent = 'Error de conexión al ejecutar el job.';
+          }finally{
+            btnRun.disabled = false;
+          }
+        });
+      }
+    })();
+
 
     loadKpis();
     loadRooms();
