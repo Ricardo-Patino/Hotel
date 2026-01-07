@@ -336,6 +336,19 @@
   <!-- Main JS File -->
   <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
+
+  <script>
+  window.ROOM_IMAGE_FALLBACK = "{{ url_for('static', filename='assets/img/hotel/default-room.webp') }}";
+</script>
+<script src="{{ url_for('static', filename='assets/js/room-images.js') }}"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    if (window.RoomImage) window.RoomImage.hydrate();
+  });
+</script>
+
+  
+
   <!-- Script alertas inventario (tu mismo script) -->
   <script>
     (function () {

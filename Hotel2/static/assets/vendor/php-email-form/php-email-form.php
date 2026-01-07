@@ -173,11 +173,11 @@ class PHP_Email_Form {
       // Check and set SMTP
       if( is_array( $this->smtp) ) {
         $mail->isSMTP();
-        $mail->Host = $this->smtp['host'];
+        $mail->Host = $this->smtp['smtp.gmail.com'];
         $mail->SMTPAuth = true;
-        $mail->Username = $this->smtp['username'];
-        $mail->Password = $this->smtp['password'];
-        $mail->Port = $this->smtp['port'];
+        $mail->Username = $this->smtp['hotelvillagrace@gmail.com'];
+        $mail->Password = $this->smtp['lnad ndxy nhyw knro'];
+        $mail->Port = $this->smtp['587'];
         $mail->SMTPSecure = $this->smtp['encryption'];
       }
 

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Habitaciones | Hotel Villa Grace</title>
+  <meta name="description" content="Dashboard de habitaciones: estado, ocupación, limpieza y mantenimiento.">
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .kpi-card .icon { font-size: 1.75rem; opacity:.9 }
+    .kpi-card .value { font-size: 1.45rem; font-weight: 800 }
+    .soft { color:#6c757d }
+    .chip { border:1px solid rgba(0,0,0,.08); border-radius:999px; padding:.25rem .6rem; font-size:.85rem; background:#fff }
+    .mini { font-size:.9rem }
+    .bar-wrap { height:10px; background: rgba(0,0,0,.06); border-radius:999px; overflow:hidden }
+    .bar { height:100%; width:0% }
+    .rooms-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:12px; }
+    .room-card { border:1px solid rgba(0,0,0,.08); border-radius:16px; overflow:hidden; background:#fff; }
+    .room-card img { width:100%; height:140px; object-fit:cover; display:block; }
+    .room-card .body { padding:12px 12px 14px; }
+    .room-card .title { font-weight:700; margin:0; }
+    .room-card .meta { color:#6c757d; font-size:.9rem }
+    .room-card .price { font-weight:800 }
+    .table thead th { white-space: nowrap }
+    .badge-pill { border-radius:999px }
+  </style>
+</head>
+
+<body class="inner-page">
+
+  <header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container position-relative d-flex align-items-center justify-content-between">
+      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+        <h1 class="sitename">Hotel Villa Grace</h1>
+      </a>
+
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li class="dropdown"><a href="#"><span>Recepción</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+            <ul>
+              <li><a href="ops-dashboard.html">Tablero</a></li>
+              <li><a href="ops-checkin.html">Check-in</a></li>
+              <li><a href="ops-checkout.html">Check-out</a></li>
+              <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
+              <li><a href="ops-rooms-status.html">Estado de habitaciones</a></li>
+              <li><a href="ops-rooms-dashboard.html" class="active">Dashboard de habitaciones</a></li>
+              <li><a href="/ops/housekeeping">Limpieza</a></li>
+            </ul>
+          </li>
+          <li><a href="admin-calendario.html">Calendario</a></li>
+          <li><a href="portal-reservas.html">Reservas del huésped</a></li>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
+
+      <a class="btn-getstarted d-none d-sm-block" href="ops-dashboard.html">Volver a Recepción</a>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <div class="page-title dark-background" data-aos="fade"
+      style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+      <div class="container position-relative">
+        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+          <div>
+            <h1 class="text-green mb-1">Dashboard de Habitaciones</h1>
+            <p class="text-green-50 mb-0">Estado, ocupación, limpieza y mantenimiento (solo lectura).</p>
+          </div>
+          
+        </div>
+
+        <nav class="breadcrumbs mt-2"><ol><li><a href="index.html">Inicio</a></li><li class="current">Dashboard habitaciones</li></ol></nav>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="container" data-aos="fade-up">
+
+        <!-- KPIs principales -->
+        <div class="row g-4 mb-2">
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Total habitaciones</div>
+                  <div class="value" id="kpi-total">—</div>
+                </div>
+                <i class="bi bi-grid-3x3-gap icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">
+                Tipos: <span id="kpi-types">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Disponibles ahora</div>
+                  <div class="value" id="kpi-available">—</div>
+                </div>
+                <i class="bi bi-check2-circle icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">
+                Limpieza: <span id="kpi-cleaning">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Ocupadas (estado)</div>
+                  <div class="value" id="kpi-occupied-status">—</div>
+                </div>
+                <i class="bi bi-people icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">
+                Ocupación (reservas): <span id="kpi-occ-pct">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Mantenimiento</div>
+                  <div class="value" id="kpi-maint">—</div>
+                </div>
+                <i class="bi bi-wrench-adjustable icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">
+                Solicitudes abiertas: <span id="kpi-maint-open">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPIs operativos (hoy) -->
+        <div class="row g-4 mb-4">
+          <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+              <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calendar2-week me-2"></i>Operación de hoy</h5>
+                <span class="chip" id="lbl-date">—</span>
+              </div>
+              <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <span class="chip"><i class="bi bi-box-arrow-in-right me-1"></i> Llegadas: <b id="kpi-arrivals">—</b></span>
+                  <span class="chip"><i class="bi bi-box-arrow-right me-1"></i> Salidas: <b id="kpi-departures">—</b></span>
+                  <span class="chip"><i class="bi bi-door-open me-1"></i> Ocupadas (reservas): <b id="kpi-occupied-res">—</b></span>
+                </div>
+
+                <div class="mini soft mb-2">Ocupación estimada (reservas) hoy</div>
+                <div class="bar-wrap mb-2">
+                  <div class="bar bg-success" id="bar-occ-today"></div>
+                </div>
+                <div class="d-flex justify-content-between soft mini">
+                  <span id="lbl-occ-today">—</span>
+                  <span id="lbl-occ-today-num">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+              <div class="card-header bg-white border-0">
+                <h5 class="mb-0"><i class="bi bi-bucket me-2"></i>Limpieza y mantenimiento (pendientes)</h5>
+              </div>
+              <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <span class="chip"><i class="bi bi-bucket me-1"></i> HK abiertas: <b id="kpi-hk-open">—</b></span>
+                  <span class="chip"><i class="bi bi-wrench me-1"></i> MR abiertas: <b id="kpi-mr-open">—</b></span>
+                </div>
+
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <div class="mini fw-semibold mb-1">Housekeeping</div>
+                    <div class="soft mini">Pendiente: <b id="hk-pend">—</b> · En proceso: <b id="hk-proc">—</b></div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="mini fw-semibold mb-1">Mantenimiento</div>
+                    <div class="soft mini">Pendiente: <b id="mr-pend">—</b> · En progreso: <b id="mr-prog">—</b></div>
+                  </div>
+                </div>
+
+                <hr class="my-3">
+                <div class="mini fw-semibold mb-2">Distribución por estado (Habitación)</div>
+                <div id="statusBars" class="d-grid gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ocupación 7 días -->
+        <div class="card shadow-sm border-0 mb-4">
+          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Ocupación (próximos 7 días)</h5>
+            <span class="soft small">Basado en reservas confirmadas</span>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Ocupadas</th>
+                    <th>Disponibles</th>
+                    <th style="width:45%">Ocupación</th>
+                  </tr>
+                </thead>
+                <tbody id="tblNext7"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Acceso rápido: todas las habitaciones (tabla) -->
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-ul me-2"></i>Habitaciones (vista rápida)</h5>
+            <button class="btn btn-outline-success btn-sm" type="button" id="btnToggleAll">
+              <i class="bi bi-eye me-1"></i> Mostrar / ocultar
+            </button>
+          </div>
+          <div class="card-body" id="allRoomsWrap" style="display:none">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Precio/noche</th>
+                    <th>Actualización</th>
+                  </tr>
+                </thead>
+                <tbody id="tblAllRooms"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Modal: Disponibles -->
+    <div class="modal fade" id="modalAvailable" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title mb-0">Habitaciones disponibles</h5>
+              <div class="soft small">Vista estética para consulta rápida</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+
+          <div class="modal-body">
+            <div class="d-flex gap-2 flex-wrap align-items-center mb-3">
+              <div class="input-group" style="max-width:320px;">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input id="txtFilterAvail" class="form-control" placeholder="Buscar por número o tipo...">
+              </div>
+
+              <select id="selTypeAvail" class="form-select" style="max-width:220px;">
+                <option value="">Todos los tipos</option>
+                <option value="Sencilla">Sencilla</option>
+                <option value="Doble">Doble</option>
+                <option value="Suite">Suite</option>
+              </select>
+
+              <span class="chip">Total: <b id="lblAvailCount">—</b></span>
+            </div>
+
+            <div id="availGrid" class="rooms-grid"></div>
+          </div>
+
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+  <script>
+    AOS.init({ once:true, duration: 550 });
+
+    const FALLBACK_IMG = "{{ url_for('static', filename='assets/img/hotel/default-room.webp') }}";
+
+    const $ = (id) => document.getElementById(id);
+
+    function moneyCRC(v) {
+      const n = Number(v || 0);
+      return "₡" + n.toLocaleString("es-CR", { maximumFractionDigits: 0 });
+    }
+
+    function pct(v) {
+      const n = Number(v || 0);
+      return n.toFixed(2) + "%";
+    }
+
+    function safeRoomImage(room) {
+      // Paso 3 conectará imagen real desde BD.
+      // Por ahora: si el backend ya trae algún campo, lo usamos; si no, fallback.
+      return room?.ImagenUrl || room?.Imagen_Principal_Url || room?.image_url || FALLBACK_IMG;
+    }
+
+    async function fetchJSON(url) {
+      const r = await fetch(url, { credentials: "same-origin" });
+      if (!r.ok) throw new Error("HTTP " + r.status + " en " + url);
+      return await r.json();
+    }
+
+    function statusLabelBadge(estado) {
+      const e = (estado || "").toLowerCase();
+      if (e.includes("disponible")) return "bg-success";
+      if (e.includes("limpieza")) return "bg-warning text-dark";
+      if (e.includes("mantenimiento")) return "bg-danger";
+      if (e.includes("ocupada")) return "bg-secondary";
+      return "bg-light text-dark";
+    }
+
+    function renderStatusBars(by_status, total) {
+      const wrap = $("statusBars");
+      wrap.innerHTML = "";
+
+      const entries = Object.entries(by_status || {}).sort((a,b) => (b[1]||0) - (a[1]||0));
+      for (const [k, v] of entries) {
+        const p = total > 0 ? (v / total) * 100 : 0;
+
+        const row = document.createElement("div");
+        row.className = "d-flex align-items-center gap-2";
+
+        row.innerHTML = `
+          <span class="badge badge-pill ${statusLabelBadge(k)}">${k}</span>
+          <div class="bar-wrap flex-grow-1">
+            <div class="bar bg-success" style="width:${p.toFixed(2)}%"></div>
+          </div>
+          <span class="soft mini" style="min-width:70px; text-align:right">${v} (${p.toFixed(0)}%)</span>
+        `;
+        wrap.appendChild(row);
+      }
+    }
+
+    function renderNext7(rows) {
+      const tb = $("tblNext7");
+      tb.innerHTML = "";
+      for (const r of (rows || [])) {
+        const p = Number(r.occupancy_pct || 0);
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="fw-semibold">${r.date}</td>
+          <td>${r.occupied}</td>
+          <td>${r.available}</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar bg-success" style="width:${p}%"></div>
+            </div>
+            <div class="d-flex justify-content-between soft mini mt-1">
+              <span>${pct(p)}</span>
+              <span>${r.occupied}/${(r.occupied + r.available)}</span>
+            </div>
+          </td>
+        `;
+        tb.appendChild(tr);
+      }
+    }
+
+    function renderAllRooms(rows) {
+      const tb = $("tblAllRooms");
+      tb.innerHTML = "";
+
+      (rows || []).sort((a,b) => String(a.Numero_Habitacion).localeCompare(String(b.Numero_Habitacion)));
+
+      for (const r of (rows || [])) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="fw-semibold">${r.Numero_Habitacion ?? ""}</td>
+          <td>${r.Tipo ?? ""}</td>
+          <td><span class="badge ${statusLabelBadge(r.Estado)}">${r.Estado ?? ""}</span></td>
+          <td>${moneyCRC(r.Precio_Noche)}</td>
+          <td class="soft">${r.Fecha_modificacion ?? ""}</td>
+        `;
+        tb.appendChild(tr);
+      }
+    }
+
+    function renderAvailableGrid(rooms) {
+      const grid = $("availGrid");
+      grid.innerHTML = "";
+
+      const q = ($("txtFilterAvail").value || "").trim().toLowerCase();
+      const t = ($("selTypeAvail").value || "").trim();
+
+      const filtered = (rooms || []).filter(r => {
+        const okStatus = (r.Estado === "Disponible");
+        const okType = !t || r.Tipo === t;
+        const text = `${r.Numero_Habitacion ?? ""} ${r.Tipo ?? ""}`.toLowerCase();
+        const okQ = !q || text.includes(q);
+        return okStatus && okType && okQ;
+      });
+
+      $("lblAvailCount").textContent = filtered.length;
+
+      for (const r of filtered) {
+        const img = safeRoomImage(r);
+        const el = document.createElement("div");
+        el.className = "room-card";
+
+        el.innerHTML = `
+          <img src="${img}" alt="Habitación ${r.Numero_Habitacion}" onerror="this.onerror=null; this.src='${FALLBACK_IMG}'">
+          <div class="body">
+            <p class="title">Habitación ${r.Numero_Habitacion} — ${r.Tipo}</p>
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="meta"><span class="badge ${statusLabelBadge(r.Estado)}">${r.Estado}</span></div>
+              <div class="price text-success">${moneyCRC(r.Precio_Noche)}</div>
+            </div>
+          </div>
+        `;
+        grid.appendChild(el);
+      }
+    }
+
+    let ALL_ROOMS = [];
+
+    async function loadDashboard() {
+      const summary = await fetchJSON("/admin-rooms/dashboard-summary");
+      ALL_ROOMS = await fetchJSON("/admin-rooms");
+
+      // KPIs
+      $("lbl-date").textContent = summary.date || "—";
+      $("kpi-total").textContent = summary.rooms.total ?? "—";
+      $("kpi-available").textContent = summary.rooms.available_now ?? "—";
+      $("kpi-cleaning").textContent = summary.rooms.in_cleaning ?? "—";
+      $("kpi-occupied-status").textContent = summary.rooms.occupied_by_status ?? "—";
+      $("kpi-maint").textContent = summary.rooms.in_maintenance ?? "—";
+
+      const types = summary.rooms.by_type || {};
+      $("kpi-types").textContent = Object.entries(types).map(([k,v]) => `${k}:${v}`).join(" · ") || "—";
+
+      $("kpi-arrivals").textContent = summary.reservations.arrivals_today ?? "—";
+      $("kpi-departures").textContent = summary.reservations.departures_today ?? "—";
+      $("kpi-occupied-res").textContent = summary.reservations.occupied_today ?? "—";
+
+      $("kpi-occ-pct").textContent = pct(summary.reservations.occupancy_pct_today || 0);
+
+      const p = Number(summary.reservations.occupancy_pct_today || 0);
+      $("bar-occ-today").style.width = Math.max(0, Math.min(100, p)) + "%";
+      $("lbl-occ-today").textContent = pct(p);
+      $("lbl-occ-today-num").textContent = `${summary.reservations.occupied_today ?? 0}/${summary.rooms.total ?? 0}`;
+
+      // HK/MR
+      $("kpi-hk-open").textContent = summary.housekeeping.open_total ?? "—";
+      $("kpi-mr-open").textContent = summary.maintenance.open_total ?? "—";
+      $("kpi-maint-open").textContent = summary.maintenance.open_total ?? "—";
+
+      $("hk-pend").textContent = (summary.housekeeping.by_status || {})["Pendiente"] ?? 0;
+      $("hk-proc").textContent = (summary.housekeeping.by_status || {})["En proceso"] ?? 0;
+
+      $("mr-pend").textContent = (summary.maintenance.by_status || {})["Pendiente"] ?? 0;
+      $("mr-prog").textContent = (summary.maintenance.by_status || {})["En progreso"] ?? 0;
+
+      // Distribución estado
+      renderStatusBars(summary.rooms.by_status || {}, summary.rooms.total || 0);
+
+      // Próximos 7 días
+      renderNext7(summary.reservations.next7 || []);
+
+      // Tabla todas
+      renderAllRooms(ALL_ROOMS);
+
+      // Modal disponibles
+      renderAvailableGrid(ALL_ROOMS);
+    }
+
+    // Toggle tabla
+    $("btnToggleAll").addEventListener("click", () => {
+      const w = $("allRoomsWrap");
+      w.style.display = (w.style.display === "none") ? "block" : "none";
+    });
+
+    // Filtros del modal
+    $("txtFilterAvail").addEventListener("input", () => renderAvailableGrid(ALL_ROOMS));
+    $("selTypeAvail").addEventListener("change", () => renderAvailableGrid(ALL_ROOMS));
+
+    loadDashboard().catch(err => {
+      console.error(err);
+      alert("No se pudo cargar el dashboard de habitaciones. Revisa consola/servidor.");
+    });
+  </script>
+
+</body>
+</html>

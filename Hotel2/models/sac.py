@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from extensions import db
+from sqlalchemy.orm import synonym
 
 
 class SACConfig(db.Model):
@@ -109,18 +110,36 @@ class SACConversation(db.Model):
     )
 
 
-
 class SACConversationMsg(db.Model):
     __tablename__ = "SAC_ConversationMsg"
 
-    Id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    Conv_Id = db.Column(
-        db.Integer,
+    # Compatibilidad de esquema:
+    # - En MySQL la FK se llama `Conversation_Id` (NO `Conv_Id`)
+    # - El texto del mensaje se llama `Msg_Text` (NO `Texto`)
+    # El backend usa Conv_Id/Texto, así que creamos aliases con synonym().
+
+    Id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+
+    # Columna REAL en MySQL
+    Conversation_Id = db.Column(
+        "Conversation_Id",
+        db.BigInteger,
         db.ForeignKey("SAC_Conversation.Id", ondelete="CASCADE"),
         nullable=False,
     )
-    Rol = db.Column(db.String(10), nullable=False)  # user | bot | agente
-    Texto = db.Column(db.Text, nullable=False)
+    # Alias usado por el código
+    Conv_Id = synonym("Conversation_Id")
+
+    Rol = db.Column(db.String(10), nullable=False)  # user | bot | agent
+
+    # Columna REAL en MySQL
+    Msg_Text = db.Column("Msg_Text", db.Text, nullable=False)
+    # Alias usado por el código
+    Texto = synonym("Msg_Text")
+
+    # Existe en el script base (opcional)
+    Meta_JSON = db.Column(db.JSON)
+
     Creada_At = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     conversation = db.relationship("SACConversation", back_populates="mensajes")
@@ -147,6 +166,7 @@ class SACIncident(db.Model):
     def __repr__(self) -> str:
         return f"<SACIncident {self.Id} tipo={self.Tipo} sev={self.Severidad}>"
 
+
 class SACIncidentComment(db.Model):
     __tablename__ = "sac_incident_comment"
 
@@ -155,6 +175,7 @@ class SACIncidentComment(db.Model):
     Autor = db.Column(db.String(120), nullable=True)
     Comentario = db.Column(db.Text, nullable=False)
     Creada_At = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
 
 class SACFeedback(db.Model):
     __tablename__ = "SAC_Feedback"

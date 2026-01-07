@@ -469,7 +469,7 @@ def marcar_entrada():
     """Crea la marcación de entrada del día si no existe una abierta."""
     fid = _current_funcionario_id()
     if not fid:
-        return jsonify({"ok": False, "error": "No hay colaborador en sesión"}), 401
+        return jsonify({"ok": False, "error": "La entrada no fue registrada,ingrese al sistema y haga su marca"}), 401
 
     ahora = datetime.now()     # Hora local
     hoy = ahora.date()

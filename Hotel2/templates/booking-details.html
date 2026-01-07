@@ -136,6 +136,9 @@
 {% endblock %}
 
 {% block scripts %}
+
+<script src="{{ url_for('static', filename='assets/js/room-images.js') }}"></script>
+
 <script>
   const PRICING = { TAX_RATE:0.13, NRB_DISCOUNT:0.10, ROUND:(n)=>Math.round((Number(n)+Number.EPSILON)*100)/100 };
   const money = (n)=> new Intl.NumberFormat("es-CR",{style:"currency",currency:"CRC",minimumFractionDigits:2}).format(Number(n||0));
@@ -160,7 +163,7 @@
       adults:    sel?.adults || qp.get('adults') || storedSearch.adults || '2',
       children:  sel?.children || qp.get('children') || storedSearch.children || '0',
       roomName:  sel?.roomName || 'Habitación seleccionada',
-      img:       sel?.img || "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}",
+      img:       sel?.img || "",
       rateName:  sel?.rateName || 'Tarifa Flexible',
       rateCode:  sel?.rateCode || 'flex',
       tipo:      sel?.tipo || 'Sencilla'
@@ -184,11 +187,17 @@
         if (r) {
           sel.roomName = sel.roomName || r.Nombre || r.name || sel.roomName;
           sel.priceNight = Number(r.Precio_Noche ?? r.Precio_Base ?? r.price ?? 0) || sel.priceNight || 0;
-          sel.img = sel.img || r.Imagen_URL || r.img || sel.img;
+          sel.img = r.Imagen_URL || r.img || sel.img || "";
           sel.tipo = sel.tipo || r.Tipo || sel.tipo;
         }
       }
     }
+
+    const DEFAULT_IMG = "{{ url_for('static', filename='assets/img/rooms/room-2.webp') }}";
+    if ((!sel.img || sel.img === DEFAULT_IMG) && sel.roomCode && window.RoomImage) {
+      sel.img = await RoomImage.lookup(sel.roomCode, { fallback: DEFAULT_IMG });
+    }
+    
 
     if (!sel.priceNight || sel.priceNight <= 0) {
       alert('No pudimos determinar el precio de la habitación seleccionada. Por favor, vuelve a resultados y selecciona de nuevo.');

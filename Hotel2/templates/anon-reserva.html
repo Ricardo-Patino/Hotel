@@ -129,36 +129,17 @@
 
               <div class="col-12">
                 <div class="alert alert-info small" id="pay-hint">
-                  El pago se procesa para confirmar la reserva. Los datos de tarjeta no se almacenan.
+                  El pago se procesa para confirmar la reserva.
                 </div>
               </div>
 
               <div class="col-12 col-md-6">
                 <label class="form-label">Método</label>
                 <select id="pay_method" class="form-select">
-                  <option value="tarjeta" selected>Tarjeta en línea</option>
+                  <option value="tarjeta" selected>SINPE</option>
                 </select>
               </div>
-
-              <!-- Campos de tarjeta (se ocultan si se usa datáfono) -->
-              <div id="card-fields" class="row g-3">
-                <div class="col-12 col-md-6">
-                  <label class="form-label">Nombre en la tarjeta</label>
-                  <input type="text" id="card_name" class="form-control" maxlength="80" autocomplete="cc-name">
-                </div>
-                <div class="col-12 col-md-6">
-                  <label class="form-label">Número de tarjeta</label>
-                  <input type="text" id="card_number" class="form-control" inputmode="numeric" autocomplete="cc-number" maxlength="19" placeholder="XXXX XXXX XXXX XXXX">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">Expira (MM/AA)</label>
-                  <input type="text" id="card_exp" class="form-control" inputmode="numeric" maxlength="5" placeholder="MM/AA" autocomplete="cc-exp">
-                </div>
-                <div class="col-6 col-md-3">
-                  <label class="form-label">CVV</label>
-                  <input type="password" id="card_cvv" class="form-control" inputmode="numeric" maxlength="4" placeholder="CVV" autocomplete="cc-csc">
-                </div>
-              </div>
+              
 
               {# Botón especial para Recepción: SOLO si is_recepcionista=True #}
               {% if is_recepcionista %}

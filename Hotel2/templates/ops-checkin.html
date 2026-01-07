@@ -22,16 +22,83 @@
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 
   <style>
-    .soft{color:#6c757d}
-    .hint{font-size:.9rem;color:#6c757d}
-    .card+.card{margin-top:1rem}
-    .doc-preview{max-height:180px;object-fit:contain;border:1px dashed #ced4da;border-radius:.5rem;padding:.25rem;background:#fafafa}
-    .sig-pad{border:1px dashed #ced4da;border-radius:.5rem;background:#fff}
-    .toggleable{display:none}
-    .toggleable.show{display:block}
-    .result-row:hover{background:#f9fafb}
-    .badge-pill{border-radius:50rem}
-  </style>
+  :root{
+    --card-radius: 14px;
+    --card-border: rgba(0,0,0,.06);
+  }
+
+  .soft{ color:#6c757d; }
+  .hint{ font-size:.9rem; color:#6c757d; }
+
+  /* Consistencia de tarjetas */
+  .card{
+    border: 1px solid var(--card-border) !important;
+    border-radius: var(--card-radius) !important;
+    overflow: hidden;
+  }
+  .card-header{
+    background: #fff !important;
+    border-bottom: 1px solid rgba(0,0,0,.06) !important;
+    padding: .85rem 1rem !important;
+  }
+  .card-body{
+    padding: 1rem !important;
+  }
+
+  /* Tablas más compactas y legibles */
+  .table{
+    margin-bottom: 0 !important;
+  }
+  .table thead th{
+    font-size: .85rem;
+    font-weight: 600;
+    color: #495057;
+    background: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,.08) !important;
+    white-space: nowrap;
+  }
+  .table td{
+    padding: .55rem .75rem !important;
+  }
+
+  /* Evitar “a. m.” en líneas separadas y mantener columnas claves en una línea */
+  .text-nowrap{ white-space: nowrap !important; }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+  /* Semana: layout estable */
+  .wk-table{
+    table-layout: fixed;
+    width: 100%;
+  }
+  .wk-col-dt{ width: 170px; }
+  .wk-col-res{ width: 140px; }
+  .wk-col-hab{ width: 90px; }
+  .wk-col-doc{ width: 170px; }
+
+  /* Resultados: reservar espacio para botón */
+  .res-col-actions{ width: 150px; }
+
+  /* Opcionales */
+  .doc-preview{
+    max-height: 180px;
+    object-fit: contain;
+    border: 1px dashed #ced4da;
+    border-radius: .75rem;
+    padding: .35rem;
+    background: #fafafa;
+  }
+  .sig-pad{
+    border: 1px dashed #ced4da;
+    border-radius: .75rem;
+    background: #fff;
+  }
+  .toggleable{ display:none; }
+  .toggleable.show{ display:block; }
+
+  /* Ajustes de separación general */
+  .section .card{ margin-bottom: 1rem; }
+</style>
+
 </head>
 <body class="inner-page">
 
@@ -58,16 +125,55 @@
     <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
       <div class="container position-relative">
         <h1>Check-in de Huéspedes</h1>
-        <p class="mb-0">Valida por <strong>cédula/pasaporte</strong>. Early check-in opcional.</p>
+        <p class="mb-0">Selecciona una reserva confirmada y valida por <strong>cédula/pasaporte/correo</strong>. Early check-in opcional.</p>
         <nav class="breadcrumbs"><ol><li><a href="index.html">Inicio</a></li><li><a href="ops-dashboard.html">Recepción</a></li><li class="current">Check-in</li></ol></nav>
       </div>
     </div>
 
-    <!-- Contenido -->
     <section class="section">
       <div class="container" data-aos="fade-up">
 
-        <!-- Búsqueda por documento -->
+        <!-- ALERTA UI (estética, no alert() del navegador) -->
+        <div id="ui-alert" class="alert d-none shadow-sm" role="alert"></div>
+
+        <!-- ✅ Check-ins realizados en la semana (tiempo real) -->
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <div>
+              <h5 class="mb-0"><i class="bi bi-calendar-week me-2"></i>Check-ins realizados esta semana</h5>
+              <div class="small soft" id="wk-range">—</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge text-bg-primary" id="wk-count">0</span>
+              <button class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="btn-wk-refresh" type="button">
+                <i class="bi bi-arrow-repeat me-1"></i><span class="d-none d-sm-inline">Actualizar</span>
+              </button>
+            </div>
+            
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle wk-table">
+                <thead>
+                  <tr>
+                    <th class="wk-col-dt">Fecha / Hora</th>
+                    <th class="wk-col-res">Reserva</th>
+                    <th>Huésped</th>
+                    <th class="wk-col-hab text-center">Hab.</th>
+                    <th class="wk-col-doc">Documento</th>
+                  </tr>
+                </thead>
+                
+                <tbody id="wk-body">
+                  <tr><td colspan="5" class="text-center soft py-4">Cargando check-ins de la semana…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="px-3 py-2 small soft" id="wk-updated">—</div>
+          </div>
+        </div>
+
+        <!-- Validar documento -->
         <div class="card shadow-sm border-0">
           <div class="card-header bg-white border-0">
             <h5 class="mb-0"><i class="bi bi-search me-2"></i>Validar documento</h5>
@@ -75,28 +181,36 @@
           <div class="card-body">
             <form id="frm-search" class="row g-3">
               <div class="col-md-6">
-                <label class="form-label">Cédula o Pasaporte <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="doc" placeholder="Ej: 1-1234-5678 o P1234567" required>
-                <div class="hint mt-1">Debe coincidir con el documento del <em>perfil</em> que realizó la reserva.</div>
+                <label class="form-label">Cédula / Pasaporte / Correo</label>
+                <input type="text" class="form-control" id="doc" placeholder="Ej: 305440468 · P1234567 · correo@dominio.com">
+                <div class="hint mt-1">
+                  Si aún no ingresas documento, abajo se muestran <strong>reservas confirmadas activas</strong> para hoy.
+                  Para completar check-in, el documento debe coincidir con el perfil que creó la reserva.
+                </div>
               </div>
               <div class="col-md-3">
                 <label class="form-label">Fecha (opcional)</label>
                 <input type="date" class="form-control" id="when">
-                <div class="hint mt-1">Por defecto busca reservas activas para hoy.</div>
+                <div class="hint mt-1">Por defecto usa hoy.</div>
               </div>
               <div class="col-md-3 d-grid align-items-end">
-                <button class="btn btn-primary" id="btn-search"><i class="bi bi-search me-1"></i> Buscar reserva</button>
+                <button class="btn btn-primary" id="btn-search" type="submit">
+                  <i class="bi bi-search me-1"></i> Buscar
+                </button>
               </div>
             </form>
-
-            <div id="search-alert" class="alert alert-info d-none mt-3"></div>
           </div>
         </div>
 
         <!-- Resultados -->
-        <div class="card shadow-sm border-0" id="card-results" style="display:none;">
+        <div class="card shadow-sm border-0" id="card-results">
           <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Resultado de la búsqueda</h5>
+            <div class="d-flex align-items-center gap-2">
+              <h5 class="mb-0">Resultado de la búsqueda</h5>
+              <button class="btn btn-sm btn-outline-secondary" id="btn-reset" type="button" title="Volver a confirmadas del día">
+                <i class="bi bi-funnel me-1"></i> Confirmadas del día
+              </button>
+            </div>
             <span class="soft small" id="result-count">0 coincidencias</span>
           </div>
           <div class="card-body p-0">
@@ -133,7 +247,7 @@
                 </div>
               </div>
               <div class="col-md-3 d-grid">
-                <button class="btn btn-outline-primary" id="btn-early">Aplicar</button>
+                <button class="btn btn-outline-primary" id="btn-early" type="button">Aplicar</button>
               </div>
               <div class="col-md-6">
                 <div class="soft small" id="early-msg">Añade cargo por ingreso temprano y marcará la habitación como “Ocupada-temprana”.</div>
@@ -158,8 +272,8 @@
                 <div id="sign-wrap" class="toggleable">
                   <canvas id="sign-pad" class="w-100 sig-pad" height="180"></canvas>
                   <div class="d-flex gap-2 mt-2">
-                    <button class="btn btn-sm btn-outline-secondary" id="btn-clear-sign"><i class="bi bi-eraser me-1"></i> Limpiar</button>
-                    <button class="btn btn-sm btn-outline-primary" id="btn-save-sign"><i class="bi bi-check2 me-1"></i> Guardar firma</button>
+                    <button class="btn btn-sm btn-outline-secondary" id="btn-clear-sign" type="button"><i class="bi bi-eraser me-1"></i> Limpiar</button>
+                    <button class="btn btn-sm btn-outline-primary" id="btn-save-sign" type="button"><i class="bi bi-check2 me-1"></i> Guardar firma</button>
                     <span class="hint align-self-center">Se adjunta si decides guardarla.</span>
                   </div>
                 </div>
@@ -183,7 +297,9 @@
         <!-- Acciones finales -->
         <div class="card shadow-sm border-0">
           <div class="card-body d-flex flex-wrap gap-2">
-            <button class="btn btn-success" id="btn-checkin" disabled><i class="bi bi-box-arrow-in-right me-1"></i> Realizar Check-in</button>
+            <button class="btn btn-success" id="btn-checkin" disabled type="button">
+              <i class="bi bi-box-arrow-in-right me-1"></i> Realizar Check-in
+            </button>
             <a class="btn btn-outline-secondary" href="ops-dashboard.html"><i class="bi bi-arrow-left me-1"></i> Volver</a>
             <div class="ms-auto soft small">Requiere documento válido + reserva seleccionada.</div>
           </div>
@@ -209,17 +325,35 @@
     // -------- Utilidades --------
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-    const fmtDate = (s) => s ? new Date(s).toLocaleDateString('es-CR') : '—';
 
-    function setAlert(msg, type='info'){
-      const el = $('#search-alert');
-      el.className = `alert alert-${type} mt-3`;
-      el.textContent = msg;
-      if(!msg){ el.classList.add('d-none'); } else { el.classList.remove('d-none'); }
+    function showUiAlert(message, type='info'){
+      const el = $('#ui-alert');
+      el.className = `alert alert-${type} shadow-sm`;
+      el.textContent = message || '';
+      if(!message) el.classList.add('d-none'); else el.classList.remove('d-none');
     }
 
-    function enableCheckin(enable){
-      $('#btn-checkin').disabled = !enable;
+    function fmtDateOnly(s){
+      if(!s) return '—';
+      const d = new Date(s);
+      return d.toLocaleDateString('es-CR');
+    }
+    function fmtDateTime(s){
+      if(!s) return '—';
+      const d = new Date(s);
+      return d.toLocaleString('es-CR', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+    }
+
+    async function fetchJsonStrict(url, opts={}){
+      const r = await fetch(url, {headers:{Accept:'application/json', ...(opts.headers||{})}, ...opts});
+      const raw = await r.text();
+      let j = null;
+      try { j = raw ? JSON.parse(raw) : null; } catch(e){ j = null; }
+      if(!r.ok || !j){
+        const snippet = (raw || '').slice(0, 180).replace(/\s+/g,' ').trim();
+        throw new Error(`Respuesta no-JSON (HTTP ${r.status}). Snippet: ${snippet}`);
+      }
+      return j;
     }
 
     // -------- Firma (opcional) --------
@@ -233,7 +367,12 @@
       const h = pad.getAttribute('height');
       pad.width = w*dpr; pad.height = h*dpr; ctx.scale(dpr,dpr);
       ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222';
-      const pos = (e) => { const r = pad.getBoundingClientRect(); const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left; const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top; return {x, y}; };
+      const pos = (e) => {
+        const r = pad.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+        return {x, y};
+      };
       const start = (e)=>{ isDrawing=true; last=pos(e); };
       const move = (e)=>{ if(!isDrawing) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
       const end = ()=>{ isDrawing=false; };
@@ -260,25 +399,32 @@
       $('#toggle-docimg').addEventListener('change', (e)=> $('#docimg-wrap').classList.toggle('show', e.target.checked));
     }
 
-    // -------- Render resultados --------
+    // -------- Resultados --------
     let selectedReserva = null;
     let resultsCache = [];
 
+    function enableCheckin(enable){
+      $('#btn-checkin').disabled = !enable;
+    }
+
     function renderResults(items){
-      const tbody = $('#tbody-results'); tbody.innerHTML = '';
-      const card = $('#card-results');
+      const tbody = $('#tbody-results');
+      tbody.innerHTML = '';
       $('#result-count').textContent = `${items.length} coincidencia(s)`;
+
       if(!items.length){
-        card.style.display = 'block';
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center soft">No se encontraron reservas para el documento indicado.</td></tr>`;
-        enableCheckin(false); return;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center soft py-4">No hay reservas para mostrar.</td></tr>`;
+        enableCheckin(false);
+        return;
       }
+
       items.forEach(it=>{
         const tr = document.createElement('tr'); tr.className = 'result-row';
+        const estado = (it.estado || '').toLowerCase();
         tr.innerHTML = `
           <td><strong>${it.numero || ('VG-' + it.id)}</strong></td>
           <td>${it.huesped || '—'}</td>
-          <td>${fmtDate(it.checkin)} → ${fmtDate(it.checkout)}</td>
+          <td>${fmtDateOnly(it.checkin)} → ${fmtDateOnly(it.checkout)}</td>
           <td>
             <div><strong>${it.room?.number ?? it.habitacion ?? '—'}</strong></div>
             ${it.room ? `
@@ -289,54 +435,134 @@
                   (Number.isFinite(+it.room.price) ? ('₡' + Number(it.room.price).toFixed(2) + '/noche') : null)
                 ].filter(Boolean).join(' · ')}
               </div>
-              ${it.room.desc ? `<div class="small soft">${it.room.desc}</div>` : ``}
-              ${it.room.img ? `<div class="mt-1"><img src="${it.room.img}" alt="Foto hab." style="max-height:56px;border-radius:6px"></div>` : ``}
             ` : ``}
           </td>
-          <td><span class="badge ${String(it.estado||'').toLowerCase()==='confirmada'?'text-bg-success':'text-bg-secondary'}">${it.estado || '—'}</span></td>
+          <td><span class="badge ${estado==='confirmada'?'text-bg-success':'text-bg-secondary'}">${it.estado || '—'}</span></td>
           <td class="text-end">
-            <button class="btn btn-sm btn-outline-primary btn-select" data-id="${it.id}"><i class="bi bi-check2-circle me-1"></i> Seleccionar</button>
+            <button class="btn btn-sm btn-outline-primary btn-select" data-id="${it.id}">
+              <i class="bi bi-check2-circle me-1"></i> Seleccionar
+            </button>
           </td>
         `;
         tbody.appendChild(tr);
       });
-      card.style.display = 'block';
 
       $$('.btn-select').forEach(btn=>{
         btn.addEventListener('click', ()=>{
           const id = Number(btn.dataset.id);
-          selectedReserva = resultsCache.find(x=> Number(x.id)===id) || null;
+          selectedReserva = resultsCache.find(x => Number(x.id) === id) || null;
+
           enableCheckin(!!selectedReserva);
+
           $$('.result-row').forEach(r=> r.classList.remove('table-success'));
           btn.closest('tr').classList.add('table-success');
+
+          showUiAlert(selectedReserva ? `Reserva seleccionada: ${selectedReserva.numero || ('VG-' + selectedReserva.id)}` : '', 'info');
+          if(!selectedReserva) showUiAlert('No se pudo seleccionar la reserva.', 'warning');
         });
       });
     }
 
-    // -------- Búsqueda por documento --------
-    async function doSearch(){
-      setAlert(''); enableCheckin(false); selectedReserva = null;
-      const doc = $('#doc').value.trim(); const when = $('#when').value || '';
-      if(!doc){ setAlert('Debes ingresar la cédula o pasaporte para validar la reserva.', 'warning'); return; }
+    async function loadConfirmed(){
+      const when = ($('#when').value || '').trim();
+      const url = `/api/ops/checkin/confirmed${when ? `?when=${encodeURIComponent(when)}` : ''}`;
       try{
-        const url = `/api/ops/checkin/search?doc=${encodeURIComponent(doc)}${when?`&when=${encodeURIComponent(when)}`:''}`;
-        const r = await fetch(url, {headers:{Accept:'application/json'}});
-        if(!r.ok){ throw new Error('Respuesta no OK'); }
-        const j = await r.json();
+        const j = await fetchJsonStrict(url);
         resultsCache = Array.isArray(j.items) ? j.items : [];
+        selectedReserva = null;
+        enableCheckin(false);
         renderResults(resultsCache);
-        if(!resultsCache.length){ setAlert('No se encontraron reservas asociadas a ese documento.', 'warning'); }
       }catch(e){
-        console.warn('search error', e);
-        renderResults([]); setAlert('No se pudo consultar la reserva. Verifica /api/ops/checkin/search.', 'danger');
+        console.warn('loadConfirmed error', e);
+        showUiAlert(`No se pudieron cargar reservas confirmadas: ${e.message}`, 'danger');
+        resultsCache = [];
+        renderResults([]);
       }
     }
 
-    // -------- Check-in --------
+    async function doSearch(){
+      const doc = ($('#doc').value || '').trim();
+      const when = ($('#when').value || '').trim();
+
+      // Si no hay documento, según requisito: mostrar confirmadas (no error)
+      if(!doc){
+        showUiAlert('', 'info');
+        await loadConfirmed();
+        return;
+      }
+
+      try{
+        const url = `/api/ops/checkin/search?doc=${encodeURIComponent(doc)}${when?`&when=${encodeURIComponent(when)}`:''}`;
+        const j = await fetchJsonStrict(url);
+        resultsCache = Array.isArray(j.items) ? j.items : [];
+        selectedReserva = null;
+        enableCheckin(false);
+        renderResults(resultsCache);
+
+        if(!resultsCache.length){
+          showUiAlert('No se encontraron reservas asociadas al documento indicado.', 'warning');
+        }else{
+          showUiAlert(`Se encontraron ${resultsCache.length} reserva(s). Selecciona una para continuar.`, 'info');
+        }
+      }catch(e){
+        console.warn('doSearch error', e);
+        showUiAlert(`Error en búsqueda: ${e.message}`, 'danger');
+        resultsCache = [];
+        renderResults([]);
+      }
+    }
+
+    // -------- Check-ins semana --------
+    async function loadWeek(){
+      try{
+        const j = await fetchJsonStrict('/api/ops/checkin/week');
+        const items = Array.isArray(j.items) ? j.items : [];
+        $('#wk-count').textContent = String(items.length);
+        if(j.week_start && j.week_end){
+          $('#wk-range').textContent = `Semana: ${j.week_start} → ${j.week_end}`;
+        }else{
+          $('#wk-range').textContent = 'Semana actual';
+        }
+
+        const body = $('#wk-body');
+        body.innerHTML = '';
+
+        if(!items.length){
+          body.innerHTML = `<tr><td colspan="5" class="text-center soft py-4">Aún no hay check-ins registrados esta semana.</td></tr>`;
+        }else{
+          items.forEach(it=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="mono text-nowrap">${fmtDateTime(it.created_at)}</td>
+              <td class="text-nowrap"><strong>${it.numero || (it.reserva_id ? ('VG-' + it.reserva_id) : '—')}</strong></td>
+              <td class="text-truncate" style="max-width: 380px;">${it.huesped || '—'}</td>
+              <td class="text-center text-nowrap">${it.habitacion ?? '—'}</td>
+              <td class="mono text-nowrap">${(it.doc_number || '—')}</td>
+            `;
+            
+            body.appendChild(tr);
+          });
+        }
+
+        $('#wk-updated').textContent = `Actualizado: ${new Date().toLocaleString('es-CR')}`;
+      }catch(e){
+        console.warn('loadWeek error', e);
+        $('#wk-body').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error cargando semana: ${e.message}</td></tr>`;
+        $('#wk-updated').textContent = '—';
+      }
+    }
+
+    // -------- Realizar check-in --------
     async function doCheckin(){
-      const doc = $('#doc').value.trim();
-      if(!doc){ setAlert('El documento es obligatorio para realizar el check-in.', 'warning'); return; }
-      if(!selectedReserva){ setAlert('Debes seleccionar una reserva encontrada.', 'warning'); return; }
+      const doc = ($('#doc').value || '').trim();
+      if(!selectedReserva){
+        showUiAlert('Debes seleccionar una reserva antes de completar el check-in.', 'warning');
+        return;
+      }
+      if(!doc){
+        showUiAlert('Debes ingresar el documento (cédula/pasaporte/correo) para completar el check-in.', 'warning');
+        return;
+      }
 
       const payload = {
         reserva_id: selectedReserva.id,
@@ -345,45 +571,82 @@
       };
 
       try{
-        const resp = await fetch('/api/ops/checkin/complete', {
-          method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+        const j = await fetchJsonStrict('/api/ops/checkin/complete', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
         });
-        if(!resp.ok){ throw new Error('Respuesta no OK'); }
-        const j = await resp.json();
-        if(!j || !j.ok){ setAlert(j.message || 'No se pudo completar el check-in.', 'danger'); return; }
-        setAlert('Check-in realizado correctamente.', 'success'); enableCheckin(false);
-        if(j.comprobante_reserva_id){ try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){ } }
+
+        if(!j.ok){
+          showUiAlert(j.message || 'No se pudo completar el check-in.', 'danger');
+          return;
+        }
+
+        showUiAlert('Check-in realizado correctamente.', 'success');
+        enableCheckin(false);
+        selectedReserva = null;
+
+        // refrescar listados (tiempo real inmediato)
+        await loadWeek();
+        await loadConfirmed();
+
+        // comprobante
+        if(j.comprobante_reserva_id){
+          try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){}
+        }
+
       }catch(e){
-        console.warn('checkin error', e); setAlert('No se pudo completar el check-in. Revisa /api/ops/checkin/complete.', 'danger');
+        console.warn('doCheckin error', e);
+        showUiAlert(`Error al completar check-in: ${e.message}`, 'danger');
       }
     }
 
     // -------- Early check-in (GRR-01-017) --------
-    document.getElementById('btn-early').addEventListener('click', async ()=>{
-      const pct = Number(document.getElementById('early-pct').value || 30);
-      const msg = document.getElementById('early-msg');
-      if(!selectedReserva){ msg.textContent = 'Selecciona una reserva primero.'; return; }
+    $('#btn-early').addEventListener('click', async ()=>{
+      const pct = Number($('#early-pct').value || 30);
+      const msg = $('#early-msg');
+
+      if(!selectedReserva){
+        msg.textContent = 'Selecciona una reserva primero.';
+        return;
+      }
+
       msg.textContent = 'Aplicando cargo por early…';
       try{
         const r = await fetch(`/grr/reservas/${selectedReserva.id}/early-checkin`, {
-          method:'POST', headers:{'Content-Type':'application/json'},
+          method:'POST',
+          headers:{'Content-Type':'application/json', 'Accept':'application/json'},
           body: JSON.stringify({ porcentaje: pct })
         });
-        const js = await r.json();
+
+        const raw = await r.text();
+        let js = null;
+        try{ js = raw ? JSON.parse(raw) : null; }catch(_){ js = null; }
+        if(!r.ok || !js) throw new Error('Respuesta inválida del servidor.');
+
         if(!js.ok) throw new Error(js.error || 'No se aplicó el cargo');
         msg.textContent = `Early check-in aplicado. Cargo: ₡${Number(js.cargo||0).toFixed(2)}`;
-      }catch(e){ msg.textContent = e.message || 'Error al aplicar early check-in.'; }
+      }catch(e){
+        msg.textContent = e.message || 'Error al aplicar early check-in.';
+      }
     });
 
     // -------- Bind & init --------
-    document.addEventListener('DOMContentLoaded', ()=>{
+    document.addEventListener('DOMContentLoaded', async ()=>{
       bindToggles(); setupSignPad(); setupDocImg();
-      $('#frm-search').addEventListener('submit', (e)=>{ e.preventDefault(); doSearch(); });
-      $('#btn-search').addEventListener('click', (e)=>{ e.preventDefault(); doSearch(); });
-      $('#btn-checkin').addEventListener('click', (e)=>{ e.preventDefault(); doCheckin(); });
 
-      const u = new URL(window.location.href); const q = u.searchParams.get('q');
-      if(q){ $('#doc').value = q; doSearch(); }
+      $('#frm-search').addEventListener('submit', async (e)=>{ e.preventDefault(); await doSearch(); });
+      $('#btn-reset').addEventListener('click', async ()=>{ $('#doc').value = ''; showUiAlert('', 'info'); await loadConfirmed(); });
+      $('#btn-checkin').addEventListener('click', async ()=>{ await doCheckin(); });
+
+      $('#btn-wk-refresh').addEventListener('click', async ()=>{ await loadWeek(); });
+
+      // carga inicial requerida:
+      await loadWeek();
+      await loadConfirmed();
+
+      // “tiempo real” (polling):
+      setInterval(loadWeek, 15000);
     });
   </script>
 </body>

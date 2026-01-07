@@ -6,15 +6,19 @@ from sqlalchemy.exc import DataError, IntegrityError
 import json, random, string, secrets
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, Tuple, List, Optional
 
-from flask import Blueprint, jsonify, request, session, current_app, render_template
+
+from flask import Blueprint, jsonify, request, session, current_app, render_template, url_for
+from sqlalchemy.orm import selectinload
+
 from sqlalchemy import func, select, text, and_, or_, text as _t
 
 # Imports seguros para ejecución como paquete; con fallback en modo script
 try:
     from ...extensions import db
-    from ...models_sql import Habitacion, Reserva, Usuario, MantenimientoSolicitud
+    from ...models_sql import Habitacion, HabitacionImagen, Reserva, Usuario, MantenimientoSolicitud
     from ...services.grr.reservation_service import ReservationService
     from ...services.grr.housekeeping_sync import mark_room_to_cleaning
 except ImportError:
@@ -22,7 +26,7 @@ except ImportError:
     import os, sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     from extensions import db
-    from models_sql import Habitacion, Reserva, Usuario, MantenimientoSolicitud
+    from models_sql import Habitacion, HabitacionImagen, Reserva, Usuario, MantenimientoSolicitud
     from services.grr.reservation_service import ReservationService
     from services.grr.housekeeping_sync import mark_room_to_cleaning
 
@@ -74,6 +78,62 @@ def _precio_noche(h: Habitacion) -> float:
         except Exception:
             continue
     return 0.0
+
+
+
+def _room_image_url(h: Habitacion) -> str:
+    """
+    Devuelve la URL pública (src) de la imagen principal de una habitación,
+    basada en HabitacionImagen (imagenes). Mantiene fallback al campo legacy
+    si existiera.
+    """
+    try:
+        # 1) Nuevo modelo: relación Habitacion.imagenes
+        imgs = getattr(h, "imagenes", None) or []
+        chosen = None
+
+        # preferir principal
+        for it in imgs:
+            if getattr(it, "Is_Principal", False):
+                chosen = it
+                break
+
+        # si no hay principal, preferir menor Sort_Order, luego el primero
+        if chosen is None and imgs:
+            try:
+                chosen = sorted(
+                    imgs,
+                    key=lambda x: (
+                        (getattr(x, "Sort_Order", 0) or 0),
+                        (getattr(x, "Id", 0) or 0),
+                    ),
+                )[0]
+            except Exception:
+                chosen = imgs[0]
+
+        fp = getattr(chosen, "File_Path", None) if chosen else None
+
+        # 2) Fallback legacy (por compatibilidad)
+        if not fp:
+            fp = getattr(h, "Imagen_URL", None) or getattr(h, "img", None) or None
+
+        if not fp:
+            return ""
+
+        u = str(fp).strip().replace("\\", "/")
+
+        # si ya es URL absoluta o raíz
+        if u.startswith("http") or u.startswith("data:image") or u.startswith("/"):
+            return u
+
+        # si viene como "static/...." normalizar a url_for('static', filename=...)
+        if u.startswith("static/"):
+            u = u[len("static/") :]
+
+        return url_for("static", filename=u)
+
+    except Exception:
+        return ""
 
 
 # --- Helpers para columnas y funcionario por defecto ---
@@ -709,6 +769,11 @@ def grr_checkin_por_cedula():
 def grr_habitaciones():
     try:
         q = Habitacion.query
+
+        # Eager-load de imágenes (evita N+1) solo si la relación existe
+        if hasattr(Habitacion, "imagenes"):
+            q = q.options(selectinload(Habitacion.imagenes))
+
         # Ordenar por número si existe, si no por código
         if hasattr(Habitacion, "Numero_Habitacion"):
             q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
@@ -718,27 +783,36 @@ def grr_habitaciones():
         rooms = []
         for h in q.all():
             tipo = (getattr(h, "Tipo", None) or "Sencilla")
+
             # Derivar capacidad si la tabla no la tuviera
-            tl = tipo.lower()
-            cap = 4 if ("suite" in tl or "doble" in tl) else 2
+            tl = (tipo or "").lower()
+            cap_default = 4 if ("suite" in tl or "doble" in tl) else 2
 
             price = _precio_noche(h)
+            try:
+                price_float = float(price) if price is not None else 0.0
+            except Exception:
+                price_float = 0.0
+
+            # ✅ Fuente única de imagen: HabitacionImagen (principal) -> fallback
+            img_url = _room_image_url(h)  # debe existir en este mismo archivo
 
             item = {
                 # claves "amigables"
                 "code": int(getattr(h, "Codigo_Habitacion")),
                 "name": getattr(h, "Nombre", None) or f"Habitación {getattr(h, 'Codigo_Habitacion')}",
                 "tipo": tipo,
-                "capacity": int(getattr(h, "Capacidad", None) or cap),
-                "price": price,
-                "img": getattr(h, "Imagen_URL", None) or "",
+                "capacity": int(getattr(h, "Capacidad", None) or cap_default),
+                "price": price_float,
+                "img": img_url,
+
                 # compatibilidad con vistas existentes:
                 "Codigo_Habitacion": int(getattr(h, "Codigo_Habitacion")),
                 "Numero_Habitacion": getattr(h, "Numero_Habitacion", None),
                 "Tipo": tipo,
-                "Capacidad": int(getattr(h, "Capacidad", None) or cap),
-                "Precio_Noche": float(price),
-                "Imagen_URL": getattr(h, "Imagen_URL", None) or "",
+                "Capacidad": int(getattr(h, "Capacidad", None) or cap_default),
+                "Precio_Noche": price_float,
+                "Imagen_URL": img_url,
                 "Estado": getattr(h, "Estado", None) or "Disponible",
             }
             rooms.append(item)
@@ -749,6 +823,7 @@ def grr_habitaciones():
         if current_app:
             current_app.logger.exception(f"[GRR] habitaciones error: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
+
 
 
 
@@ -2297,55 +2372,256 @@ def _no_show_penalty_for_reserva(reserva_id: int) -> float:
 @grr_bp.post("/jobs/run-noshow")
 def run_noshow():
     """
-    Marca como No-Show a reservas Confirmadas/Pendientes que no hicieron check-in
+    Marca como No-Show a reservas Confirmadas/Pendientes que **no** registraron check-in
     antes de la hora de corte (NOSHOW_CUTOFF_HOUR, default 18).
-    - Libera la habitación (no genera estancia)
-    - Aplica penalización y la suma al Monto_Total
-    - Actualiza KPI (ingresos y noches=0 para ADR)
+
+    Acciones:
+    - Cambia Reserva.Estado a 'NoShow'
+    - Aplica penalización (1 noche con IVA) y la suma al Monto_Total
+    - Libera habitación (Habitacion.Estado='Disponible')
+    - Libera asignaciones (ReservaEstancia.Estado='Liberada') para evitar bloqueos de disponibilidad
+    - Registra auditoría y actualiza KPIs (ingresos con noches=0)
+
+    Respuesta:
+    - processed: reservas marcadas como NoShow
+    - liberadas/released: cantidad de habitaciones liberadas
+    - items: detalle por reserva (útil para la UI del Paso 2)
     """
+
     cutoff = int(current_app.config.get("NOSHOW_CUTOFF_HOUR", 18))
-    today = date.today()
-    now_h = datetime.utcnow().hour  # usa UTC; si deseas TZ local, ajusta aquí
 
-    # Candidatas: fecha_entrada < hoy, o (== hoy y hora >= cutoff)
-    cand = db.session.execute(text("""
-        SELECT Codigo_Reserva, Codigo_Habitacion, Fecha_Entrada, Fecha_Salida, Monto_Total
-          FROM Reserva
-         WHERE Estado IN ('Confirmada','Pendiente')
-           AND (
-                DATE(Fecha_Entrada) < CURDATE()
-                OR (DATE(Fecha_Entrada) = CURDATE() AND :h >= :cut)
-           )
-    """), {"h": now_h, "cut": cutoff}).mappings().all()
+    # Hora local (evita desalineación UTC vs Costa Rica)
+    tz_name = current_app.config.get("APP_TZ", "America/Costa_Rica")
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz = ZoneInfo("America/Costa_Rica")
 
-    changed = 0
+    local_now = datetime.now(tz)
+    today = local_now.date()
+    now_h = local_now.hour
+
+    # --- Candidatas:
+    #  - Estado Confirmada/Pendiente
+    #  - Sin registro de check-in (guest_checkin)
+    #  - Entrada en pasado, o entrada hoy y ya pasó la hora de corte
+    #  - Aún no es "histórica" (Fecha_Salida >= hoy) para no chocar con el trigger de historial
+    params = {"today": today, "now_h": now_h, "cut": cutoff}
+
+    try:
+        cand = db.session.execute(text("""
+            SELECT R.Codigo_Reserva, R.Codigo_Habitacion, R.Fecha_Entrada, R.Fecha_Salida, R.Monto_Total
+              FROM Reserva R
+              LEFT JOIN guest_checkin gc ON gc.reserva_id = R.Codigo_Reserva
+             WHERE gc.id IS NULL
+               AND R.Estado IN ('Confirmada','Pendiente')
+               AND R.Fecha_Salida >= :today
+               AND (
+                    R.Fecha_Entrada < :today
+                    OR (R.Fecha_Entrada = :today AND :now_h >= :cut)
+               )
+        """), params).mappings().all()
+    except Exception:
+        # Fallback si por algún motivo guest_checkin no existe en la BD local
+        cand = db.session.execute(text("""
+            SELECT Codigo_Reserva, Codigo_Habitacion, Fecha_Entrada, Fecha_Salida, Monto_Total
+              FROM Reserva
+             WHERE Estado IN ('Confirmada','Pendiente')
+               AND Fecha_Salida >= :today
+               AND (
+                    Fecha_Entrada < :today
+                    OR (Fecha_Entrada = :today AND :now_h >= :cut)
+               )
+        """), params).mappings().all()
+
+    processed = 0
+    liberadas = 0
+    items: list[dict] = []
+
     for r in cand:
+        rid = int(r["Codigo_Reserva"])
         try:
-            # penalización
-            fee = _no_show_penalty_for_reserva(int(r["Codigo_Reserva"]))
-            nuevo_total = float(r["Monto_Total"] or 0.0) + fee
+            monto_anterior = float(r.get("Monto_Total") or 0.0)
+
+            # Penalización
+            fee = float(_no_show_penalty_for_reserva(rid) or 0.0)
+            monto_nuevo = monto_anterior + fee
+
+            # 1) Marcar reserva como NoShow
             db.session.execute(text("""
                 UPDATE Reserva
                    SET Estado='NoShow',
                        Monto_Total=:m,
-                       Observaciones = CONCAT(COALESCE(Observaciones,''),' | No-Show aplicado')
+                       Observaciones = LEFT(
+                           CONCAT(COALESCE(Observaciones,''),' | No-Show aplicado'),
+                           255
+                       )
                  WHERE Codigo_Reserva=:id
-            """), {"m": nuevo_total, "id": r["Codigo_Reserva"]})
-            # devolver la habitación a Disponible
+            """), {"m": monto_nuevo, "id": rid})
+
+            # 2) Liberar asignaciones (si existían)
             db.session.execute(text("""
-                UPDATE Habitacion SET Estado='Disponible'
-                 WHERE Codigo_Habitacion=:h
-            """), {"h": r["Codigo_Habitacion"]})
+                UPDATE ReservaEstancia
+                   SET Estado='Liberada'
+                 WHERE Codigo_Reserva=:id
+                   AND Estado IN ('Pendiente','Asignada')
+            """), {"id": rid})
+
+            # 3) Determinar habitaciones a liberar (prefiere ReservaEstancia, fallback a Reserva)
+            room_ids = [row[0] for row in db.session.execute(text("""
+                SELECT DISTINCT Habitacion_Id
+                  FROM ReservaEstancia
+                 WHERE Codigo_Reserva=:id
+            """), {"id": rid}).fetchall() if row and row[0]]
+
+            if not room_ids:
+                hab = r.get("Codigo_Habitacion")
+                if hab:
+                    room_ids = [hab]
+
+            # 4) Liberar habitación(es)
+            released_this = 0
+            for hab_id in dict.fromkeys(room_ids):
+                db.session.execute(text("""
+                    UPDATE Habitacion
+                       SET Estado='Disponible'
+                     WHERE Codigo_Habitacion=:h
+                """), {"h": hab_id})
+                released_this += 1
+
             db.session.commit()
-            _audit_log(_current_user_email(), "reserva.noshow", {"reserva": int(r["Codigo_Reserva"]), "fee": fee}, str(r["Codigo_Reserva"]))
-            # KPI: ingresos (sin noches) para ADR correcto
-            _update_kpis(nuevo_total, str(r["Fecha_Entrada"]), noches=0)
-            changed += 1
+
+            # Auditoría y KPIs
+            _audit_log(_current_user_email(), "reserva.noshow", {"reserva": rid, "fee": fee}, str(rid))
+            _update_kpis(monto_nuevo, str(r.get("Fecha_Entrada")), noches=0)
+
+            processed += 1
+            liberadas += released_this
+            items.append({
+                "reserva_id": rid,
+                "fecha_entrada": str(r.get("Fecha_Entrada")),
+                "fecha_salida": str(r.get("Fecha_Salida")),
+                "monto_anterior": monto_anterior,
+                "penalizacion": fee,
+                "monto_nuevo": monto_nuevo,
+                "habitaciones_liberadas": list(dict.fromkeys(room_ids)),
+            })
+
         except Exception as e:
             db.session.rollback()
-            current_app.logger.warning(f"[NOSHOW] {e}")
+            current_app.logger.warning(f"[NOSHOW] reserva={rid} error={e}")
 
-    return jsonify({"ok": True, "processed": changed})
+    return jsonify({
+        "ok": True,
+        "processed": processed,
+        "released": liberadas,
+        "liberadas": liberadas,
+        "items": items,
+        "cutoff_hour": cutoff,
+        "server_time_local": local_now.isoformat(),
+        "tz": tz_name,
+    })
+
+
+
+
+@grr_bp.get("/jobs/noshow/recent")
+def noshow_recent():
+    """
+    Devuelve los registros recientes del corte de No-Show, basado en Auditoria_Log,
+    y valida estado actual de Reserva + Habitacion (evidencia para UI).
+
+    Querystring:
+      - days: días hacia atrás (default 7)
+      - limit: máximo de filas (default 50, tope 200)
+    """
+    try:
+        days = int(request.args.get("days", 7))
+    except Exception:
+        days = 7
+    days = max(1, min(days, 60))
+
+    try:
+        limit = int(request.args.get("limit", 50))
+    except Exception:
+        limit = 50
+    limit = max(1, min(limit, 200))
+
+    # Hora local (para meta en respuesta)
+    tz_name = current_app.config.get("APP_TZ", "America/Costa_Rica")
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz = ZoneInfo("America/Costa_Rica")
+    local_now = datetime.now(tz)
+
+    since_dt = datetime.now() - timedelta(days=days)
+
+    # Nota: LIMIT se inyecta como entero sanitizado para evitar problemas de bind en MySQL con LIMIT.
+    sql = text(f"""
+        SELECT
+          A.Id AS audit_id,
+          A.Fecha AS audit_fecha,
+          A.Usuario AS audit_usuario,
+          A.Entidad_Id AS reserva_id,
+          JSON_UNQUOTE(JSON_EXTRACT(A.Datos,'$.fee')) AS penalizacion,
+
+          R.Estado AS reserva_estado,
+          R.Codigo_Habitacion AS habitacion_id,
+          R.Fecha_Entrada AS fecha_entrada,
+          R.Fecha_Salida AS fecha_salida,
+          R.Monto_Total AS monto_total,
+
+          H.Estado AS habitacion_estado
+        FROM Auditoria_Log A
+        LEFT JOIN Reserva R
+          ON R.Codigo_Reserva = CAST(A.Entidad_Id AS UNSIGNED)
+        LEFT JOIN Habitacion H
+          ON H.Codigo_Habitacion = R.Codigo_Habitacion
+        WHERE A.Entidad = 'GRR'
+          AND A.Accion = 'reserva.noshow'
+          AND A.Fecha >= :since
+        ORDER BY A.Fecha DESC
+        LIMIT {limit}
+    """)
+
+    rows = db.session.execute(sql, {"since": since_dt}).mappings().all()
+
+    items = []
+    for row in rows:
+        try:
+            fee_raw = row.get("penalizacion")
+            fee = float(fee_raw) if fee_raw not in (None, "", "null") else 0.0
+        except Exception:
+            fee = 0.0
+
+        items.append({
+            "audit_id": row.get("audit_id"),
+            "audit_fecha": str(row.get("audit_fecha")) if row.get("audit_fecha") is not None else None,
+            "audit_usuario": row.get("audit_usuario"),
+
+            "reserva_id": row.get("reserva_id"),
+            "reserva_estado": row.get("reserva_estado"),
+
+            "habitacion_id": row.get("habitacion_id"),
+            "habitacion_estado": row.get("habitacion_estado"),
+
+            "fecha_entrada": str(row.get("fecha_entrada")) if row.get("fecha_entrada") is not None else None,
+            "fecha_salida": str(row.get("fecha_salida")) if row.get("fecha_salida") is not None else None,
+
+            "penalizacion": fee,
+            "monto_total": float(row.get("monto_total") or 0.0),
+        })
+
+    return jsonify({
+        "ok": True,
+        "items": items,
+        "days": days,
+        "limit": limit,
+        "server_time_local": local_now.isoformat(),
+        "tz": tz_name,
+    })
+
 
 
 # =========================
