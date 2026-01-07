@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cambios de reserva | Hotel Villa Grace</title>
+  <meta name="description" content="Aprobación o rechazo de cambios solicitados por clientes.">
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .pill-count{ font-size:.85rem }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .muted-mini{ font-size:.875rem; color:#6c757d; }
+    .action-col{ white-space: nowrap; }
+    .kpi-card{ border:0; box-shadow: 0 8px 24px rgba(0,0,0,.08); border-radius: 16px; }
+    .kpi-num{ font-size:1.6rem; font-weight:800; line-height:1; }
+    .kpi-label{ font-size:.9rem; color:#6c757d; }
+    .table td, .table th{ vertical-align: middle; }
+    .badge-soft{
+      background: rgba(13,110,253,.08);
+      color:#0d6efd;
+      border: 1px solid rgba(13,110,253,.18);
+    }
+    .badge-soft-success{
+      background: rgba(25,135,84,.10);
+      color:#198754;
+      border: 1px solid rgba(25,135,84,.20);
+    }
+    .badge-soft-danger{
+      background: rgba(220,53,69,.10);
+      color:#dc3545;
+      border: 1px solid rgba(220,53,69,.20);
+    }
+    .badge-soft-warning{
+      background: rgba(255,193,7,.14);
+      color:#b58100;
+      border: 1px solid rgba(255,193,7,.25);
+    }
+    .search-wrap{
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 999px;
+      padding: .35rem .75rem;
+      background: #fff;
+    }
+    .search-wrap input{ border:0; outline:0; width: 260px; }
+    @media(max-width: 575px){
+      .search-wrap input{ width: 160px; }
+    }
+  </style>
+</head>
+
+<body class="inner-page">
+
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="ops-dashboard.html">Tablero</a></li>
+        <li><a href="ops-approvals.html">Aprobaciones</a></li>
+        <li><a href="ops-approvals-cambios.html" class="active">Cambios</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+
+    <a class="btn-getstarted d-none d-sm-block" href="ops-approvals.html">Volver</a>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-title dark-background" data-aos="fade"
+       style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
+    <div class="container position-relative">
+      <h1>Cambios de reserva</h1>
+      <p class="mb-0">Aprueba o rechaza solicitudes de modificación (fechas / huéspedes)</p>
+    </div>
+  </div>
+
+  <section class="section pt-3">
+    <div class="container" data-aos="fade-up">
+
+      <div class="alert alert-info d-flex align-items-start gap-2">
+        <i class="bi bi-info-circle fs-5"></i>
+        <div>
+          <div class="fw-semibold">Flujo recomendado</div>
+          <div class="muted-mini">
+            1) Revisa el detalle del cambio. 2) Si el cliente ya pagó el adicional, <strong>Aprobar</strong>.
+            3) Si no corresponde, <strong>Rechazar</strong> con motivo. 4) <strong>Retractar</strong> revierte la reserva y devuelve el cambio a pendiente.
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+          <div class="card kpi-card">
+            <div class="card-body d-flex align-items-center justify-content-between">
+              <div>
+                <div class="kpi-label">Cambios pendientes</div>
+                <div class="kpi-num text-warning" id="kpiPending">0</div>
+              </div>
+              <i class="bi bi-hourglass-split fs-1 text-warning"></i>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card kpi-card">
+            <div class="card-body d-flex align-items-center justify-content-between">
+              <div>
+                <div class="kpi-label">Aprobados</div>
+                <div class="kpi-num text-success" id="kpiApproved">0</div>
+              </div>
+              <i class="bi bi-check2-circle fs-1 text-success"></i>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="card kpi-card">
+            <div class="card-body d-flex align-items-center justify-content-between">
+              <div>
+                <div class="kpi-label">Rechazados</div>
+                <div class="kpi-num text-danger" id="kpiRejected">0</div>
+              </div>
+              <i class="bi bi-x-circle fs-1 text-danger"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <div class="search-wrap d-flex align-items-center gap-2">
+            <i class="bi bi-search text-muted"></i>
+            <input id="txtSearch" type="text" placeholder="Buscar por cliente, reserva o cambio…">
+          </div>
+          <span class="badge badge-soft mono" id="lblLastRefresh">—</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-outline-secondary btn-sm" id="btnRefresh">
+            <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Cambios Pendientes -->
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h5 class="card-title mb-0">
+              Cambios pendientes
+              <span class="badge bg-danger pill-count ms-2" id="pendingCount">0</span>
+            </h5>
+            <span class="muted-mini">
+              <i class="bi bi-shield-check me-1"></i> Aprueba solo si confirmaste el pago adicional SINPE.
+            </span>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Reserva</th>
+                  <th>Cliente</th>
+                  <th>Cambio</th>
+                  <th>Adicional</th>
+                  <th class="action-col text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="pendingTbody">
+                <tr><td colspan="6" class="text-muted">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cambios Confirmados -->
+      <div class="card shadow-sm border-0 mt-4">
+        <div class="card-body">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h5 class="card-title mb-0">
+              Cambios confirmados
+              <span class="badge bg-success pill-count ms-2" id="confirmedCount">0</span>
+            </h5>
+            <span class="muted-mini">
+              <i class="bi bi-exclamation-triangle me-1"></i> Retractar revierte la reserva y devuelve el cambio a pendiente.
+            </span>
+          </div>
+
+          <div class="table-responsive mt-3">
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>ID</th>
+                  <th>Reserva</th>
+                  <th>Cliente</th>
+                  <th>Cambio</th>
+                  <th>Estado</th>
+                  <th class="action-col text-end">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="confirmedTbody">
+                <tr><td colspan="6" class="text-muted">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
+
+<!-- Modal Rechazo -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i>Rechazar cambio</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 text-muted">
+          Cambio <span class="mono" id="rejectId">—</span>
+        </div>
+        <label class="form-label">Motivo del rechazo</label>
+        <textarea class="form-control" id="rejectReason" rows="3" placeholder="Ej. No se recibió el pago adicional SINPE dentro del plazo."></textarea>
+        <div class="muted-mini mt-2">Este motivo queda registrado para el cliente y auditoría.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btnRejectConfirm">
+          <i class="bi bi-x-circle me-1"></i>Rechazar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Confirmación -->
+<div class="modal fade" id="opsConfirmModal" tabindex="-1" aria-labelledby="opsConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="opsConfirmModalLabel">
+          <i class="bi bi-shield-exclamation me-2 text-warning"></i>
+          Confirmación
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="opsConfirmModalBody" class="small text-muted"></div>
+        <div class="alert alert-warning mt-3 mb-0 small">
+          <i class="bi bi-info-circle me-1"></i>
+          Esta acción impacta el estado del cambio y la reserva.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="opsConfirmModalOk">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+  <div id="opsToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header">
+      <i class="bi bi-bell me-2"></i>
+      <strong class="me-auto">Operaciones</strong>
+      <small id="toastTime">Ahora</small>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+    </div>
+    <div class="toast-body" id="toastMsg">—</div>
+  </div>
+</div>
+
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+<div id="preloader"></div>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
+<script>
+function opsConfirm({ title, bodyHtml, okText = "Confirmar", okClass = "btn-success" }) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("opsConfirmModal");
+    const titleEl = document.getElementById("opsConfirmModalLabel");
+    const bodyEl  = document.getElementById("opsConfirmModalBody");
+    const okBtn   = document.getElementById("opsConfirmModalOk");
+
+    titleEl.innerHTML = title || "Confirmación";
+    bodyEl.innerHTML  = bodyHtml || "";
+    okBtn.textContent = okText;
+    okBtn.className = "btn " + (okClass || "btn-success");
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: "static", keyboard: false });
+
+    const onOk = () => { cleanup(); modal.hide(); resolve(true); };
+    const onHide = () => { cleanup(); resolve(false); };
+
+    function cleanup() {
+      okBtn.removeEventListener("click", onOk);
+      modalEl.removeEventListener("hidden.bs.modal", onHide);
+    }
+
+    okBtn.addEventListener("click", onOk, { once: true });
+    modalEl.addEventListener("hidden.bs.modal", onHide, { once: true });
+
+    modal.show();
+  });
+}
+
+(function(){
+  const money = (n) => new Intl.NumberFormat("es-CR", { style:"currency", currency:"CRC", minimumFractionDigits:2 }).format(Number(n||0));
+
+  const fmt = (d) => {
+    if (!d) return "—";
+    const s = String(d).trim();
+    const m = s.match(/\\d{4}-\\d{2}-\\d{2}/);
+    const iso = m ? m[0] : (s.length >= 10 ? s.slice(0, 10) : s);
+    const dt = new Date(iso + "T00:00:00");
+    if (Number.isNaN(dt.getTime())) return iso || "—";
+    return new Intl.DateTimeFormat("es-CR", { day: "2-digit", month: "short", year: "numeric" }).format(dt).replace(".", "");
+  };
+
+  const badgeEstado = (estado) => {
+    const e = String(estado || "").toLowerCase();
+    if (e === "pendiente") return `<span class="badge badge-soft-warning">Pendiente</span>`;
+    if (e === "aprobado") return `<span class="badge badge-soft-success">Aprobado</span>`;
+    if (e === "rechazado") return `<span class="badge badge-soft-danger">Rechazado</span>`;
+    return `<span class="badge badge-soft">${estado || "—"}</span>`;
+  };
+
+  // DOM
+  const pendingTbody = document.getElementById("pendingTbody");
+  const confirmedTbody = document.getElementById("confirmedTbody");
+  const pendingCount = document.getElementById("pendingCount");
+  const confirmedCount = document.getElementById("confirmedCount");
+
+  const kpiPending = document.getElementById("kpiPending");
+  const kpiApproved = document.getElementById("kpiApproved");
+  const kpiRejected = document.getElementById("kpiRejected");
+
+  const txtSearch = document.getElementById("txtSearch");
+  const lblLastRefresh = document.getElementById("lblLastRefresh");
+
+  const toastEl = document.getElementById("opsToast");
+  const toastMsg = document.getElementById("toastMsg");
+  const toast = new bootstrap.Toast(toastEl, { delay: 3200 });
+
+  const rejectModalEl = document.getElementById("rejectModal");
+  const rejectModal = new bootstrap.Modal(rejectModalEl);
+  const rejectIdEl = document.getElementById("rejectId");
+  const rejectReasonEl = document.getElementById("rejectReason");
+  const btnRejectConfirm = document.getElementById("btnRejectConfirm");
+
+  let rejectTargetId = null;
+  let DATA = { pending: [], confirmed: [] };
+
+  function showToast(msg){
+    toastMsg.textContent = msg;
+    toast.show();
+  }
+
+  function getCliente(r){
+    // Soporta varios formatos: objeto, string o campos aplanados
+    if (r.cliente && typeof r.cliente === "object"){
+      const n = r.cliente.nombre || r.cliente.name || r.cliente.full_name || "";
+      const a = r.cliente.apellido || "";
+      const full = (String(n || "") + " " + String(a || "")).trim();
+      return {
+        nombre: full || r.cliente_nombre || "—",
+        correo: r.cliente.correo || r.cliente_email || "",
+        telefono: r.cliente.telefono || r.cliente_telefono || "",
+      };
+    }
+    if (typeof r.cliente === "string"){
+      return { nombre: r.cliente || "—", correo: r.cliente_correo || "", telefono: r.cliente_telefono || "" };
+    }
+    return { nombre: r.cliente_nombre || "—", correo: r.cliente_correo || "", telefono: r.cliente_telefono || "" };
+  }
+
+  function getAntesDespues(r){
+    const antes = r.antes || r.old || {};
+    const despues = r.despues || r.new || {};
+    const a_ci = antes.Fecha_Entrada || antes.checkin || antes.Checkin || "";
+    const a_co = antes.Fecha_Salida || antes.checkout || antes.Checkout || "";
+    const a_px = antes.Huespedes || antes.huespedes || antes.pax || "";
+    const d_ci = despues.Fecha_Entrada || despues.checkin || despues.Checkin || "";
+    const d_co = despues.Fecha_Salida || despues.checkout || despues.Checkout || "";
+    const d_px = despues.Huespedes || despues.huespedes || despues.pax || "";
+    return { a_ci, a_co, a_px, d_ci, d_co, d_px };
+  }
+
+  function getAdicional(r){
+    const q = r.cotizacion || r.quote || {};
+    const v = q.Monto_Adicional ?? q.monto_adicional ?? q.adicional ?? q.additional ?? r.monto_adicional;
+    return Number(v || 0);
+  }
+
+  function rowPending(r){
+    const id = r.id ?? r.Id_Cambio ?? "—";
+    const reservaId = r.reserva_id ?? r.Codigo_Reserva ?? "—";
+    const numero = r.numero_comprobante ?? r.Numero_Comprobante ?? "";
+    const c = getCliente(r);
+    const ad = getAdicional(r);
+    const { a_ci, a_co, a_px, d_ci, d_co, d_px } = getAntesDespues(r);
+
+    const contact = (c.correo || c.telefono) ? `<div class="muted-mini">${c.correo ? c.correo : ""}${c.correo && c.telefono ? " · " : ""}${c.telefono ? c.telefono : ""}</div>` : "";
+
+    return `
+      <tr data-search="${String(id).toLowerCase()} ${String(reservaId).toLowerCase()} ${String(c.nombre).toLowerCase()} ${String(c.correo||"").toLowerCase()}">
+        <td class="mono">${id}</td>
+        <td>
+          <div class="fw-semibold">#${reservaId} ${numero ? `<span class="badge bg-light text-dark mono ms-1">${numero}</span>` : ""}</div>
+        </td>
+        <td>
+          <div class="fw-semibold">${c.nombre}</div>
+          ${contact}
+        </td>
+        <td>
+          <div class="muted-mini"><span class="badge badge-soft">Antes</span> ${fmt(a_ci)} – ${fmt(a_co)} · ${a_px ? a_px : "—"} huésp.</div>
+          <div class="muted-mini"><span class="badge badge-soft">Después</span> ${fmt(d_ci)} – ${fmt(d_co)} · ${d_px ? d_px : "—"} huésp.</div>
+        </td>
+        <td class="fw-semibold">${money(ad)}</td>
+        <td class="text-end action-col">
+          <button class="btn btn-success btn-sm me-2" data-act="approve" data-id="${id}">
+            <i class="bi bi-check2-circle me-1"></i>Aprobar
+          </button>
+          <button class="btn btn-outline-danger btn-sm" data-act="reject" data-id="${id}">
+            <i class="bi bi-x-circle me-1"></i>Rechazar
+          </button>
+        </td>
+      </tr>
+    `;
+  }
+
+  function rowConfirmed(r){
+    const id = r.id ?? r.Id_Cambio ?? "—";
+    const estado = r.estado ?? r.Estado ?? "—";
+    const reservaId = r.reserva_id ?? r.Codigo_Reserva ?? "—";
+    const numero = r.numero_comprobante ?? r.Numero_Comprobante ?? "";
+    const c = getCliente(r);
+    const { a_ci, a_co, a_px, d_ci, d_co, d_px } = getAntesDespues(r);
+
+    const contact = (c.correo || c.telefono) ? `<div class="muted-mini">${c.correo ? c.correo : ""}${c.correo && c.telefono ? " · " : ""}${c.telefono ? c.telefono : ""}</div>` : "";
+
+    const canRetract = String(estado || "").toLowerCase() === "aprobado";
+
+    return `
+      <tr data-search="${String(id).toLowerCase()} ${String(reservaId).toLowerCase()} ${String(c.nombre).toLowerCase()} ${String(c.correo||"").toLowerCase()}">
+        <td class="mono">${id}</td>
+        <td>
+          <div class="fw-semibold">#${reservaId} ${numero ? `<span class="badge bg-light text-dark mono ms-1">${numero}</span>` : ""}</div>
+        </td>
+        <td>
+          <div class="fw-semibold">${c.nombre}</div>
+          ${contact}
+        </td>
+        <td>
+          <div class="muted-mini"><span class="badge badge-soft">Antes</span> ${fmt(a_ci)} – ${fmt(a_co)} · ${a_px ? a_px : "—"} huésp.</div>
+          <div class="muted-mini"><span class="badge badge-soft">Después</span> ${fmt(d_ci)} – ${fmt(d_co)} · ${d_px ? d_px : "—"} huésp.</div>
+        </td>
+        <td>${badgeEstado(estado)}</td>
+        <td class="text-end action-col">
+          ${
+            canRetract
+              ? `<button class="btn btn-outline-warning btn-sm" data-act="retract" data-id="${id}">
+                   <i class="bi bi-arrow-counterclockwise me-1"></i>Retractar
+                 </button>`
+              : `<span class="muted-mini">—</span>`
+          }
+        </td>
+      </tr>
+    `;
+  }
+
+  function applySearch(){
+    const q = String(txtSearch.value || "").trim().toLowerCase();
+    const rows = document.querySelectorAll("tr[data-search]");
+    rows.forEach(tr => {
+      const hay = (tr.getAttribute("data-search") || "");
+      tr.style.display = (!q || hay.includes(q)) ? "" : "none";
+    });
+  }
+
+  async function post(url, body){
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "Accept":"application/json" },
+      body: JSON.stringify(body || {})
+    });
+    const j = await r.json().catch(()=> ({}));
+    if(!r.ok || j.ok === false) throw new Error(j.error || j.msg || `HTTP ${r.status}`);
+    return j;
+  }
+
+  async function load(){
+    try{
+      pendingTbody.innerHTML = `<tr><td colspan="6" class="text-muted">Cargando…</td></tr>`;
+      confirmedTbody.innerHTML = `<tr><td colspan="6" class="text-muted">Cargando…</td></tr>`;
+
+      const r = await fetch("/api/ops/cambios?limit=200", { headers:{ "Accept":"application/json" } });
+      const j = await r.json().catch(()=> ({}));
+      if(!r.ok || !j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+
+      const p = Array.isArray(j.pending) ? j.pending : [];
+      const c = Array.isArray(j.confirmed) ? j.confirmed : [];
+
+      DATA = { pending: p, confirmed: c };
+
+      pendingCount.textContent = String(p.length);
+      confirmedCount.textContent = String(c.length);
+
+      const approved = c.filter(x => String((x.estado ?? x.Estado) || "").toLowerCase() === "aprobado").length;
+      const rejected = c.filter(x => String((x.estado ?? x.Estado) || "").toLowerCase() === "rechazado").length;
+
+      kpiPending.textContent = String(p.length);
+      kpiApproved.textContent = String(approved);
+      kpiRejected.textContent = String(rejected);
+
+      pendingTbody.innerHTML = p.length ? p.map(rowPending).join("") :
+        `<tr><td colspan="6" class="text-muted">No hay cambios pendientes.</td></tr>`;
+
+      confirmedTbody.innerHTML = c.length ? c.map(rowConfirmed).join("") :
+        `<tr><td colspan="6" class="text-muted">No hay cambios confirmados.</td></tr>`;
+
+      lblLastRefresh.textContent = new Date().toLocaleString("es-CR", { hour:"2-digit", minute:"2-digit" });
+      applySearch();
+
+    }catch(e){
+      const msg = `Error cargando cambios: ${String(e.message||e)}`;
+      pendingTbody.innerHTML = `<tr><td colspan="6" class="text-danger">${msg}</td></tr>`;
+      confirmedTbody.innerHTML = `<tr><td colspan="6" class="text-danger">${msg}</td></tr>`;
+    }
+  }
+
+  pendingTbody.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    if(!btn) return;
+    const act = btn.dataset.act;
+    const id = btn.dataset.id;
+
+    if(act === "approve"){
+      const ok = await opsConfirm({
+        title: `<i class="bi bi-check2-circle me-2 text-success"></i>Aprobar cambio`,
+        bodyHtml: `
+          <div class="fw-semibold mb-2">¿Confirmas aprobar el cambio <span class="text-success">#${id}</span>?</div>
+          <div class="text-muted small">Asegúrate de haber confirmado el pago adicional SINPE antes de continuar.</div>
+        `,
+        okText: "Aprobar",
+        okClass: "btn-success"
+      });
+      if(!ok) return;
+
+      try{
+        btn.disabled = true;
+        await post(`/api/ops/cambios/${encodeURIComponent(id)}/approve`, {});
+        showToast(`Cambio ${id} aprobado.`);
+        await load();
+      }catch(e){
+        showToast(`No se pudo aprobar: ${String(e.message||e)}`);
+      }finally{
+        btn.disabled = false;
+      }
+    }
+
+    if(act === "reject"){
+      rejectTargetId = id;
+      rejectIdEl.textContent = id;
+      rejectReasonEl.value = "";
+      rejectModal.show();
+    }
+  });
+
+  confirmedTbody.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    if(!btn) return;
+    const act = btn.dataset.act;
+    const id = btn.dataset.id;
+
+    if(act === "retract"){
+      const ok = await opsConfirm({
+        title: `<i class="bi bi-arrow-counterclockwise me-2 text-warning"></i>Retractar cambio`,
+        bodyHtml: `
+          <div class="fw-semibold mb-2">¿Confirmas retractar el cambio <span class="text-warning">#${id}</span>?</div>
+          <div class="text-muted small">La reserva se revertirá y el cambio volverá a <strong>PENDIENTE</strong>.</div>
+        `,
+        okText: "Retractar",
+        okClass: "btn-warning"
+      });
+      if(!ok) return;
+
+      try{
+        btn.disabled = true;
+        await post(`/api/ops/cambios/${encodeURIComponent(id)}/retract`, {});
+        showToast(`Cambio ${id} retractado (Pendiente).`);
+        await load();
+      }catch(e){
+        showToast(`No se pudo retractar: ${String(e.message||e)}`);
+      }finally{
+        btn.disabled = false;
+      }
+    }
+  });
+
+  btnRejectConfirm.addEventListener("click", async () => {
+    const id = rejectTargetId;
+    const motivo = (rejectReasonEl.value || "").trim();
+    if(!motivo){
+      rejectReasonEl.focus();
+      return;
+    }
+    try{
+      btnRejectConfirm.disabled = true;
+      // Backend espera "motivo" (no "reason")
+      await post(`/api/ops/cambios/${encodeURIComponent(id)}/reject`, { motivo });
+      rejectModal.hide();
+      showToast(`Cambio ${id} rechazado.`);
+      await load();
+    }catch(e){
+      showToast(`No se pudo rechazar: ${String(e.message||e)}`);
+    }finally{
+      btnRejectConfirm.disabled = false;
+    }
+  });
+
+  document.getElementById("btnRefresh").addEventListener("click", load);
+  txtSearch.addEventListener("input", applySearch);
+
+  load();
+})();
+</script>
+
+</body>
+</html>

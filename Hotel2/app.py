@@ -700,34 +700,39 @@ def _query_user_reservas(
 
 
 def _get_reserva_by_id(reserva_id: int):
+    """
+    Obtiene una reserva por ID para consumo interno.
+    IMPORTANTE: usamos LEFT JOIN para evitar falsos not_found por inconsistencias
+    en Cliente/Habitacion (datos quemados, FK incompleta, etc.).
+    """
     row = (
         db.session.execute(
             text(
                 """
-        SELECT
-          R.Codigo_Reserva,
-          R.Numero_Comprobante AS Numero,
-          R.Estado,
-          R.Canal,
-          R.Fecha_Entrada,
-          R.Fecha_Salida,
-          R.Monto_Total,
-          R.Observaciones,
-          R.Huespedes,
-          H.Precio_Noche,
-          H.Tipo,
-          R.Codigo_Cliente,
-          R.Codigo_Habitacion,
-          R.Codigo_Funcionario,
-          R.Fecha_Registro      AS Fecha_Creacion,
-          R.Fecha_Registro      AS Fecha_Modificacion,
-          C.Correo              AS Usuario
-        FROM Reserva R
-        JOIN Cliente    C ON C.Codigo_Cliente    = R.Codigo_Cliente
-        JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
-        WHERE R.Codigo_Reserva = :id
-        LIMIT 1
-    """
+                SELECT
+                  R.Codigo_Reserva,
+                  R.Numero_Comprobante AS Numero,
+                  R.Estado,
+                  R.Canal,
+                  R.Fecha_Entrada,
+                  R.Fecha_Salida,
+                  R.Monto_Total,
+                  R.Observaciones,
+                  R.Huespedes,
+                  H.Precio_Noche,
+                  H.Tipo,
+                  R.Codigo_Cliente,
+                  R.Codigo_Habitacion,
+                  R.Codigo_Funcionario,
+                  R.Fecha_Registro      AS Fecha_Creacion,
+                  R.Fecha_Registro      AS Fecha_Modificacion,
+                  C.Correo              AS Usuario
+                FROM Reserva R
+                LEFT JOIN Cliente    C ON C.Codigo_Cliente    = R.Codigo_Cliente
+                LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+                WHERE R.Codigo_Reserva = :id
+                LIMIT 1
+                """
             ),
             {"id": reserva_id},
         )
@@ -735,6 +740,7 @@ def _get_reserva_by_id(reserva_id: int):
         .first()
     )
     return row
+
 
 
 
@@ -1846,17 +1852,31 @@ def create_app() -> Flask:
         # Se leen de variables de entorno (.env o sistema):
         #  - SINPE_MOBILE / SINPE_NUMERO / SINPE_PHONE
         #  - SINPE_BENEFICIARIO / SINPE_NOMBRE
-        sinpe_mobile = (
-            os.getenv("SINPE_MOBILE")
-            or os.getenv("SINPE_NUMERO")
-            or os.getenv("SINPE_PHONE")
-            or ""
+        # Paso 1/2 (SINPE): datos para mostrar en plantillas.
+        # Fuente principal: tabla SAC_Config (si existe). Fallback: variables de entorno.
+        def _sac_cfg(key: str, default: str = "") -> str:
+            try:
+                v = db.session.execute(
+                    text("SELECT Valor FROM SAC_Config WHERE Clave=:k LIMIT 1"),
+                    {"k": key},
+                ).scalar()
+                if v is None:
+                    return default
+                if isinstance(v, str):
+                    v = v.strip()
+                return v if v else default
+            except Exception:
+                return default
+        
+        sinpe_mobile = _sac_cfg(
+            "sinpe_mobile",
+            os.getenv("SINPE_MOBILE") or os.getenv("SINPE_NUMERO") or os.getenv("SINPE_PHONE") or "",
         )
-        sinpe_beneficiary = (
-            os.getenv("SINPE_BENEFICIARIO")
-            or os.getenv("SINPE_NOMBRE")
-            or "Hotel Villa Grace"
+        sinpe_beneficiary = _sac_cfg(
+            "sinpe_beneficiary",
+            os.getenv("SINPE_BENEFICIARIO") or os.getenv("SINPE_NOMBRE") or "Hotel Villa Grace",
         )
+        
 
         return {
             "is_logged_in": is_logged_in,
@@ -2220,6 +2240,14 @@ def create_app() -> Flask:
     @role_required("Administrador", "Recepcionista")
     def ops_approvals_html():
         return render_template("ops-approvals.html")
+    
+    
+    
+    @app.get("/ops-approvals-cambios.html")
+    @role_required("Recepcionista", "Administrador", "Admin")
+    def ops_approvals_cambios_html():
+        return render_template("ops-approvals-cambios.html")
+    
 
 
 
@@ -2653,6 +2681,32 @@ def create_app() -> Flask:
     @app.get("/booking/search")
     def booking_search_alias():
         return redirect(url_for("api_availability", **request.args))
+    
+    
+    # =========================
+    # API pública: Tipos de habitación (para anon-reserva.html)
+    # =========================
+    @app.get("/api/public/room-types")
+    def api_public_room_types():
+        """Devuelve la lista de tipos distintos definidos en Habitacion.Tipo (si existe)."""
+        try:
+            if not _col_exists("Habitacion", "Tipo"):
+                return jsonify({"ok": True, "items": []}), 200
+    
+            rows = db.session.execute(text("""
+                SELECT DISTINCT Tipo
+                  FROM Habitacion
+                 WHERE Tipo IS NOT NULL AND TRIM(Tipo) <> ''
+                 ORDER BY Tipo
+            """)).scalars().all()
+    
+            items = [str(r).strip() for r in rows if r and str(r).strip()]
+            return jsonify({"ok": True, "items": items}), 200
+    
+        except Exception as e:
+            current_app.logger.exception(f"[api/public/room-types] error: {e}")
+            return jsonify({"ok": False, "items": []}), 200
+    
     
     
     # =========================
@@ -3258,7 +3312,8 @@ def create_app() -> Flask:
     
         Importante:
           - 'tipo' es OPCIONAL (coincide con templates/anon-reserva.html)
-          - La verificación de disponibilidad se alinea con /grr/availability:
+          - Se respeta la habitación seleccionada si viene en el payload (Codigo_Habitacion / room_id / habitacion_id)
+          - La verificación de disponibilidad se alinea con /api/availability/rooms:
             solo excluye 'Mantenimiento' y solapes; no exige estado 'Disponible'.
         """
         p = request.get_json(silent=True) or {}
@@ -3277,6 +3332,18 @@ def create_app() -> Flask:
         doc_tipo   = req("doc_tipo")
         doc_numero = req("doc_numero")
         acepta     = str(p.get("acepta") or "0") in ("1", "true", "True", "on", "sí", "si")
+    
+        # Habitación seleccionada (opcional, pero si viene se debe respetar)
+        hab_sel = (
+            p.get("Codigo_Habitacion")
+            or p.get("codigo_habitacion")
+            or p.get("room_id")
+            or p.get("habitacion_id")
+        )
+        try:
+            hab_sel = int(hab_sel) if hab_sel not in (None, "", False) else None
+        except Exception:
+            hab_sel = None
     
         try:
             huespedes = int(p.get("huespedes") or 1)
@@ -3334,56 +3401,119 @@ def create_app() -> Flask:
             if not _type_exists:
                 return jsonify({"ok": False, "message": f"No hay habitaciones de tipo '{tipo}' configuradas."}), 400
     
-        # ---- Buscar una habitación LIBRE que cumpla con tipo/capacidad y rango ----
-        conds  = []
-        params = {"ci": checkin, "co": checkout}
+        # ---- Selección de habitación ----
+        hab_id = None
+        price_n = 0.0
     
-        if tipo and has_tipo:
-            conds.append("h.Tipo = :t")  # colación UTF8MB4 normalmente es case-insensitive
-            params["t"] = tipo
+        # Caso A: el usuario seleccionó una habitación -> se respeta y se valida disponibilidad
+        if hab_sel:
+            hab_row = db.session.execute(
+                text("""
+                    SELECT h.Codigo_Habitacion,
+                           h.Precio_Noche
+                           {cap_col}
+                           {tipo_col}
+                           , h.Estado
+                      FROM Habitacion h
+                     WHERE h.Codigo_Habitacion = :id
+                     LIMIT 1
+                """.format(
+                    cap_col=", h.Capacidad" if has_cap else "",
+                    tipo_col=", h.Tipo" if has_tipo else ""
+                )),
+                {"id": hab_sel}
+            ).mappings().first()
     
-        if has_cap:
-            conds.append("COALESCE(h.Capacidad, 2) >= :cap")
-            params["cap"] = int(huespedes)
+            if not hab_row:
+                return jsonify({"ok": False, "message": "La habitación seleccionada no existe."}), 404
     
-        where_extra = (" AND " + " AND ".join(conds)) if conds else ""
+            # Excluir mantenimiento
+            estado_h = (hab_row.get("Estado") or "").strip()
+            if estado_h.lower() == "mantenimiento":
+                return jsonify({"ok": False, "message": "La habitación seleccionada está en mantenimiento."}), 409
     
-        # Alineado con /grr/availability:
-        #  - NO exigimos 'Disponible' (el estado actual no bloquea reservas futuras)
-        #  - SÍ excluimos 'Mantenimiento'
-        #  - Excluimos reservas solapadas con Estado <> 'Cancelada'
-        hab = db.session.execute(
-            text(f"""
-                SELECT h.Codigo_Habitacion, h.Precio_Noche
-                  FROM Habitacion h
-                 WHERE (h.Estado IS NULL OR h.Estado <> 'Mantenimiento')
-                   {where_extra}
-                   AND NOT EXISTS (
-                         SELECT 1
-                           FROM Reserva r
-                          WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
-                            AND r.Estado <> 'Cancelada'
-                            AND DATE(r.Fecha_Entrada) < DATE(:co)
-                            AND DATE(r.Fecha_Salida)  > DATE(:ci)
-                   )
-                 ORDER BY h.Codigo_Habitacion
-                 LIMIT 1
-            """),
-            params
-        ).mappings().first()
+            # Validar tipo/capacidad contra la habitación elegida (si aplica)
+            if tipo and has_tipo:
+                tipo_h = (hab_row.get("Tipo") or "").strip()
+                if tipo_h and tipo_h != tipo:
+                    return jsonify({"ok": False, "message": "La habitación seleccionada no coincide con el tipo elegido."}), 400
     
-        if not hab:
-            return jsonify({
-                "ok": False,
-                "message": "No hay habitaciones disponibles que cumplan los criterios para ese rango."
-            }), 409
+            if has_cap:
+                cap_h = hab_row.get("Capacidad")
+                try:
+                    cap_h = int(cap_h) if cap_h is not None else None
+                except Exception:
+                    cap_h = None
+                if cap_h is not None and huespedes > cap_h:
+                    return jsonify({"ok": False, "message": "La habitación seleccionada no tiene capacidad suficiente."}), 400
     
-        hab_id  = int(hab["Codigo_Habitacion"])
-        price_n = float(hab["Precio_Noche"] or 0.0)
+            # Validar solape con reservas no canceladas
+            solape = db.session.execute(
+                text("""
+                    SELECT 1
+                      FROM Reserva r
+                     WHERE r.Codigo_Habitacion = :h
+                       AND r.Estado <> 'Cancelada'
+                       AND DATE(r.Fecha_Entrada) < DATE(:co)
+                       AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                     LIMIT 1
+                """),
+                {"h": hab_sel, "ci": checkin, "co": checkout}
+            ).first()
+    
+            if solape:
+                return jsonify({"ok": False, "message": "La habitación seleccionada ya no está disponible para ese rango."}), 409
+    
+            hab_id = int(hab_row["Codigo_Habitacion"])
+            price_n = float(hab_row["Precio_Noche"] or 0.0)
+    
+        # Caso B: no seleccionó habitación -> buscamos una libre que cumpla criterios
+        if hab_id is None:
+            conds  = []
+            params = {"ci": checkin, "co": checkout}
+    
+            if tipo and has_tipo:
+                conds.append("h.Tipo = :t")
+                params["t"] = tipo
+    
+            if has_cap:
+                conds.append("COALESCE(h.Capacidad, 2) >= :cap")
+                params["cap"] = int(huespedes)
+    
+            where_extra = (" AND " + " AND ".join(conds)) if conds else ""
+    
+            hab = db.session.execute(
+                text(f"""
+                    SELECT h.Codigo_Habitacion, h.Precio_Noche
+                      FROM Habitacion h
+                     WHERE (h.Estado IS NULL OR h.Estado <> 'Mantenimiento')
+                       {where_extra}
+                       AND NOT EXISTS (
+                             SELECT 1
+                               FROM Reserva r
+                              WHERE r.Codigo_Habitacion = h.Codigo_Habitacion
+                                AND r.Estado <> 'Cancelada'
+                                AND DATE(r.Fecha_Entrada) < DATE(:co)
+                                AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                       )
+                     ORDER BY h.Codigo_Habitacion
+                     LIMIT 1
+                """),
+                params
+            ).mappings().first()
+    
+            if not hab:
+                return jsonify({
+                    "ok": False,
+                    "message": "No hay habitaciones disponibles que cumplan los criterios para ese rango."
+                }), 409
+    
+            hab_id  = int(hab["Codigo_Habitacion"])
+            price_n = float(hab["Precio_Noche"] or 0.0)
     
         # ---- Calcular noches y monto total (server-side autoritativo) ----
         nights = max((co_dt - ci_dt).days, 1)
-        # IVA configurable; fallback 13%
+    
         tax = None
         for k in ("VAT_RATE", "TAX_RATE", "IVA", "IVA_RATE"):
             if k in current_app.config:
@@ -3508,7 +3638,7 @@ def create_app() -> Flask:
         except Exception as e:
             db.session.rollback()
             current_app.logger.warning("[ANON] No se pudo asignar Numero_Comprobante: %s", e)
-            numero = _make_unique_number(reserva_id, checkin)  # fallback in-memory
+            numero = _make_unique_number(reserva_id, checkin)
     
         # ---- Auditoría + KPI ----
         try:
@@ -3534,6 +3664,8 @@ def create_app() -> Flask:
             "numero": numero,
             "redirect": url_for("anon_reserva_exito_html", numero=numero)
         }), 201
+
+
     
     
     
@@ -3968,6 +4100,42 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "message": "No autorizado."}), 403
 
         return jsonify({"ok": True, "item": _reserva_to_dict(row)}), 200
+    
+    
+    @app.get("/api/portal/reservas/<int:reserva_id>/summary")
+    @role_required("Cliente")
+    def api_portal_reserva_summary(reserva_id: int):
+        """
+        Resumen en el formato que consume el nuevo portal-reserva-detalle (UI v2).
+        Evita romper el endpoint legacy /api/portal/reservas/<id>.
+        """
+        email = _current_user_email()
+        if not email:
+            return jsonify({"error": "auth_required"}), 401
+
+        row = _get_reserva_by_id(reserva_id)
+        if not row:
+            return jsonify({"error": "not_found"}), 404
+
+        if not _reserva_belongs_to_email(reserva_id, email):
+            return jsonify({"error": "forbidden"}), 403
+
+        checkin = (_normalize_date_like(row.get("Fecha_Entrada")) or "")[:10]
+        checkout = (_normalize_date_like(row.get("Fecha_Salida")) or "")[:10]
+        room_type = row.get("Tipo") or "—"
+        room_name = f"Habitación {row.get('Codigo_Habitacion')}" if row.get("Codigo_Habitacion") else room_type
+
+        return jsonify({
+            "id": int(row.get("Codigo_Reserva") or reserva_id),
+            "roomName": room_name,
+            "roomType": room_type,
+            "checkin": checkin,
+            "checkout": checkout,
+            "guests": int(row.get("Huespedes") or 1),
+            "total": float(row.get("Monto_Total") or 0.0),
+            "status": row.get("Estado") or "—",
+        }), 200
+
 
     @app.route("/api/portal/reservas/<int:reserva_id>", methods=["PUT", "PATCH"])
     @role_required("Cliente")
@@ -4263,98 +4431,123 @@ def create_app() -> Flask:
     
 
 
+    from sqlalchemy import text
+    from flask import request, session, jsonify
+    
     @app.put("/api/portal/reservas/<int:reserva_id>/apply-changes")
-    @role_required("Cliente")
-    def api_portal_reserva_apply(reserva_id: int):
-        email = _current_user_email()
-        if not email:
-            return jsonify({"ok": False, "message": "No autenticado."}), 401
-
-        r = _get_reserva_by_id(reserva_id)
-        if not r:
-            return jsonify({"ok": False, "message": "Reserva no encontrada."}), 404
-
-        if not _reserva_belongs_to_email(reserva_id, email):
-            return jsonify({"ok": False, "message": "No autorizado."}), 403
-
-        p = request.get_json(silent=True) or {}
-        new_ci = (p.get("checkin") or _normalize_date_like(r.get("Fecha_Entrada")) or "")[:10]
-        new_co = (p.get("checkout") or _normalize_date_like(r.get("Fecha_Salida")) or "")[:10]
-        obs    = (p.get("observaciones") or r.get("Observaciones") or "").strip()
+    @role_required("Cliente", "Recepcionista", "Admin")
+    def api_portal_reserva_apply(reserva_id):
+        """
+        PASO 1 (nuevo comportamiento):
+        - Ya NO se cobra con tarjeta.
+        - Al confirmar "Listo" (SINPE), se crea una solicitud de cambio en estado Pendiente.
+        - NO se actualiza la reserva todavía (eso será en Paso 3 cuando Admin apruebe).
+        """
         try:
-            new_pax = int(p.get("huespedes") or r.get("Huespedes") or 1)
-        except Exception:
-            new_pax = 1
-
-        if not new_ci or not new_co:
-            return jsonify({"ok": False, "message": "Fechas inválidas."}), 400
-
-        nights = _nights(new_ci, new_co)
-        if nights <= 0:
-            return jsonify({"ok": False, "message": "Rango de fechas no válido."}), 400
-
-        room_id = int(r["Codigo_Habitacion"])
-        ok_free, msg = _room_is_available_for(room_id, new_ci, new_co, exclude_reserva_id=reserva_id)
-        if not ok_free:
-            return jsonify({"ok": False, "message": msg or "Sin disponibilidad para ese rango."}), 409
-
-        # Recalcular monto nuevo
-        info = _get_room_info(room_id)
-        price_n = float(info.get("price") or 0.0)
-        total_new = _calc_total(price_n, nights, new_pax, iva_rate=DEFAULT_IVA, include_tax=ROOM_TOTAL_INCLUDES_TAX)
-        total_old = float(r.get("Monto_Total") or 0.0)
-        delta = round(max(0.0, total_new - total_old), 2)
-
-        # Si hay adicional y no vino pago -> avisar
-        payment = p.get("payment")
-        if delta > 0 and not payment:
-            return jsonify({"ok": False, "error": "payment_required", "amount_due": delta, "message": "Se requiere pago adicional."}), 402
-
-        # Simular registro de pago (solo auditar últimos 4 / marca)
-        if delta > 0 and payment:
+            data = request.get_json(silent=True) or {}
+    
+            # Esperado desde el frontend (portal-reserva-detalle)
+            old_data = data.get("old") or {}
+            new_data = data.get("new") or {}
+            quote = data.get("quote") or {}
+    
+            new_checkin = (new_data.get("checkin") or "").strip()
+            new_checkout = (new_data.get("checkout") or "").strip()
+            new_guests = new_data.get("guests")
+    
+            if not new_checkin or not new_checkout or new_guests is None:
+                return jsonify({"error": "Datos incompletos para solicitar cambios."}), 400
+    
+            # Monto adicional (si el frontend ya cotizó, lo usamos; si no, asumimos 0)
             try:
-                holder = (payment.get("holder") or "").strip()
-                last4  = (payment.get("card_last4") or "").strip()
-                brand  = (payment.get("card_brand") or "").strip() or None
-                if not holder or not last4 or not last4.isdigit() or len(last4) != 4:
-                    return jsonify({"ok": False, "message": "Datos de pago incompletos."}), 400
-
-                # Nota de auditoría en Observaciones
-                obs = (obs + f" | PAGO Δ: ₡{delta:.2f} ({brand or 'Tarjeta'}) ****{last4}").strip()
-
-                # (Opcional) crear PDF de recibo por diferencia
-                try:
-                    _create_recibo_pdf(dict(r), delta, pay_method=brand or "tarjeta", reference=f"****{last4}")
-                except Exception:
-                    pass
-            except Exception as e:
-                current_app.logger.warning(f"[PAY] Error parseando pago: {e}")
-                return jsonify({"ok": False, "message": "Error al validar el pago."}), 400
-
-        # Persistir cambios en Reserva
-        try:
-            db.session.execute(
-                text("""
-                    UPDATE Reserva
-                       SET Fecha_Entrada = :ci,
-                           Fecha_Salida  = :co,
-                           Huespedes     = :pax,
-                           Monto_Total   = :monto,
-                           Observaciones = :obs,
-                           Fecha_Registro = Fecha_Registro  -- conservación
-                     WHERE Codigo_Reserva = :rid
-                """),
-                {"ci": new_ci, "co": new_co, "pax": int(new_pax), "monto": float(total_new), "obs": obs, "rid": int(reserva_id)}
-            )
+                delta = float(quote.get("delta", 0) or 0)
+            except Exception:
+                delta = 0.0
+    
+            monto_adicional = delta if delta > 0 else 0.0
+    
+            # Validación mínima (no dejamos checkout <= checkin)
+            # Mantengo validación ligera para no depender de formatos internos;
+            # el cotizador del frontend ya lo controla.
+            if new_checkout <= new_checkin:
+                return jsonify({"error": "Rango de fechas inválido."}), 400
+    
+            # Evitar múltiples solicitudes pendientes por la misma reserva
+            db.session.execute(text("""
+                CREATE TABLE IF NOT EXISTS ReservaCambioSolicitud (
+                  Id_Cambio INT NOT NULL AUTO_INCREMENT,
+                  Codigo_Reserva INT NOT NULL,
+                  Estado ENUM('Pendiente','Aprobado','Rechazado','Retractado') NOT NULL DEFAULT 'Pendiente',
+                  Monto_Adicional DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                  Solicitud_JSON JSON NOT NULL,
+                  Creado_En DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  Decidido_En DATETIME DEFAULT NULL,
+                  Decidido_Por INT DEFAULT NULL,
+                  Rechazo_Motivo TEXT DEFAULT NULL,
+                  PRIMARY KEY (Id_Cambio),
+                  KEY IX_RCC_Reserva (Codigo_Reserva),
+                  KEY IX_RCC_Estado (Estado),
+                  KEY IX_RCC_Creado (Creado_En)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """))
             db.session.commit()
+    
+            pending = db.session.execute(text("""
+                SELECT COUNT(1) AS c
+                FROM ReservaCambioSolicitud
+                WHERE Codigo_Reserva = :rid AND Estado = 'Pendiente'
+            """), {"rid": reserva_id}).scalar() or 0
+    
+            if int(pending) > 0:
+                return jsonify({"error": "Ya existe una solicitud de cambio pendiente para esta reserva."}), 409
+    
+            # Identidad del actor (para auditoría, útil en Paso 3)
+            decided_by = session.get("user_id")
+    
+            payload = {
+                "old": {
+                    "checkin": old_data.get("checkin"),
+                    "checkout": old_data.get("checkout"),
+                    "guests": old_data.get("guests"),
+                    "total": old_data.get("total"),
+                },
+                "new": {
+                    "checkin": new_checkin,
+                    "checkout": new_checkout,
+                    "guests": new_guests,
+                },
+                "quote": quote,
+                "payment": {
+                    "method": "SINPE",
+                    "declared": True
+                },
+                "meta": {
+                    "requested_by_user_id": decided_by
+                }
+            }
+    
+            db.session.execute(text("""
+                INSERT INTO ReservaCambioSolicitud (Codigo_Reserva, Estado, Monto_Adicional, Solicitud_JSON, Creado_En, Decidido_Por)
+                VALUES (:rid, 'Pendiente', :monto, CAST(:json_payload AS JSON), NOW(), :user_id)
+            """), {
+                "rid": reserva_id,
+                "monto": monto_adicional,
+                "json_payload": __import__("json").dumps(payload, ensure_ascii=False),
+                "user_id": decided_by
+            })
+            db.session.commit()
+    
+            # NO aplicamos cambios aquí. Eso queda para Paso 3 (Aprobar/Rechazar).
+            return jsonify({
+                "ok": True,
+                "message": "Solicitud de cambio creada y enviada a aprobación.",
+                "monto_adicional": monto_adicional
+            })
+    
         except Exception as e:
             db.session.rollback()
-            current_app.logger.exception("[APPLY] Error actualizando reserva: %s", e)
-            return jsonify({"ok": False, "message": "No se pudo aplicar los cambios."}), 500
-
-        # Recargar y devolver
-        r2 = _get_reserva_by_id(reserva_id)
-        return jsonify({"ok": True, "item": _reserva_to_dict(r2)}), 200
+            return jsonify({"error": f"Error procesando solicitud de cambio: {str(e)}"}), 500
+    
     
     
     
@@ -4390,7 +4583,77 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.exception(f"[SEND_CONFIRMATION] error reserva={reserva_id}: {e}")
             return jsonify({"ok": False, "error": "server_error"}), 500
+        
+        
+    from flask import jsonify
+    import os
     
+    @app.get("/api/public/sinpe-config")
+    def api_public_sinpe_config():
+        """
+        Retorna la configuración SINPE (número y beneficiario) priorizando BD (SAC_Config).
+        Fallback: variables de entorno.
+        """
+        try:
+            from sqlalchemy import text
+    
+            def _cfg_value(clave: str, default=None):
+                try:
+                    row = db.session.execute(
+                        text("SELECT Valor FROM SAC_Config WHERE Clave=:c LIMIT 1"),
+                        {"c": clave}
+                    ).first()
+                    val = row[0] if row else None
+                    if val is None:
+                        return default
+                    if isinstance(val, (bytes, bytearray)):
+                        val = val.decode("utf-8", errors="ignore")
+                    val = str(val).strip()
+                    return val if val else default
+                except Exception:
+                    return default
+    
+            # 1) BD
+            sinpe_mobile = (_cfg_value("sinpe_mobile", None) or "").strip()
+            sinpe_beneficiary = (_cfg_value("sinpe_beneficiary", None) or "").strip()
+    
+            # 2) Fallback env (compatibilidad)
+            if not sinpe_mobile:
+                sinpe_mobile = (
+                    os.getenv("SINPE_MOBILE")
+                    or os.getenv("SINPE_NUMERO")
+                    or os.getenv("SINPE_PHONE")
+                    or ""
+                ).strip()
+    
+            if not sinpe_beneficiary:
+                sinpe_beneficiary = (
+                    os.getenv("SINPE_BENEFICIARIO")
+                    or os.getenv("SINPE_NOMBRE")
+                    or os.getenv("SINPE_BENEFICIARY")
+                    or "Hotel Villa Grace"
+                ).strip()
+    
+            # 3) Defaults finales
+            if not sinpe_mobile:
+                sinpe_mobile = "SINPE no configurado"
+            if not sinpe_beneficiary:
+                sinpe_beneficiary = "Hotel Villa Grace"
+    
+            return jsonify({
+                "sinpe_mobile": sinpe_mobile,
+                "sinpe_beneficiary": sinpe_beneficiary
+            })
+    
+        except Exception:
+            # fallback ultra seguro
+            return jsonify({
+                "sinpe_mobile": "SINPE no configurado",
+                "sinpe_beneficiary": "Hotel Villa Grace"
+            })
+    
+    
+        
 
 
 
@@ -8061,6 +8324,741 @@ def create_app() -> Flask:
             except Exception:
                 pass
             return jsonify({"ok": False, "error": "retract_failed"}), 500
+        
+        
+        
+        
+    # =========================================================
+    # OPS: APROBACIÓN/RECHAZO DE CAMBIOS SOLICITADOS (Paso 3)
+    # =========================================================
+    import json
+    from datetime import datetime
+    
+    def _safe_int(v, default=None):
+        try:
+            return int(v)
+        except Exception:
+            return default
+    
+    def _parse_date_ymd(s: str):
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    
+    def _extract_change_payload(solicitud_json_raw) -> dict:
+        """
+        Lee Solicitud_JSON (str/dict) y devuelve un dict con estructura:
+          { old:{checkin,checkout,huespedes,total}, new:{...}, quote:{delta,new_total} }
+
+        - Soporta payloads legacy con:
+            * old/new usando 'guests' o 'pax' en lugar de 'huespedes'
+            * payload plano (old_checkin/new_checkin/...)
+        - Además aplica normalización con _normalize_cambio_payload() si está disponible.
+        """
+        try:
+            if solicitud_json_raw is None:
+                return {}
+
+            # 1) Parse seguro
+            if isinstance(solicitud_json_raw, dict):
+                p = solicitud_json_raw
+            else:
+                p = json.loads(solicitud_json_raw or "{}")
+
+            if not isinstance(p, dict):
+                return {}
+
+            # 2) Compat payload plano (por si existiera histórico)
+            if ("old" not in p or "new" not in p) and any(k in p for k in (
+                "old_checkin", "old_checkout", "old_guests", "old_huespedes", "old_pax",
+                "new_checkin", "new_checkout", "new_guests", "new_huespedes", "new_pax"
+            )):
+                p = {
+                    "old": {
+                        "checkin": p.get("old_checkin"),
+                        "checkout": p.get("old_checkout"),
+                        "guests": p.get("old_guests") or p.get("old_huespedes") or p.get("old_pax"),
+                        "total": p.get("old_total"),
+                    },
+                    "new": {
+                        "checkin": p.get("new_checkin"),
+                        "checkout": p.get("new_checkout"),
+                        "guests": p.get("new_guests") or p.get("new_huespedes") or p.get("new_pax"),
+                        "total": p.get("new_total"),
+                    },
+                    "quote": p.get("quote") if isinstance(p.get("quote"), dict) else {
+                        "delta": p.get("delta"),
+                        "new_total": p.get("new_total"),
+                    }
+                }
+
+            # 3) Normaliza keys (guests/pax -> huespedes, totales, etc.)
+            try:
+                p = _normalize_cambio_payload(p)
+            except Exception:
+                pass
+
+            return p
+        except Exception:
+            return {}
+
+    
+    def _calc_total_like_web(price_per_night: float, checkin: str, checkout: str, huespedes: int) -> float:
+        """
+        Cálculo autoritativo server-side (alineado al flujo web):
+        subtotal = precio_noche * noches * huespedes
+        total = subtotal * (1 + IVA)
+        """
+        ci = _parse_date_ymd(checkin)
+        co = _parse_date_ymd(checkout)
+        nights = max((co - ci).days, 1)
+    
+        tax = None
+        for k in ("VAT_RATE", "TAX_RATE", "IVA", "IVA_RATE"):
+            if k in current_app.config:
+                try:
+                    tax = float(current_app.config.get(k))
+                    break
+                except Exception:
+                    pass
+        if tax is None:
+            tax = 0.13
+    
+        subtotal = round(float(price_per_night or 0.0) * nights * int(huespedes or 1), 2)
+        return round(subtotal * (1.0 + tax), 2)
+    
+    def _room_overlap_exists(hab_id: int, reserva_id: int, checkin: str, checkout: str) -> bool:
+        """
+        Verifica solape para la misma habitación excluyendo la reserva actual.
+        Regla usada en availability: excluye solo Cancelada.
+        """
+        q = db.session.execute(
+            text("""
+                SELECT 1
+                  FROM Reserva r
+                 WHERE r.Codigo_Habitacion = :h
+                   AND r.Codigo_Reserva <> :rid
+                   AND r.Estado <> 'Cancelada'
+                   AND DATE(r.Fecha_Entrada) < DATE(:co)
+                   AND DATE(r.Fecha_Salida)  > DATE(:ci)
+                 LIMIT 1
+            """),
+            {"h": int(hab_id), "rid": int(reserva_id), "ci": checkin, "co": checkout}
+        ).first()
+        return bool(q)
+    
+    def _send_email_safe(to_email: str, subject: str, body: str):
+        """
+        Reutiliza lo que ya exista en tu proyecto (sin inventar SMTP nuevo).
+        """
+        fn = globals().get("_send_email") or globals().get("send_email") or globals().get("_send_mail")
+        if callable(fn):
+            try:
+                return fn(to_email, subject, body)
+            except Exception:
+                return None
+        return None
+    
+    def _notify_change_status(correo: str, telefono: str, subject: str, body: str):
+        """
+        Intento 1: reusar NotificationService si existe.
+        Fallback: email directo.
+        """
+        # 1) NotificationService (si existe en tu código)
+        try:
+            NotificationService = globals().get("NotificationService", None)
+            if NotificationService:
+                ns = NotificationService(db.session)
+                # Este método puede variar en tu implementación; ajusta si tu servicio usa otro nombre.
+                if hasattr(ns, "route_and_queue"):
+                    ns.route_and_queue(
+                        to_email=correo,
+                        to_phone=telefono,
+                        subject=subject,
+                        body=body,
+                        category="RESERVAS_CAMBIOS"
+                    )
+                    return
+        except Exception:
+            pass
+    
+        # 2) fallback: email
+        _send_email_safe(correo, subject, body)
+    
+    @app.get("/api/ops/cambios")
+    @role_required("Recepcionista", "Administrador", "Admin")
+    def api_ops_cambios_list():
+        """
+        Devuelve:
+          - pending: cambios Estado='Pendiente'
+          - confirmed: cambios Estado='Aprobado'
+          - pending_count
+        """
+        rows = db.session.execute(
+            text("""
+                SELECT c.Id_Cambio, c.Codigo_Reserva, c.Estado, c.Solicitud_JSON,
+                       c.Monto_Adicional, c.Creado_En, c.Decidido_En, c.Decidido_Por,
+                       c.Rechazo_Motivo,
+                       r.Numero_Comprobante,
+                       r.Codigo_Habitacion, r.Codigo_Cliente,
+                       cl.Nombre, cl.Apellido, cl.Correo, cl.Telefono
+                  FROM ReservaCambioSolicitud c
+                  JOIN Reserva r  ON r.Codigo_Reserva  = c.Codigo_Reserva
+                  JOIN Cliente cl ON cl.Codigo_Cliente = r.Codigo_Cliente
+                 WHERE c.Estado IN ('Pendiente','Aprobado')
+                 ORDER BY c.Creado_En DESC
+                 LIMIT 500
+            """)
+        ).mappings().all()
+    
+        pending, confirmed = [], []
+        for row in rows:
+            payload = _extract_change_payload(row.get("Solicitud_JSON"))
+            old = payload.get("old") or {}
+            new = payload.get("new") or {}
+            quote = payload.get("quote") or {}
+    
+            item = {
+                "id": int(row["Id_Cambio"]),
+                "reserva_id": int(row["Codigo_Reserva"]),
+                "estado": row.get("Estado"),
+                "numero": row.get("Numero_Comprobante"),
+                "cliente": {
+                    "nombre": (row.get("Nombre") or ""),
+                    "apellido": (row.get("Apellido") or ""),
+                    "correo": (row.get("Correo") or ""),
+                    "telefono": (row.get("Telefono") or "")
+                },
+                "cliente_nombre": (f"{(row.get('Nombre') or '').strip()} {(row.get('Apellido') or '').strip()}").strip(),
+                "cliente_correo": (row.get("Correo") or ""),
+                "cliente_telefono": (row.get("Telefono") or ""),
+
+                "old": {
+                    "checkin": old.get("checkin"),
+                    "checkout": old.get("checkout"),
+                    "huespedes": old.get("huespedes") or old.get("guests") or old.get("pax"),
+                    "total": old.get("total"),
+                },
+                "new": {
+                    "checkin": new.get("checkin"),
+                    "checkout": new.get("checkout"),
+                    "huespedes": new.get("huespedes") or new.get("guests") or new.get("pax"),
+                    "total": new.get("total"),
+                },
+                "quote": {
+                    "delta": quote.get("delta"),
+                    "new_total": quote.get("new_total"),
+                },
+                "monto_adicional": float(row.get("Monto_Adicional") or 0.0),
+                "creado_en": row.get("Creado_En").isoformat() if row.get("Creado_En") else None,
+                "decidido_en": row.get("Decidido_En").isoformat() if row.get("Decidido_En") else None,
+                "decidido_por": row.get("Decidido_Por"),
+                "rechazo_motivo": row.get("Rechazo_Motivo"),
+            }
+    
+            if row.get("Estado") == "Pendiente":
+                pending.append(item)
+            else:
+                confirmed.append(item)
+    
+        return jsonify({
+            "ok": True,
+            "pending_count": len(pending),
+            "pending": pending,
+            "confirmed": confirmed
+        })
+    
+    @app.get("/api/ops/cambios/count")
+    @role_required("Recepcionista", "Administrador", "Admin")
+    def api_ops_cambios_count():
+        n = db.session.execute(
+            text("SELECT COUNT(*) FROM ReservaCambioSolicitud WHERE Estado='Pendiente'")
+        ).scalar() or 0
+        return jsonify({"ok": True, "count": int(n)})
+    
+    # =========================================================
+    # Helpers Cambios (normalización del payload)
+    # =========================================================
+    import json
+    from datetime import datetime
+    from flask import request, jsonify, session, current_app
+    from sqlalchemy import text
+    
+    def _normalize_cambio_payload(p: dict) -> dict:
+        """
+        Normaliza estructura del payload de cambios para tolerar llaves distintas:
+          - huespedes / guests / pax
+          - old/new/quote pueden venir incompletos
+        Retorna dict con: { old: {...}, new: {...}, quote: {...} }
+        """
+        if not isinstance(p, dict):
+            p = {}
+    
+        old = p.get("old") if isinstance(p.get("old"), dict) else {}
+        new = p.get("new") if isinstance(p.get("new"), dict) else {}
+        quote = p.get("quote") if isinstance(p.get("quote"), dict) else {}
+    
+        def norm_pax(d: dict) -> dict:
+            if not isinstance(d, dict):
+                return {}
+            # prioriza huespedes, pero acepta guests/pax
+            if d.get("huespedes") in (None, "", 0):
+                v = d.get("guests")
+                if v in (None, "", 0):
+                    v = d.get("pax")
+                if v not in (None, "", 0):
+                    d["huespedes"] = v
+            # espejo opcional (por compatibilidad hacia atrás)
+            if d.get("guests") in (None, "", 0) and d.get("huespedes") not in (None, "", 0):
+                d["guests"] = d.get("huespedes")
+            return d
+    
+        old = norm_pax(old)
+        new = norm_pax(new)
+    
+        return {"old": old, "new": new, "quote": quote}
+
+
+    # =========================================================
+    # OPS: Aprobar cambio
+    # Endpoint: POST /api/ops/cambios/<int:cambio_id>/approve
+    # =========================================================
+    @app.post("/api/ops/cambios/<int:cambio_id>/approve")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_cambios_approve(cambio_id: int):
+        """
+        Aprueba un cambio solicitado:
+          - Toma payload desde request si viene (recomendado), sino desde ReservaCambioSolicitud.Solicitud_JSON
+          - Valida datos mínimos
+          - Aplica cambios a Reserva (Fechas/Huéspedes y opcionalmente Monto_Total si viene quote.new_total)
+          - Marca ReservaCambioSolicitud como Aprobado y guarda snapshot before/after dentro de Solicitud_JSON
+        """
+        try:
+            row = db.session.execute(
+                text("""
+                    SELECT Id_Cambio, Codigo_Reserva, Estado, Solicitud_JSON, Monto_Adicional
+                      FROM ReservaCambioSolicitud
+                     WHERE Id_Cambio = :id
+                     LIMIT 1
+                """),
+                {"id": cambio_id}
+            ).mappings().first()
+    
+            if not row:
+                return jsonify({"ok": False, "message": "Cambio no encontrado."}), 404
+    
+            if row["Estado"] != "Pendiente":
+                return jsonify({"ok": False, "message": f"El cambio no está Pendiente (estado actual: {row['Estado']})."}), 409
+    
+            reserva_id = int(row["Codigo_Reserva"])
+    
+            # 1) Payload: primero request, luego DB
+                    # Payload: si el request viene completo lo usamos, si viene incompleto caemos al payload DB
+            req_payload = request.get_json(silent=True) or {}
+            payload_req = None
+    
+            if isinstance(req_payload, dict) and ("old" in req_payload or "new" in req_payload or "quote" in req_payload):
+                payload_req = _normalize_cambio_payload(req_payload)
+    
+            payload_db = _normalize_cambio_payload(_extract_change_payload(row.get("Solicitud_JSON")))
+            payload = payload_req or payload_db
+    
+            old = payload.get("old") or {}
+            new = payload.get("new") or {}
+            quote = payload.get("quote") or {}
+    
+            new_ci = (new.get("checkin") or "").strip()
+            new_co = (new.get("checkout") or "").strip()
+            new_pax = _safe_int(new.get("huespedes"), None)
+    
+            # Si vino payload del request pero está incompleto, usar DB
+            if payload_req and not (new_ci and new_co and new_pax):
+                payload = payload_db
+                old = payload.get("old") or {}
+                new = payload.get("new") or {}
+                quote = payload.get("quote") or {}
+                new_ci = (new.get("checkin") or "").strip()
+                new_co = (new.get("checkout") or "").strip()
+                new_pax = _safe_int(new.get("huespedes"), None)
+    
+    
+            # normaliza pax a int si vino como texto
+            try:
+                new_pax = int(new_pax) if new_pax not in (None, "") else None
+            except Exception:
+                new_pax = None
+    
+            if not (new_ci and new_co and new_pax):
+                return jsonify({"ok": False, "message": "Solicitud incompleta: faltan datos de cambio."}), 400
+    
+            # 3) Snapshot BEFORE (estado actual real en Reserva)
+            before_row = db.session.execute(
+                text("""
+                    SELECT Fecha_Entrada, Fecha_Salida, Huespedes, Monto_Total
+                      FROM Reserva
+                     WHERE Codigo_Reserva = :r
+                     LIMIT 1
+                """),
+                {"r": reserva_id}
+            ).mappings().first()
+    
+            if not before_row:
+                return jsonify({"ok": False, "message": "La reserva asociada no existe."}), 404
+    
+            before = {
+                "checkin": str(before_row["Fecha_Entrada"])[:10] if before_row["Fecha_Entrada"] else None,
+                "checkout": str(before_row["Fecha_Salida"])[:10] if before_row["Fecha_Salida"] else None,
+                "huespedes": int(before_row["Huespedes"] or 1),
+                "total": float(before_row["Monto_Total"] or 0.0),
+            }
+    
+            # 4) Aplicar cambios a Reserva
+            set_parts = ["Fecha_Entrada=:ci", "Fecha_Salida=:co", "Huespedes=:pax"]
+            params = {"ci": new_ci, "co": new_co, "pax": int(new_pax), "r": reserva_id}
+    
+            # si viene new_total, úsalo (sino, deja Monto_Total igual)
+            new_total = quote.get("new_total")
+            if new_total not in (None, ""):
+                try:
+                    new_total = float(new_total)
+                    set_parts.append("Monto_Total=:mt")
+                    params["mt"] = new_total
+                except Exception:
+                    pass
+    
+            db.session.execute(
+                text(f"UPDATE Reserva SET {', '.join(set_parts)} WHERE Codigo_Reserva=:r"),
+                params
+            )
+    
+            # 5) Snapshot AFTER (ya aplicado)
+            after_row = db.session.execute(
+                text("""
+                    SELECT Fecha_Entrada, Fecha_Salida, Huespedes, Monto_Total
+                      FROM Reserva
+                     WHERE Codigo_Reserva = :r
+                     LIMIT 1
+                """),
+                {"r": reserva_id}
+            ).mappings().first()
+    
+            after = {
+                "checkin": str(after_row["Fecha_Entrada"])[:10] if after_row and after_row["Fecha_Entrada"] else None,
+                "checkout": str(after_row["Fecha_Salida"])[:10] if after_row and after_row["Fecha_Salida"] else None,
+                "huespedes": int((after_row["Huespedes"] if after_row else new_pax) or 1),
+                "total": float((after_row["Monto_Total"] if after_row else before["total"]) or 0.0),
+            }
+    
+            # 6) Guardar snapshots en Solicitud_JSON + marcar Aprobado
+            try:
+                stored = row["Solicitud_JSON"]
+                stored_obj = json.loads(stored) if isinstance(stored, (str, bytes)) else (stored or {})
+                if not isinstance(stored_obj, dict):
+                    stored_obj = {}
+            except Exception:
+                stored_obj = {}
+    
+            stored_obj["Snapshot_Before"] = before
+            stored_obj["Snapshot_After"] = after
+    
+            # monto adicional: preferimos quote.delta si viene, sino el de la fila
+            delta = quote.get("delta")
+            try:
+                delta = float(delta) if delta not in (None, "") else float(row["Monto_Adicional"] or 0.0)
+            except Exception:
+                delta = float(row["Monto_Adicional"] or 0.0)
+    
+            uid = session.get("user_id")
+            try:
+                uid = int(uid) if uid is not None else None
+            except Exception:
+                uid = None
+    
+            db.session.execute(
+                text("""
+                    UPDATE ReservaCambioSolicitud
+                       SET Estado='Aprobado',
+                           Monto_Adicional=:d,
+                           Solicitud_JSON=:sj,
+                           Decidido_En=NOW(),
+                           Decidido_Por=:u
+                     WHERE Id_Cambio=:id
+                """),
+                {
+                    "d": delta,
+                    "sj": json.dumps(stored_obj, ensure_ascii=False),
+                    "u": uid,
+                    "id": cambio_id
+                }
+            )
+    
+            db.session.commit()
+    
+            # 7) Notificación (si ya tienes NotificationService/SAC, aquí puedes integrarlo)
+            try:
+                # Ejemplo: deja esto si ya lo usas en tu proyecto.
+                NotificationService().route_and_queue(
+                    event_type="reserva.cambio.aprobado",
+                    to_email=None,
+                    to_phone=None,
+                    subject=f"Cambios aprobados en tu reserva #{reserva_id}",
+                    message=f"Tus cambios fueron aprobados. Nuevo ingreso: {after['checkin']}, salida: {after['checkout']}, huéspedes: {after['huespedes']}.",
+                    ref_tipo="ReservaCambioSolicitud",
+                    ref_id=str(cambio_id)
+                )
+            except Exception:
+                pass
+    
+            return jsonify({"ok": True, "id_cambio": cambio_id, "reserva_id": reserva_id}), 200
+    
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception("[OPS-CAMBIOS] Error aprobando cambio: %s", e)
+            return jsonify({"ok": False, "message": "Error interno aprobando el cambio."}), 500
+    
+    
+    
+    
+    
+    
+    @app.post("/api/ops/cambios/<int:cambio_id>/reject")
+    @role_required("Recepcionista", "Administrador", "Admin")
+    def api_ops_cambios_reject(cambio_id: int):
+        """
+        Rechaza el cambio:
+          - marca solicitud como Rechazado
+          - guarda motivo
+          - notifica al cliente
+        """
+        p = request.get_json(silent=True) or {}
+        motivo = (p.get("motivo") or p.get("reason") or "").strip()
+        if not motivo:
+            return jsonify({"ok": False, "message": "Debe indicar el motivo del rechazo."}), 400
+        
+    
+        row = db.session.execute(
+            text("""
+                SELECT c.Id_Cambio, c.Estado, c.Codigo_Reserva,
+                       r.Numero_Comprobante,
+                       cl.Correo, cl.Telefono, cl.Nombre
+                  FROM ReservaCambioSolicitud c
+                  JOIN Reserva r  ON r.Codigo_Reserva  = c.Codigo_Reserva
+                  JOIN Cliente cl ON cl.Codigo_Cliente = r.Codigo_Cliente
+                 WHERE c.Id_Cambio = :id
+                 LIMIT 1
+            """),
+            {"id": int(cambio_id)}
+        ).mappings().first()
+    
+        if not row:
+            return jsonify({"ok": False, "message": "Cambio no encontrado."}), 404
+        if row.get("Estado") != "Pendiente":
+            return jsonify({"ok": False, "message": "Este cambio ya no está pendiente."}), 409
+    
+        try:
+            db.session.execute(
+                text("""
+                    UPDATE ReservaCambioSolicitud
+                       SET Estado = 'Rechazado',
+                           Decidido_Por = :uid,
+                           Decidido_En = NOW(),
+                           Rechazo_Motivo = :m
+                     WHERE Id_Cambio = :id
+                     LIMIT 1
+                """),
+                {"uid": _safe_int(session.get("user_id"), None), "m": motivo, "id": int(cambio_id)}
+            )
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception("[OPS-CAMBIOS] Error rechazando cambio: %s", e)
+            return jsonify({"ok": False, "message": "Error interno rechazando el cambio."}), 500
+    
+        # Notificación
+        try:
+            correo = (row.get("Correo") or "").strip().lower()
+            tel = (row.get("Telefono") or "").strip()
+            numero = row.get("Numero_Comprobante") or f"RES-{row.get('Codigo_Reserva')}"
+            subject = f"Cambios rechazados – Reserva {numero}"
+            body = (
+                f"Hola {row.get('Nombre','')},\n\n"
+                f"Tu solicitud de cambios fue RECHAZADA.\n"
+                f"Reserva: {numero}\n\n"
+                f"Motivo: {motivo}\n\n"
+                f"Si deseas, puedes solicitar un cambio diferente desde el portal."
+            )
+            _notify_change_status(correo, tel, subject, body)
+        except Exception:
+            pass
+    
+        return jsonify({"ok": True})
+    
+    from sqlalchemy.exc import SQLAlchemyError
+    
+    @app.post("/api/ops/cambios/<int:cambio_id>/retract")
+    @role_required("Recepcionista", "Administrador", "Admin")
+    def api_ops_cambios_retract(cambio_id):
+        """
+        Retracta un cambio aprobado:
+          - Revierte la Reserva a su snapshot anterior (Snapshot_Before dentro de Solicitud_JSON)
+          - Devuelve el cambio a estado 'Pendiente' para que vuelva a aparecer en Cambios pendientes
+    
+        Nota:
+          - NO dependemos de columnas Snapshot_Before/Snapshot_After en tabla (porque pueden no existir).
+        """
+        try:
+            # 1) Cargar cambio + reserva + habitación (sin seleccionar Snapshot_Before como columna)
+            row = db.session.execute(
+                text("""
+                    SELECT c.Id_Cambio, c.Estado, c.Codigo_Reserva, c.Solicitud_JSON,
+                           r.Codigo_Habitacion, r.Fecha_Salida AS Reserva_Checkout,
+                           h.Estado AS Estado_Habitacion
+                      FROM ReservaCambioSolicitud c
+                      JOIN Reserva r ON r.Codigo_Reserva = c.Codigo_Reserva
+                      JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion
+                     WHERE c.Id_Cambio = :id
+                     LIMIT 1
+                """),
+                {"id": cambio_id}
+            ).mappings().first()
+    
+            if not row:
+                return jsonify({"ok": False, "error": "Cambio no encontrado."}), 404
+    
+            if (row.get("Estado") or "").strip() != "Aprobado":
+                return jsonify({"ok": False, "error": "Solo se pueden retractar cambios en estado Aprobado."}), 409
+    
+            # 2) Extraer Snapshot_Before desde Solicitud_JSON
+            solicitud_raw = row.get("Solicitud_JSON") or "{}"
+            try:
+                stored = json.loads(solicitud_raw) if isinstance(solicitud_raw, str) else (solicitud_raw or {})
+            except Exception:
+                stored = {}
+    
+            before = (
+                stored.get("Snapshot_Before")
+                or stored.get("snapshot_before")
+                or stored.get("SnapshotBefore")
+            )
+    
+            # Si viniera como string JSON embebido
+            if isinstance(before, str):
+                try:
+                    before = json.loads(before)
+                except Exception:
+                    before = None
+    
+            # Fallback: si tu helper ya lo arma de otra forma
+            if not isinstance(before, dict) or not before:
+                try:
+                    payload = _extract_change_payload(solicitud_raw)
+                    if isinstance(payload, dict):
+                        before = payload.get("old") if isinstance(payload.get("old"), dict) else None
+                except Exception:
+                    before = None
+    
+            if not isinstance(before, dict) or not before:
+                return jsonify({
+                    "ok": False,
+                    "error": "No se pudo retractar: falta Snapshot_Before/old para revertir."
+                }), 409
+    
+            # 3) Normalizar llaves esperadas (acepta varias formas)
+            def pick(d: dict, *keys):
+                for k in keys:
+                    v = d.get(k)
+                    if v not in (None, ""):
+                        return v
+                return None
+    
+            old_checkin  = pick(before, "Fecha_Entrada", "checkin", "Checkin", "fecha_entrada")
+            old_checkout = pick(before, "Fecha_Salida",  "checkout", "Checkout", "fecha_salida")
+            old_pax      = pick(before, "Huespedes", "huespedes", "Pax", "pax")
+            old_total    = pick(before, "Monto_Total", "total", "monto_total", "Monto")
+    
+            if not (old_checkin and old_checkout and old_pax):
+                return jsonify({
+                    "ok": False,
+                    "error": "Solicitud incompleta: faltan datos del estado anterior para revertir."
+                }), 409
+    
+            # 4) Guardas mínimas de consistencia (no rompe el retract si hay formatos raros)
+            reserva_id = int(row.get("Codigo_Reserva") or 0)
+            if reserva_id <= 0:
+                return jsonify({"ok": False, "error": "Cambio inválido: no hay Codigo_Reserva."}), 409
+    
+            # 5) Revertir Reserva al snapshot anterior
+            #    - Monto_Total: si no viene en snapshot, no lo tocamos.
+            params = {
+                "rid": reserva_id,
+                "ci": str(old_checkin)[:10],
+                "co": str(old_checkout)[:10],
+                "pax": int(old_pax),
+            }
+    
+            if old_total not in (None, ""):
+                try:
+                    params["m"] = float(old_total)
+                except Exception:
+                    params["m"] = None
+            else:
+                params["m"] = None
+    
+            db.session.execute(
+                text("""
+                    UPDATE Reserva
+                       SET Fecha_Entrada = :ci,
+                           Fecha_Salida  = :co,
+                           Huespedes     = :pax,
+                           Monto_Total   = CASE
+                                             WHEN :m IS NULL THEN Monto_Total
+                                             ELSE :m
+                                           END
+                     WHERE Codigo_Reserva = :rid
+                     LIMIT 1
+                """),
+                params
+            )
+    
+            # 6) Devolver el cambio a Pendiente (para que reaparezca en Cambios pendientes)
+            db.session.execute(
+                text("""
+                    UPDATE ReservaCambioSolicitud
+                       SET Estado='Pendiente',
+                           Decidido_En=NULL,
+                           Decidido_Por=NULL,
+                           Rechazo_Motivo=NULL
+                     WHERE Id_Cambio=:id
+                     LIMIT 1
+                """),
+                {"id": cambio_id}
+            )
+    
+            db.session.commit()
+    
+            # Auditoría (si existe helper)
+            try:
+                _audit_log(
+                    session.get("user_email") or "ops",
+                    "reserva.cambio.retractado",
+                    {"Id_Cambio": int(cambio_id), "Codigo_Reserva": int(reserva_id)},
+                    entidad_id=str(reserva_id)
+                )
+            except Exception:
+                pass
+    
+            return jsonify({
+                "ok": True,
+                "id": int(cambio_id),
+                "reserva_id": int(reserva_id),
+                "estado": "Pendiente"
+            }), 200
+    
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception("[OPS][CAMBIOS] Error retractando %s: %s", cambio_id, e)
+            return jsonify({"ok": False, "error": "Error interno retractando cambio."}), 500
+    
+    
+        
 
     
 

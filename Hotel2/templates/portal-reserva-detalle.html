@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {% extends "base.html" %}
 
 {% block title %}Detalle de reserva — Hotel Villa Grace{% endblock %}
@@ -140,9 +141,97 @@
             <div class="col-12">
               <div class="label">Tipo habitación</div>
               <div class="value" id="valTipo">—</div>
+=======
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Portal de Reserva | Detalle</title>
+
+
+
+  
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+
+  <style>
+    .soft-card { border: 1px solid rgba(0,0,0,.08); border-radius: 14px; }
+    .soft-pill { border-radius: 999px; }
+    .sinpe-box {
+      border: 1px dashed rgba(25,135,84,.35);
+      background: rgba(25,135,84,.06);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .sinpe-amount {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+    .muted { color: rgba(0,0,0,.60); }
+  </style>
+</head>
+
+<body class="bg-light">
+
+  <main class="container py-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <h3 class="mb-0">Solicitar cambios</h3>
+        <div class="muted">Revisa tu reserva, cotiza el cambio y envíalo a aprobación.</div>
+      </div>
+      <a href="portal-reservas.html" class="btn btn-outline-secondary soft-pill">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+    </div>
+
+    <div id="topAlert" class="alert d-none" role="alert"></div>
+
+    <div class="row g-3">
+      <!-- Resumen reserva -->
+      <div class="col-lg-5">
+        <div class="card soft-card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Detalle de la reserva</h5>
+
+            <div class="mb-2">
+              <div class="muted small">Habitación</div>
+              <div id="sumRoom" class="fw-semibold">—</div>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="muted small">Entrada</div>
+                <div id="sumCheckin" class="fw-semibold">—</div>
+              </div>
+              <div class="col-6">
+                <div class="muted small">Salida</div>
+                <div id="sumCheckout" class="fw-semibold">—</div>
+              </div>
+              <div class="col-6">
+                <div class="muted small">Huéspedes</div>
+                <div id="sumGuests" class="fw-semibold">—</div>
+              </div>
+              <div class="col-6">
+                <div class="muted small">Total actual</div>
+                <div id="sumTotal" class="fw-semibold">—</div>
+              </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="muted small">Estado</div>
+              <span id="sumStatus" class="badge bg-secondary soft-pill">—</span>
+>>>>>>> b1ef506 (Arreglo en el pago con SINPE)
             </div>
           </div>
 
+<<<<<<< HEAD
           <hr class="my-4">
 
           <div>
@@ -151,12 +240,84 @@
               <a id="btnExportPdf" class="btn btn-outline-primary" href="#" target="_blank">PDF</a>
             </div>
             <div class="form-hint mt-2">El PDF usa el comprobante oficial.</div>
+=======
+      <!-- Form cambio -->
+      <div class="col-lg-7">
+        <div class="card soft-card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title mb-3">Selecciona el cambio</h5>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Nueva fecha de entrada</label>
+                <input type="date" id="newCheckin" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Nueva fecha de salida</label>
+                <input type="date" id="newCheckout" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Nuevos huéspedes</label>
+                <input type="number" min="1" id="newGuests" class="form-control" placeholder="Ej: 2">
+              </div>
+              <div class="col-md-6 d-flex align-items-end">
+                <button id="btnQuote" class="btn btn-primary w-100 soft-pill">
+                  <i class="bi bi-calculator"></i> Cotizar cambios
+                </button>
+              </div>
+            </div>
+
+            <div id="quoteWrap" class="mt-4 d-none">
+              <hr class="my-3">
+
+              <h6 class="mb-2">Resumen del cambio</h6>
+
+              <div class="row g-2">
+                <div class="col-6">
+                  <div class="muted small">Total actual</div>
+                  <div id="qOldTotal" class="fw-semibold">—</div>
+                </div>
+                <div class="col-6">
+                  <div class="muted small">Nuevo total</div>
+                  <div id="qNewTotal" class="fw-semibold">—</div>
+                </div>
+                <div class="col-12">
+                  <div class="muted small">Diferencia</div>
+                  <div id="qDelta" class="sinpe-amount">—</div>
+                </div>
+              </div>
+
+              <div class="sinpe-box mt-3">
+                <div class="d-flex align-items-start gap-2">
+                  <i class="bi bi-phone text-success fs-4"></i>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold">Pago del monto adicional por SINPE</div>
+                    <div class="muted small">
+                      Si la diferencia es mayor a ₡0, realiza el SINPE y luego presiona <b>Listo</b> para enviar la solicitud.
+                      Si la diferencia es ₡0, igualmente presiona <b>Listo</b> para enviar la solicitud.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-3 d-flex flex-wrap gap-2">
+                  <button id="btnApply" class="btn btn-success soft-pill">
+                    <i class="bi bi-shield-check"></i> Pagar y aplicar cambios
+                  </button>
+                  <button id="btnReset" class="btn btn-outline-secondary soft-pill">
+                    Reiniciar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+>>>>>>> b1ef506 (Arreglo en el pago con SINPE)
           </div>
 
         </div>
       </div>
     </div>
 
+<<<<<<< HEAD
     <!-- Edición + Cotización/Pago -->
     <div class="col-12 col-lg-6">
       <div class="card info-card">
@@ -331,9 +492,180 @@
         alertMsg('danger', err.message || 'Error al cargar la reserva.');
       }finally{
         spinner.style.display = 'none';
+=======
+  <!-- Modal SINPE -->
+  <div class="modal fade" id="sinpeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content soft-card">
+        <div class="modal-header">
+          <h5 class="modal-title">Instrucciones de pago</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="sinpe-box">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <div class="muted small">SINPE Móvil</div>
+                <div class="fw-bold" id="sinpeMobile">Cargando...</div>
+              </div>
+              <button class="btn btn-outline-success btn-sm soft-pill" id="btnCopySinpe">
+                <i class="bi bi-clipboard"></i> Copiar
+              </button>
+            </div>
+
+            <div class="mt-2">
+              <div class="muted small">A nombre de</div>
+              <div class="fw-semibold" id="sinpeBeneficiary">Cargando...</div>
+            </div>
+
+            <div class="mt-3">
+              <div class="muted small">Monto adicional a depositar</div>
+              <div class="sinpe-amount">₡<span id="sinpeAmount">0</span></div>
+            </div>
+          </div>
+
+          <div class="alert alert-warning mt-3 mb-0">
+            <i class="bi bi-info-circle"></i>
+            Una vez realizado el SINPE, presiona <b>Listo</b>. Tu solicitud quedará <b>Pendiente</b> hasta aprobación del hotel.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary soft-pill" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-success soft-pill" id="btnSinpeDone">
+            <i class="bi bi-check2-circle"></i> Listo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS -->
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const reservaId = qs.get("id");
+
+    const el = (id) => document.getElementById(id);
+
+    const state = {
+      summary: null,
+      quote: null,
+      sinpe: null
+    };
+
+    function moneyCRC(n) {
+      try {
+        const v = Number(n || 0);
+        return "₡" + v.toLocaleString("es-CR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      } catch {
+        return "₡0";
       }
     }
 
+    function showAlert(type, msg) {
+      const a = el("topAlert");
+      a.className = "alert alert-" + type;
+      a.textContent = msg;
+      a.classList.remove("d-none");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function loadSinpeConfig() {
+      const r = await fetch("/api/public/sinpe-config");
+      const j = await r.json();
+      state.sinpe = j;
+      el("sinpeMobile").textContent = j.sinpe_mobile || "SINPE no configurado";
+      el("sinpeBeneficiary").textContent = j.sinpe_beneficiary || "Hotel Villa Grace";
+    }
+
+    async function loadSummary() {
+      if (!reservaId) {
+        showAlert("danger", "No se recibió el ID de reserva.");
+        return;
+      }
+
+      const r = await fetch(`/api/portal/reservas/${reservaId}/summary`);
+      const j = await r.json();
+
+      if (!r.ok) {
+        showAlert("danger", j.error || "No se pudo cargar el resumen de la reserva.");
+        return;
+      }
+
+      state.summary = j;
+
+      el("sumRoom").textContent = (j.roomName || j.roomType || "—");
+      el("sumCheckin").textContent = j.checkin || "—";
+      el("sumCheckout").textContent = j.checkout || "—";
+      el("sumGuests").textContent = j.guests ?? "—";
+      el("sumTotal").textContent = moneyCRC(j.total);
+
+      const st = (j.status || "—");
+      el("sumStatus").textContent = st;
+
+      // Pintado simple del badge
+      el("sumStatus").className = "badge soft-pill " + (
+        st.toLowerCase().includes("confirm") ? "bg-success" :
+        st.toLowerCase().includes("pend") ? "bg-warning text-dark" :
+        "bg-secondary"
+      );
+
+      // set defaults en el form
+      el("newCheckin").value = j.checkin || "";
+      el("newCheckout").value = j.checkout || "";
+      el("newGuests").value = (j.guests ?? "");
+    }
+
+    async function quoteChanges() {
+      try {
+        const payload = {
+          checkin: el("newCheckin").value,
+          checkout: el("newCheckout").value,
+          guests: Number(el("newGuests").value || 0)
+        };
+
+        if (!payload.checkin || !payload.checkout || !payload.guests) {
+          showAlert("warning", "Completa fechas y cantidad de huéspedes antes de cotizar.");
+          return;
+        }
+
+        const r = await fetch(`/api/portal/reservas/${reservaId}/quote-changes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const j = await r.json();
+        if (!r.ok) {
+          showAlert("danger", j.error || "No se pudo cotizar el cambio.");
+          return;
+        }
+
+        state.quote = j;
+
+        el("quoteWrap").classList.remove("d-none");
+        el("qOldTotal").textContent = moneyCRC(j.old_total);
+        el("qNewTotal").textContent = moneyCRC(j.new_total);
+
+        const delta = Number(j.delta || 0);
+        el("qDelta").textContent = (delta >= 0 ? "+" : "") + moneyCRC(delta).replace("₡", "₡");
+
+      } catch (e) {
+        showAlert("danger", "Error inesperado cotizando cambios.");
+      }
+    }
+
+    function openSinpeModal() {
+      if (!state.summary || !state.quote) {
+        showAlert("warning", "Primero debes cotizar los cambios.");
+        return;
+>>>>>>> b1ef506 (Arreglo en el pago con SINPE)
+      }
+    }
+
+<<<<<<< HEAD
     function renderQuote(qd){
       const nights      = qd.nights      ?? qd.pricing?.nights_new ?? qd.pricing?.nights ?? null;
       const priceNight  = qd.price_night ?? qd.pricing?.price_night ?? null;
@@ -481,3 +813,113 @@
   })();
 </script>
 {% endblock %}
+=======
+      const delta = Number(state.quote.delta || 0);
+      const monto = delta > 0 ? delta : 0;
+      el("sinpeAmount").textContent = Number(monto).toLocaleString("es-CR", { maximumFractionDigits: 0 });
+
+      const modal = new bootstrap.Modal(document.getElementById("sinpeModal"));
+      modal.show();
+    }
+
+    async function submitChangeRequest() {
+      try {
+        if (!state.summary || !state.quote) {
+          showAlert("warning", "Primero debes cotizar los cambios.");
+          return;
+        }
+
+        const newCheckin = el("newCheckin").value;
+        const newCheckout = el("newCheckout").value;
+        const newGuests = Number(el("newGuests").value || 0);
+
+        const payload = {
+          old: {
+            checkin: state.summary.checkin,
+            checkout: state.summary.checkout,
+            guests: state.summary.guests,
+            total: state.summary.total
+          },
+          new: {
+            checkin: newCheckin,
+            checkout: newCheckout,
+            guests: newGuests
+          },
+          quote: state.quote,
+          payment: { method: "SINPE", declared: true }
+        };
+
+        const btn = el("btnSinpeDone");
+        btn.disabled = true;
+
+        const r = await fetch(`/api/portal/reservas/${reservaId}/apply-changes`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const j = await r.json();
+        btn.disabled = false;
+
+        if (!r.ok) {
+          showAlert("danger", j.error || "No se pudo enviar la solicitud de cambio.");
+          return;
+        }
+
+        // cerrar modal
+        const modalEl = document.getElementById("sinpeModal");
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+
+        showAlert("success", j.message || "Solicitud enviada. Queda pendiente de aprobación.");
+
+        // Redirigir a lista tras un pequeño delay visual
+        setTimeout(() => {
+          location.href = "portal-reservas.html";
+        }, 900);
+
+      } catch (e) {
+        showAlert("danger", "Error inesperado enviando la solicitud.");
+      }
+    }
+
+    function resetAll() {
+      state.quote = null;
+      el("quoteWrap").classList.add("d-none");
+      el("topAlert").classList.add("d-none");
+
+      // reset a valores originales
+      if (state.summary) {
+        el("newCheckin").value = state.summary.checkin || "";
+        el("newCheckout").value = state.summary.checkout || "";
+        el("newGuests").value = (state.summary.guests ?? "");
+      }
+    }
+
+    // Eventos
+    el("btnQuote").addEventListener("click", (e) => { e.preventDefault(); quoteChanges(); });
+    el("btnApply").addEventListener("click", (e) => { e.preventDefault(); openSinpeModal(); });
+    el("btnReset").addEventListener("click", (e) => { e.preventDefault(); resetAll(); });
+
+    el("btnCopySinpe").addEventListener("click", async () => {
+      try {
+        const t = el("sinpeMobile").textContent || "";
+        await navigator.clipboard.writeText(t);
+        showAlert("success", "SINPE copiado al portapapeles.");
+      } catch {
+        showAlert("warning", "No se pudo copiar el SINPE. Cópialo manualmente.");
+      }
+    });
+
+    el("btnSinpeDone").addEventListener("click", (e) => { e.preventDefault(); submitChangeRequest(); });
+
+    // init
+    (async () => {
+      await loadSinpeConfig();
+      await loadSummary();
+    })();
+  </script>
+
+</body>
+</html>
+>>>>>>> b1ef506 (Arreglo en el pago con SINPE)
