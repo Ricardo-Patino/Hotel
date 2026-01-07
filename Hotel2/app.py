@@ -1539,7 +1539,7 @@ def create_app() -> Flask:
 
     # Blueprint de Inventario (INV-07)
     from blueprints.inv import inv_bp
-    app.register_blueprint(inv_bp, url_prefix="/inv")
+    app.register_blueprint(inv_bp)
 
     # Blueprint de Operaciones
     from blueprints.admin import admin_bp 
@@ -7664,11 +7664,10 @@ app = create_app()
 # EJECUCIÓN
 # =========================
 # al final de app.py
-#if __name__ == "__main__":
-#    app.run(
-#        host="127.0.0.1",
-#        port=int(os.getenv("PORT", 5000)),
-#        debug=True,
-#        use_reloader=True,   # <-- clave para quitar ese error
-#    )
-#
+if __name__ == "__main__":
+    app.run(
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", 5000)),
+        debug=True,
+        use_reloader=True,   # <-- clave para quitar ese error
+    )
