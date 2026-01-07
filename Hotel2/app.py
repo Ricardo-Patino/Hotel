@@ -2172,6 +2172,22 @@ def create_app() -> Flask:
         )
         
         
+    @app.route("/ops-reservas.html")
+    @role_required("Administrador", "Recepcionista")
+    def ops_reservas_html():
+        return render_template("ops-reservas.html")
+    
+    
+    @app.route("/ops-reservas-dashboard.html")
+    @role_required("Administrador", "Recepcionista")
+    def ops_reservas_dashboard_html():
+        return render_template("ops-reservas-dashboard.html")
+    
+    
+        
+
+        
+        
         
         
         
@@ -7201,6 +7217,656 @@ def create_app() -> Flask:
             out.append(d)
     
         return out
+    
+    
+    def _ops_list_reservas_all(limit: int = 500, estado: str | None = None, q: str | None = None):
+        """
+        Listado general para OPS con valores 100% JSON-serializables.
+        Incluye montos pagado/saldo y filtros básicos (estado + búsqueda).
+        """
+        import re
+        from decimal import Decimal
+    
+        q_clean = (q or "").strip()
+        q_like = f"%{q_clean}%" if q_clean else None
+    
+        rows = (
+            db.session.execute(
+                text(
+                    """
+                    SELECT
+                        r.Codigo_Reserva        AS id,
+                        r.Numero_Comprobante    AS numero,
+                        r.Estado                AS estado,
+                        r.Canal                 AS canal,
+                        r.Fecha_Entrada         AS checkin,
+                        r.Fecha_Salida          AS checkout,
+                        r.Monto_Total           AS total,
+                        r.Monto_Pagado          AS pagado,
+                        (COALESCE(r.Monto_Total,0) - COALESCE(r.Monto_Pagado,0)) AS saldo,
+                        r.Huespedes             AS huespedes,
+                        r.Fuente                AS fuente,
+                        r.Observaciones         AS observaciones,
+                        CONCAT(c.Nombre,' ',c.Apellido) AS cliente_nombre,
+                        c.Correo                AS cliente_correo,
+                        c.Cedula                AS cliente_cedula,
+                        c.Telefono              AS cliente_telefono,
+                        h.Numero_Habitacion     AS habitacion_numero,
+                        h.Tipo                  AS habitacion_tipo
+                    FROM Reserva r
+                    JOIN Cliente c    ON c.Codigo_Cliente    = r.Codigo_Cliente
+                    JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion
+                    WHERE
+                        (:estado IS NULL OR r.Estado = :estado)
+                        AND (
+                            :q IS NULL
+                            OR CONCAT(c.Nombre,' ',c.Apellido) LIKE :q_like
+                            OR c.Correo LIKE :q_like
+                            OR c.Cedula LIKE :q_like
+                            OR r.Numero_Comprobante LIKE :q_like
+                            OR CAST(r.Codigo_Reserva AS CHAR) LIKE :q_like
+                            OR h.Numero_Habitacion LIKE :q_like
+                        )
+                    ORDER BY r.Fecha_Registro DESC, r.Codigo_Reserva DESC
+                    LIMIT :lim
+                    """
+                ),
+                {"estado": estado, "q": q_clean if q_clean else None, "q_like": q_like, "lim": int(limit)},
+            )
+            .mappings()
+            .all()
+        )
+    
+        out = []
+        for x in rows:
+            d = dict(x)
+    
+            # Fechas a YYYY-MM-DD
+            for k in ("checkin", "checkout"):
+                v = d.get(k)
+                if v is None:
+                    continue
+                try:
+                    if hasattr(v, "isoformat"):
+                        d[k] = v.isoformat()[:10]
+                    else:
+                        s = str(v).strip()
+                        m = re.search(r"(\d{4}-\d{2}-\d{2})", s)
+                        d[k] = m.group(1) if m else (s[:10] if len(s) >= 10 else s)
+                except Exception:
+                    try:
+                        s = str(v).strip()
+                        d[k] = s[:10] if len(s) >= 10 else s
+                    except Exception:
+                        pass
+    
+            # Montos a float
+            for money_key in ("total", "pagado", "saldo"):
+                tv = d.get(money_key)
+                if tv is None:
+                    d[money_key] = 0.0
+                elif isinstance(tv, Decimal):
+                    d[money_key] = float(tv)
+                else:
+                    try:
+                        d[money_key] = float(tv)
+                    except Exception:
+                        d[money_key] = 0.0
+    
+            out.append(d)
+    
+        return out
+    
+    
+    @app.get("/api/ops/reservas")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_reservas_list():
+        """
+        GET /api/ops/reservas?limit=500&estado=Confirmada&q=...
+        """
+        try:
+            limit_raw = request.args.get("limit", "500")
+            try:
+                limit_i = int(limit_raw)
+            except Exception:
+                limit_i = 500
+            limit_i = max(1, min(2000, limit_i))
+    
+            estado = (request.args.get("estado") or "").strip() or None
+            q = request.args.get("q") or None
+    
+            items = _ops_list_reservas_all(limit=limit_i, estado=estado, q=q)
+            return jsonify({"ok": True, "items": items})
+        except Exception as e:
+            try:
+                current_app.logger.warning(f"[OPS] reservas list error: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "reservas_list_failed"}), 500
+        
+        
+        
+    from datetime import timedelta
+
+    @app.get("/api/ops/reservas/calendar")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_reservas_calendar():
+        """
+        Construcción de calendario:
+          - Devuelve reservas que se solapan con el rango [from..to]
+          - Devuelve habitaciones "usables" (por defecto excluye Mantenimiento)
+    
+        Query:
+          from=YYYY-MM-DD   (requerido)
+          to=YYYY-MM-DD     (requerido)
+          estados=Confirmada,Pendiente  (opcional; default)
+          exclude_room_estados=Mantenimiento (opcional; default)
+        """
+        try:
+            from_s = (request.args.get("from") or "").strip()
+            to_s = (request.args.get("to") or "").strip()
+            if not from_s or not to_s:
+                return jsonify({"ok": False, "error": "missing_range"}), 400
+    
+            try:
+                d_from = datetime.strptime(from_s, "%Y-%m-%d").date()
+                d_to = datetime.strptime(to_s, "%Y-%m-%d").date()
+            except ValueError:
+                return jsonify({"ok": False, "error": "invalid_range"}), 400
+    
+            if d_to < d_from:
+                return jsonify({"ok": False, "error": "range_order"}), 400
+    
+            estados_csv = (request.args.get("estados") or "Confirmada,Pendiente").strip()
+            exclude_room_csv = (request.args.get("exclude_room_estados") or "Mantenimiento").strip()
+    
+            # Para solape usando checkout exclusivo: checkin < (to+1) AND checkout > from
+            to_plus1 = d_to + timedelta(days=1)
+    
+            reservas_rows = (
+                db.session.execute(
+                    text(
+                        """
+                        SELECT
+                            r.Codigo_Reserva AS id,
+                            r.Estado AS estado,
+                            r.Canal AS canal,
+                            r.Numero_Comprobante AS numero,
+                            r.Fecha_Entrada AS checkin,
+                            r.Fecha_Salida AS checkout,
+                            r.Monto_Total AS total,
+                            r.Monto_Pagado AS pagado,
+    
+                            CONCAT(c.Nombre,' ',c.Apellido) AS cliente_nombre,
+                            c.Correo AS cliente_correo,
+                            c.Cedula AS cliente_cedula,
+    
+                            h.Codigo_Habitacion AS room_id,
+                            h.Numero_Habitacion AS habitacion_numero,
+                            h.Tipo AS habitacion_tipo
+                        FROM Reserva r
+                        JOIN Cliente c ON c.Codigo_Cliente = r.Codigo_Cliente
+                        JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion
+                        WHERE
+                            r.Fecha_Entrada < :to_plus1
+                            AND r.Fecha_Salida > :from_d
+                            AND (
+                              :estados_csv IS NULL OR :estados_csv = ''
+                              OR FIND_IN_SET(r.Estado, :estados_csv) > 0
+                            )
+                        ORDER BY r.Fecha_Entrada ASC, r.Codigo_Reserva ASC
+                        """
+                    ),
+                    {"to_plus1": to_plus1, "from_d": d_from, "estados_csv": estados_csv},
+                )
+                .mappings()
+                .all()
+            )
+    
+            rooms_rows = (
+                db.session.execute(
+                    text(
+                        """
+                        SELECT
+                            h.Codigo_Habitacion AS id,
+                            h.Numero_Habitacion AS numero,
+                            h.Tipo AS tipo,
+                            h.Precio_Noche AS precio_noche,
+                            h.Estado AS estado
+                        FROM Habitacion h
+                        WHERE
+                          (:exclude_room_csv IS NULL OR :exclude_room_csv = ''
+                           OR FIND_IN_SET(h.Estado, :exclude_room_csv) = 0)
+                        ORDER BY CAST(h.Numero_Habitacion AS UNSIGNED), h.Numero_Habitacion
+                        """
+                    ),
+                    {"exclude_room_csv": exclude_room_csv},
+                )
+                .mappings()
+                .all()
+            )
+    
+            def _iso_date(v):
+                if v is None:
+                    return None
+                return v.isoformat()[:10] if hasattr(v, "isoformat") else str(v)[:10]
+    
+            reservas = []
+            for r in reservas_rows:
+                d = dict(r)
+                d["checkin"] = _iso_date(d.get("checkin"))
+                d["checkout"] = _iso_date(d.get("checkout"))
+                for k in ("total", "pagado"):
+                    try:
+                        d[k] = float(d.get(k) or 0)
+                    except Exception:
+                        d[k] = 0.0
+                reservas.append(d)
+    
+            rooms = []
+            for rm in rooms_rows:
+                d = dict(rm)
+                try:
+                    d["precio_noche"] = float(d.get("precio_noche") or 0)
+                except Exception:
+                    d["precio_noche"] = 0.0
+                rooms.append(d)
+    
+            return jsonify(
+                {
+                    "ok": True,
+                    "range": {"from": from_s, "to": to_s},
+                    "estados": estados_csv,
+                    "exclude_room_estados": exclude_room_csv,
+                    "rooms": rooms,
+                    "reservas": reservas,
+                }
+            )
+    
+        except Exception as e:
+            try:
+                current_app.logger.exception(f"[OPS] reservas calendar error: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "calendar_failed"}), 500
+        
+        
+    from datetime import timedelta
+    
+    @app.get("/api/ops/reservas/dashboard")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_reservas_dashboard():
+        """
+        Dashboard de reservas (rango por día):
+          - Ingresos estimados prorrateados por noche (Confirmada)
+          - Ocupación: noches vendidas / (hab. usables * días)
+          - ADR, RevPAR
+          - Llegadas/Salidas
+          - Distribución por estado/canal
+          - Próximas llegadas (7 días) + alertas saldo pendiente
+    
+        Query:
+          from=YYYY-MM-DD (requerido)
+          to=YYYY-MM-DD   (requerido)
+          exclude_room_estados=Mantenimiento (opcional; default)
+        """
+        try:
+            from_s = (request.args.get("from") or "").strip()
+            to_s = (request.args.get("to") or "").strip()
+            if not from_s or not to_s:
+                return jsonify({"ok": False, "error": "missing_range"}), 400
+    
+            try:
+                d_from = datetime.strptime(from_s, "%Y-%m-%d").date()
+                d_to = datetime.strptime(to_s, "%Y-%m-%d").date()
+            except ValueError:
+                return jsonify({"ok": False, "error": "invalid_range"}), 400
+    
+            if d_to < d_from:
+                return jsonify({"ok": False, "error": "range_order"}), 400
+    
+            max_days = 400
+            days = (d_to - d_from).days + 1
+            if days > max_days:
+                return jsonify({"ok": False, "error": "range_too_large", "max_days": max_days}), 400
+    
+            exclude_room_csv = (request.args.get("exclude_room_estados") or "Mantenimiento").strip()
+            to_plus1 = d_to + timedelta(days=1)
+    
+            # Rooms usables
+            rooms_rows = (
+                db.session.execute(
+                    text(
+                        """
+                        SELECT
+                            h.Codigo_Habitacion AS id,
+                            h.Numero_Habitacion AS numero,
+                            h.Tipo AS tipo,
+                            h.Precio_Noche AS precio_noche,
+                            h.Estado AS estado
+                        FROM Habitacion h
+                        WHERE
+                          (:exclude_room_csv IS NULL OR :exclude_room_csv = ''
+                           OR FIND_IN_SET(h.Estado, :exclude_room_csv) = 0)
+                        ORDER BY CAST(h.Numero_Habitacion AS UNSIGNED), h.Numero_Habitacion
+                        """
+                    ),
+                    {"exclude_room_csv": exclude_room_csv},
+                )
+                .mappings()
+                .all()
+            )
+            total_rooms = len(rooms_rows)
+    
+            # Reservas que solapan el rango (para ocupación/ingresos/estado/canal)
+            reservas_rows = (
+                db.session.execute(
+                    text(
+                        """
+                        SELECT
+                            r.Codigo_Reserva AS id,
+                            r.Estado AS estado,
+                            r.Canal AS canal,
+                            r.Numero_Comprobante AS numero,
+                            r.Fecha_Entrada AS checkin,
+                            r.Fecha_Salida AS checkout,
+                            r.Monto_Total AS total,
+                            r.Monto_Pagado AS pagado,
+                            r.Fecha_Registro AS created_at,
+    
+                            CONCAT(c.Nombre,' ',c.Apellido) AS cliente_nombre,
+                            c.Correo AS cliente_correo,
+    
+                            h.Codigo_Habitacion AS room_id,
+                            h.Numero_Habitacion AS habitacion_numero,
+                            h.Tipo AS habitacion_tipo
+                        FROM Reserva r
+                        JOIN Cliente c ON c.Codigo_Cliente = r.Codigo_Cliente
+                        JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion
+                        WHERE
+                            r.Fecha_Entrada < :to_plus1
+                            AND r.Fecha_Salida > :from_d
+                        ORDER BY r.Fecha_Entrada ASC, r.Codigo_Reserva ASC
+                        """
+                    ),
+                    {"to_plus1": to_plus1, "from_d": d_from},
+                )
+                .mappings()
+                .all()
+            )
+    
+            # Serie de reservas creadas por día (por Fecha_Registro, no por estancia)
+            created_map = { (d_from + timedelta(days=i)).isoformat(): 0 for i in range(days) }
+            created_rows = (
+                db.session.execute(
+                    text(
+                        """
+                        SELECT DATE(Fecha_Registro) AS d, COUNT(*) AS cnt
+                        FROM Reserva
+                        WHERE DATE(Fecha_Registro) BETWEEN :from_d AND :to_d
+                        GROUP BY DATE(Fecha_Registro)
+                        """
+                    ),
+                    {"from_d": d_from, "to_d": d_to},
+                )
+                .mappings()
+                .all()
+            )
+            for r in created_rows:
+                if r["d"]:
+                    created_map[str(r["d"])[:10]] = int(r["cnt"] or 0)
+    
+            # Próximas llegadas (7 días)
+            today = date.today()
+            next7 = today + timedelta(days=7)
+            upcoming_rows = (
+                db.session.execute(
+                    text(
+                        """
+                        SELECT
+                            r.Codigo_Reserva AS id,
+                            r.Estado AS estado,
+                            r.Canal AS canal,
+                            r.Fecha_Entrada AS checkin,
+                            r.Fecha_Salida AS checkout,
+                            r.Monto_Total AS total,
+                            r.Monto_Pagado AS pagado,
+                            CONCAT(c.Nombre,' ',c.Apellido) AS cliente_nombre,
+                            h.Numero_Habitacion AS habitacion_numero,
+                            h.Tipo AS habitacion_tipo
+                        FROM Reserva r
+                        JOIN Cliente c ON c.Codigo_Cliente = r.Codigo_Cliente
+                        JOIN Habitacion h ON h.Codigo_Habitacion = r.Codigo_Habitacion
+                        WHERE r.Fecha_Entrada BETWEEN :today AND :next7
+                          AND r.Estado IN ('Confirmada','Pendiente')
+                        ORDER BY r.Fecha_Entrada ASC, r.Codigo_Reserva ASC
+                        LIMIT 12
+                        """
+                    ),
+                    {"today": today, "next7": next7},
+                )
+                .mappings()
+                .all()
+            )
+    
+            # Helpers
+            def _iso_date(v):
+                return v.isoformat()[:10] if v is not None and hasattr(v, "isoformat") else None
+    
+            # Preparar series base
+            dates = [(d_from + timedelta(days=i)) for i in range(days)]
+            idx = { d.isoformat(): i for i, d in enumerate(dates) }
+    
+            arrivals = [0] * days
+            departures = [0] * days
+            occ_rooms_sets = [set() for _ in range(days)]
+            revenue_by_day = [0.0] * days
+            paid_by_day = [0.0] * days
+    
+            confirmed_set = {"Confirmada"}  # coherente para ocupación/ingresos
+            status_counts = {}
+            channel_counts = {}
+    
+            overlapping_reservations = 0
+            confirmed_overlap = 0
+            cancelled_overlap = 0
+            noshow_overlap = 0
+    
+            room_nights_sold = 0.0  # noches vendidas (confirmadas)
+            revenue_total = 0.0
+            paid_total = 0.0
+    
+            # Métricas LOS/Lead (para llegadas confirmadas en rango)
+            los_sum = 0.0
+            los_n = 0
+            lead_sum = 0.0
+            lead_n = 0
+    
+            for r in reservas_rows:
+                overlapping_reservations += 1
+    
+                estado = (r.get("estado") or "")
+                canal = (r.get("canal") or "—").strip() or "—"
+    
+                status_counts[estado] = status_counts.get(estado, 0) + 1
+                channel_counts[canal] = channel_counts.get(canal, 0) + 1
+    
+                if estado == "Confirmada":
+                    confirmed_overlap += 1
+                elif estado == "Cancelada":
+                    cancelled_overlap += 1
+                elif estado == "NoShow":
+                    noshow_overlap += 1
+    
+                ci = r.get("checkin")
+                co = r.get("checkout")
+                if not ci or not co:
+                    continue
+    
+                # llegadas/salidas (solo confirmadas para KPIs operativos)
+                if estado in confirmed_set:
+                    if d_from <= ci <= d_to:
+                        arrivals[idx[ci.isoformat()]] += 1
+                        # LOS y Lead
+                        nights_total = (co - ci).days
+                        if nights_total > 0:
+                            los_sum += float(nights_total)
+                            los_n += 1
+                        created_at = r.get("created_at")
+                        if created_at:
+                            try:
+                                lead = (ci - created_at.date()).days
+                                lead_sum += float(max(0, lead))
+                                lead_n += 1
+                            except Exception:
+                                pass
+    
+                    if d_from <= co <= d_to:
+                        departures[idx[co.isoformat()]] += 1
+    
+                # Ocupación e ingresos prorrateados por noche: checkin <= día < checkout
+                nights_total = (co - ci).days
+                if nights_total <= 0:
+                    continue
+    
+                total = float(r.get("total") or 0)
+                pagado = float(r.get("pagado") or 0)
+                per_night_total = total / nights_total
+                per_night_paid = pagado / nights_total
+    
+                start = max(ci, d_from)
+                end_excl = min(co, to_plus1)  # checkout exclusivo
+    
+                if estado in confirmed_set:
+                    d = start
+                    while d < end_excl:
+                        key = d.isoformat()
+                        j = idx.get(key)
+                        if j is not None:
+                            occ_rooms_sets[j].add(r.get("room_id"))
+                            revenue_by_day[j] += per_night_total
+                            paid_by_day[j] += per_night_paid
+                            room_nights_sold += 1.0
+                        d = d + timedelta(days=1)
+    
+            # Consolidar ocupación diaria y totales
+            sold_rooms_by_day = [len(s) for s in occ_rooms_sets]
+            occ_pct_by_day = [
+                ( (sold_rooms_by_day[i] / total_rooms) * 100.0 ) if total_rooms > 0 else 0.0
+                for i in range(days)
+            ]
+    
+            revenue_total = float(sum(revenue_by_day))
+            paid_total = float(sum(paid_by_day))
+            balance_total = float(max(0.0, revenue_total - paid_total))
+    
+            room_nights_available = float(total_rooms * days)
+            occupancy_pct = (room_nights_sold / room_nights_available * 100.0) if room_nights_available > 0 else 0.0
+            adr = (revenue_total / room_nights_sold) if room_nights_sold > 0 else 0.0
+            revpar = (revenue_total / room_nights_available) if room_nights_available > 0 else 0.0
+    
+            avg_los = (los_sum / los_n) if los_n > 0 else 0.0
+            avg_lead = (lead_sum / lead_n) if lead_n > 0 else 0.0
+    
+            # Alertas de cobro: próximas llegadas con saldo pendiente
+            risk_items = []
+            for r in upcoming_rows:
+                total = float(r.get("total") or 0)
+                pagado = float(r.get("pagado") or 0)
+                balance = float(max(0.0, total - pagado))
+                if balance > 0:
+                    risk_items.append({
+                        "id": int(r["id"]),
+                        "estado": r.get("estado"),
+                        "canal": r.get("canal"),
+                        "checkin": _iso_date(r.get("checkin")),
+                        "checkout": _iso_date(r.get("checkout")),
+                        "cliente_nombre": r.get("cliente_nombre"),
+                        "habitacion_numero": r.get("habitacion_numero"),
+                        "habitacion_tipo": r.get("habitacion_tipo"),
+                        "balance": balance
+                    })
+    
+            upcoming_items = []
+            for r in upcoming_rows:
+                total = float(r.get("total") or 0)
+                pagado = float(r.get("pagado") or 0)
+                balance = float(max(0.0, total - pagado))
+                upcoming_items.append({
+                    "id": int(r["id"]),
+                    "estado": r.get("estado"),
+                    "canal": r.get("canal"),
+                    "checkin": _iso_date(r.get("checkin")),
+                    "checkout": _iso_date(r.get("checkout")),
+                    "cliente_nombre": r.get("cliente_nombre"),
+                    "habitacion_numero": r.get("habitacion_numero"),
+                    "habitacion_tipo": r.get("habitacion_tipo"),
+                    "balance": balance
+                })
+    
+            # Preparar breakdowns ordenados
+            status_breakdown = [{"name": k, "count": int(v)} for k, v in status_counts.items()]
+            status_breakdown.sort(key=lambda x: x["count"], reverse=True)
+    
+            channel_breakdown = [{"name": k, "count": int(v)} for k, v in channel_counts.items()]
+            channel_breakdown.sort(key=lambda x: x["count"], reverse=True)
+    
+            # Serie de balance por día (estimado)
+            balance_by_day = [max(0.0, revenue_by_day[i] - paid_by_day[i]) for i in range(days)]
+    
+            return jsonify({
+                "ok": True,
+                "range": {"from": from_s, "to": to_s, "days": int(days)},
+                "rooms": {"total_usable": int(total_rooms), "exclude_room_estados": exclude_room_csv},
+                "kpis": {
+                    "overlapping_reservations": int(overlapping_reservations),
+                    "confirmed_overlap": int(confirmed_overlap),
+                    "cancelled_overlap": int(cancelled_overlap),
+                    "noshow_overlap": int(noshow_overlap),
+    
+                    "revenue": float(round(revenue_total, 2)),
+                    "paid": float(round(paid_total, 2)),
+                    "balance": float(round(balance_total, 2)),
+    
+                    "room_nights_sold": float(round(room_nights_sold, 2)),
+                    "room_nights_available": float(round(room_nights_available, 2)),
+                    "occupancy_pct": float(round(occupancy_pct, 2)),
+    
+                    "adr": float(round(adr, 2)),
+                    "revpar": float(round(revpar, 2)),
+    
+                    "arrivals": int(sum(arrivals)),
+                    "departures": int(sum(departures)),
+                    "avg_los_nights": float(round(avg_los, 2)),
+                    "avg_lead_days": float(round(avg_lead, 2)),
+                },
+                "breakdowns": {
+                    "status": status_breakdown,
+                    "channel": channel_breakdown
+                },
+                "series": {
+                    "dates": [d.isoformat() for d in dates],
+                    "arrivals_by_day": arrivals,
+                    "departures_by_day": departures,
+                    "sold_rooms_by_day": sold_rooms_by_day,
+                    "occ_pct_by_day": [float(round(x, 2)) for x in occ_pct_by_day],
+                    "revenue_by_day": [float(round(x, 2)) for x in revenue_by_day],
+                    "paid_by_day": [float(round(x, 2)) for x in paid_by_day],
+                    "balance_by_day": [float(round(x, 2)) for x in balance_by_day],
+                    "created_count_by_day": [int(created_map[d.isoformat()]) for d in dates],
+                },
+                "upcoming": {"arrivals": upcoming_items},
+                "risk": {"items": risk_items}
+            })
+    
+        except Exception as e:
+            try:
+                current_app.logger.exception(f"[OPS] reservas dashboard error: {e}")
+            except Exception:
+                pass
+            return jsonify({"ok": False, "error": "dashboard_failed"}), 500
+    
+    
     
     
 
