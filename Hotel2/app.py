@@ -1540,7 +1540,7 @@ def create_app() -> Flask:
 
     # Blueprint de Inventario (INV-07)
     from blueprints.inv import inv_bp
-    app.register_blueprint(inv_bp, url_prefix="/inv")
+    app.register_blueprint(inv_bp)
 
     # Blueprint de Operaciones
     from blueprints.admin import admin_bp 
