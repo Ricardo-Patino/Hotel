@@ -1,121 +1,162 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nuevo Insumo | Hotel Villa Grace</title>
+{% extends "base.html" %}
 
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-</head>
+{% block title %}Inventario · Nuevo insumo | Hotel Villa Grace{% endblock %}
 
-<body class="index-page">
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container d-flex align-items-center justify-content-between">
-    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
-        <li class="dropdown">
-          <a href="#"><span>Páginas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-          <ul>
-            {% if session.get('user_role') in ['Administrador','Recepcionista'] %}
-              <li><a href="{{ url_for('inv.insumos_list') }}">Inventario – Insumos</a></li>
-              <li><a href="{{ url_for('inv.insumo_new') }}">Inventario – Nuevo insumo</a></li>
-            {% endif %}
-          </ul>
-        </li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list" aria-label="Abrir menú"></i>
-    </nav>
-  </div>
-</header>
+{% block content %}
 
-<main class="main" style="padding-top: 100px">
-  <div class="container" data-aos="fade-up" data-aos-delay="100">
-    <div class="row justify-content-center">
-      <div class="col-lg-8">
+<main class="main">
 
-        <div class="card shadow-sm">
-          <div class="card-body">
-            <h3 class="mb-3"><i class="bi bi-plus-circle me-2"></i>Nuevo insumo</h3>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for cat, msg in messages %}
-                  <div class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show" role="alert">
-                    {{ msg }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                  </div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
-
-            <form method="post" novalidate>
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label for="categoria_id" class="form-label">Categoría</label>
-                  <select id="categoria_id" name="categoria_id" class="form-select" required>
-                    <option value="">Selecciona…</option>
-                    {% for c in categorias %}
-                      <option value="{{ c.Id }}">{{ c.Nombre }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-
-                <div class="col-md-6">
-                  <label for="nombre" class="form-label">Nombre del insumo</label>
-                  <input id="nombre" name="nombre" type="text" class="form-control" maxlength="120" required>
-                </div>
-
-                <div class="col-md-4">
-                  <label for="unidad" class="form-label">Unidad</label>
-                  <select id="unidad" name="unidad" class="form-select" required>
-                    <option value="">Selecciona…</option>
-                    {% for u in unidades %}
-                      <option value="{{ u }}">{{ u|upper }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-
-                <div class="col-md-4">
-                  <label for="stock_inicial" class="form-label">Stock inicial</label>
-                  <input id="stock_inicial" name="stock_inicial" type="number" step="0.001" min="0" class="form-control" value="0">
-                </div>
-
-                <div class="col-md-4">
-                  <label for="stock_minimo" class="form-label">Stock mínimo</label>
-                  <input id="stock_minimo" name="stock_minimo" type="number" step="0.001" min="0" class="form-control" value="0">
-                </div>
-              </div>
-
-              <div class="d-flex gap-2 mt-4">
-                <button class="btn btn-primary" type="submit">
-                  <i class="bi bi-check2-circle me-1"></i> Guardar
-                </button>
-                <a class="btn btn-outline-secondary" href="{{ url_for('inv.insumos_list') }}">
-                  <i class="bi bi-arrow-left"></i> Volver
-                </a>
-              </div>
-            </form>
-          </div>
-        </div>
-
-      </div>
+  <!-- ======= Page Title ======= -->
+  <div class="page-title dark-background"
+       style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="container position-relative">
+      <h1>Inventario · Nuevo insumo</h1>
+      <p>Registro de insumos para control de existencias y movimientos</p>
+      <nav class="breadcrumbs">
+        <ol>
+          <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+          <li><a href="{{ url_for('inv.insumos_list') }}">Insumos</a></li>
+          <li class="current">Nuevo</li>
+        </ol>
+      </nav>
     </div>
   </div>
+
+  <!-- ======= Section ======= -->
+  <section class="section">
+    <div class="container" data-aos="fade-up">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show" role="alert">
+              {{ msg }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="row justify-content-center">
+        <div class="col-lg-9 col-xl-8">
+
+          <div class="card shadow-sm border-0">
+
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="bi bi-plus-circle me-1"></i>Crear insumo</h5>
+              <span class="badge bg-dark">{{ session.get('user_role','') }}</span>
+            </div>
+
+            <div class="card-body">
+
+              {% if not categorias or (categorias|length) == 0 %}
+                <div class="alert alert-warning" role="alert">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                  No hay categorías activas disponibles.
+                  {% if session.get('user_role') == 'Administrador' %}
+                    Crea una categoría primero desde <a href="{{ url_for('inv.categorias_new') }}" class="alert-link">Nueva categoría</a>.
+                  {% else %}
+                    Solicita a un Administrador que cree una categoría.
+                  {% endif %}
+                </div>
+              {% endif %}
+
+              <form method="post" novalidate>
+                <div class="row g-3">
+
+                  <!-- Categoría -->
+                  <div class="col-md-6">
+                    <label for="categoria_id" class="form-label">Categoría <span class="text-danger">*</span></label>
+                    <select id="categoria_id" name="categoria_id" class="form-select" required {% if not categorias or (categorias|length)==0 %}disabled{% endif %}>
+                      <option value="">Selecciona…</option>
+                      {% for c in categorias %}
+                        <option value="{{ c.Id }}" {% if request.form.get('categoria_id') == (c.Id ~ '') %}selected{% endif %}>
+                          {{ c.Nombre }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <div class="form-text">La categoría permite agrupar y filtrar insumos.</div>
+                  </div>
+
+                  <!-- Nombre -->
+                  <div class="col-md-6">
+                    <label for="nombre" class="form-label">Nombre del insumo <span class="text-danger">*</span></label>
+                    <input id="nombre" name="nombre" type="text" class="form-control" maxlength="120" required
+                           value="{{ request.form.get('nombre','') }}" placeholder="Ej.: Toallas, Jabón líquido, Café molido">
+                    <div class="form-text">Evita duplicados dentro de la misma categoría.</div>
+                  </div>
+
+                  <!-- Unidad -->
+                  <div class="col-md-4">
+                    <label for="unidad" class="form-label">Unidad <span class="text-danger">*</span></label>
+                    <select id="unidad" name="unidad" class="form-select" required>
+                      <option value="">Selecciona…</option>
+                      {% for u in unidades %}
+                        <option value="{{ u }}" {% if (request.form.get('unidad') or '')|lower == u %}selected{% endif %}>
+                          {{ u|upper }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <div class="form-text">Define cómo se mide el stock (un, kg, lt, etc.).</div>
+                  </div>
+
+                  <!-- Stock inicial -->
+                  <div class="col-md-4">
+                    <label for="stock_inicial" class="form-label">Stock inicial</label>
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="bi bi-archive"></i></span>
+                      <input id="stock_inicial" name="stock_inicial" type="number" step="0.001" min="0" class="form-control"
+                             value="{{ request.form.get('stock_inicial','0') }}">
+                    </div>
+                    <div class="form-text">Opcional. Puedes iniciar en 0 y registrar una entrada después.</div>
+                  </div>
+
+                  <!-- Stock mínimo -->
+                  <div class="col-md-4">
+                    <label for="stock_minimo" class="form-label">Stock mínimo</label>
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="bi bi-exclamation-diamond"></i></span>
+                      <input id="stock_minimo" name="stock_minimo" type="number" step="0.001" min="0" class="form-control"
+                             value="{{ request.form.get('stock_minimo','0') }}">
+                    </div>
+                    <div class="form-text">Se marcará como alerta cuando el stock esté por debajo del mínimo.</div>
+                  </div>
+
+                </div>
+
+                <hr class="my-4">
+
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-primary" type="submit" {% if not categorias or (categorias|length)==0 %}disabled{% endif %}>
+                    <i class="bi bi-check2-circle me-1"></i> Guardar
+                  </button>
+
+                  <a class="btn btn-outline-secondary" href="{{ url_for('inv.insumos_list') }}">
+                    <i class="bi bi-arrow-left me-1"></i> Volver
+                  </a>
+
+                  {% if session.get('user_role') == 'Administrador' %}
+                    <a class="btn btn-outline-dark" href="{{ url_for('inv.categorias_list') }}">
+                      <i class="bi bi-tags me-1"></i> Categorías
+                    </a>
+                  {% endif %}
+                </div>
+
+              </form>
+            </div>
+          </div>
+
+          <div class="text-muted small mt-3">
+            <i class="bi bi-shield-lock me-1"></i>
+            Este módulo registra auditoría en movimientos cuando se realizan ajustes o ediciones (según permisos).
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
 </main>
 
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
-</html>
+{% endblock %}
