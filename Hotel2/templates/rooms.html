@@ -1,22 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Habitaciones{% endblock %}
+{% block title %}Hotel Villa Grace | Habitaciones{% endblock %}
+{% block meta_description %}Explora las habitaciones disponibles en Hotel Villa Grace: tipos, estado, capacidad y precio por noche. Elige tu opción ideal y reserva en línea.{% endblock %}
+{% block meta_keywords %}Hotel Villa Grace, habitaciones, Cóbano, Puntarenas, reservar habitación, suite, doble, sencilla{% endblock %}
+
+{% block body_class %}rooms-page{% endblock %}
+{% block nav_rooms %}active{% endblock %}
 
 {% block content %}
 
-<!-- Page Title -->
-<div class="page-title dark-background" data-aos="fade">
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
   <div class="container position-relative">
     <h1>Habitaciones</h1>
     <p>Explora las habitaciones disponibles y sus características.</p>
-    <div class="mt-3 d-inline-flex align-items-center gap-2 px-3 py-2 rounded-3"
-         style="background: rgba(19, 32, 15, 0.442); border: 1px solid rgba(255,255,255,.20);">
-      <i class="bi bi-info-circle text-white"></i>
-      <span class="text-white-50 small">
-        El número de habitación corresponde a la <b class="text-white">numeración real</b> en el hotel.
-      </span>
-    </div>
-    <nav class="breadcrumbs">
+    <nav class="breadcrumbs" aria-label="breadcrumbs">
       <ol>
         <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
         <li class="current">Habitaciones</li>
@@ -25,16 +23,11 @@
   </div>
 </div>
 
-
-
-<!-- End Page Title -->
-
 <section id="rooms" class="rooms section light-background">
   <div class="container" data-aos="fade-up">
 
     <div class="row g-4">
 
-      <!-- Sidebar Filters -->
       <div class="col-lg-4">
         <div class="filters-wrapper">
 
@@ -94,68 +87,64 @@
         </div>
       </div>
 
-      <!-- Rooms Grid -->
       <div class="col-lg-8">
-
         <div class="row gy-4" id="rooms-grid">
-        
+
           {% for h in habitaciones %}
             {% set tipo = h.Tipo or "Sencilla" %}
             {% set estado = h.Estado or "Disponible" %}
             {% set num = h.Numero_Habitacion or h.Codigo_Habitacion %}
             {% set precio = h.Precio_Noche or 0 %}
-        
+
             <div class="col-lg-6 col-md-6 room-item"
-                 data-type="{{ tipo }}"
-                 data-status="{{ estado }}"
-                 data-search="{{ (num|string) ~ ' ' ~ tipo ~ ' ' ~ estado }}">
-        
+              data-type="{{ tipo }}"
+              data-status="{{ estado }}"
+              data-search="{{ (num|string) ~ ' ' ~ tipo ~ ' ' ~ estado }}">
+
               <div class="room-card modern-room-card border-0 rounded-4 overflow-hidden shadow-sm h-100">
-        
-                <!-- Imagen superior -->
+
                 <div class="room-image position-relative overflow-hidden">
                   <img class="img-fluid w-100"
-                       loading="lazy"
-                       data-room-code="{{ h.Codigo_Habitacion }}"
-                       data-room-fallback="{{ url_for('static', filename='assets/img/hotel/room-1.jpg') }}"
-                       src="{{ url_for('static', filename='assets/img/hotel/room-1.jpg') }}"
-                       alt="Habitación {{ num }}">
+                    loading="lazy"
+                    data-room-code="{{ h.Codigo_Habitacion }}"
+                    data-room-fallback="{{ url_for('static', filename='assets/img/hotel/room-1.jpg') }}"
+                    src="{{ url_for('static', filename='assets/img/hotel/room-1.jpg') }}"
+                    alt="Habitación {{ num }}">
+
                   <div class="room-price-badge bg-success text-white fw-bold position-absolute top-0 end-0 m-2 px-3 py-1 rounded-pill shadow-sm">
                     ₡{{ "{:,.0f}".format(precio) }}
                     <span class="small fw-normal">/noche</span>
                   </div>
+
                   <div class="room-badge position-absolute top-0 start-0 m-2">
                     <span class="badge bg-primary">{{ tipo }}</span>
                   </div>
                 </div>
-        
-                <!-- Contenido -->
+
                 <div class="room-content p-4">
                   <h4 class="room-title mb-2">Habitación {{ num }}</h4>
-        
+
                   <div class="d-flex flex-wrap gap-2 mb-3 text-muted small">
                     <span><i class="bi bi-info-circle me-1"></i>{{ estado }}</span>
                     <span><i class="bi bi-people me-1"></i>Capacidad: {{ h.Capacidad or 2 }}</span>
                   </div>
-        
+
                   <p class="text-muted mb-4">
                     Disfruta de una experiencia de descanso y comodidad con todas las amenidades del Hotel Villa Grace.
                   </p>
-        
+
                   <div class="d-flex justify-content-between align-items-center">
                     <a href="{{ url_for('booking_html') }}" class="btn btn-success w-100 rounded-pill">
                       <i class="bi bi-calendar-check me-2"></i>Reservar
                     </a>
                   </div>
                 </div>
-        
+
               </div>
             </div>
           {% endfor %}
-        
-        </div>
-        
 
+        </div>
       </div>
 
     </div>
@@ -168,7 +157,6 @@
 {% block scripts %}
 {{ super() }}
 
-<!-- NUEVO: helper de imágenes por código -->
 <script src="{{ url_for('static', filename='assets/js/room-images.js') }}"></script>
 
 <script>
@@ -188,12 +176,10 @@
       }
     }
 
-    // Formatear precios (manteniendo tu diseño)
     document.querySelectorAll("[data-money]").forEach(el => {
       el.textContent = money(el.getAttribute("data-money")).replace("₡", "").trim();
     });
 
-    // NUEVO: hidratar imágenes por código (misma lógica que booking-results usa vía /grr/habitaciones)
     if (window.RoomImage && typeof RoomImage.hydrateByCode === "function") {
       RoomImage.hydrateByCode(document);
     }
