@@ -1,537 +1,230 @@
-{% set title = "RRHH | Hotel Villa Grace" %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>{{ title }}</title>
+{% extends "base.html" %}
 
-  <!-- Favicon -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}RRHH | Hotel Villa Grace{% endblock %}
 
-  <!-- Tipografías -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+{% block head_extra %}
+<style>
+  main.main { padding-top: 90px; }
 
-  <!-- CSS base (igual que Periodos) -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  :root{
+    --vg-green: #1c4b3c;
+    --vg-green-soft: #e0f2eb;
+    --vg-muted: #6c757d;
+  }
 
-  <style>
-    :root{
-      --vg-green: #1c4b3c;
-      --vg-green-soft: #e0f2eb;
-      --vg-muted: #6c757d;
-    }
+  .hrm-wrapper{
+    background:#ffffff;
+    border-radius:1.5rem;
+    padding:1.75rem;
+    border:1px solid #edf1f4;
+    box-shadow:0 12px 30px rgba(15,34,58,0.08);
+  }
 
-    body{
-      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background-color:#f5f6f7;
-      color:#212529;
-    }
+  .hrm-header{
+    display:flex;
+    align-items:center;
+    gap:.75rem;
+    margin-bottom:1.5rem;
+  }
 
-    /* wrapper central tipo card */
-    .hrm-wrapper{
-      background:#ffffff;
-      border-radius:1.5rem;
-      padding:1.75rem;
-      border:1px solid #edf1f4;
-      box-shadow:0 12px 30px rgba(15,34,58,0.08);
-    }
+  .hrm-title{
+    display:flex;
+    align-items:center;
+    gap:.75rem;
+  }
 
-    .hrm-header{
-      display:flex;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:space-between;
-      gap:.75rem;
-      margin-bottom:1.5rem;
-    }
+  .hrm-title-icon{
+    width:42px;
+    height:42px;
+    border-radius:999px;
+    background:var(--vg-green-soft);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--vg-green);
+  }
 
-    .hrm-title{
-      display:flex;
-      align-items:center;
-      gap:.75rem;
-    }
+  .hrm-title h2{
+    margin:0;
+    font-size:1.6rem;
+    font-weight:600;
+  }
 
-    .hrm-title-icon{
-      width:42px;
-      height:42px;
-      border-radius:999px;
-      background:var(--vg-green-soft);
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      color:var(--vg-green);
-    }
+  .hrm-subtitle{
+    margin:0;
+    font-size:.9rem;
+    color:var(--vg-muted);
+  }
 
-    .hrm-title h2{
-      margin:0;
-      font-size:1.6rem;
-      font-weight:600;
-      color:#12212b;
-    }
+  .kpi-card{
+    border-radius:1rem;
+    border:1px solid #edf1f4;
+    background:#fff;
+    padding:.85rem 1rem;
+    box-shadow:0 8px 22px rgba(15,34,58,.06);
+  }
 
-    .hrm-subtitle{
-      margin:0;
-      font-size:.9rem;
-      color:var(--vg-muted);
-    }
+  .kpi-label{
+    font-size:.75rem;
+    text-transform:uppercase;
+    color:var(--vg-muted);
+    letter-spacing:.08em;
+  }
 
-    /* KPI cards */
-    .kpi-card{
-      border-radius:1rem;
-      border:1px solid #edf1f4;
-      background:#ffffff;
-      color:#12212b;
-      padding:.85rem 1rem;
-      box-shadow:0 8px 22px rgba(15,34,58,0.06);
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-      gap:.25rem;
-    }
+  .kpi-value{
+    font-size:1.7rem;
+    font-weight:600;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
 
-    .kpi-label{
-      font-size:.8rem;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-      color:var(--vg-muted);
-    }
+  .kpi-icon{
+    width:30px;
+    height:30px;
+    border-radius:999px;
+    background:var(--vg-green-soft);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--vg-green);
+  }
 
-    .kpi-value{
-      font-size:1.7rem;
-      font-weight:600;
-      display:flex;
-      align-items:center;
-      gap:.35rem;
-    }
+  .vg-card{
+    border-radius:1.2rem;
+    border:1px solid #edf1f4;
+    background:#fff;
+    box-shadow:0 10px 28px rgba(15,34,58,.08);
+  }
+</style>
+{% endblock %}
 
-    .kpi-icon{
-      width:28px;
-      height:28px;
-      border-radius:999px;
-      background:var(--vg-green-soft);
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      color:var(--vg-green);
-      font-size:1rem;
-    }
+{% block content %}
 
-    /* Cards formularios */
-    .vg-card{
-      border-radius:1.2rem;
-      border:1px solid #edf1f4;
-      background:#ffffff;
-      box-shadow:0 10px 28px rgba(15,34,58,0.08);
-    }
-
-    .vg-card h5{
-      font-size:1.05rem;
-      font-weight:600;
-      color:#12212b;
-    }
-
-    .vg-card small{
-      color:var(--vg-muted);
-    }
-
-    .form-control,
-    .form-select{
-      background-color:#ffffff;
-      border-radius:.75rem;
-      border:1px solid #dfe4ea;
-      color:#495057;
-      font-size:.86rem;
-    }
-
-    .form-control::placeholder{ color:#adb5bd; }
-
-    .form-control:focus,
-    .form-select:focus{
-      border-color:var(--vg-green);
-      box-shadow:0 0 0 .15rem rgba(28,75,60,.18);
-      background-color:#ffffff;
-      color:#212529;
-    }
-
-    .btn-primary{
-      background:var(--vg-green);
-      border:none;
-      color:#ffffff;
-      font-weight:600;
-      border-radius:999px;
-      padding-inline:1.4rem;
-    }
-
-    .btn-primary:hover{
-      filter:brightness(1.05);
-      color:#ffffff;
-    }
-
-    .btn-outline-danger{
-      border-radius:999px;
-      border-width:1px;
-    }
-
-    /* Tabla periodos */
-    .table-wrapper{
-      border-radius:1.1rem;
-      border:1px solid #edf1f4;
-      background:#ffffff;
-      overflow:hidden;
-      box-shadow:0 10px 26px rgba(15,34,58,0.08);
-    }
-
-    .table{
-      margin-bottom:0;
-      color:#212529;
-      font-size:.86rem;
-    }
-
-    .table thead{
-      background:#f7fafc;
-    }
-
-    .table thead th{
-      border-bottom:none;
-      font-weight:500;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      font-size:.75rem;
-      color:#4a5568;
-    }
-
-    .table tbody tr{
-      border-color:#edf1f4;
-    }
-
-    .badge-estado{
-      padding:.15rem .7rem;
-      border-radius:999px;
-      font-size:.72rem;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-    }
-
-    .badge-estado.ACTIVO,
-    .badge-estado.CERRADO{
-      background:var(--vg-green-soft);
-      color:var(--vg-green);
-      border:1px solid #a3d4c4;
-    }
-
-    .badge-estado.ABIERTO,
-    .badge-estado.PENDIENTE{
-      background:#fff3cd;
-      color:#856404;
-      border:1px solid #ffe49b;
-    }
-
-    .badge-estado.CANCELADO{
-      background:#fde4e5;
-      color:#b3261e;
-      border:1px solid #f5b5ba;
-    }
-
-    hr{ border-color:#edf1f4; }
-
-    @media (max-width:768px){
-      .hrm-wrapper{ padding:1.25rem; border-radius:1.2rem; }
-      .kpi-card{ padding:.75rem .9rem; }
-      .hrm-header{ align-items:flex-start; }
-      .hrm-title h2{ font-size:1.3rem; }
-    }
-  </style>
-</head>
-<body>
-
-<!-- HEADER VERDE (igual al resto del sitio) -->
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="/">Inicio</a></li>
-        <li><a href="/grr">Reservas</a></li>
-        <li><a href="/fin">Finanzas</a></li>
-        <li><a href="/hrm/empleados-ui">Colaboradores</a></li>
-        <li><a href="/hrm/mis-horas">Mis horas</a></li>
-        <li><a href="#" class="active">RRHH</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="/grr">Reservar</a>
+<div class="page-title dark-background"
+     style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container">
+    <h1>Recursos Humanos</h1>
+    <p>Gestión de ausencias y amonestaciones</p>
   </div>
-</header>
+</div>
 
-<main class="main">
-  <!-- BANDA CON IMAGEN (USANDO FOTO EXTERNA, TEMA RRHH) -->
-<main class="main">
-  <div class="page-title dark-background"
-       data-aos="fade"
-       style="
-         background-image:url('https://images.pexels.com/photos/1181562/pexels-photo-1181562.jpeg?auto=compress&cs=tinysrgb&w=1600');
-         background-size: cover;
-         background-position: center 25%;
-       ">
-    <div class="container position-relative">
-      <h1>Recursos Humanos</h1>
-      <p>Panel para gestionar colaboradores, ausencias, amonestaciones y periodos de nómina.</p>
-      <nav class="breadcrumbs">
-        <ol>
-          <li><a href="/">Inicio</a></li>
-          <li class="current">RRHH</li>
-        </ol>
-      </nav>
-    </div>
-  </div>
+<section class="section">
+  <div class="container">
+    <div class="hrm-wrapper">
 
-  <section class="section">
-    <div class="container" data-aos="fade-up">
-      <div class="hrm-wrapper">
-
-        <!-- Encabezado sección interno -->
-        <div class="hrm-header">
-          <div class="hrm-title">
-            <span class="hrm-title-icon">
-              <i class="bi bi-people-fill"></i>
-            </span>
-            <div>
-              <h2>Recursos Humanos</h2>
-              <p class="hrm-subtitle">
-                Panel interno para gestionar ausencias, amonestaciones y
-                periodos de nómina del Hotel Villa Grace.
-              </p>
-            </div>
-          </div>
+      <!-- HEADER -->
+      <div class="hrm-header">
+        <span class="hrm-title-icon">
+          <i class="bi bi-people-fill"></i>
+        </span>
+        <div>
+          <h2>Recursos Humanos</h2>
+          <p class="hrm-subtitle">Panel interno para la gestión de incidencias del personal</p>
         </div>
-
-        <!-- KPIs -->
-        <div class="row g-3 mb-4">
-          <div class="col-md-3">
-            <div class="kpi-card">
-              <div class="kpi-label">Colaboradores activos</div>
-              <div class="kpi-value">
-                <span>{{ resumen.activos }}</span>
-                <span class="kpi-icon"><i class="bi bi-person-check-fill"></i></span>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-md-3">
-            <div class="kpi-card">
-              <div class="kpi-label">Vacaciones pendientes</div>
-              <div class="kpi-value">
-                <span>{{ resumen.vac_pend }}</span>
-                <span class="kpi-icon"><i class="bi bi-sun-fill"></i></span>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-md-3">
-            <div class="kpi-card">
-              <div class="kpi-label">Amonestaciones sin notificar</div>
-              <div class="kpi-value">
-                <span>{{ resumen.amon_pend }}</span>
-                <span class="kpi-icon"><i class="bi bi-bell-fill"></i></span>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-md-3">
-            <div class="kpi-card">
-              <div class="kpi-label">Ausencias hoy</div>
-              <div class="kpi-value">
-                <span>{{ resumen.aus_hoy }}</span>
-                <span class="kpi-icon"><i class="bi bi-clock-history"></i></span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Formularios rápidos -->
-        <div class="row g-4">
-          <div class="col-lg-6">
-            <div class="card vg-card p-3 p-md-4">
-              <h5 class="mb-3">
-                <i class="bi bi-dash-circle me-1"></i>
-                Registrar ausencia sin goce
-              </h5>
-              <small class="d-block mb-3">
-                Registre salidas por gestiones personales, citas médicas u
-                otras ausencias sin goce de salario.
-              </small>
-              <div class="row g-2">
-                <div class="col-6">
-                  <input id="abs_func" class="form-control" placeholder="Código funcionario">
-                </div>
-                <div class="col-6">
-                  <input id="abs_fecha" type="date" class="form-control">
-                </div>
-                <div class="col-6">
-                  <input id="abs_horas" type="number" step="0.25" class="form-control"
-                         placeholder="Horas (opcional)">
-                </div>
-                <div class="col-6">
-                  <input id="abs_motivo" class="form-control" placeholder="Motivo">
-                </div>
-                <div class="col-12 text-end mt-2">
-                  <button class="btn btn-primary" id="btnAbs">
-                    <i class="bi bi-check-circle"></i> Registrar ausencia
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-lg-6">
-            <div class="card vg-card p-3 p-md-4">
-              <h5 class="mb-3">
-                <i class="bi bi-exclamation-triangle me-1"></i>
-                Nueva amonestación
-              </h5>
-              <small class="d-block mb-3">
-                Registre incidentes disciplinarios y notifique al
-                colaborador por los medios definidos por RRHH.
-              </small>
-              <div class="row g-2">
-                <div class="col-4">
-                  <input id="w_func" class="form-control" placeholder="Código funcionario">
-                </div>
-                <div class="col-4">
-                  <select id="w_sev" class="form-select">
-                    <option>LEVE</option>
-                    <option>MEDIA</option>
-                    <option>GRAVE</option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <input id="w_motivo" class="form-control" placeholder="Motivo">
-                </div>
-                <div class="col-12 text-end mt-2">
-                  <button class="btn btn-outline-danger" id="btnWarn">
-                    <i class="bi bi-send"></i> Registrar y notificar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr class="my-4">
-
-        <!-- Tabla de periodos -->
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <h5 class="mb-0">Últimos periodos de nómina</h5>
-          <small class="text-muted">
-            Vista resumida de quincenas procesadas para el hotel.
-          </small>
-        </div>
-
-        <div class="table-responsive table-wrapper mt-2">
-          <table class="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th>Periodo</th>
-                <th>Quincena</th>
-                <th>Desde</th>
-                <th>Hasta</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for p in periodos %}
-              <tr>
-                <td>{{ p.Periodo_Key }}</td>
-                <td>{{ p.Quincena }}</td>
-                <td>{{ p.Fecha_Desde }}</td>
-                <td>{{ p.Fecha_Hasta }}</td>
-                <td>
-                  <span class="badge-estado {{ p.Estado }}">
-                    {{ p.Estado }}
-                  </span>
-                </td>
-              </tr>
-              {% else %}
-              <tr>
-                <td colspan="5" class="text-center text-muted py-3">
-                  No hay periodos de nómina registrados aún.
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
       </div>
-    </div>
-  </section>
-</main>
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center">
-    <div class="container">
-      © <strong><span>Hotel Villa Grace</span></strong>
+      <!-- KPIs -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="kpi-card">
+            <div class="kpi-label">Colaboradores activos</div>
+            <div class="kpi-value">
+              {{ resumen.activos }}
+              <span class="kpi-icon"><i class="bi bi-person-check-fill"></i></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="kpi-card">
+            <div class="kpi-label">Ausencias registradas (hoy)</div>
+            <div class="kpi-value">
+              {{ resumen.aus_hoy }}
+              <span class="kpi-icon"><i class="bi bi-clock-history"></i></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="kpi-card">
+            <div class="kpi-label">Amonestaciones pendientes</div>
+            <div class="kpi-value">
+              {{ resumen.amon_pend }}
+              <span class="kpi-icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORMULARIOS -->
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="vg-card p-4">
+            <h5>Registrar ausencia</h5>
+            <input id="abs_func" class="form-control mb-2" placeholder="Código funcionario">
+            <input id="abs_fecha" type="date" class="form-control mb-2">
+            <input id="abs_horas" type="number" step="0.25" class="form-control mb-2" placeholder="Horas">
+            <input id="abs_motivo" class="form-control mb-2" placeholder="Motivo">
+            <div class="text-end">
+              <button id="btnAbs" class="btn btn-primary">Registrar ausencia</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="vg-card p-4">
+            <h5>Nueva amonestación</h5>
+            <input id="w_func" class="form-control mb-2" placeholder="Código funcionario">
+            <select id="w_sev" class="form-select mb-2">
+              <option>LEVE</option>
+              <option>MEDIA</option>
+              <option>GRAVE</option>
+            </select>
+            <input id="w_motivo" class="form-control mb-2" placeholder="Motivo">
+            <div class="text-end">
+              <button id="btnWarn" class="btn btn-outline-danger">Registrar amonestación</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
-</footer>
+</section>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-  <i class="bi bi-arrow-up-short"></i>
-</a>
-<div id="preloader"></div>
+{% endblock %}
 
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-
+{% block scripts %}
 <script>
-  document.getElementById("btnAbs")?.addEventListener("click", async () => {
-    const body = {
-      func: parseInt(document.getElementById("abs_func").value),
-      fecha: document.getElementById("abs_fecha").value,
-      horas: parseFloat(document.getElementById("abs_horas").value || 0),
-      motivo: document.getElementById("abs_motivo").value,
-      user_id: 1,
-    };
-
-    await fetch('{{ url_for("hrm.add_absence") }}', {
+  document.getElementById("btnAbs").onclick = async () => {
+    await fetch("{{ url_for('hrm.add_absence') }}", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        func: parseInt(abs_func.value),
+        fecha: abs_fecha.value,
+        horas: parseFloat(abs_horas.value || 0),
+        motivo: abs_motivo.value,
+        user_id: 1
+      })
     });
+    location.reload();
+  };
 
-    alert("Ausencia registrada");
-  });
-
-  document.getElementById("btnWarn")?.addEventListener("click", async () => {
-    const body = {
-      func: parseInt(document.getElementById("w_func").value),
-      sev: document.getElementById("w_sev").value,
-      motivo: document.getElementById("w_motivo").value,
-      user_id: 1,
-    };
-
-    await fetch('{{ url_for("hrm.create_warning") }}', {
+  document.getElementById("btnWarn").onclick = async () => {
+    await fetch("{{ url_for('hrm.create_warning') }}", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        func: parseInt(w_func.value),
+        sev: w_sev.value,
+        motivo: w_motivo.value,
+        user_id: 1
+      })
     });
-
-    alert("Amonestación registrada y notificada");
-  });
+    location.reload();
+  };
 </script>
-</body>
-</html>
+{% endblock %}
 

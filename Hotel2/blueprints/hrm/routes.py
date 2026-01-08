@@ -7,12 +7,34 @@ from flask import request, jsonify, render_template, session, redirect, url_for,
 from sqlalchemy import func, or_, text
 from extensions import db
 from . import hrm_bp
+from datetime import datetime
+from models import Funcionario
+
+from models.usuario import Usuario
+from models.ausencia import Ausencia
+from models.amonestacion import Amonestacion
+
+
 #from models import HoraExtra
 
 # Modelos principales HRM
 from models import Funcionario, FuncionarioHistorial
 # Modelo de marcaciones (HU-08-002)
 from models import Marcacion
+
+from functools import wraps
+from flask import abort
+
+def require_roles(*roles):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            rol = session.get("user_role")
+            if rol not in roles:
+                return abort(403)
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # =============================================================================
@@ -46,13 +68,34 @@ def _registrado_por():
 def _current_funcionario_id() -> int | None:
     """
     Obtiene el funcionario 'logueado'.
-    - Primero busca en sesión (p. ej. session["Codigo_Funcionario"]).
-    - También admite ?func=ID en la URL para pruebas.
+    - 1) session["Codigo_Funcionario"]
+    - 2) si viene ?func=ID (testing)
+    - 3) si hay session["user_id"], busca Funcionario por Codigo_Usuario y lo guarda en sesión
     """
     fid = session.get("Codigo_Funcionario")
-    if not fid:
-        fid = request.args.get("func", type=int)
-    return fid
+    if fid:
+        try:
+            return int(fid)
+        except Exception:
+            pass
+
+    fid_qs = request.args.get("func", type=int)
+    if fid_qs:
+        session["Codigo_Funcionario"] = int(fid_qs)
+        return int(fid_qs)
+
+    uid = session.get("user_id")
+    if uid:
+        funci = Funcionario.query.filter_by(Codigo_Usuario=uid).first()
+        if funci:
+            session["Codigo_Funcionario"] = int(funci.Codigo_Funcionario)
+            session["Departamento"] = funci.Departamento
+            return int(funci.Codigo_Funcionario)
+
+    return None
+
+
+
 
 
 def _calc_hours(dt_in: datetime, dt_out: datetime) -> float:
@@ -415,6 +458,7 @@ def ver_empleado_detalle_alias(codigo_func):
 # HU-08-002 — Registro de horas por el colaborador
 # =============================================================================
 @hrm_bp.route("/mis-horas", methods=["GET"])
+@require_roles("Limpieza")
 def mis_horas_ui():
     """
     Panel del colaborador para ver/registrar sus horas.
@@ -465,8 +509,8 @@ def mis_horas_ui():
 
 
 @hrm_bp.route("/marcar/entrada", methods=["POST"])
+@require_roles("Limpieza")
 def marcar_entrada():
-    """Crea la marcación de entrada del día si no existe una abierta."""
     fid = _current_funcionario_id()
     if not fid:
         return jsonify({"ok": False, "error": "La entrada no fue registrada,ingrese al sistema y haga su marca"}), 401
@@ -514,61 +558,33 @@ def marcar_salida():
     ahora = datetime.now()
     hoy = ahora.date()
 
-    # Buscar la última entrada abierta de hoy
     m = (
         Marcacion.query
         .filter(
             Marcacion.Codigo_Funcionario == fid,
             Marcacion.Fecha == hoy,
-            Marcacion.Hora_Salida.is_(None)  # jornada aún abierta
+            Marcacion.Hora_Salida.is_(None)
         )
-        .order_by(Marcacion.Id.desc())
         .first()
     )
 
     if not m:
-        return jsonify({"ok": False, "error": "No hay marcación de entrada abierta hoy."}), 400
+        return jsonify({"ok": False, "error": "No hay entrada abierta hoy"}), 400
 
-    # Validar hora de entrada
-    dt_in = getattr(m, "Hora_Entrada", None)
-    if not dt_in:
-        return jsonify({"ok": False, "error": "La marcación no tiene hora de entrada válida."}), 400
+    dt_in = m.Hora_Entrada
+    horas = round((ahora - dt_in).total_seconds() / 3600, 2)
 
-    # Calcular horas totales (en decimales)
-    delta = (ahora - dt_in).total_seconds() / 3600
-    horas_trab = round(delta, 2)
-
-    # Actualizar marcación
     m.Hora_Salida = ahora
-    m.Horas = horas_trab
-    m.Total_Horas = horas_trab
-    m.Horas_Regulares = horas_trab
+    m.Horas = horas
+    m.Total_Horas = horas
+    m.Horas_Regulares = horas
     m.Estado = "Pendiente"
     m.Observaciones = "Marcación de salida"
 
     db.session.commit()
 
-    # === HRM-08-004: Registrar horas extra si superan 8 ===
-    extras = 0
-    if horas_trab > 8:
-        extras = round(horas_trab - 8, 2)
-        nueva_extra = HoraExtra(
-            Marcacion_Id=m.Id,
-            Codigo_Funcionario=m.Codigo_Funcionario,
-            Fecha=m.Fecha,
-            Horas_Extras=extras,
-            Motivo="Jornada superior a 8 horas",
-            Estado="Pendiente",
-            Validado_Por=None
-        )
-        db.session.add(nueva_extra)
-        db.session.commit()
+    return jsonify({"ok": True, "horas": horas})
 
-    return jsonify({
-        "ok": True,
-        "horas_regulares": horas_trab,
-        "horas_extra": extras
-    })
 
 
 @hrm_bp.route("/mis-horas/listado", methods=["GET"])
@@ -942,13 +958,37 @@ def dashboard():
     # mini-resumen para tarjetas
     resumen = q("""
         SELECT 
-          (SELECT COUNT(*) FROM Funcionario WHERE Estado_Empleado='Activo') AS activos,
-          (SELECT COUNT(*) FROM HRM_VacationRequest WHERE Estado='PENDIENTE') AS vac_pend,
-          (SELECT COUNT(*) FROM HRM_Warning WHERE Estado='REGISTRADA') AS amon_pend,
-          (SELECT COUNT(*) FROM HRM_Absence WHERE Fecha=CURDATE()) AS aus_hoy
+          (SELECT COUNT(*) 
+             FROM Funcionario 
+            WHERE Estado_Empleado='Activo') AS activos,
+
+          -- dejamos esto aunque no se use ahora
+          (SELECT COUNT(*) 
+             FROM HRM_VacationRequest 
+            WHERE Estado='PENDIENTE') AS vac_pend,
+
+          -- TOTAL de amonestaciones registradas
+          (SELECT COUNT(*) 
+             FROM HRM_Warning) AS amon_pend,
+
+          -- TOTAL de ausencias registradas
+          (SELECT COUNT(*) 
+             FROM HRM_Absence) AS aus_hoy
     """)[0]
-    periodos = q("SELECT * FROM HRM_PayrollPeriod ORDER BY Fecha_Desde DESC LIMIT 6")
-    return render_template("hrm-dashboard.html", resumen=resumen, periodos=periodos)
+
+    periodos = q("""
+        SELECT * 
+        FROM HRM_PayrollPeriod 
+        ORDER BY Fecha_Desde DESC 
+        LIMIT 6
+    """)
+
+    return render_template(
+        "hrm-dashboard.html",
+        resumen=resumen,
+        periodos=periodos
+    )
+
 
 # =============== HRM-08-005 ===============
 @hrm_bp.post("/absences")
@@ -1237,3 +1277,36 @@ def aguinaldo_generate():
           ON DUPLICATE KEY UPDATE Bruto_Quincena=:b, Neto_Pagar=:b
         """, pid=per["Id"], f=r["Codigo_Funcionario"], base=base, b=bruto)
     return jsonify({"ok": True})
+
+@hrm_bp.route("/", methods=["GET"])
+def rrhh_ui():
+    resumen = {
+        "activos": db.session.query(Funcionario)
+            .filter(Funcionario.Estado_Empleado == "Activo")
+            .count(),
+
+        "vac_pend": db.session.query(HRMAbsence)
+            .filter(HRMAbsence.Tipo == "VACACIONES")
+            .count(),
+
+        "amon_pend": db.session.query(text("HRM_Warning"))
+            .filter(text("Estado='REGISTRADA'"))
+            .count(),
+
+        "aus_hoy": db.session.query(HRMAbsence)
+            .filter(HRMAbsence.Fecha == func.curdate())
+            .count(),
+    }
+
+    periodos = (
+        db.session.query(HRMPayrollPeriod)
+        .order_by(HRMPayrollPeriod.Fecha_Desde.desc())
+        .limit(5)
+        .all()
+    )
+
+    return render_template(
+        "rrhh.html",
+        resumen=resumen,
+        periodos=periodos,
+    )

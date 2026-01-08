@@ -8,6 +8,7 @@ import smtplib
 import ssl
 import json
 import csv
+import models
 from functools import wraps
 from email.message import EmailMessage
 from datetime import datetime, date
@@ -2129,7 +2130,17 @@ def create_app() -> Flask:
     @app.route("/admin-users.html")
     @role_required("Administrador", "Recepcionista")
     def admin_users_html():
-        return render_template("admin-users.html")
+        print("SESSION ACTUAL:", dict(session))
+        from models.security import Usuario, Rol
+
+        usuarios = Usuario.query.all()
+        roles = Rol.query.all()
+
+        return render_template(
+            "admin-users.html",
+            usuarios=usuarios,
+            roles=roles
+        )
 
 
     @app.route("/portal-perfil.html")
@@ -2145,10 +2156,12 @@ def create_app() -> Flask:
     @app.route("/portal-reservas.html")
     @role_required("Cliente")
     def portal_reservas_html():
-        uid = session.get("user_id")
-        if not uid:
-            # Si por alguna razón llega aquí sin sesión, redirige a login (consistente con el resto)
-            return redirect(url_for("login_html", next=request.path))
+        uid = session.get("user_id")  # o como lo guardes en sesión
+        current_user = {
+            "id": int(uid) if uid is not None else None,
+            "is_authenticated": bool(uid)
+        }
+        return render_template("portal-reservas.html", user_id=session.get("user_id", 1))
     
         current_user = {
             "id": int(uid),
@@ -5085,6 +5098,7 @@ def create_app() -> Flask:
             db.session.add(u)
     
             try:
+                
                 # 1) Asegurar Cliente con documento
                 cliente_id = ensure_cliente_for_email(full_name, email, phone_norm, doc_num=national_id)
                 if cliente_id:
