@@ -1,27 +1,12 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recepción – Check-in | Hotel Villa Grace</title>
-  <meta name="description" content="Módulo de check-in para recepción con early check-in (GRR-01-017).">
+{% extends "base.html" %}
 
-  <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}Recepción – Check-in | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Módulo de check-in para recepción con early check-in (GRR-01-017).{% endblock %}
 
-  <!-- Fuentes & Vendors -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+{% block body_class %}inner-page{% endblock %}
 
-  <!-- Estilos -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-
-  <style>
+{% block head_extra %}
+<style>
   :root{
     --card-radius: 14px;
     --card-border: rgba(0,0,0,.06);
@@ -98,556 +83,516 @@
   /* Ajustes de separación general */
   .section .card{ margin-bottom: 1rem; }
 </style>
+{% endblock %}
 
-</head>
-<body class="inner-page">
+{% block content %}
 
-  <!-- Header -->
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li><a href="ops-dashboard.html">Tablero</a></li>
-          <li><a href="ops-arrivals-departures.html">Llegadas/Salidas</a></li>
-          <li><a href="ops-rooms-status.html">Estado Hab.</a></li>
-          <li><a href="/grr/ops/housekeeping">Limpieza</a></li>
-          <li><a href="/grr/ops/coupons">Cupones</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
-      <a class="btn-getstarted d-none d-sm-block" href="ops-dashboard.html">Volver al tablero</a>
-    </div>
-  </header>
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Check-in de Huéspedes</h1>
+    <p class="mb-0">
+      Selecciona una reserva confirmada y valida por <strong>cédula/pasaporte/correo</strong>. Early check-in opcional.
+    </p>
+    <nav class="breadcrumbs" aria-label="breadcrumbs">
+      <ol>
+        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+        <li><a href="ops-dashboard.html">Recepción</a></li>
+        <li class="current">Check-in</li>
+      </ol>
+    </nav>
+  </div>
+</div>
 
-  <main class="main">
-    <!-- Título -->
-    <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-      <div class="container position-relative">
-        <h1>Check-in de Huéspedes</h1>
-        <p class="mb-0">Selecciona una reserva confirmada y valida por <strong>cédula/pasaporte/correo</strong>. Early check-in opcional.</p>
-        <nav class="breadcrumbs"><ol><li><a href="index.html">Inicio</a></li><li><a href="ops-dashboard.html">Recepción</a></li><li class="current">Check-in</li></ol></nav>
+<section class="section">
+  <div class="container" data-aos="fade-up">
+
+    <div id="ui-alert" class="alert d-none shadow-sm" role="alert"></div>
+
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0"><i class="bi bi-calendar-week me-2"></i>Check-ins realizados esta semana</h5>
+          <div class="small soft" id="wk-range">—</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge text-bg-primary" id="wk-count">0</span>
+          <button class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="btn-wk-refresh" type="button">
+            <i class="bi bi-arrow-repeat me-1"></i><span class="d-none d-sm-inline">Actualizar</span>
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle wk-table">
+            <thead>
+              <tr>
+                <th class="wk-col-dt">Fecha / Hora</th>
+                <th class="wk-col-res">Reserva</th>
+                <th>Huésped</th>
+                <th class="wk-col-hab text-center">Hab.</th>
+                <th class="wk-col-doc">Documento</th>
+              </tr>
+            </thead>
+            <tbody id="wk-body">
+              <tr><td colspan="5" class="text-center soft py-4">Cargando check-ins de la semana…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-3 py-2 small soft" id="wk-updated">—</div>
       </div>
     </div>
 
-    <section class="section">
-      <div class="container" data-aos="fade-up">
-
-        <!-- ALERTA UI (estética, no alert() del navegador) -->
-        <div id="ui-alert" class="alert d-none shadow-sm" role="alert"></div>
-
-        <!-- ✅ Check-ins realizados en la semana (tiempo real) -->
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-            <div>
-              <h5 class="mb-0"><i class="bi bi-calendar-week me-2"></i>Check-ins realizados esta semana</h5>
-              <div class="small soft" id="wk-range">—</div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              <span class="badge text-bg-primary" id="wk-count">0</span>
-              <button class="btn btn-sm btn-outline-secondary d-flex align-items-center" id="btn-wk-refresh" type="button">
-                <i class="bi bi-arrow-repeat me-1"></i><span class="d-none d-sm-inline">Actualizar</span>
-              </button>
-            </div>
-            
-          </div>
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table table-sm align-middle wk-table">
-                <thead>
-                  <tr>
-                    <th class="wk-col-dt">Fecha / Hora</th>
-                    <th class="wk-col-res">Reserva</th>
-                    <th>Huésped</th>
-                    <th class="wk-col-hab text-center">Hab.</th>
-                    <th class="wk-col-doc">Documento</th>
-                  </tr>
-                </thead>
-                
-                <tbody id="wk-body">
-                  <tr><td colspan="5" class="text-center soft py-4">Cargando check-ins de la semana…</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="px-3 py-2 small soft" id="wk-updated">—</div>
-          </div>
-        </div>
-
-        <!-- Validar documento -->
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0">
-            <h5 class="mb-0"><i class="bi bi-search me-2"></i>Validar documento</h5>
-          </div>
-          <div class="card-body">
-            <form id="frm-search" class="row g-3">
-              <div class="col-md-6">
-                <label class="form-label">Cédula / Pasaporte / Correo</label>
-                <input type="text" class="form-control" id="doc" placeholder="Ej: 305440468 · P1234567 · correo@dominio.com">
-                <div class="hint mt-1">
-                  Si aún no ingresas documento, abajo se muestran <strong>reservas confirmadas activas</strong> para hoy.
-                  Para completar check-in, el documento debe coincidir con el perfil que creó la reserva.
-                </div>
-              </div>
-              <div class="col-md-3">
-                <label class="form-label">Fecha (opcional)</label>
-                <input type="date" class="form-control" id="when">
-                <div class="hint mt-1">Por defecto usa hoy.</div>
-              </div>
-              <div class="col-md-3 d-grid align-items-end">
-                <button class="btn btn-primary" id="btn-search" type="submit">
-                  <i class="bi bi-search me-1"></i> Buscar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Resultados -->
-        <div class="card shadow-sm border-0" id="card-results">
-          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2">
-              <h5 class="mb-0">Resultado de la búsqueda</h5>
-              <button class="btn btn-sm btn-outline-secondary" id="btn-reset" type="button" title="Volver a confirmadas del día">
-                <i class="bi bi-funnel me-1"></i> Confirmadas del día
-              </button>
-            </div>
-            <span class="soft small" id="result-count">0 coincidencias</span>
-          </div>
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th># Reserva</th>
-                    <th>Huésped</th>
-                    <th>Fechas</th>
-                    <th>Hab.</th>
-                    <th>Estado</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-results"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Early check-in (GRR-01-017) -->
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0">
-            <h5 class="mb-0"><i class="bi bi-alarm me-2"></i>Early check-in (opcional)</h5>
-          </div>
-          <div class="card-body">
-            <div class="row g-2 align-items-end">
-              <div class="col-md-3">
-                <label class="form-label">Porcentaje</label>
-                <div class="input-group">
-                  <input id="early-pct" type="number" min="0" max="100" class="form-control" value="30">
-                  <span class="input-group-text">%</span>
-                </div>
-              </div>
-              <div class="col-md-3 d-grid">
-                <button class="btn btn-outline-primary" id="btn-early" type="button">Aplicar</button>
-              </div>
-              <div class="col-md-6">
-                <div class="soft small" id="early-msg">Añade cargo por ingreso temprano y marcará la habitación como “Ocupada-temprana”.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Datos opcionales -->
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0">
-            <h5 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Datos opcionales</h5>
-          </div>
-          <div class="card-body">
-            <div class="row g-4">
-              <!-- Firma -->
-              <div class="col-lg-6">
-                <div class="form-check form-switch mb-2">
-                  <input class="form-check-input" type="checkbox" role="switch" id="toggle-sign">
-                  <label class="form-check-label" for="toggle-sign">Capturar firma digital del huésped (opcional)</label>
-                </div>
-                <div id="sign-wrap" class="toggleable">
-                  <canvas id="sign-pad" class="w-100 sig-pad" height="180"></canvas>
-                  <div class="d-flex gap-2 mt-2">
-                    <button class="btn btn-sm btn-outline-secondary" id="btn-clear-sign" type="button"><i class="bi bi-eraser me-1"></i> Limpiar</button>
-                    <button class="btn btn-sm btn-outline-primary" id="btn-save-sign" type="button"><i class="bi bi-check2 me-1"></i> Guardar firma</button>
-                    <span class="hint align-self-center">Se adjunta si decides guardarla.</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Doc -->
-              <div class="col-lg-6">
-                <div class="form-check form-switch mb-2">
-                  <input class="form-check-input" type="checkbox" role="switch" id="toggle-docimg">
-                  <label class="form-check-label" for="toggle-docimg">Adjuntar imagen del documento (opcional)</label>
-                </div>
-                <div id="docimg-wrap" class="toggleable">
-                  <input type="file" id="docimg" accept="image/*,application/pdf" class="form-control">
-                  <img id="docimg-preview" class="doc-preview mt-2 d-none" alt="Preview">
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Acciones finales -->
-        <div class="card shadow-sm border-0">
-          <div class="card-body d-flex flex-wrap gap-2">
-            <button class="btn btn-success" id="btn-checkin" disabled type="button">
-              <i class="bi bi-box-arrow-in-right me-1"></i> Realizar Check-in
-            </button>
-            <a class="btn btn-outline-secondary" href="ops-dashboard.html"><i class="bi bi-arrow-left me-1"></i> Volver</a>
-            <div class="ms-auto soft small">Requiere documento válido + reserva seleccionada.</div>
-          </div>
-        </div>
-
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0">
+        <h5 class="mb-0"><i class="bi bi-search me-2"></i>Validar documento</h5>
       </div>
-    </section>
-  </main>
-
-  <footer id="footer" class="footer position-relative dark-background">
-    <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong></div></div>
-  </footer>
-
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-  <div id="preloader"></div>
-
-  <!-- JS -->
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-
-  <script>
-    // -------- Utilidades --------
-    const $ = (sel) => document.querySelector(sel);
-    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
-
-    function showUiAlert(message, type='info'){
-      const el = $('#ui-alert');
-      el.className = `alert alert-${type} shadow-sm`;
-      el.textContent = message || '';
-      if(!message) el.classList.add('d-none'); else el.classList.remove('d-none');
-    }
-
-    function fmtDateOnly(s){
-      if(!s) return '—';
-      const d = new Date(s);
-      return d.toLocaleDateString('es-CR');
-    }
-    function fmtDateTime(s){
-      if(!s) return '—';
-      const d = new Date(s);
-      return d.toLocaleString('es-CR', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
-    }
-
-    async function fetchJsonStrict(url, opts={}){
-      const r = await fetch(url, {headers:{Accept:'application/json', ...(opts.headers||{})}, ...opts});
-      const raw = await r.text();
-      let j = null;
-      try { j = raw ? JSON.parse(raw) : null; } catch(e){ j = null; }
-      if(!r.ok || !j){
-        const snippet = (raw || '').slice(0, 180).replace(/\s+/g,' ').trim();
-        throw new Error(`Respuesta no-JSON (HTTP ${r.status}). Snippet: ${snippet}`);
-      }
-      return j;
-    }
-
-    // -------- Firma (opcional) --------
-    let isDrawing=false, last={x:0,y:0};
-    function setupSignPad(){
-      const pad = $('#sign-pad');
-      if(!pad) return;
-      const ctx = pad.getContext('2d');
-      const dpr = window.devicePixelRatio || 1;
-      const w = pad.clientWidth;
-      const h = pad.getAttribute('height');
-      pad.width = w*dpr; pad.height = h*dpr; ctx.scale(dpr,dpr);
-      ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222';
-      const pos = (e) => {
-        const r = pad.getBoundingClientRect();
-        const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-        const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
-        return {x, y};
-      };
-      const start = (e)=>{ isDrawing=true; last=pos(e); };
-      const move = (e)=>{ if(!isDrawing) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
-      const end = ()=>{ isDrawing=false; };
-      pad.addEventListener('mousedown', start); pad.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
-      pad.addEventListener('touchstart', start, {passive:true}); pad.addEventListener('touchmove', move, {passive:true}); pad.addEventListener('touchend', end);
-      $('#btn-clear-sign').addEventListener('click',()=>{ ctx.clearRect(0,0,pad.width,pad.height); });
-      $('#btn-save-sign').addEventListener('click',()=>{ try{ sessionStorage.setItem('ops.sign', pad.toDataURL('image/png')); }catch(_){ } });
-    }
-
-    // -------- Doc image (opcional) --------
-    function setupDocImg(){
-      $('#docimg')?.addEventListener('change', (e)=>{
-        const f = e.target.files?.[0];
-        const prev = $('#docimg-preview');
-        if(!f){ prev.classList.add('d-none'); return; }
-        if(f.type.startsWith('image/')){ prev.src = URL.createObjectURL(f); prev.classList.remove('d-none'); }
-        else { prev.classList.add('d-none'); }
-      });
-    }
-
-    // -------- Toggle opcionales --------
-    function bindToggles(){
-      $('#toggle-sign').addEventListener('change', (e)=> $('#sign-wrap').classList.toggle('show', e.target.checked));
-      $('#toggle-docimg').addEventListener('change', (e)=> $('#docimg-wrap').classList.toggle('show', e.target.checked));
-    }
-
-    // -------- Resultados --------
-    let selectedReserva = null;
-    let resultsCache = [];
-
-    function enableCheckin(enable){
-      $('#btn-checkin').disabled = !enable;
-    }
-
-    function renderResults(items){
-      const tbody = $('#tbody-results');
-      tbody.innerHTML = '';
-      $('#result-count').textContent = `${items.length} coincidencia(s)`;
-
-      if(!items.length){
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center soft py-4">No hay reservas para mostrar.</td></tr>`;
-        enableCheckin(false);
-        return;
-      }
-
-      items.forEach(it=>{
-        const tr = document.createElement('tr'); tr.className = 'result-row';
-        const estado = (it.estado || '').toLowerCase();
-        tr.innerHTML = `
-          <td><strong>${it.numero || ('VG-' + it.id)}</strong></td>
-          <td>${it.huesped || '—'}</td>
-          <td>${fmtDateOnly(it.checkin)} → ${fmtDateOnly(it.checkout)}</td>
-          <td>
-            <div><strong>${it.room?.number ?? it.habitacion ?? '—'}</strong></div>
-            ${it.room ? `
-              <div class="small text-muted">
-                ${[
-                  it.room.type || null,
-                  (it.room.capacity ? (it.room.capacity + ' pax') : null),
-                  (Number.isFinite(+it.room.price) ? ('₡' + Number(it.room.price).toFixed(2) + '/noche') : null)
-                ].filter(Boolean).join(' · ')}
-              </div>
-            ` : ``}
-          </td>
-          <td><span class="badge ${estado==='confirmada'?'text-bg-success':'text-bg-secondary'}">${it.estado || '—'}</span></td>
-          <td class="text-end">
-            <button class="btn btn-sm btn-outline-primary btn-select" data-id="${it.id}">
-              <i class="bi bi-check2-circle me-1"></i> Seleccionar
+      <div class="card-body">
+        <form id="frm-search" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Cédula / Pasaporte / Correo</label>
+            <input type="text" class="form-control" id="doc" placeholder="Ej: 305440468 · P1234567 · correo@dominio.com">
+            <div class="hint mt-1">
+              Si aún no ingresas documento, abajo se muestran <strong>reservas confirmadas activas</strong> para hoy.
+              Para completar check-in, el documento debe coincidir con el perfil que creó la reserva.
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Fecha (opcional)</label>
+            <input type="date" class="form-control" id="when">
+            <div class="hint mt-1">Por defecto usa hoy.</div>
+          </div>
+          <div class="col-md-3 d-grid align-items-end">
+            <button class="btn btn-primary" id="btn-search" type="submit">
+              <i class="bi bi-search me-1"></i> Buscar
             </button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
+          </div>
+        </form>
+      </div>
+    </div>
 
-      $$('.btn-select').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const id = Number(btn.dataset.id);
-          selectedReserva = resultsCache.find(x => Number(x.id) === id) || null;
+    <div class="card shadow-sm border-0" id="card-results">
+      <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <h5 class="mb-0">Resultado de la búsqueda</h5>
+          <button class="btn btn-sm btn-outline-secondary" id="btn-reset" type="button" title="Volver a confirmadas del día">
+            <i class="bi bi-funnel me-1"></i> Confirmadas del día
+          </button>
+        </div>
+        <span class="soft small" id="result-count">0 coincidencias</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th># Reserva</th>
+                <th>Huésped</th>
+                <th>Fechas</th>
+                <th>Hab.</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody-results"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
-          enableCheckin(!!selectedReserva);
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0">
+        <h5 class="mb-0"><i class="bi bi-alarm me-2"></i>Early check-in (opcional)</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Porcentaje</label>
+            <div class="input-group">
+              <input id="early-pct" type="number" min="0" max="100" class="form-control" value="30">
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+          <div class="col-md-3 d-grid">
+            <button class="btn btn-outline-primary" id="btn-early" type="button">Aplicar</button>
+          </div>
+          <div class="col-md-6">
+            <div class="soft small" id="early-msg">Añade cargo por ingreso temprano y marcará la habitación como “Ocupada-temprana”.</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-          $$('.result-row').forEach(r=> r.classList.remove('table-success'));
-          btn.closest('tr').classList.add('table-success');
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0">
+        <h5 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Datos opcionales</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" role="switch" id="toggle-sign">
+              <label class="form-check-label" for="toggle-sign">Capturar firma digital del huésped (opcional)</label>
+            </div>
+            <div id="sign-wrap" class="toggleable">
+              <canvas id="sign-pad" class="w-100 sig-pad" height="180"></canvas>
+              <div class="d-flex gap-2 mt-2">
+                <button class="btn btn-sm btn-outline-secondary" id="btn-clear-sign" type="button"><i class="bi bi-eraser me-1"></i> Limpiar</button>
+                <button class="btn btn-sm btn-outline-primary" id="btn-save-sign" type="button"><i class="bi bi-check2 me-1"></i> Guardar firma</button>
+                <span class="hint align-self-center">Se adjunta si decides guardarla.</span>
+              </div>
+            </div>
+          </div>
 
-          showUiAlert(selectedReserva ? `Reserva seleccionada: ${selectedReserva.numero || ('VG-' + selectedReserva.id)}` : '', 'info');
-          if(!selectedReserva) showUiAlert('No se pudo seleccionar la reserva.', 'warning');
-        });
-      });
+          <div class="col-lg-6">
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" role="switch" id="toggle-docimg">
+              <label class="form-check-label" for="toggle-docimg">Adjuntar imagen del documento (opcional)</label>
+            </div>
+            <div id="docimg-wrap" class="toggleable">
+              <input type="file" id="docimg" accept="image/*,application/pdf" class="form-control">
+              <img id="docimg-preview" class="doc-preview mt-2 d-none" alt="Preview">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+      <div class="card-body d-flex flex-wrap gap-2">
+        <button class="btn btn-success" id="btn-checkin" disabled type="button">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Realizar Check-in
+        </button>
+        <a class="btn btn-outline-secondary" href="ops-dashboard.html"><i class="bi bi-arrow-left me-1"></i> Volver</a>
+        <div class="ms-auto soft small">Requiere documento válido + reserva seleccionada.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // -------- Utilidades --------
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+  function showUiAlert(message, type='info'){
+    const el = $('#ui-alert');
+    el.className = `alert alert-${type} shadow-sm`;
+    el.textContent = message || '';
+    if(!message) el.classList.add('d-none'); else el.classList.remove('d-none');
+  }
+
+  function fmtDateOnly(s){
+    if(!s) return '—';
+    const d = new Date(s);
+    return d.toLocaleDateString('es-CR');
+  }
+  function fmtDateTime(s){
+    if(!s) return '—';
+    const d = new Date(s);
+    return d.toLocaleString('es-CR', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+  }
+
+  async function fetchJsonStrict(url, opts={}){
+    const r = await fetch(url, {headers:{Accept:'application/json', ...(opts.headers||{})}, ...opts});
+    const raw = await r.text();
+    let j = null;
+    try { j = raw ? JSON.parse(raw) : null; } catch(e){ j = null; }
+    if(!r.ok || !j){
+      const snippet = (raw || '').slice(0, 180).replace(/\s+/g,' ').trim();
+      throw new Error(`Respuesta no-JSON (HTTP ${r.status}). Snippet: ${snippet}`);
+    }
+    return j;
+  }
+
+  // -------- Firma (opcional) --------
+  let isDrawing=false, last={x:0,y:0};
+  function setupSignPad(){
+    const pad = $('#sign-pad');
+    if(!pad) return;
+    const ctx = pad.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = pad.clientWidth;
+    const h = pad.getAttribute('height');
+    pad.width = w*dpr; pad.height = h*dpr; ctx.scale(dpr,dpr);
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#222';
+    const pos = (e) => {
+      const r = pad.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+      return {x, y};
+    };
+    const start = (e)=>{ isDrawing=true; last=pos(e); };
+    const move = (e)=>{ if(!isDrawing) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; };
+    const end = ()=>{ isDrawing=false; };
+    pad.addEventListener('mousedown', start); pad.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+    pad.addEventListener('touchstart', start, {passive:true}); pad.addEventListener('touchmove', move, {passive:true}); pad.addEventListener('touchend', end);
+    $('#btn-clear-sign').addEventListener('click',()=>{ ctx.clearRect(0,0,pad.width,pad.height); });
+    $('#btn-save-sign').addEventListener('click',()=>{ try{ sessionStorage.setItem('ops.sign', pad.toDataURL('image/png')); }catch(_){ } });
+  }
+
+  // -------- Doc image (opcional) --------
+  function setupDocImg(){
+    $('#docimg')?.addEventListener('change', (e)=>{
+      const f = e.target.files?.[0];
+      const prev = $('#docimg-preview');
+      if(!f){ prev.classList.add('d-none'); return; }
+      if(f.type.startsWith('image/')){ prev.src = URL.createObjectURL(f); prev.classList.remove('d-none'); }
+      else { prev.classList.add('d-none'); }
+    });
+  }
+
+  // -------- Toggle opcionales --------
+  function bindToggles(){
+    $('#toggle-sign').addEventListener('change', (e)=> $('#sign-wrap').classList.toggle('show', e.target.checked));
+    $('#toggle-docimg').addEventListener('change', (e)=> $('#docimg-wrap').classList.toggle('show', e.target.checked));
+  }
+
+  // -------- Resultados --------
+  let selectedReserva = null;
+  let resultsCache = [];
+
+  function enableCheckin(enable){
+    $('#btn-checkin').disabled = !enable;
+  }
+
+  function renderResults(items){
+    const tbody = $('#tbody-results');
+    tbody.innerHTML = '';
+    $('#result-count').textContent = `${items.length} coincidencia(s)`;
+
+    if(!items.length){
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center soft py-4">No hay reservas para mostrar.</td></tr>`;
+      enableCheckin(false);
+      return;
     }
 
-    async function loadConfirmed(){
-      const when = ($('#when').value || '').trim();
-      const url = `/api/ops/checkin/confirmed${when ? `?when=${encodeURIComponent(when)}` : ''}`;
-      try{
-        const j = await fetchJsonStrict(url);
-        resultsCache = Array.isArray(j.items) ? j.items : [];
-        selectedReserva = null;
-        enableCheckin(false);
-        renderResults(resultsCache);
-      }catch(e){
-        console.warn('loadConfirmed error', e);
-        showUiAlert(`No se pudieron cargar reservas confirmadas: ${e.message}`, 'danger');
-        resultsCache = [];
-        renderResults([]);
-      }
-    }
-
-    async function doSearch(){
-      const doc = ($('#doc').value || '').trim();
-      const when = ($('#when').value || '').trim();
-
-      // Si no hay documento, según requisito: mostrar confirmadas (no error)
-      if(!doc){
-        showUiAlert('', 'info');
-        await loadConfirmed();
-        return;
-      }
-
-      try{
-        const url = `/api/ops/checkin/search?doc=${encodeURIComponent(doc)}${when?`&when=${encodeURIComponent(when)}`:''}`;
-        const j = await fetchJsonStrict(url);
-        resultsCache = Array.isArray(j.items) ? j.items : [];
-        selectedReserva = null;
-        enableCheckin(false);
-        renderResults(resultsCache);
-
-        if(!resultsCache.length){
-          showUiAlert('No se encontraron reservas asociadas al documento indicado.', 'warning');
-        }else{
-          showUiAlert(`Se encontraron ${resultsCache.length} reserva(s). Selecciona una para continuar.`, 'info');
-        }
-      }catch(e){
-        console.warn('doSearch error', e);
-        showUiAlert(`Error en búsqueda: ${e.message}`, 'danger');
-        resultsCache = [];
-        renderResults([]);
-      }
-    }
-
-    // -------- Check-ins semana --------
-    async function loadWeek(){
-      try{
-        const j = await fetchJsonStrict('/api/ops/checkin/week');
-        const items = Array.isArray(j.items) ? j.items : [];
-        $('#wk-count').textContent = String(items.length);
-        if(j.week_start && j.week_end){
-          $('#wk-range').textContent = `Semana: ${j.week_start} → ${j.week_end}`;
-        }else{
-          $('#wk-range').textContent = 'Semana actual';
-        }
-
-        const body = $('#wk-body');
-        body.innerHTML = '';
-
-        if(!items.length){
-          body.innerHTML = `<tr><td colspan="5" class="text-center soft py-4">Aún no hay check-ins registrados esta semana.</td></tr>`;
-        }else{
-          items.forEach(it=>{
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td class="mono text-nowrap">${fmtDateTime(it.created_at)}</td>
-              <td class="text-nowrap"><strong>${it.numero || (it.reserva_id ? ('VG-' + it.reserva_id) : '—')}</strong></td>
-              <td class="text-truncate" style="max-width: 380px;">${it.huesped || '—'}</td>
-              <td class="text-center text-nowrap">${it.habitacion ?? '—'}</td>
-              <td class="mono text-nowrap">${(it.doc_number || '—')}</td>
-            `;
-            
-            body.appendChild(tr);
-          });
-        }
-
-        $('#wk-updated').textContent = `Actualizado: ${new Date().toLocaleString('es-CR')}`;
-      }catch(e){
-        console.warn('loadWeek error', e);
-        $('#wk-body').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error cargando semana: ${e.message}</td></tr>`;
-        $('#wk-updated').textContent = '—';
-      }
-    }
-
-    // -------- Realizar check-in --------
-    async function doCheckin(){
-      const doc = ($('#doc').value || '').trim();
-      if(!selectedReserva){
-        showUiAlert('Debes seleccionar una reserva antes de completar el check-in.', 'warning');
-        return;
-      }
-      if(!doc){
-        showUiAlert('Debes ingresar el documento (cédula/pasaporte/correo) para completar el check-in.', 'warning');
-        return;
-      }
-
-      const payload = {
-        reserva_id: selectedReserva.id,
-        documento: doc,
-        guardar_firma: $('#toggle-sign').checked ? (sessionStorage.getItem('ops.sign') || null) : null
-      };
-
-      try{
-        const j = await fetchJsonStrict('/api/ops/checkin/complete', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
-        });
-
-        if(!j.ok){
-          showUiAlert(j.message || 'No se pudo completar el check-in.', 'danger');
-          return;
-        }
-
-        showUiAlert('Check-in realizado correctamente.', 'success');
-        enableCheckin(false);
-        selectedReserva = null;
-
-        // refrescar listados (tiempo real inmediato)
-        await loadWeek();
-        await loadConfirmed();
-
-        // comprobante
-        if(j.comprobante_reserva_id){
-          try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){}
-        }
-
-      }catch(e){
-        console.warn('doCheckin error', e);
-        showUiAlert(`Error al completar check-in: ${e.message}`, 'danger');
-      }
-    }
-
-    // -------- Early check-in (GRR-01-017) --------
-    $('#btn-early').addEventListener('click', async ()=>{
-      const pct = Number($('#early-pct').value || 30);
-      const msg = $('#early-msg');
-
-      if(!selectedReserva){
-        msg.textContent = 'Selecciona una reserva primero.';
-        return;
-      }
-
-      msg.textContent = 'Aplicando cargo por early…';
-      try{
-        const r = await fetch(`/grr/reservas/${selectedReserva.id}/early-checkin`, {
-          method:'POST',
-          headers:{'Content-Type':'application/json', 'Accept':'application/json'},
-          body: JSON.stringify({ porcentaje: pct })
-        });
-
-        const raw = await r.text();
-        let js = null;
-        try{ js = raw ? JSON.parse(raw) : null; }catch(_){ js = null; }
-        if(!r.ok || !js) throw new Error('Respuesta inválida del servidor.');
-
-        if(!js.ok) throw new Error(js.error || 'No se aplicó el cargo');
-        msg.textContent = `Early check-in aplicado. Cargo: ₡${Number(js.cargo||0).toFixed(2)}`;
-      }catch(e){
-        msg.textContent = e.message || 'Error al aplicar early check-in.';
-      }
+    items.forEach(it=>{
+      const tr = document.createElement('tr'); tr.className = 'result-row';
+      const estado = (it.estado || '').toLowerCase();
+      tr.innerHTML = `
+        <td><strong>${it.numero || ('VG-' + it.id)}</strong></td>
+        <td>${it.huesped || '—'}</td>
+        <td>${fmtDateOnly(it.checkin)} → ${fmtDateOnly(it.checkout)}</td>
+        <td>
+          <div><strong>${it.room?.number ?? it.habitacion ?? '—'}</strong></div>
+          ${it.room ? `
+            <div class="small text-muted">
+              ${[
+                it.room.type || null,
+                (it.room.capacity ? (it.room.capacity + ' pax') : null),
+                (Number.isFinite(+it.room.price) ? ('₡' + Number(it.room.price).toFixed(2) + '/noche') : null)
+              ].filter(Boolean).join(' · ')}
+            </div>
+          ` : ``}
+        </td>
+        <td><span class="badge ${estado==='confirmada'?'text-bg-success':'text-bg-secondary'}">${it.estado || '—'}</span></td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-primary btn-select" data-id="${it.id}">
+            <i class="bi bi-check2-circle me-1"></i> Seleccionar
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
     });
 
-    // -------- Bind & init --------
-    document.addEventListener('DOMContentLoaded', async ()=>{
-      bindToggles(); setupSignPad(); setupDocImg();
+    $$('.btn-select').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = Number(btn.dataset.id);
+        selectedReserva = resultsCache.find(x => Number(x.id) === id) || null;
 
-      $('#frm-search').addEventListener('submit', async (e)=>{ e.preventDefault(); await doSearch(); });
-      $('#btn-reset').addEventListener('click', async ()=>{ $('#doc').value = ''; showUiAlert('', 'info'); await loadConfirmed(); });
-      $('#btn-checkin').addEventListener('click', async ()=>{ await doCheckin(); });
+        enableCheckin(!!selectedReserva);
 
-      $('#btn-wk-refresh').addEventListener('click', async ()=>{ await loadWeek(); });
+        $$('.result-row').forEach(r=> r.classList.remove('table-success'));
+        btn.closest('tr').classList.add('table-success');
 
-      // carga inicial requerida:
+        showUiAlert(selectedReserva ? `Reserva seleccionada: ${selectedReserva.numero || ('VG-' + selectedReserva.id)}` : '', 'info');
+        if(!selectedReserva) showUiAlert('No se pudo seleccionar la reserva.', 'warning');
+      });
+    });
+  }
+
+  async function loadConfirmed(){
+    const when = ($('#when').value || '').trim();
+    const url = `/api/ops/checkin/confirmed${when ? `?when=${encodeURIComponent(when)}` : ''}`;
+    try{
+      const j = await fetchJsonStrict(url);
+      resultsCache = Array.isArray(j.items) ? j.items : [];
+      selectedReserva = null;
+      enableCheckin(false);
+      renderResults(resultsCache);
+    }catch(e){
+      console.warn('loadConfirmed error', e);
+      showUiAlert(`No se pudieron cargar reservas confirmadas: ${e.message}`, 'danger');
+      resultsCache = [];
+      renderResults([]);
+    }
+  }
+
+  async function doSearch(){
+    const doc = ($('#doc').value || '').trim();
+    const when = ($('#when').value || '').trim();
+
+    if(!doc){
+      showUiAlert('', 'info');
+      await loadConfirmed();
+      return;
+    }
+
+    try{
+      const url = `/api/ops/checkin/search?doc=${encodeURIComponent(doc)}${when?`&when=${encodeURIComponent(when)}`:''}`;
+      const j = await fetchJsonStrict(url);
+      resultsCache = Array.isArray(j.items) ? j.items : [];
+      selectedReserva = null;
+      enableCheckin(false);
+      renderResults(resultsCache);
+
+      if(!resultsCache.length){
+        showUiAlert('No se encontraron reservas asociadas al documento indicado.', 'warning');
+      }else{
+        showUiAlert(`Se encontraron ${resultsCache.length} reserva(s). Selecciona una para continuar.`, 'info');
+      }
+    }catch(e){
+      console.warn('doSearch error', e);
+      showUiAlert(`Error en búsqueda: ${e.message}`, 'danger');
+      resultsCache = [];
+      renderResults([]);
+    }
+  }
+
+  // -------- Check-ins semana --------
+  async function loadWeek(){
+    try{
+      const j = await fetchJsonStrict('/api/ops/checkin/week');
+      const items = Array.isArray(j.items) ? j.items : [];
+      $('#wk-count').textContent = String(items.length);
+      if(j.week_start && j.week_end){
+        $('#wk-range').textContent = `Semana: ${j.week_start} → ${j.week_end}`;
+      }else{
+        $('#wk-range').textContent = 'Semana actual';
+      }
+
+      const body = $('#wk-body');
+      body.innerHTML = '';
+
+      if(!items.length){
+        body.innerHTML = `<tr><td colspan="5" class="text-center soft py-4">Aún no hay check-ins registrados esta semana.</td></tr>`;
+      }else{
+        items.forEach(it=>{
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="mono text-nowrap">${fmtDateTime(it.created_at)}</td>
+            <td class="text-nowrap"><strong>${it.numero || (it.reserva_id ? ('VG-' + it.reserva_id) : '—')}</strong></td>
+            <td class="text-truncate" style="max-width: 380px;">${it.huesped || '—'}</td>
+            <td class="text-center text-nowrap">${it.habitacion ?? '—'}</td>
+            <td class="mono text-nowrap">${(it.doc_number || '—')}</td>
+          `;
+          body.appendChild(tr);
+        });
+      }
+
+      $('#wk-updated').textContent = `Actualizado: ${new Date().toLocaleString('es-CR')}`;
+    }catch(e){
+      console.warn('loadWeek error', e);
+      $('#wk-body').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Error cargando semana: ${e.message}</td></tr>`;
+      $('#wk-updated').textContent = '—';
+    }
+  }
+
+  // -------- Realizar check-in --------
+  async function doCheckin(){
+    const doc = ($('#doc').value || '').trim();
+    if(!selectedReserva){
+      showUiAlert('Debes seleccionar una reserva antes de completar el check-in.', 'warning');
+      return;
+    }
+    if(!doc){
+      showUiAlert('Debes ingresar el documento (cédula/pasaporte/correo) para completar el check-in.', 'warning');
+      return;
+    }
+
+    const payload = {
+      reserva_id: selectedReserva.id,
+      documento: doc,
+      guardar_firma: $('#toggle-sign').checked ? (sessionStorage.getItem('ops.sign') || null) : null
+    };
+
+    try{
+      const j = await fetchJsonStrict('/api/ops/checkin/complete', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+
+      if(!j.ok){
+        showUiAlert(j.message || 'No se pudo completar el check-in.', 'danger');
+        return;
+      }
+
+      showUiAlert('Check-in realizado correctamente.', 'success');
+      enableCheckin(false);
+      selectedReserva = null;
+
       await loadWeek();
       await loadConfirmed();
 
-      // “tiempo real” (polling):
-      setInterval(loadWeek, 15000);
-    });
-  </script>
-</body>
-</html>
+      if(j.comprobante_reserva_id){
+        try{ window.open(`/api/reservas/${j.comprobante_reserva_id}/comprobante`, '_blank'); }catch(_){}
+      }
+
+    }catch(e){
+      console.warn('doCheckin error', e);
+      showUiAlert(`Error al completar check-in: ${e.message}`, 'danger');
+    }
+  }
+
+  // -------- Early check-in (GRR-01-017) --------
+  $('#btn-early').addEventListener('click', async ()=>{
+    const pct = Number($('#early-pct').value || 30);
+    const msg = $('#early-msg');
+
+    if(!selectedReserva){
+      msg.textContent = 'Selecciona una reserva primero.';
+      return;
+    }
+
+    msg.textContent = 'Aplicando cargo por early…';
+    try{
+      const r = await fetch(`/grr/reservas/${selectedReserva.id}/early-checkin`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json', 'Accept':'application/json'},
+        body: JSON.stringify({ porcentaje: pct })
+      });
+
+      const raw = await r.text();
+      let js = null;
+      try{ js = raw ? JSON.parse(raw) : null; }catch(_){ js = null; }
+      if(!r.ok || !js) throw new Error('Respuesta inválida del servidor.');
+
+      if(!js.ok) throw new Error(js.error || 'No se aplicó el cargo');
+      msg.textContent = `Early check-in aplicado. Cargo: ₡${Number(js.cargo||0).toFixed(2)}`;
+    }catch(e){
+      msg.textContent = e.message || 'Error al aplicar early check-in.';
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    bindToggles(); setupSignPad(); setupDocImg();
+
+    $('#frm-search').addEventListener('submit', async (e)=>{ e.preventDefault(); await doSearch(); });
+    $('#btn-reset').addEventListener('click', async ()=>{ $('#doc').value = ''; showUiAlert('', 'info'); await loadConfirmed(); });
+    $('#btn-checkin').addEventListener('click', async ()=>{ await doCheckin(); });
+
+    $('#btn-wk-refresh').addEventListener('click', async ()=>{ await loadWeek(); });
+
+    await loadWeek();
+    await loadConfirmed();
+
+    setInterval(loadWeek, 15000);
+  });
+</script>
+{% endblock %}
