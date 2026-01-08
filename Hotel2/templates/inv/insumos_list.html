@@ -1,189 +1,262 @@
-<!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>Inventario – Insumos | Hotel Villa Grace</title>
+{% extends "base.html" %}
 
-    <link
-      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/css/main.css') }}"
-      rel="stylesheet"
-    />
-  </head>
-  <body class="index-page">
-    <header id="header" class="header d-flex align-items-center fixed-top">
-      <div class="container d-flex align-items-center justify-content-between">
-        <a
-          href="{{ url_for('index_html') }}"
-          class="logo d-flex align-items-center me-auto me-xl-0"
-        >
-          <h1 class="sitename">Hotel Villa Grace</h1>
-        </a>
-        <nav id="navmenu" class="navmenu">
-          <ul>
-            <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
-            <li class="dropdown">
-              <a href="#"
-                ><span>Páginas</span>
-                <i class="bi bi-chevron-down toggle-dropdown"></i
-              ></a>
-              <ul>
-                {% if session.get('user_role') in
-                ['Administrador','Recepcionista'] %}
-                <li>
-                  <a href="{{ url_for('inv.insumos_list') }}" class="active"
-                    >Inventario – Insumos</a
-                  >
-                </li>
-                {% endif %}
-              </ul>
-            </li>
-          </ul>
-          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-        </nav>
-        <a
-          class="btn-getstarted d-none d-sm-block ms-2 ms-md-3 ms-xl-4"
-          href="{{ url_for('booking_search') }}"
-          >Reservar</a
-        >
-      </div>
-    </header>
+{% block title %}Inventario · Insumos | Hotel Villa Grace{% endblock %}
 
-    <main class="main" style="padding-top: 100px">
-      <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="mb-0">
-            <i class="bi bi-box-seam me-2"></i>Inventario – Insumos
-          </h2>
-          <div class="d-flex gap-2">
-            {% if session.get('user_role') in ['Administrador','Recepcionista']
-            %}
-            <!-- Si ya tienes una ruta para crear, cámbiala aquí -->
-            <a href="{{ url_for('inv.insumo_new') }}" class="btn btn-primary">
-              <i class="bi bi-plus-lg"></i> Nuevo insumo
-            </a>
-            {% endif %}
+{% block content %}
+
+<main class="main">
+
+  <!-- ======= Page Title ======= -->
+  <div class="page-title dark-background"
+       style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+    <div class="container position-relative">
+      <h1>Inventario · Insumos</h1>
+      <p>Control de existencias, mínimos y estado de insumos</p>
+      <nav class="breadcrumbs">
+        <ol>
+          <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+          <li class="current">Insumos</li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+
+  <!-- ======= Section ======= -->
+  <section class="section">
+    <div class="container" data-aos="fade-up">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show" role="alert">
+              {{ msg }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- ======= Resumen + Acciones ======= -->
+      <div class="row g-3 align-items-stretch mb-3">
+
+        <!-- Stats -->
+        <div class="col-lg-8">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                      <div class="text-muted small">Total</div>
+                      <div class="fs-4 fw-semibold">{{ (items|length) if items is not none else 0 }}</div>
+                    </div>
+                    <div class="fs-3"><i class="bi bi-box-seam"></i></div>
+                  </div>
+                  <div class="text-muted small mt-1">Insumos registrados</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  {% set activos = 0 %}
+                  {% for row in items %}
+                    {% if row.insumo and row.insumo.Activo %}{% set activos = activos + 1 %}{% endif %}
+                  {% endfor %}
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                      <div class="text-muted small">Activos</div>
+                      <div class="fs-4 fw-semibold">{{ activos }}</div>
+                    </div>
+                    <div class="fs-3 text-success"><i class="bi bi-check-circle"></i></div>
+                  </div>
+                  <div class="text-muted small mt-1">Disponibles para movimientos</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                      <div class="text-muted small">Bajo mínimo</div>
+                      <div class="fs-4 fw-semibold">{{ low_count or 0 }}</div>
+                    </div>
+                    <div class="fs-3 text-danger"><i class="bi bi-exclamation-triangle"></i></div>
+                  </div>
+                  <div class="text-muted small mt-1">Requieren reposición</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {% with messages = get_flashed_messages(with_categories=true) %} {% if
-        messages %} {% for cat, msg in messages %}
-        <div
-          class="alert alert-{{ 'warning' if cat=='message' else cat }} alert-dismissible fade show"
-          role="alert"
-        >
-          {{ msg }}
-          <button
-            type="button"
-            class="btn-close"
-            data-bs-dismiss="alert"
-          ></button>
-        </div>
-        {% endfor %} {% endif %} {% endwith %}
+        <!-- Actions -->
+        <div class="col-lg-4">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body d-flex flex-column gap-2">
+              <div class="d-flex align-items-center justify-content-between">
+                <h6 class="mb-0"><i class="bi bi-lightning-charge me-1"></i>Acciones</h6>
+                <span class="badge bg-dark">{{ session.get('user_role','') }}</span>
+              </div>
 
-        <div class="card shadow-sm">
+              <div class="d-grid gap-2">
+                {% if session.get('user_role') in ['Administrador','Recepcionista'] %}
+                  <a class="btn btn-primary" href="{{ url_for('inv.insumo_new') }}">
+                    <i class="bi bi-plus-lg me-1"></i> Nuevo insumo
+                  </a>                  
+                {% endif %}
+
+                {% if session.get('user_role') == 'Administrador' %}
+                  <a class="btn btn-outline-secondary" href="{{ url_for('inv.categorias_list') }}">
+                    <i class="bi bi-tags me-1"></i> Ver categorías
+                  </a>
+                {% endif %}
+              </div>
+
+              <div class="mt-auto">
+                <label for="invSearch" class="form-label small text-muted mb-1">Búsqueda rápida</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-search"></i></span>
+                  <input id="invSearch" type="text" class="form-control" placeholder="Nombre, categoría o unidad…" autocomplete="off">
+                </div>
+                <div class="form-text">Filtra en pantalla (sin recargar).</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {% if low_count and low_count > 0 %}
+        <div class="alert alert-warning d-flex align-items-start" role="alert">
+          <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+          <div>
+            Hay <strong>{{ low_count }}</strong> insumo{{ 's' if low_count != 1 else '' }} con stock por debajo del mínimo.
+            Revisa la lista y registra una entrada si corresponde.
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- ======= Tabla ======= -->
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="bi bi-list-check me-1"></i>Listado</h5>
+          <small class="text-muted">Vista general de existencias</small>
+        </div>
+        <div class="card-body p-0">
           <div class="table-responsive">
-            <table id="tabla-insumos" class="table align-middle mb-0">
+            <table class="table table-hover align-middle mb-0" id="tablaInsumos">
               <thead class="table-light">
                 <tr>
-                  <th>Activo</th>
+                  <th style="width: 140px;">Estado</th>
                   <th>Insumo</th>
-                  <th>Unidad</th>
-                  <th class="text-end">Stock</th>
-                  <th class="text-end">Mín.</th>
                   <th>Categoría</th>
-                  <th class="text-center">Acciones</th>
+                  <th style="width: 120px;">Unidad</th>
+                  <th class="text-end" style="width: 130px;">Stock</th>
+                  <th class="text-end" style="width: 130px;">Mínimo</th>
+                  <th class="text-end" style="width: 140px;">Acciones</th>
                 </tr>
               </thead>
-              <tbody id="tabla-insumos">
-                {% for row in items %} {% set i = row.insumo %} {% set c =
-                row.categoria %} {% set bajo = (i.Stock_Actual or 0) <
-                (i.Stock_Minimo or 0) %}
-                <tr class="{{ 'table-warning' if bajo else '' }}">
-                  <td class="text-nowrap">
-                    {% if bajo %}
-                    <span class="me-1" title="Bajo mínimo">
-                      <i
-                        class="bi bi-exclamation-triangle-fill text-danger"
-                      ></i>
-                    </span>
-                    {% else %}
-                    <span class="me-1" title="OK">
-                      <i class="bi bi-check-circle text-success"></i>
-                    </span>
-                    {% endif %}
-                    <strong>{{ i.Nombre }}</strong>
-                    <small class="text-muted ms-1">({{ c.Nombre }})</small>
-                  </td>
-                  <td class="text-end">{{ i.Stock_Actual }}</td>
-                  <td class="text-end">{{ i.Stock_Minimo }}</td>
-                  <td class="text-nowrap">{{ i.Unidad }}</td>
-                  <td class="text-nowrap">
-                    {% if i.Activo %}
-                    <span class="badge bg-success">Activo</span>
-                    {% else %}
-                    <span class="badge bg-secondary">Inactivo</span>
-                    {% endif %}
-                  </td>
-                  <td class="text-end text-nowrap">
-                    <a
-                      class="btn btn-sm btn-outline-primary"
-                      href="{{ url_for('inv.insumo_edit', insumo_id=i.Id) }}"
-                      ><i class="bi bi-pencil-square"></i
-                    ></a>
-                    <a
-                      class="btn btn-sm btn-outline-warning"
-                      href="{{ url_for('inv.insumo_adjust', insumo_id=i.Id) }}"
-                      ><i class="bi bi-sliders"></i
-                    ></a>
-                  </td>
-                </tr>
+              <tbody>
+                {% for row in items %}
+                  {% set i = row.insumo %}
+                  {% set c = row.categoria %}
+                  {% set stock = (i.Stock_Actual or 0) %}
+                  {% set minimo = (i.Stock_Minimo or 0) %}
+                  {% set bajo = stock < minimo %}
+
+                  <tr class="inv-row {{ 'table-warning' if bajo else '' }}"
+                      data-search="{{ (i.Nombre ~ ' ' ~ (c.Nombre if c else '') ~ ' ' ~ (i.Unidad or ''))|lower }}">
+                    <td>
+                      {% if i.Activo %}
+                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Activo</span>
+                      {% else %}
+                        <span class="badge bg-secondary"><i class="bi bi-slash-circle me-1"></i>Inactivo</span>
+                      {% endif %}
+
+                      {% if bajo %}
+                        <div class="small text-danger mt-1">
+                          <i class="bi bi-exclamation-triangle-fill me-1"></i>Bajo mínimo
+                        </div>
+                      {% endif %}
+                    </td>
+
+                    <td>
+                      <div class="fw-semibold">{{ i.Nombre }}</div>
+                      <div class="text-muted small">ID {{ i.Id }}</div>
+                    </td>
+
+                    <td>
+                      <span class="badge bg-light text-dark border">{{ c.Nombre if c else '—' }}</span>
+                    </td>
+
+                    <td class="text-nowrap">{{ (i.Unidad or '—')|upper }}</td>
+
+                    <td class="text-end">
+                      <span class="fw-semibold">{{ stock }}</span>
+                    </td>
+
+                    <td class="text-end">{{ minimo }}</td>
+
+                    <td class="text-end text-nowrap">
+                      {% if session.get('user_role') == 'Administrador' %}
+                        <a class="btn btn-sm btn-outline-primary" title="Editar"
+                           href="{{ url_for('inv.insumo_edit', insumo_id=i.Id) }}">
+                          <i class="bi bi-pencil-square"></i>
+                        </a>                        
+                      {% else %}
+                        <span class="text-muted small">—</span>
+                      {% endif %}
+                    </td>
+                  </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
         </div>
       </div>
-    </main>
 
-    {% if low_count and low_count > 0 %}
-    <div
-      class="alert alert-warning d-flex align-items-center mb-3"
-      role="alert"
-    >
-      <i class="bi bi-exclamation-triangle-fill me-2"></i>
-      <div>
-        Tienes <strong>{{ low_count }}</strong> insumo{{ 's' if low_count != 1
-        else '' }} con stock por debajo del mínimo.
-        <a href="#tabla-insumos" class="alert-link ms-1">Ver detalles</a>
-      </div>
+      {% if not items or (items|length) == 0 %}
+        <div class="text-center text-muted mt-4">
+          <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+          No hay insumos registrados.
+          {% if session.get('user_role') in ['Administrador','Recepcionista'] %}
+            <div class="mt-2">
+              <a class="btn btn-sm btn-primary" href="{{ url_for('inv.insumo_new') }}">
+                <i class="bi bi-plus-lg me-1"></i> Crear el primer insumo
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
     </div>
-    {% endif %}
+  </section>
 
-    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-    <script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-  </body>
-</html>
+</main>
+
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    (function () {
+      const input = document.getElementById('invSearch');
+      if (!input) return;
+
+      const rows = Array.from(document.querySelectorAll('#tablaInsumos tbody tr.inv-row'));
+
+      function applyFilter() {
+        const q = (input.value || '').trim().toLowerCase();
+        rows.forEach(tr => {
+          const haystack = (tr.getAttribute('data-search') || '');
+          tr.style.display = (!q || haystack.includes(q)) ? '' : 'none';
+        });
+      }
+
+      input.addEventListener('input', applyFilter);
+    })();
+  </script>
+{% endblock %}
