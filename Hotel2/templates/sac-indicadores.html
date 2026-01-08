@@ -1,11 +1,6 @@
-{# templates/sac-indicadores.html #}
+<!-- templates/sac-indicadores.html -->
 {% extends "sac/_layout.html" %}
-
-{% block title %}Indicadores – SAC{% endblock %}
-{% block page_h1 %}Indicadores{% endblock %}
-{% block crumb %}Indicadores{% endblock %}
-
-{% block sac_content %}
+{% block content %}
 <div class="container-fluid py-3">
 
   <div class="row g-3 mb-3">
@@ -32,7 +27,7 @@
   <div class="vg-card p-3">
     <div class="d-flex align-items-center justify-content-between mb-2">
       <strong>Flujo de notificaciones (últimos)</strong>
-      <button id="btn-refresh" class="btn btn-sm btn-outline-primary" type="button">Actualizar</button>
+      <button id="btn-refresh" class="btn btn-sm btn-outline-primary">Actualizar</button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm table-striped mb-0">
@@ -53,14 +48,12 @@
   </div>
 
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-(function(){
+(async function(){
   async function loadKPIs(){
     try {
-      const r = await fetch('/sac/indicadores/kpis', { credentials: 'same-origin' });
+      const r = await fetch('/sac/indicadores/kpis');
       const js = await r.json();
       if(js && js.ok){
         document.getElementById('kpi-tickets').textContent   = js.tickets ?? '--';
@@ -74,7 +67,7 @@
     const tbody = document.getElementById('flujo-body');
     tbody.innerHTML = `<tr><td colspan="5" class="text-muted">Cargando…</td></tr>`;
     try {
-      const r = await fetch('/sac/indicadores/flujo', { credentials: 'same-origin' });
+      const r = await fetch('/sac/indicadores/flujo');
       const js = await r.json();
       if(!js || !js.ok){ tbody.innerHTML = `<tr><td colspan="5">Error al cargar</td></tr>`; return; }
       const items = js.items || [];
@@ -95,15 +88,12 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    const btn = document.getElementById('btn-refresh');
-    if (btn) btn.addEventListener('click', ()=>{ loadKPIs(); loadFlujo(); });
+  document.getElementById('btn-refresh').addEventListener('click', ()=>{ loadKPIs(); loadFlujo(); });
+  await loadKPIs();
+  await loadFlujo();
 
-    await loadKPIs();
-    await loadFlujo();
-
-    setInterval(()=>{ loadKPIs(); loadFlujo(); }, 30000);
-  });
+  // auto-refresh suave
+  setInterval(()=>{ loadKPIs(); loadFlujo(); }, 30000);
 })();
 </script>
 {% endblock %}
