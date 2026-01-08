@@ -1,238 +1,209 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+{% extends "base.html" %}
 
-  <title>Operaciones — Check-out</title>
+{% block title %}Operaciones — Check-out | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Módulo de check-out para recepción: pendientes de hoy, búsqueda por documento, desglose y confirmación.{% endblock %}
 
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block body_class %}inner-page{% endblock %}
 
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+{% block head_extra %}
+<style>
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .table td, .table th { vertical-align: middle; }
+</style>
+{% endblock %}
 
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
+{% block content %}
 
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-
-  <style>
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .table td, .table th { vertical-align: middle; }
-  </style>
-</head>
-
-<body class="index-page">
-
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container-fluid container-xl position-relative d-flex align-items-center justify-content-between">
-    <a href="index.html" class="logo d-flex align-items-center">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="{{ url_for('ops_dashboard_html') }}">Dashboard</a></li>
-        <li><a href="{{ url_for('ops_checkin_html') }}">Check-in</a></li>
-        <li><a href="{{ url_for('ops_checkout_html') }}" class="active">Check-out</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Operaciones — Check-out</h1>
+    <p class="mb-0">
+      Por defecto se muestran los <strong>check-outs pendientes para hoy</strong>. Puede filtrar por documento.
+    </p>
+    <nav class="breadcrumbs" aria-label="breadcrumbs">
+      <ol>
+        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+        <li><a href="{{ url_for('ops_dashboard_html') }}">Recepción</a></li>
+        <li class="current">Check-out</li>
+      </ol>
     </nav>
   </div>
-</header>
+</div>
 
-<main class="main" style="margin-top: 90px;">
-  <section class="section">
-    <div class="container" data-aos="fade-up">
+<section class="section">
+  <div class="container" data-aos="fade-up">
 
-      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-        <div>
-          <h2 class="mb-1">Operaciones — Check-out</h2>
-          <p class="mb-0 text-muted">
-            Por defecto se muestran los <b>check-outs pendientes para hoy</b>. Puede filtrar por documento.
-          </p>
-        </div>
-        <a class="btn btn-outline-secondary" href="{{ url_for('ops_dashboard_html') }}"><i class="bi bi-arrow-left"></i> Volver</a>
-      </div>
-
-      <!-- ✅ ALERTAS ESTÉTICAS (reemplaza alert del sistema) -->
-      <div id="ui-alert" class="alert d-none alert-dismissible fade show" role="alert">
-        <span id="ui-alert-msg"></span>
-        <button type="button" class="btn-close" aria-label="Close" onclick="hideUIAlert()"></button>
-      </div>
-
-      <div class="row g-4">
-        <!-- Pendientes hoy -->
-        <div class="col-lg-4">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <div class="d-flex align-items-start justify-content-between gap-2">
-                <div>
-                  <h5 class="card-title mb-1">Pendientes para hoy</h5>
-                  <div class="text-muted small">Lista de estancias con salida hoy. Seleccione una para ver desglose y confirmar.</div>
-                </div>
-                <span class="badge text-bg-success" id="today-count">0</span>
-              </div>
-
-              <div id="today-list" class="list-group mt-3">
-                <div class="list-group-item text-muted">Cargando...</div>
-              </div>
-
-              <div class="d-grid mt-3">
-                <button id="btn-refresh-today" class="btn btn-outline-secondary">
-                  <i class="bi bi-arrow-clockwise"></i> Refrescar
-                </button>
-              </div>
-
-            </div>
-          </div>
-        </div>
-
-        <!-- Buscar por documento -->
-        <div class="col-lg-8">
-          <div class="card shadow-sm">
-            <div class="card-body">
-              <h5 class="card-title mb-2">Buscar por documento</h5>
-              <div class="text-muted small mb-3">Cédula o Pasaporte. Si está vacío, se mantiene la lista de pendientes de hoy.</div>
-
-              <div class="row g-2">
-                <div class="col-md-8">
-                  <input id="doc" class="form-control" placeholder="Ej: 1-2345-6789 o pasaporte">
-                </div>
-                <div class="col-md-4 d-grid">
-                  <button id="btn-search" class="btn btn-primary">Buscar</button>
-                </div>
-              </div>
-
-              <div class="d-flex gap-2 mt-2">
-                <button id="btn-clear" class="btn btn-outline-secondary">Limpiar</button>
-              </div>
-
-              <hr>
-
-              <h6 class="mb-2">Resultado de búsqueda</h6>
-              <div class="table-responsive">
-                <table class="table table-hover">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Reserva</th>
-                      <th>Huésped</th>
-                      <th>Habitación</th>
-                      <th>Salida</th>
-                      <th class="text-end">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody id="search-body">
-                    <tr><td colspan="5" class="text-muted">Ingrese un documento para filtrar (opcional).</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-            </div>
-          </div>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div class="d-none d-md-block">
+        <div class="text-muted small">
+          Seleccione un pendiente (hoy o por búsqueda) para ver desglose y confirmar.
         </div>
       </div>
+      <a class="btn btn-outline-secondary" href="{{ url_for('ops_dashboard_html') }}">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+    </div>
 
-      <!-- Desglose / Confirmación -->
-      <div class="card shadow-sm mt-4">
-        <div class="card-body">
-          <h5 class="card-title mb-2">Desglose / Confirmación</h5>
-          <p class="text-muted small mb-3">
-            Seleccione un pendiente (hoy o por búsqueda) para ver el total. Puede registrar un pago final opcional.
-          </p>
+    <div id="ui-alert" class="alert d-none alert-dismissible fade show" role="alert">
+      <span id="ui-alert-msg"></span>
+      <button type="button" class="btn-close" aria-label="Close" onclick="hideUIAlert()"></button>
+    </div>
 
-          <div class="row g-3 align-items-end">
-            <div class="col-md-4">
-              <label class="form-label">Pago final (opcional)</label>
-              <input id="pago_final" type="number" step="0.01" class="form-control" value="0.00">
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+              <div>
+                <h5 class="card-title mb-1">Pendientes para hoy</h5>
+                <div class="text-muted small">
+                  Lista de estancias con salida hoy. Seleccione una para ver desglose y confirmar.
+                </div>
+              </div>
+              <span class="badge text-bg-success" id="today-count">0</span>
             </div>
-            <div class="col-md-4">
-              <label class="form-label">Método</label>
-              <select id="metodo" class="form-select">
-                <option value="Efectivo">Efectivo</option>
-                <option value="SINPE">SINPE</option>
-                <option value="Transferencia">Transferencia</option>
-              </select>
+
+            <div id="today-list" class="list-group mt-3">
+              <div class="list-group-item text-muted">Cargando...</div>
             </div>
-            <div class="col-md-4 d-grid">
-              <button id="btn-confirm" class="btn btn-success" disabled>
-                <i class="bi bi-check2-circle"></i> Confirmar check-out
+
+            <div class="d-grid mt-3">
+              <button id="btn-refresh-today" class="btn btn-outline-secondary" type="button">
+                <i class="bi bi-arrow-clockwise"></i> Refrescar
               </button>
             </div>
-          </div>
 
-          <div class="mt-3">
-            <div class="d-flex align-items-center justify-content-between">
-              <div class="text-muted small">Seleccionado:</div>
-              <div class="mono" id="sel">—</div>
-            </div>
-            <pre id="breakdown" class="mt-2 p-3 bg-light rounded" style="min-height:120px; white-space:pre-wrap;">Seleccione una estancia para ver el desglose...</pre>
           </div>
         </div>
       </div>
 
-      <!-- Semana -->
-      <div class="card shadow-sm mt-4">
-        <div class="card-body">
-          <div class="d-flex align-items-start justify-content-between gap-2">
-            <div>
-              <h5 class="card-title mb-1">Check-outs realizados esta semana</h5>
-              <div class="text-muted small">Se refresca automáticamente cada 20 segundos.</div>
+      <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <h5 class="card-title mb-2">Buscar por documento</h5>
+            <div class="text-muted small mb-3">
+              Cédula o Pasaporte. Si está vacío, se mantiene la lista de pendientes de hoy.
             </div>
-            <span class="badge text-bg-success" id="week-count">0</span>
-          </div>
 
-          <div class="table-responsive mt-3">
-            <table class="table table-sm table-hover">
-              <thead class="table-light">
-                <tr>
-                  <th>Fecha</th>
-                  <th>Reserva</th>
-                  <th>Huésped</th>
-                  <th>Habitación</th>
-                  <th>Recepción</th>
-                  <th class="text-end">Pago final</th>
-                  <th>Método</th>
-                </tr>
-              </thead>
-              <tbody id="week-body">
-                <tr><td colspan="7" class="text-muted">Cargando...</td></tr>
-              </tbody>
-            </table>
-          </div>
+            <div class="row g-2">
+              <div class="col-md-8">
+                <input id="doc" class="form-control" placeholder="Ej: 1-2345-6789 o pasaporte">
+              </div>
+              <div class="col-md-4 d-grid">
+                <button id="btn-search" class="btn btn-primary" type="button">Buscar</button>
+              </div>
+            </div>
 
+            <div class="d-flex gap-2 mt-2">
+              <button id="btn-clear" class="btn btn-outline-secondary" type="button">Limpiar</button>
+            </div>
+
+            <hr>
+
+            <h6 class="mb-2">Resultado de búsqueda</h6>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>Reserva</th>
+                    <th>Huésped</th>
+                    <th>Habitación</th>
+                    <th>Salida</th>
+                    <th class="text-end">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="search-body">
+                  <tr><td colspan="5" class="text-muted">Ingrese un documento para filtrar (opcional).</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
         </div>
       </div>
-
     </div>
-  </section>
-</main>
 
-<footer id="footer" class="footer">
-  <div class="container text-center">
-    <div class="copyright">
-      © <span>Copyright</span> <strong class="px-1 sitename">Hotel Villa Grace</strong> <span>All Rights Reserved</span>
+    <div class="card shadow-sm border-0 mt-4">
+      <div class="card-body">
+        <h5 class="card-title mb-2">Desglose / Confirmación</h5>
+        <p class="text-muted small mb-3">
+          Seleccione un pendiente (hoy o por búsqueda) para ver el total. Puede registrar un pago final opcional.
+        </p>
+
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Pago final (opcional)</label>
+            <input id="pago_final" type="number" step="0.01" class="form-control" value="0.00">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Método</label>
+            <select id="metodo" class="form-select">
+              <option value="Efectivo">Efectivo</option>
+              <option value="SINPE">SINPE</option>
+              <option value="Transferencia">Transferencia</option>
+            </select>
+          </div>
+          <div class="col-md-4 d-grid">
+            <button id="btn-confirm" class="btn btn-success" disabled type="button">
+              <i class="bi bi-check2-circle"></i> Confirmar check-out
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="text-muted small">Seleccionado:</div>
+            <div class="mono" id="sel">—</div>
+          </div>
+          <pre id="breakdown" class="mt-2 p-3 bg-light rounded" style="min-height:120px; white-space:pre-wrap;">Seleccione una estancia para ver el desglose...</pre>
+        </div>
+      </div>
     </div>
+
+    <div class="card shadow-sm border-0 mt-4">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between gap-2">
+          <div>
+            <h5 class="card-title mb-1">Check-outs realizados esta semana</h5>
+            <div class="text-muted small">Se refresca automáticamente cada 20 segundos.</div>
+          </div>
+          <span class="badge text-bg-success" id="week-count">0</span>
+        </div>
+
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Reserva</th>
+                <th>Huésped</th>
+                <th>Habitación</th>
+                <th>Recepción</th>
+                <th class="text-end">Pago final</th>
+                <th>Método</th>
+              </tr>
+            </thead>
+            <tbody id="week-body">
+              <tr><td colspan="7" class="text-muted">Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
   </div>
-</footer>
+</section>
 
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/glightbox/js/glightbox.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+{% endblock %}
 
+{% block scripts %}
 <script>
   const $ = (id) => document.getElementById(id);
 
   let selected = { estancia_id: null, reserva_id: null };
 
-  // ✅ Alertas estéticas
   function showUIAlert(type, msg) {
     const box = $("ui-alert");
     const span = $("ui-alert-msg");
@@ -351,7 +322,7 @@
         <td>${it.huesped || "—"}</td>
         <td>${it.hab_num || "—"}</td>
         <td>${it.checkout || "—"}</td>
-        <td class="text-end"><button class="btn btn-sm btn-outline-primary">Seleccionar</button></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary" type="button">Seleccionar</button></td>
       `;
       tr.querySelector("button").addEventListener("click", async () => {
         hideUIAlert();
@@ -440,12 +411,10 @@
 
       showUIAlert("success", `Check-out completado correctamente. Reserva VG-${data.reserva_id}.`);
 
-      // Reset selección
       setSelected(null, null);
       $("breakdown").textContent = "Seleccione una estancia para ver el desglose...";
       $("pago_final").value = "0.00";
 
-      // Refresh listas
       await loadToday();
       await loadWeek();
 
@@ -455,8 +424,6 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
-    AOS.init();
-
     $("btn-search").addEventListener("click", doSearch);
     $("btn-clear").addEventListener("click", async () => {
       hideUIAlert();
@@ -473,15 +440,11 @@
       showUIAlert("info", "Pendientes de hoy actualizados.");
     });
 
-    // Inicial
     await loadToday();
     await loadWeek();
 
-    // Tiempo real
     setInterval(loadToday, 20000);
     setInterval(loadWeek, 20000);
   });
 </script>
-
-</body>
-</html>
+{% endblock %}

@@ -1,120 +1,121 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recepción – Habitaciones | Hotel Villa Grace</title>
-  <meta name="description" content="Módulo de habitaciones: accesos a gestión y dashboard.">
+{% extends "base.html" %}
 
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}Recepción – Habitaciones | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Módulo de habitaciones: accesos a gestión y dashboard.{% endblock %}
 
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+{% block body_class %}inner-page{% endblock %}
 
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+{% block head_extra %}
+<link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+<style>
+  .soft {
+    color: #6c757d;
+  }
 
-  <style>
-    .ops-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
-    .ops-item{ display:flex; gap:12px; align-items:flex-start; padding:16px; border:1px solid rgba(255,255,255,.55);
-      border-radius:16px; background:rgba(255,255,255,.92); box-shadow:0 10px 30px rgba(0,0,0,.08); transition:.15s transform,.15s box-shadow; }
-    .ops-item:hover{ transform:translateY(-2px); box-shadow:0 14px 34px rgba(0,0,0,.12); }
-    .ops-item i{ font-size:1.6rem; }
-    .soft{ color:#6c757d; }
-  </style>
-</head>
+  .ops-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+  }
 
-<body class="inner-page">
+  .ops-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 16px;
+    border: 1px solid rgba(0, 0, 0, .08);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
 
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <h1 class="sitename">Hotel Villa Grace</h1>
-      </a>
+  .ops-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .10);
+  }
 
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li class="dropdown"><a href="#" class="active"><span>Recepción</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-            <ul>
-              <li><a href="ops-dashboard.html">Tablero</a></li>
-              <li><a href="ops-checkin.html">Check-in</a></li>
-              <li><a href="ops-checkout.html">Check-out</a></li>
-              <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
-              <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
-              <li><a href="ops-rooms-status.html">Estado de habitaciones</a></li>
-              <li><a href="ops-rooms.html" class="active">Habitaciones</a></li>
-              <li><a href="/ops/housekeeping">Limpieza</a></li>
-              <li><a href="/ops/coupons">Cupones</a></li>
-            </ul>
-          </li>
-          <li><a href="admin-calendario.html">Calendario</a></li>
-          <li><a href="portal-reservas.html">Reservas del huésped</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
+  .ops-item i {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+</style>
+{% endblock %}
 
-      <a class="btn-getstarted d-none d-sm-block" href="ops-dashboard.html">Volver</a>
-    </div>
-  </header>
+{% block content %}
 
-  <main class="main">
-    <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
       <div class="container position-relative">
-        <div class="section-title text-white">
-          <h1>Habitaciones</h1>
-          <p class="mb-0">Accesos rápidos para gestión y dashboard.</p>
+        <h1>Habitaciones</h1>
+        <p>Accesos rápidos para gestión y dashboard.</p>
+
+        <nav class="breadcrumbs" aria-label="breadcrumbs">
+          <ol>
+            <li><a href="index.html">Inicio</a></li>
+            <li><a href="ops-dashboard.html">Recepción</a></li>
+            <li class="current">Habitaciones</li>
+          </ol>
+        </nav>
+      </div>
+
+
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-success" href="ops-dashboard.html">
+          <i class="bi bi-arrow-left me-1"></i> Volver
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="section">
+  <div class="container" data-aos="fade-up">
+
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0">
+        <h5 class="mb-0"><i class="bi bi-grid-1x2 me-2"></i>Menú de habitaciones</h5>
+        <div class="soft small">Diseñado para operación diaria y administración.</div>
+      </div>
+
+      <div class="card-body">
+        <div class="ops-grid">
+
+          {% if session.get('user_role') == 'Administrador' %}
+          <a class="ops-item text-decoration-none" href="ops-rooms-manage.html">
+            <i class="bi bi-sliders text-success"></i>
+            <div>
+              <div class="fw-semibold text-dark">Gestión de habitaciones</div>
+              <div class="soft small">Crear, editar, eliminar y administrar imágenes.</div>
+            </div>
+          </a>
+          {% endif %}
+
+          <a class="ops-item text-decoration-none" href="ops-rooms-dashboard.html">
+            <i class="bi bi-bar-chart-line text-primary"></i>
+            <div>
+              <div class="fw-semibold text-dark">Dashboard de habitaciones</div>
+              <div class="soft small">Vista solo lectura con indicadores.</div>
+            </div>
+          </a>
+
         </div>
-        <nav class="breadcrumbs mt-2"><ol><li><a href="index.html">Inicio</a></li><li><a href="ops-dashboard.html">Recepción</a></li><li class="current">Habitaciones</li></ol></nav>
       </div>
     </div>
 
-    <section class="section">
-      <div class="container" data-aos="fade-up">
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0">
-            <h5 class="mb-0"><i class="bi bi-grid-1x2 me-2"></i>Menú de habitaciones</h5>
-            <div class="soft small">Diseñado para operación diaria y administración.</div>
-          </div>
-          <div class="card-body">
-            <div class="ops-grid">
+  </div>
+</section>
 
-              {% if session.get('user_role') == 'Administrador' %}
-              <a class="ops-item text-decoration-none" href="ops-rooms-manage.html">
-                <i class="bi bi-sliders text-success"></i>
-                <div>
-                  <div class="fw-semibold">Gestión de habitaciones</div>
-                  <div class="soft small">Crear, editar, eliminar y administrar imágenes.</div>
-                </div>
-              </a>
-              {% endif %}
+{% endblock %}
 
-              <a class="ops-item text-decoration-none" href="ops-rooms-dashboard.html">
-                <i class="bi bi-bar-chart-line text-primary"></i>
-                <div>
-                  <div class="fw-semibold">Dashboard de habitaciones</div>
-                  <div class="soft small">Vista solo lectura con indicadores.</div>
-                </div>
-              </a>
-
-              
-
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
-  <div id="preloader"></div>
-
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-</body>
-</html>
+{% block scripts %}
+<script>
+  window.addEventListener("load", () => {
+    if (window.AOS) AOS.init();
+  });
+</script>
+{% endblock %}
