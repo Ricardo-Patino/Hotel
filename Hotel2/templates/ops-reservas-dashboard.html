@@ -1,575 +1,598 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recepción – Dashboard Reservas | Hotel Villa Grace</title>
-  <meta name="description" content="Dashboard operativo y comercial de reservas.">
+{# templates/ops/ops-reservas-dashboard.html #}
+{% extends "base.html" %}
 
-  <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}Recepción – Dashboard Reservas | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Dashboard operativo y comercial de reservas.{% endblock %}
 
-  <!-- Fuentes -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+{% block body_class %}inner-page{% endblock %}
+{% block nav_ops %}active{% endblock %}
 
-  <!-- Vendors -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+{% block page_styles %}
+<style>
+  .soft {
+    color: #6c757d;
+  }
 
-  <!-- Estilos -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
 
-  <style>
-    .soft{ color:#6c757d; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .kpi .label{ font-size:.78rem; letter-spacing:.04em; text-transform:uppercase; color:#6c757d; }
-    .kpi .value{ font-size:1.55rem; font-weight:900; }
-    .kpi .sub{ font-size:.85rem; color:#6c757d; }
-    .card{ border:1px solid rgba(0,0,0,.06); border-radius:16px; }
-    .toolbar-card{ background: rgba(255,255,255,.92); backdrop-filter: blur(10px); }
-    .chip{
-      display:inline-flex; align-items:center; gap:.4rem;
-      border:1px solid rgba(0,0,0,.08); border-radius:999px;
-      padding:.35rem .6rem; font-size:.82rem; background:#fff;
-    }
-    .spark{ width:100%; height:56px; }
-    .spark path, .spark polyline { vector-effect: non-scaling-stroke; }
-    .list-tight .list-group-item{ padding:.65rem .85rem; }
-    .bar-row{ display:flex; align-items:center; gap:.65rem; }
-    .bar-row .name{ width: 38%; min-width: 140px; }
-    .bar-row .pct{ width: 12%; min-width: 54px; text-align:right; color:#6c757d; font-size:.85rem; }
-    .bar-row .bar{ flex:1; height:10px; border-radius:999px; background: rgba(0,0,0,.06); overflow:hidden; }
-    .bar-row .bar > div{ height:10px; width:0%; background:#198754; }
-    .table thead th{ white-space:nowrap; }
-  </style>
-</head>
+  .kpi .label {
+    font-size: .78rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #6c757d;
+  }
 
-<body class="inner-page">
+  .kpi .value {
+    font-size: 1.55rem;
+    font-weight: 900;
+  }
 
-  <!-- Header -->
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <h1 class="sitename">Hotel Villa Grace</h1>
+  .kpi .sub {
+    font-size: .85rem;
+    color: #6c757d;
+  }
+
+  .card {
+    border: 1px solid rgba(0, 0, 0, .06);
+    border-radius: 16px;
+  }
+
+  .toolbar-card {
+    background: rgba(255, 255, 255, .92);
+    backdrop-filter: blur(10px);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    border: 1px solid rgba(0, 0, 0, .08);
+    border-radius: 999px;
+    padding: .35rem .6rem;
+    font-size: .82rem;
+    background: #fff;
+  }
+
+  .spark {
+    width: 100%;
+    height: 56px;
+  }
+
+  .spark path,
+  .spark polyline {
+    vector-effect: non-scaling-stroke;
+  }
+
+  .list-tight .list-group-item {
+    padding: .65rem .85rem;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+  }
+
+  .bar-row .name {
+    width: 38%;
+    min-width: 140px;
+  }
+
+  .bar-row .pct {
+    width: 12%;
+    min-width: 54px;
+    text-align: right;
+    color: #6c757d;
+    font-size: .85rem;
+  }
+
+  .bar-row .bar {
+    flex: 1;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .06);
+    overflow: hidden;
+  }
+
+  .bar-row .bar>div {
+    height: 10px;
+    width: 0%;
+    background: #198754;
+  }
+
+  .table thead th {
+    white-space: nowrap;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image:url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');">
+  <div class="container position-relative">
+    <div>
+      <h1 class="mb-1">Dashboard de Reservas</h1>
+      <div class="soft" style="color: rgba(0,0,0,.75) !important;">
+        Indicadores comerciales y operativos para apoyar decisiones de ocupación, cobro y planificación.
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
+      <span class="chip"><i class="bi bi-shield-check text-success"></i> Datos globales (todos los usuarios)</span>
+      <span class="chip"><i class="bi bi-door-open text-success"></i> Excluye Mantenimiento</span>
+      <span class="chip"><i class="bi bi-calendar3 text-success"></i> Rango configurable</span>
+    </div>
+
+    <nav class="breadcrumbs mt-2" aria-label="breadcrumbs">
+      <ol>
+        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+        <li><a href="{{ url_for('ops_dashboard_html') }}">Recepción</a></li>
+        <li><a href="{{ url_for('ops_reservas_html') }}">Reservas</a></li>
+        <li class="current">Dashboard</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<section class="section">
+  <div class="container" data-aos="fade-up">
+
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary d-none d-sm-inline-flex" href="ops-reservas.html">
+        <i class="bi bi-arrow-left me-1"></i> Volver a Reservas
       </a>
-
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li class="dropdown"><a href="#" class="active"><span>Recepción</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-            <ul>
-              <li><a href="ops-dashboard.html">Tablero</a></li>
-              <li><a href="ops-reservas.html">Reservas</a></li>
-              <li><a href="ops-reservas-dashboard.html" class="active">Dashboard reservas</a></li>
-              <li><a href="ops-checkin.html">Check-in</a></li>
-              <li><a href="ops-checkout.html">Check-out</a></li>
-              <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
-              <li><a href="ops-rooms.html">Habitaciones</a></li>
-            </ul>
-          </li>
-          <li><a href="portal-reservas.html">Reservas del huésped</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
-
-      <div class="d-flex gap-2">
-        <a class="btn btn-outline-light d-none d-sm-inline-flex" href="ops-reservas.html">
-          <i class="bi bi-arrow-left me-1"></i> Volver a Reservas
-        </a>
-        <a class="btn btn-success d-none d-sm-inline-flex" href="ops-dashboard.html">
-          <i class="bi bi-house-door me-1"></i> Tablero
-        </a>
-      </div>
+      <a class="btn btn-success d-none d-sm-inline-flex" href="ops-dashboard.html">
+        <i class="bi bi-house-door me-1"></i> Tablero
+      </a>
     </div>
-  </header>
-  <!-- /Header -->
 
-  <main class="main">
-
-    <!-- Encabezado -->
-    <div class="page-title dark-background" data-aos="fade"
-         style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-      <div class="container position-relative">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <div class="text-white">
-            <h1 class="mb-1">Dashboard de Reservas</h1>
-            <div class="soft text-white-50">Indicadores comerciales y operativos para apoyar decisiones de ocupación, cobro y planificación.</div>
+    <!-- Toolbar -->
+    <div class="card toolbar-card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-lg-3">
+            <label class="form-label soft small">Desde</label>
+            <input type="date" class="form-control" id="fromDate">
+          </div>
+          <div class="col-lg-3">
+            <label class="form-label soft small">Hasta</label>
+            <input type="date" class="form-control" id="toDate">
           </div>
 
-          <div class="d-flex flex-wrap gap-2">
-            <span class="chip"><i class="bi bi-shield-check text-success"></i> Datos globales (todos los usuarios)</span>
-            <span class="chip"><i class="bi bi-door-open text-success"></i> Excluye Mantenimiento</span>
-            <span class="chip"><i class="bi bi-calendar3 text-success"></i> Rango configurable</span>
+          <div class="col-lg-6">
+            <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+              <button class="btn btn-outline-secondary" id="btnThisMonth" type="button">
+                <i class="bi bi-calendar2-month me-1"></i>Este mes
+              </button>
+              <button class="btn btn-outline-secondary" id="btnLast30" type="button">
+                <i class="bi bi-arrow-left-right me-1"></i>Últimos 30 días
+              </button>
+              <button class="btn btn-outline-secondary" id="btnNext30" type="button">
+                <i class="bi bi-arrow-right me-1"></i>Próximos 30 días
+              </button>
+              <button class="btn btn-success" id="btnApply" type="button">
+                <i class="bi bi-arrow-repeat me-1"></i>Aplicar
+              </button>
+            </div>
           </div>
         </div>
 
-        <nav class="breadcrumbs mt-2">
-          <ol>
-            <li><a href="index.html">Inicio</a></li>
-            <li><a href="ops-dashboard.html">Recepción</a></li>
-            <li><a href="ops-reservas.html">Reservas</a></li>
-            <li class="current">Dashboard</li>
-          </ol>
-        </nav>
+        <div class="d-flex align-items-center gap-2 mt-3" id="loadingBar" style="display:none;">
+          <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+          <div class="small soft">Cargando dashboard…</div>
+        </div>
+
+        <div class="small soft mt-2" id="rangeNote">—</div>
       </div>
     </div>
 
-    <section class="section">
-      <div class="container" data-aos="fade-up">
+    <!-- KPIs -->
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body kpi">
+            <div class="label">Ingresos estimados (noche)</div>
+            <div class="value" id="kpiRevenue">—</div>
+            <div class="sub">ADR: <span id="kpiAdr">—</span> • RevPAR: <span id="kpiRevpar">—</span></div>
+            <svg class="spark text-success" viewBox="0 0 100 32" id="sparkRevenue"></svg>
+          </div>
+        </div>
+      </div>
 
-        <!-- Toolbar -->
-        <div class="card toolbar-card shadow-sm border-0 mb-4">
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body kpi">
+            <div class="label">Ocupación promedio</div>
+            <div class="value" id="kpiOcc">—</div>
+            <div class="sub">Noches vendidas: <span id="kpiNightsSold">—</span> • Capacidad: <span
+                id="kpiNightsAvail">—</span></div>
+            <svg class="spark text-success" viewBox="0 0 100 32" id="sparkOcc"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body kpi">
+            <div class="label">Llegadas / Salidas</div>
+            <div class="value"><span id="kpiArrivals">—</span> / <span id="kpiDepartures">—</span></div>
+            <div class="sub">Estadía promedio (LOS): <span id="kpiLos">—</span> • Anticipación (Lead): <span
+                id="kpiLead">—</span></div>
+            <svg class="spark text-success" viewBox="0 0 100 32" id="sparkArrivals"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body kpi">
+            <div class="label">Cobro</div>
+            <div class="value" id="kpiBalance">—</div>
+            <div class="sub">Pagado estimado: <span id="kpiPaid">—</span> • Riesgo (7 días): <span
+                id="kpiRiskCount">—</span></div>
+            <svg class="spark text-success" viewBox="0 0 100 32" id="sparkBalance"></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analítica + Listas -->
+    <div class="row g-3">
+
+      <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="fw-semibold"><i class="bi bi-bar-chart-line me-2"></i>Tendencias del rango</div>
+              <div class="small soft">Series diarias: ocupación, ingresos y movimiento.</div>
+            </div>
+          </div>
           <div class="card-body">
-            <div class="row g-3 align-items-end">
-              <div class="col-lg-3">
-                <label class="form-label soft small">Desde</label>
-                <input type="date" class="form-control" id="fromDate">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="p-3 rounded-3" style="background: rgba(25,135,84,.06); border-left:4px solid #198754;">
+                  <div class="fw-semibold mb-1">Ingresos por día</div>
+                  <div class="small soft mb-2">Estimación prorateada por noche.</div>
+                  <svg class="spark text-success" viewBox="0 0 100 32" id="chartRevenueBars"></svg>
+                </div>
               </div>
-              <div class="col-lg-3">
-                <label class="form-label soft small">Hasta</label>
-                <input type="date" class="form-control" id="toDate">
+              <div class="col-md-4">
+                <div class="p-3 rounded-3" style="background: rgba(25,135,84,.06); border-left:4px solid #198754;">
+                  <div class="fw-semibold mb-1">Ocupación por día</div>
+                  <div class="small soft mb-2">% ocupación diaria.</div>
+                  <svg class="spark text-success" viewBox="0 0 100 32" id="chartOccLine"></svg>
+                </div>
               </div>
-
-              <div class="col-lg-6">
-                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
-                  <button class="btn btn-outline-secondary" id="btnThisMonth"><i class="bi bi-calendar2-month me-1"></i>Este mes</button>
-                  <button class="btn btn-outline-secondary" id="btnLast30"><i class="bi bi-arrow-left-right me-1"></i>Últimos 30 días</button>
-                  <button class="btn btn-outline-secondary" id="btnNext30"><i class="bi bi-arrow-right me-1"></i>Próximos 30 días</button>
-                  <button class="btn btn-success" id="btnApply"><i class="bi bi-arrow-repeat me-1"></i>Aplicar</button>
+              <div class="col-md-4">
+                <div class="p-3 rounded-3" style="background: rgba(25,135,84,.06); border-left:4px solid #198754;">
+                  <div class="fw-semibold mb-1">Reservas creadas</div>
+                  <div class="small soft mb-2">Movimiento por fecha de registro.</div>
+                  <svg class="spark text-success" viewBox="0 0 100 32" id="chartCreatedBars"></svg>
                 </div>
               </div>
             </div>
 
-            <div class="d-flex align-items-center gap-2 mt-3" id="loadingBar" style="display:none;">
-              <div class="spinner-border spinner-border-sm text-success" role="status"></div>
-              <div class="small soft">Cargando dashboard…</div>
+            <hr>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="fw-semibold mb-2"><i class="bi bi-diagram-3 me-2"></i>Distribución por estado</div>
+                <div id="statusBars"></div>
+              </div>
+              <div class="col-md-6">
+                <div class="fw-semibold mb-2"><i class="bi bi-broadcast me-2"></i>Distribución por canal</div>
+                <div id="channelBars"></div>
+              </div>
             </div>
 
-            <div class="small soft mt-2" id="rangeNote">—</div>
           </div>
         </div>
-
-        <!-- KPIs -->
-        <div class="row g-3 mb-4">
-          <div class="col-12 col-md-6 col-xl-3">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body kpi">
-                <div class="label">Ingresos estimados (noche)</div>
-                <div class="value" id="kpiRevenue">—</div>
-                <div class="sub">ADR: <span id="kpiAdr">—</span> • RevPAR: <span id="kpiRevpar">—</span></div>
-                <svg class="spark text-success" viewBox="0 0 100 32" id="sparkRevenue"></svg>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-12 col-md-6 col-xl-3">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body kpi">
-                <div class="label">Ocupación promedio</div>
-                <div class="value" id="kpiOcc">—</div>
-                <div class="sub">Noches vendidas: <span id="kpiNightsSold">—</span> • Capacidad: <span id="kpiNightsAvail">—</span></div>
-                <svg class="spark text-success" viewBox="0 0 100 32" id="sparkOcc"></svg>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-12 col-md-6 col-xl-3">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body kpi">
-                <div class="label">Llegadas / Salidas</div>
-                <div class="value"><span id="kpiArrivals">—</span> / <span id="kpiDepartures">—</span></div>
-                <div class="sub">Estadía promedio (LOS): <span id="kpiLos">—</span> • Anticipación (Lead): <span id="kpiLead">—</span></div>
-                <svg class="spark text-success" viewBox="0 0 100 32" id="sparkArrivals"></svg>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-12 col-md-6 col-xl-3">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body kpi">
-                <div class="label">Cobro</div>
-                <div class="value" id="kpiBalance">—</div>
-                <div class="sub">Pagado estimado: <span id="kpiPaid">—</span> • Riesgo (7 días): <span id="kpiRiskCount">—</span></div>
-                <svg class="spark text-success" viewBox="0 0 100 32" id="sparkBalance"></svg>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Analítica + Listas -->
-        <div class="row g-3">
-
-          <div class="col-lg-8">
-            <div class="card shadow-sm border-0">
-              <div class="card-header bg-white border-0">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                  <div class="fw-semibold"><i class="bi bi-bar-chart-line me-2"></i>Tendencias del rango</div>
-                  <div class="small soft">Series diarias: ocupación, ingresos y movimiento.</div>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="row g-3">
-                  <div class="col-md-4">
-                    <div class="p-3 rounded-3" style="background: rgba(25,135,84,.06); border-left:4px solid #198754;">
-                      <div class="fw-semibold mb-1">Ingresos por día</div>
-                      <div class="small soft mb-2">Estimación prorateada por noche.</div>
-                      <svg class="spark text-success" viewBox="0 0 100 32" id="chartRevenueBars"></svg>
-                    </div>
-                  </div>
-                  <div class="col-md-4">
-                    <div class="p-3 rounded-3" style="background: rgba(25,135,84,.06); border-left:4px solid #198754;">
-                      <div class="fw-semibold mb-1">Ocupación por día</div>
-                      <div class="small soft mb-2">% ocupación diaria.</div>
-                      <svg class="spark text-success" viewBox="0 0 100 32" id="chartOccLine"></svg>
-                    </div>
-                  </div>
-                  <div class="col-md-4">
-                    <div class="p-3 rounded-3" style="background: rgba(25,135,84,.06); border-left:4px solid #198754;">
-                      <div class="fw-semibold mb-1">Reservas creadas</div>
-                      <div class="small soft mb-2">Movimiento por fecha de registro.</div>
-                      <svg class="spark text-success" viewBox="0 0 100 32" id="chartCreatedBars"></svg>
-                    </div>
-                  </div>
-                </div>
-
-                <hr>
-
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <div class="fw-semibold mb-2"><i class="bi bi-diagram-3 me-2"></i>Distribución por estado</div>
-                    <div id="statusBars"></div>
-                  </div>
-                  <div class="col-md-6">
-                    <div class="fw-semibold mb-2"><i class="bi bi-broadcast me-2"></i>Distribución por canal</div>
-                    <div id="channelBars"></div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-          <div class="col-lg-4">
-            <div class="card shadow-sm border-0 mb-3">
-              <div class="card-header bg-white border-0">
-                <div class="fw-semibold"><i class="bi bi-calendar-event me-2"></i>Próximas llegadas (7 días)</div>
-                <div class="small soft">Prioriza cobro y coordinación operativa.</div>
-              </div>
-              <div class="card-body">
-                <div class="list-group list-tight" id="upcomingList"></div>
-              </div>
-            </div>
-
-            <div class="card shadow-sm border-0">
-              <div class="card-header bg-white border-0">
-                <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-2"></i>Alertas de cobro</div>
-                <div class="small soft">Reservas próximas con saldo pendiente.</div>
-              </div>
-              <div class="card-body">
-                <div class="list-group list-tight" id="riskList"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-12">
-            <div class="card shadow-sm border-0">
-              <div class="card-header bg-white border-0">
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                  <div class="fw-semibold"><i class="bi bi-list-check me-2"></i>Resumen del rango</div>
-                  <div class="small soft" id="summaryNote">—</div>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="table-responsive">
-                  <table class="table align-middle">
-                    <thead>
-                      <tr>
-                        <th>Indicador</th>
-                        <th>Valor</th>
-                        <th class="soft">Detalle</th>
-                      </tr>
-                    </thead>
-                    <tbody id="summaryTable"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div><!-- /row -->
-
       </div>
-    </section>
 
-  </main>
-
-  <!-- Vendor JS -->
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
-
-  <script>
-    const API_URL = "/api/ops/reservas/dashboard";
-
-    function esc(s){
-      return String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
-    function moneyCRC(v){
-      const n = Number(v || 0);
-      return n.toLocaleString("es-CR", { style:"currency", currency:"CRC" });
-    }
-    function pct(v){
-      const n = Number(v || 0);
-      return `${Math.round(n)}%`;
-    }
-
-    function setLoading(on){
-      document.getElementById("loadingBar").style.display = on ? "flex" : "none";
-      document.getElementById("btnApply").disabled = !!on;
-    }
-
-    function iso(d){
-      const y = d.getFullYear();
-      const m = String(d.getMonth()+1).padStart(2,"0");
-      const dd = String(d.getDate()).padStart(2,"0");
-      return `${y}-${m}-${dd}`;
-    }
-    function parseISO(s){
-      const [y,m,d] = (s||"").split("-").map(Number);
-      return new Date(y,(m||1)-1,d||1);
-    }
-
-    function setThisMonth(){
-      const now = new Date();
-      const from = new Date(now.getFullYear(), now.getMonth(), 1);
-      const to = new Date(now.getFullYear(), now.getMonth()+1, 0);
-      fromDate.value = iso(from);
-      toDate.value = iso(to);
-    }
-    function setLast30(){
-      const now = new Date();
-      const to = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const from = new Date(to.getTime());
-      from.setDate(from.getDate()-29);
-      fromDate.value = iso(from);
-      toDate.value = iso(to);
-    }
-    function setNext30(){
-      const now = new Date();
-      const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const to = new Date(from.getTime());
-      to.setDate(to.getDate()+29);
-      fromDate.value = iso(from);
-      toDate.value = iso(to);
-    }
-
-    function downsample(values, maxPts=60){
-      const n = values.length;
-      if (n <= maxPts) return values.slice();
-      const out = [];
-      for (let i=0; i<maxPts; i++){
-        const idx = Math.round(i*(n-1)/(maxPts-1));
-        out.push(values[idx]);
-      }
-      return out;
-    }
-
-    function renderLine(svgId, values){
-      const svg = document.getElementById(svgId);
-      if (!svg) return;
-      const v = downsample(values.map(x => Number(x||0)));
-      const w = 100, h = 32, pad=2;
-
-      const min = Math.min(...v), max = Math.max(...v);
-      const denom = (max-min) || 1;
-
-      const pts = v.map((val,i) => {
-        const x = pad + (i*(w-2*pad)/(Math.max(1,v.length-1)));
-        const y = (h-pad) - ((val-min)/denom)*(h-2*pad);
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
-      }).join(" ");
-
-      // área
-      const first = pts.split(" ")[0];
-      const last = pts.split(" ").slice(-1)[0];
-      const area = `M ${first} L ${pts.replaceAll(" ", " L ")} L ${last.split(",")[0]} ${h-pad} L ${first.split(",")[0]} ${h-pad} Z`;
-
-      svg.innerHTML = `
-        <path d="${area}" fill="currentColor" opacity="0.10"></path>
-        <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
-      `;
-    }
-
-    function renderBars(svgId, values){
-      const svg = document.getElementById(svgId);
-      if (!svg) return;
-      const v = downsample(values.map(x => Number(x||0)));
-      const w=100, h=32, pad=2;
-
-      const max = Math.max(...v, 1);
-      const bw = (w-2*pad) / v.length;
-
-      let bars = "";
-      v.forEach((val,i)=>{
-        const height = ((val/max) * (h-2*pad));
-        const x = pad + i*bw + 0.6;
-        const y = (h-pad) - height;
-        bars += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${Math.max(0.8,bw-1.2).toFixed(2)}" height="${height.toFixed(2)}" fill="currentColor" opacity="0.85" rx="1.2"></rect>`;
-      });
-      svg.innerHTML = bars;
-    }
-
-    function renderBarList(containerId, items){
-      const el = document.getElementById(containerId);
-      if (!el) return;
-      const total = items.reduce((a,b)=>a + (b.count||0), 0) || 1;
-
-      el.innerHTML = items.map(it => {
-        const p = Math.round((it.count||0)*100/total);
-        return `
-          <div class="bar-row mb-2">
-            <div class="name">${esc(it.name || "—")}</div>
-            <div class="bar"><div style="width:${p}%"></div></div>
-            <div class="pct">${p}%</div>
+      <div class="col-lg-4">
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-header bg-white border-0">
+            <div class="fw-semibold"><i class="bi bi-calendar-event me-2"></i>Próximas llegadas (7 días)</div>
+            <div class="small soft">Prioriza cobro y coordinación operativa.</div>
           </div>
-        `;
-      }).join("") || `<div class="soft">Sin datos.</div>`;
-    }
+          <div class="card-body">
+            <div class="list-group list-tight" id="upcomingList"></div>
+          </div>
+        </div>
 
-    function renderUpcoming(listId, items, emptyMsg){
-      const el = document.getElementById(listId);
-      if (!el) return;
-      if (!items || items.length===0){
-        el.innerHTML = `<div class="soft">${esc(emptyMsg || "Sin datos.")}</div>`;
-        return;
-      }
-      el.innerHTML = items.map(r => `
-        <div class="list-group-item">
-          <div class="d-flex justify-content-between align-items-start gap-2">
-            <div>
-              <div class="fw-semibold">Hab. ${esc(r.habitacion_numero)} <span class="soft">(${esc(r.habitacion_tipo)})</span></div>
-              <div class="small">${esc(r.cliente_nombre)} <span class="soft">• ${esc(r.checkin)} → ${esc(r.checkout)}</span></div>
-              <div class="small soft mono">Reserva #${esc(r.id)} • ${esc(r.estado)} • ${esc(r.canal || "—")}</div>
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-2"></i>Alertas de cobro</div>
+            <div class="small soft">Reservas próximas con saldo pendiente.</div>
+          </div>
+          <div class="card-body">
+            <div class="list-group list-tight" id="riskList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div class="fw-semibold"><i class="bi bi-list-check me-2"></i>Resumen del rango</div>
+              <div class="small soft" id="summaryNote">—</div>
             </div>
-            <div class="text-end">
-              <div class="small soft">Saldo</div>
-              <div class="fw-semibold">${moneyCRC(r.balance)}</div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th>Indicador</th>
+                    <th>Valor</th>
+                    <th class="soft">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryTable"></tbody>
+              </table>
             </div>
           </div>
         </div>
-      `).join("");
+      </div>
+
+    </div><!-- /row -->
+
+  </div>
+</section>
+
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+  const API_URL = "/api/ops/reservas/dashboard";
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+  function moneyCRC(v) {
+    const n = Number(v || 0);
+    return n.toLocaleString("es-CR", { style: "currency", currency: "CRC" });
+  }
+  function pct(v) {
+    const n = Number(v || 0);
+    return `${Math.round(n)}%`;
+  }
+
+  function setLoading(on) {
+    document.getElementById("loadingBar").style.display = on ? "flex" : "none";
+    document.getElementById("btnApply").disabled = !!on;
+  }
+
+  function iso(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
+
+  function setThisMonth() {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    fromDate.value = iso(from);
+    toDate.value = iso(to);
+  }
+  function setLast30() {
+    const now = new Date();
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const from = new Date(to.getTime());
+    from.setDate(from.getDate() - 29);
+    fromDate.value = iso(from);
+    toDate.value = iso(to);
+  }
+  function setNext30() {
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const to = new Date(from.getTime());
+    to.setDate(to.getDate() + 29);
+    fromDate.value = iso(from);
+    toDate.value = iso(to);
+  }
+
+  function downsample(values, maxPts = 60) {
+    const n = values.length;
+    if (n <= maxPts) return values.slice();
+    const out = [];
+    for (let i = 0; i < maxPts; i++) {
+      const idx = Math.round(i * (n - 1) / (maxPts - 1));
+      out.push(values[idx]);
     }
+    return out;
+  }
 
-    function renderSummaryTable(rows){
-      const tbody = document.getElementById("summaryTable");
-      if (!tbody) return;
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td class="fw-semibold">${esc(r.label)}</td>
-          <td>${esc(r.value)}</td>
-          <td class="soft">${esc(r.detail || "")}</td>
-        </tr>
-      `).join("");
-    }
+  function renderLine(svgId, values) {
+    const svg = document.getElementById(svgId);
+    if (!svg) return;
+    const v = downsample(values.map(x => Number(x || 0)));
+    const w = 100, h = 32, pad = 2;
 
-    async function loadDashboard(){
-      const from = fromDate.value;
-      const to = toDate.value;
+    const min = Math.min(...v), max = Math.max(...v);
+    const denom = (max - min) || 1;
 
-      const params = new URLSearchParams();
-      params.set("from", from);
-      params.set("to", to);
+    const pts = v.map((val, i) => {
+      const x = pad + (i * (w - 2 * pad) / (Math.max(1, v.length - 1)));
+      const y = (h - pad) - ((val - min) / denom) * (h - 2 * pad);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(" ");
 
-      setLoading(true);
-      try{
-        const res = await fetch(`${API_URL}?${params.toString()}`, { credentials:"same-origin" });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data?.error || "dashboard_failed");
+    const first = pts.split(" ")[0];
+    const last = pts.split(" ").slice(-1)[0];
+    const area = `M ${first} L ${pts.replaceAll(" ", " L ")} L ${last.split(",")[0]} ${h - pad} L ${first.split(",")[0]} ${h - pad} Z`;
 
-        const k = data.kpis;
+    svg.innerHTML = `
+      <path d="${area}" fill="currentColor" opacity="0.10"></path>
+      <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    `;
+  }
 
-        document.getElementById("rangeNote").textContent =
-          `Rango: ${data.range.from} → ${data.range.to} (${data.range.days} días) • Habitaciones usables: ${data.rooms.total_usable}`;
+  function renderBars(svgId, values) {
+    const svg = document.getElementById(svgId);
+    if (!svg) return;
+    const v = downsample(values.map(x => Number(x || 0)));
+    const w = 100, h = 32, pad = 2;
 
-        document.getElementById("kpiRevenue").textContent = moneyCRC(k.revenue);
-        document.getElementById("kpiAdr").textContent = moneyCRC(k.adr);
-        document.getElementById("kpiRevpar").textContent = moneyCRC(k.revpar);
+    const max = Math.max(...v, 1);
+    const bw = (w - 2 * pad) / v.length;
 
-        document.getElementById("kpiOcc").textContent = pct(k.occupancy_pct);
-        document.getElementById("kpiNightsSold").textContent = (k.room_nights_sold || 0).toLocaleString("es-CR");
-        document.getElementById("kpiNightsAvail").textContent = (k.room_nights_available || 0).toLocaleString("es-CR");
-
-        document.getElementById("kpiArrivals").textContent = (k.arrivals || 0);
-        document.getElementById("kpiDepartures").textContent = (k.departures || 0);
-        document.getElementById("kpiLos").textContent = (k.avg_los_nights || 0).toFixed(1) + " noches";
-        document.getElementById("kpiLead").textContent = (k.avg_lead_days || 0).toFixed(1) + " días";
-
-        document.getElementById("kpiBalance").textContent = moneyCRC(k.balance);
-        document.getElementById("kpiPaid").textContent = moneyCRC(k.paid);
-        document.getElementById("kpiRiskCount").textContent = (data.risk?.items?.length || 0);
-
-        // Sparklines KPI
-        renderLine("sparkRevenue", data.series.revenue_by_day || []);
-        renderLine("sparkOcc", data.series.occ_pct_by_day || []);
-        renderLine("sparkArrivals", data.series.arrivals_by_day || []);
-        renderLine("sparkBalance", data.series.balance_by_day || []);
-
-        // Charts “grandes”
-        renderBars("chartRevenueBars", data.series.revenue_by_day || []);
-        renderLine("chartOccLine", data.series.occ_pct_by_day || []);
-        renderBars("chartCreatedBars", data.series.created_count_by_day || []);
-
-        // Barras
-        renderBarList("statusBars", data.breakdowns.status || []);
-        renderBarList("channelBars", data.breakdowns.channel || []);
-
-        // Listas
-        renderUpcoming("upcomingList", data.upcoming?.arrivals || [], "No hay llegadas próximas.");
-        renderUpcoming("riskList", data.risk?.items || [], "Sin alertas de saldo pendiente.");
-
-        // Summary
-        document.getElementById("summaryNote").textContent =
-          `Reservas en rango (solapadas): ${k.overlapping_reservations} • Confirmadas: ${k.confirmed_overlap} • Canceladas: ${k.cancelled_overlap} • NoShow: ${k.noshow_overlap}`;
-
-        renderSummaryTable([
-          { label:"Reservas solapadas (rango)", value: String(k.overlapping_reservations), detail:"Reservas cuyo intervalo toca el rango." },
-          { label:"Ingresos estimados", value: moneyCRC(k.revenue), detail:"Prorrateado por noches dentro del rango." },
-          { label:"Pagado estimado", value: moneyCRC(k.paid), detail:"Prorrateado por noches dentro del rango." },
-          { label:"Saldo estimado", value: moneyCRC(k.balance), detail:"Ingresos estimados - pagado estimado." },
-          { label:"Ocupación promedio", value: pct(k.occupancy_pct), detail:"Noches vendidas / noches disponibles (hab. usables)." },
-          { label:"ADR", value: moneyCRC(k.adr), detail:"Ingresos estimados / noches vendidas." },
-          { label:"RevPAR", value: moneyCRC(k.revpar), detail:"Ingresos estimados / (hab. usables × días)." },
-          { label:"Llegadas / Salidas", value: `${k.arrivals} / ${k.departures}`, detail:"Conteo por fechas check-in y check-out dentro del rango." },
-          { label:"LOS promedio", value: `${k.avg_los_nights.toFixed(1)} noches`, detail:"Promedio de noches (reservas con llegada en rango, confirmadas)." },
-          { label:"Lead time promedio", value: `${k.avg_lead_days.toFixed(1)} días`, detail:"Días entre registro y check-in (llegadas en rango, confirmadas)." }
-        ]);
-
-      } catch(err){
-        console.error(err);
-        document.getElementById("rangeNote").textContent = `Error: ${err.message || err}`;
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    // Init
-    const fromDate = document.getElementById("fromDate");
-    const toDate = document.getElementById("toDate");
-
-    document.getElementById("btnThisMonth").addEventListener("click", () => { setThisMonth(); loadDashboard(); });
-    document.getElementById("btnLast30").addEventListener("click", () => { setLast30(); loadDashboard(); });
-    document.getElementById("btnNext30").addEventListener("click", () => { setNext30(); loadDashboard(); });
-    document.getElementById("btnApply").addEventListener("click", loadDashboard);
-
-    window.addEventListener("load", () => {
-      AOS.init();
-      setThisMonth();
-      loadDashboard();
+    let bars = "";
+    v.forEach((val, i) => {
+      const height = ((val / max) * (h - 2 * pad));
+      const x = pad + i * bw + 0.6;
+      const y = (h - pad) - height;
+      bars += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${Math.max(0.8, bw - 1.2).toFixed(2)}" height="${height.toFixed(2)}" fill="currentColor" opacity="0.85" rx="1.2"></rect>`;
     });
-  </script>
+    svg.innerHTML = bars;
+  }
 
-</body>
-</html>
+  function renderBarList(containerId, items) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const total = items.reduce((a, b) => a + (b.count || 0), 0) || 1;
+
+    el.innerHTML = items.map(it => {
+      const p = Math.round((it.count || 0) * 100 / total);
+      return `
+        <div class="bar-row mb-2">
+          <div class="name">${esc(it.name || "—")}</div>
+          <div class="bar"><div style="width:${p}%"></div></div>
+          <div class="pct">${p}%</div>
+        </div>
+      `;
+    }).join("") || `<div class="soft">Sin datos.</div>`;
+  }
+
+  function renderUpcoming(listId, items, emptyMsg) {
+    const el = document.getElementById(listId);
+    if (!el) return;
+    if (!items || items.length === 0) {
+      el.innerHTML = `<div class="soft">${esc(emptyMsg || "Sin datos.")}</div>`;
+      return;
+    }
+    el.innerHTML = items.map(r => `
+      <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div class="fw-semibold">Hab. ${esc(r.habitacion_numero)} <span class="soft">(${esc(r.habitacion_tipo)})</span></div>
+            <div class="small">${esc(r.cliente_nombre)} <span class="soft">• ${esc(r.checkin)} → ${esc(r.checkout)}</span></div>
+            <div class="small soft mono">Reserva #${esc(r.id)} • ${esc(r.estado)} • ${esc(r.canal || "—")}</div>
+          </div>
+          <div class="text-end">
+            <div class="small soft">Saldo</div>
+            <div class="fw-semibold">${moneyCRC(r.balance)}</div>
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function renderSummaryTable(rows) {
+    const tbody = document.getElementById("summaryTable");
+    if (!tbody) return;
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="fw-semibold">${esc(r.label)}</td>
+        <td>${esc(r.value)}</td>
+        <td class="soft">${esc(r.detail || "")}</td>
+      </tr>
+    `).join("");
+  }
+
+  async function loadDashboard() {
+    const from = fromDate.value;
+    const to = toDate.value;
+
+    const params = new URLSearchParams();
+    params.set("from", from);
+    params.set("to", to);
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}?${params.toString()}`, { credentials: "same-origin" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data?.error || "dashboard_failed");
+
+      const k = data.kpis;
+
+      document.getElementById("rangeNote").textContent =
+        `Rango: ${data.range.from} → ${data.range.to} (${data.range.days} días) • Habitaciones usables: ${data.rooms.total_usable}`;
+
+      document.getElementById("kpiRevenue").textContent = moneyCRC(k.revenue);
+      document.getElementById("kpiAdr").textContent = moneyCRC(k.adr);
+      document.getElementById("kpiRevpar").textContent = moneyCRC(k.revpar);
+
+      document.getElementById("kpiOcc").textContent = pct(k.occupancy_pct);
+      document.getElementById("kpiNightsSold").textContent = (k.room_nights_sold || 0).toLocaleString("es-CR");
+      document.getElementById("kpiNightsAvail").textContent = (k.room_nights_available || 0).toLocaleString("es-CR");
+
+      document.getElementById("kpiArrivals").textContent = (k.arrivals || 0);
+      document.getElementById("kpiDepartures").textContent = (k.departures || 0);
+      document.getElementById("kpiLos").textContent = (k.avg_los_nights || 0).toFixed(1) + " noches";
+      document.getElementById("kpiLead").textContent = (k.avg_lead_days || 0).toFixed(1) + " días";
+
+      document.getElementById("kpiBalance").textContent = moneyCRC(k.balance);
+      document.getElementById("kpiPaid").textContent = moneyCRC(k.paid);
+      document.getElementById("kpiRiskCount").textContent = (data.risk?.items?.length || 0);
+
+      renderLine("sparkRevenue", data.series.revenue_by_day || []);
+      renderLine("sparkOcc", data.series.occ_pct_by_day || []);
+      renderLine("sparkArrivals", data.series.arrivals_by_day || []);
+      renderLine("sparkBalance", data.series.balance_by_day || []);
+
+      renderBars("chartRevenueBars", data.series.revenue_by_day || []);
+      renderLine("chartOccLine", data.series.occ_pct_by_day || []);
+      renderBars("chartCreatedBars", data.series.created_count_by_day || []);
+
+      renderBarList("statusBars", data.breakdowns.status || []);
+      renderBarList("channelBars", data.breakdowns.channel || []);
+
+      renderUpcoming("upcomingList", data.upcoming?.arrivals || [], "No hay llegadas próximas.");
+      renderUpcoming("riskList", data.risk?.items || [], "Sin alertas de saldo pendiente.");
+
+      document.getElementById("summaryNote").textContent =
+        `Reservas en rango (solapadas): ${k.overlapping_reservations} • Confirmadas: ${k.confirmed_overlap} • Canceladas: ${k.cancelled_overlap} • NoShow: ${k.noshow_overlap}`;
+
+      renderSummaryTable([
+        { label: "Reservas solapadas (rango)", value: String(k.overlapping_reservations), detail: "Reservas cuyo intervalo toca el rango." },
+        { label: "Ingresos estimados", value: moneyCRC(k.revenue), detail: "Prorrateado por noches dentro del rango." },
+        { label: "Pagado estimado", value: moneyCRC(k.paid), detail: "Prorrateado por noches dentro del rango." },
+        { label: "Saldo estimado", value: moneyCRC(k.balance), detail: "Ingresos estimados - pagado estimado." },
+        { label: "Ocupación promedio", value: pct(k.occupancy_pct), detail: "Noches vendidas / noches disponibles (hab. usables)." },
+        { label: "ADR", value: moneyCRC(k.adr), detail: "Ingresos estimados / noches vendidas." },
+        { label: "RevPAR", value: moneyCRC(k.revpar), detail: "Ingresos estimados / (hab. usables × días)." },
+        { label: "Llegadas / Salidas", value: `${k.arrivals} / ${k.departures}`, detail: "Conteo por fechas check-in y check-out dentro del rango." },
+        { label: "LOS promedio", value: `${k.avg_los_nights.toFixed(1)} noches`, detail: "Promedio de noches (reservas con llegada en rango, confirmadas)." },
+        { label: "Lead time promedio", value: `${k.avg_lead_days.toFixed(1)} días`, detail: "Días entre registro y check-in (llegadas en rango, confirmadas)." }
+      ]);
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById("rangeNote").textContent = `Error: ${err.message || err}`;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const fromDate = document.getElementById("fromDate");
+  const toDate = document.getElementById("toDate");
+
+  document.getElementById("btnThisMonth").addEventListener("click", () => { setThisMonth(); loadDashboard(); });
+  document.getElementById("btnLast30").addEventListener("click", () => { setLast30(); loadDashboard(); });
+  document.getElementById("btnNext30").addEventListener("click", () => { setNext30(); loadDashboard(); });
+  document.getElementById("btnApply").addEventListener("click", loadDashboard);
+
+  window.addEventListener("load", () => {
+    if (window.AOS && typeof window.AOS.init === "function") window.AOS.init();
+    setThisMonth();
+    loadDashboard();
+  });
+</script>
+{% endblock %}

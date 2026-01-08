@@ -1,13 +1,72 @@
 {# templates/sac/sac-conversaciones.html #}
-{% extends "base.html" %}
+{% extends "sac/_layout.html" %}
 
 {% block title %}Seguimiento de conversaciones – SAC{% endblock %}
 
-{% block content %}
-<div class="container-fluid sac-conv-page py-3">
+{% block page_h1 %}Seguimiento de conversaciones{% endblock %}
+{% block crumb %}Conversaciones{% endblock %}
+
+{% block head_extra %}
+<style>
+  .sac-conv-page {
+    min-height: calc(100vh - 220px);
+  }
+
+  .conv-detail-panel {
+    max-height: calc(100vh - 320px);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+  }
+
+  @media (max-width: 991.98px) {
+    .conv-detail-panel {
+      max-height: none;
+      min-height: 280px;
+    }
+  }
+
+  .conv-message {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+  }
+
+  .conv-message-user { background-color: #e9f5ff; }
+  .conv-message-bot  { background-color: #ffffff; border: 1px solid #e2e3e5; }
+  .conv-message-agent{ background-color: #e8f7ea; }
+  .conv-message-system { background-color: #f1f0f5; font-style: italic; }
+
+  .conv-message-meta {
+    font-size: 0.7rem;
+    color: #6c757d;
+  }
+
+  .conv-row { cursor: pointer; }
+  .conv-row.active { background-color: #e9f5ff; }
+
+  .conv-row.needs-agent {
+    border-left: 4px solid #dc3545;
+    background-color: #fff5f5;
+  }
+
+  .conv-row .last-snippet {
+    display: block;
+    font-size: 0.75rem;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+</style>
+{% endblock %}
+
+{% block sac_content %}
+<div class="sac-conv-page py-2">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-1">Seguimiento de conversaciones – SAC</h1>
+      <h2 class="h5 mb-1">Seguimiento de conversaciones – SAC</h2>
       <p class="text-muted mb-0 small">
         Panel para que recepción y administración vean el historial del chatbot, identifiquen
         conversaciones que requieren atención humana y continúen la atención desde este mismo chat.
@@ -20,7 +79,6 @@
   </div>
 
   <div class="row g-3">
-    <!-- Lista de conversaciones -->
     <div class="col-lg-4 col-xl-3">
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -37,24 +95,21 @@
       </div>
     </div>
 
-    <!-- Detalle conversación -->
     <div class="col-lg-8 col-xl-9">
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
           <div>
-            <h2 id="conv-detail-title" class="h6 mb-0">Selecciona una conversación</h2>
+            <h3 id="conv-detail-title" class="h6 mb-0">Selecciona una conversación</h3>
             <small id="conv-detail-subtitle" class="text-muted"></small>
           </div>
           <div id="conv-detail-status-badges" class="text-end small"></div>
         </div>
 
         <div class="card-body d-flex flex-column">
-          <!-- Mensajes -->
           <div id="conv-detail-messages" class="conv-detail-panel mb-3 small">
             <p class="text-muted mb-0">No hay conversación seleccionada.</p>
           </div>
 
-          <!-- Formulario respuesta agente -->
           <form id="agent-reply-form" class="mt-auto" style="display:none;">
             <div class="mb-2">
               <label for="agent-reply-text" class="form-label small mb-1">
@@ -77,7 +132,6 @@
             </div>
           </form>
 
-          <!-- Mensaje cuando no se puede responder -->
           <div id="agent-reply-disabled" class="mt-auto small text-muted" style="display:none;">
             Esta conversación no está marcada para atención de agente o se encuentra cerrada.
           </div>
@@ -86,80 +140,9 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
-<style>
-  .sac-conv-page {
-    min-height: calc(100vh - 120px);
-  }
-
-  /* Panel de detalle: evita que se corte en conversaciones largas */
-  .conv-detail-panel {
-    max-height: calc(100vh - 260px);
-    overflow-y: auto;
-    padding-right: 0.5rem;
-    border-radius: 0.5rem;
-    background-color: #f8f9fa;
-  }
-
-  @media (max-width: 991.98px) {
-    .conv-detail-panel {
-      max-height: none;
-      min-height: 280px;
-    }
-  }
-
-  .conv-message {
-    margin-bottom: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
-  }
-
-  .conv-message-user {
-    background-color: #e9f5ff;
-  }
-
-  .conv-message-bot {
-    background-color: #ffffff;
-    border: 1px solid #e2e3e5;
-  }
-
-  .conv-message-agent {
-    background-color: #e8f7ea;
-  }
-
-  .conv-message-system {
-    background-color: #f1f0f5;
-    font-style: italic;
-  }
-
-  .conv-message-meta {
-    font-size: 0.7rem;
-    color: #6c757d;
-  }
-
-  .conv-row {
-    cursor: pointer;
-  }
-
-  .conv-row.active {
-    background-color: #e9f5ff;
-  }
-
-  .conv-row.needs-agent {
-    border-left: 4px solid #dc3545;
-    background-color: #fff5f5;
-  }
-
-  .conv-row .last-snippet {
-    display: block;
-    font-size: 0.75rem;
-    color: #6c757d;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-</style>
-
+{% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   let currentConvId = null;
@@ -266,7 +249,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function renderMessages(conv, messages) {
+  function renderMessages(messages) {
     if (!messagesEl) return;
 
     if (!messages || messages.length === 0) {
@@ -281,16 +264,9 @@ document.addEventListener("DOMContentLoaded", function () {
       let cls = "conv-message-bot";
       let label = "Bot";
 
-      if (role === "user") {
-        cls = "conv-message-user";
-        label = "Cliente";
-      } else if (role === "agent") {
-        cls = "conv-message-agent";
-        label = "Agente";
-      } else if (role === "system") {
-        cls = "conv-message-system";
-        label = "Sistema";
-      }
+      if (role === "user") { cls = "conv-message-user"; label = "Cliente"; }
+      else if (role === "agent") { cls = "conv-message-agent"; label = "Agente"; }
+      else if (role === "system") { cls = "conv-message-system"; label = "Sistema"; }
 
       const ts = msg.created_at_human || msg.created_at || "";
       const content = (msg.content || "").replace(/\n/g, "<br>");
@@ -321,7 +297,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!data.ok) throw new Error(data.error || "Error al cargar conversación");
 
       renderHeader(data.conversation);
-      renderMessages(data.conversation, data.messages || []);
+      renderMessages(data.messages || []);
     } catch (err) {
       console.error(err);
       messagesEl.innerHTML =
@@ -357,8 +333,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       replyText.value = "";
-      await loadConversations();       // refresca lista (puede dejar de requerir atención)
-      await loadConversation(currentConvId); // recarga mensajes
+      await loadConversations();
+      await loadConversation(currentConvId);
     } catch (err) {
       console.error(err);
       alert("No se pudo enviar la respuesta del agente.");
@@ -370,15 +346,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  if (replyForm) {
-    replyForm.addEventListener("submit", handleAgentReply);
-  }
+  if (replyForm) replyForm.addEventListener("submit", handleAgentReply);
+  if (btnRefresh) btnRefresh.addEventListener("click", loadConversations);
 
-  if (btnRefresh) {
-    btnRefresh.addEventListener("click", loadConversations);
-  }
-
-  // Carga inicial
   loadConversations();
 });
 </script>
