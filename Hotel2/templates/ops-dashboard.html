@@ -1,189 +1,162 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recepción – Tablero | Hotel Villa Grace</title>
+  <meta name="description" content="Tablero operativo para Recepción: KPIs, llegadas/salidas, estado de habitaciones y accesos.">
 
-{% block title %}Recepción – Tablero | Hotel Villa Grace{% endblock %}
-{% block meta_description %}Tablero operativo para Recepción: KPIs, llegadas/salidas, estado de habitaciones y
-accesos.{% endblock %}
+  <!-- Favicons -->
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
 
-{% block body_class %}inner-page{% endblock %}
+  <!-- Fuentes -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-{% block head_extra %}
-<style>
-  .kpi-card .icon {
-    font-size: 1.75rem;
-    opacity: .9
-  }
+  <!-- Vendors -->
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
 
-  .kpi-card .value {
-    font-size: 1.5rem;
-    font-weight: 700
-  }
+  <!-- Estilos -->
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 
-  .soft {
-    color: #6c757d
-  }
+  <style>
+    .kpi-card .icon { font-size: 1.75rem; opacity:.9 }
+    .kpi-card .value { font-size: 1.5rem; font-weight: 700 }
+    .soft { color:#6c757d }
+    .section-title h1 { font-size: 1.6rem; margin:0 }
+    .table thead th { white-space: nowrap }
+    .badge-pill { border-radius: 50rem }
+    /* Menú mejorado */
+    .ops-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap:12px }
+    .ops-item { border:1px solid rgba(0,0,0,.06); border-radius:14px; padding:14px; display:flex; align-items:center; gap:12px; background:#fff; transition:all .15s ease }
+    .ops-item:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.06) }
+    .ops-item i { font-size: 1.25rem }
+    .ops-item .txt small{ color:#6c757d }
+    .ops-badge{
+      position:absolute;
+      top:10px;
+      right:10px;
+      font-size:.75rem;
+    }
+    .ops-item{ position:relative; }   
+  </style>
+</head>
+<body class="inner-page">
 
-  .section-title h1 {
-    font-size: 1.6rem;
-    margin: 0
-  }
-
-  .table thead th {
-    white-space: nowrap
-  }
-
-  .badge-pill {
-    border-radius: 50rem
-  }
-
-  .ops-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px
-  }
-
-  .ops-item {
-    border: 1px solid rgba(0, 0, 0, .06);
-    border-radius: 14px;
-    padding: 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: #fff;
-    transition: all .15s ease
-  }
-
-  .ops-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .06)
-  }
-
-  .ops-item i {
-    font-size: 1.25rem
-  }
-
-  .ops-item .txt small {
-    color: #6c757d
-  }
-
-  .ops-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: .75rem;
-  }
-
-  .ops-item {
-    position: relative;
-  }
-</style>
-{% endblock %}
-
-{% block content %}
-
-<div class="page-title dark-background" data-aos="fade"
-  style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-  <div class="container position-relative text-center">
-    <h1>Tablero de Recepción</h1>
-    <p class="mb-2">KPIs y accesos a módulos.</p>
-
-    <div class="d-flex justify-content-center gap-2 flex-wrap mt-2">
-      <a href="ops-checkin.html" class="btn btn-success">
-        <i class="bi bi-person-badge me-1"></i> Check-in
+  <!-- Header -->
+  <header id="header" class="header d-flex align-items-center fixed-top">
+    <div class="container position-relative d-flex align-items-center justify-content-between">
+      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+        <h1 class="sitename">Hotel Villa Grace</h1>
       </a>
-      <a href="/reserva-sin-sesion?ops=1" class="btn btn-success">
-        <i class="bi bi-person-plus me-1"></i> Estancia sin reserva
-      </a>
+
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li class="dropdown"><a href="#" class="active"><span>Recepción</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
+            <ul>
+              <li><a href="ops-dashboard.html" class="active">Tablero</a></li>
+              <li><a href="ops-reservas.html">Reservas</a></li>
+              <li><a href="ops-checkin.html">Check-in</a></li>
+              <li><a href="ops-checkout.html">Check-out</a></li>
+              <li><a href="ops-walkin.html">Crear estancia sin reserva</a></li>
+              <li><a href="ops-arrivals-departures.html">Llegadas y salidas</a></li>
+              <li><a href="ops-rooms.html">Habitaciones</a></li>              
+              <li><a href="/ops/coupons">Cupones</a></li>
+            </ul>
+          </li>
+          <li><a href="admin-calendario.html">Calendario</a></li>
+          <li><a href="portal-reservas.html">Reservas del huésped</a></li>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
+
+      <a class="btn-getstarted d-none d-sm-block" href="ops-checkin.html">Ir a Check-in</a>
+    </div>
+  </header>
+  <!-- /Header -->
+
+  <main class="main">
+    <!-- Encabezado -->
+    <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+      <div class="container position-relative">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="section-title text-white">
+            <h1>Tablero de Recepción</h1>
+            <p class="mb-0">KPIs y accesos a módulos.</p>
+          </div>
+          <div class="d-flex gap-2">
+            <a href="ops-checkin.html" class="btn btn-success"><i class="bi bi-person-badge me-1"></i> Check-in</a>
+            <a href="/reserva-sin-sesion?ops=1" class="btn btn-success"><i class="bi bi-person-plus me-1"></i> Estancia sin reserva</a>
+          </div>
+        </div>
+        <nav class="breadcrumbs mt-2"><ol><li><a href="index.html">Inicio</a></li><li class="current">Recepción</li></ol></nav>
+      </div>
     </div>
 
-    <nav class="breadcrumbs mt-2 d-flex justify-content-center" aria-label="breadcrumbs">
-      <ol>
-        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
-        <li class="current">Recepción</li>
-      </ol>
-    </nav>
-  </div>
-</div>
+    <!-- Contenido -->
+    <section class="section">
+      <div class="container" data-aos="fade-up">
+        <div class="row g-4">
 
-<section class="section">
-  <div class="container" data-aos="fade-up">
-    <div class="row g-4">
-
-      <!-- KPIs -->
-      <div class="col-6 col-lg-3">
-        <div class="card kpi-card shadow-sm border-0 h-100">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="soft small">Reservas (hoy)</div>
-              <div class="value" id="kpi-day-res">—</div>
-            </div>
-            <i class="bi bi-calendar2-week icon text-success"></i>
-          </div>
-          <div class="card-footer bg-white border-0 soft small">
-            Monto: <span id="kpi-day-amt">—</span><br>
-            ADR: <span id="kpi-day-adr">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-6 col-lg-3">
-        <div class="card kpi-card shadow-sm border-0 h-100">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="soft small">Semana</div>
-              <div class="value" id="kpi-week-res">—</div>
-            </div>
-            <i class="bi bi-graph-up-arrow icon text-success"></i>
-          </div>
-          <div class="card-footer bg-white border-0 soft small">
-            Monto: <span id="kpi-week-amt">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-6 col-lg-3">
-        <div class="card kpi-card shadow-sm border-0 h-100">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="soft small">Mes</div>
-              <div class="value" id="kpi-month-res">—</div>
-            </div>
-            <i class="bi bi-cash-coin icon text-success"></i>
-          </div>
-          <div class="card-footer bg-white border-0 soft small">
-            Monto: <span id="kpi-month-amt">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-6 col-lg-3">
-        <div class="card kpi-card shadow-sm border-0 h-100">
-          <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-              <div class="soft small">Ocupación estimada</div>
-              <div class="value" id="kpi-occ">—</div>
-            </div>
-            <i class="bi bi-people icon text-success"></i>
-          </div>
-          <div class="card-footer bg-white border-0 soft small">
-            Hab. libres: <span id="kpi-free">—</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Menú de accesos -->
-      <div class="col-12">
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0">
-            <h5 class="mb-0"><i class="bi bi-menu-button-wide me-2"></i>Menú de operaciones</h5>
-          </div>
-          <div class="card-body">
-            <div class="ops-grid">
-              <a class="ops-item text-decoration-none" href="ops-checkin.html">
-                <i class="bi bi-person-badge text-primary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Check-in</div><small>Registrar llegadas</small>
+          <!-- KPIs -->
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Reservas (hoy)</div>
+                  <div class="value" id="kpi-day-res">—</div>
                 </div>
-              </a>
+                <i class="bi bi-calendar2-week icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">
+                Monto: <span id="kpi-day-amt">—</span><br>
+                ADR: <span id="kpi-day-adr">—</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Semana</div>
+                  <div class="value" id="kpi-week-res">—</div>
+                </div>
+                <i class="bi bi-graph-up-arrow icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">Monto: <span id="kpi-week-amt">—</span></div>
+            </div>
+          </div>
+
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Mes</div>
+                  <div class="value" id="kpi-month-res">—</div>
+                </div>
+                <i class="bi bi-cash-coin icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">Monto: <span id="kpi-month-amt">—</span></div>
+            </div>
+          </div>
+
+          <div class="col-6 col-lg-3">
+            <div class="card kpi-card shadow-sm border-0 h-100">
+              <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="soft small">Ocupación estimada</div>
+                  <div class="value" id="kpi-occ">—</div>
+                </div>
+                <i class="bi bi-people icon text-success"></i>
+              </div>
+              <div class="card-footer bg-white border-0 soft small">Hab. libres: <span id="kpi-free">—</span></div>
+            </div>
+          </div>
 
           <!-- Menú de accesos (mejorado) -->
           <div class="col-12">
@@ -238,331 +211,331 @@ accesos.{% endblock %}
                   </a>
                   
                 </div>
-              </a>
-
-              <a class="ops-item text-decoration-none" href="/reserva-sin-sesion?ops=1">
-                <i class="bi bi-person-plus text-primary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Estancia sin reserva</div><small>Walk-in</small>
-                </div>
-              </a>
-
-              <a class="ops-item text-decoration-none" href="ops-reservas-dashboard.html">
-                <i class="bi bi-box-arrow-in-right text-secondary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Llegadas/Salidas</div><small>Listado del día</small>
-                </div>
-              </a>
-
-              <a class="ops-item text-decoration-none" href="ops-rooms-dashboard.html">
-                <i class="bi bi-door-closed text-secondary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Estado habitaciones</div><small>Tablero</small>
-                </div>
-              </a>
-
-              <a class="ops-item text-decoration-none" href="ops-reservas.html">
-                <i class="bi bi-journal-text text-success"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Reservas</div>
-                  <small>Listado general y vista calendario</small>
-                </div>
-              </a>
-
-              <a class="ops-item text-decoration-none" href="ops-rooms.html">
-                <i class="bi bi-door-open text-secondary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Habitaciones</div><small>Gestión y dashboard</small>
-                </div>
-              </a>
-
-              <a class="ops-item text-decoration-none" href="/ops/coupons">
-                <i class="bi bi-tag text-secondary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Cupones</div><small>GRR-01-015</small>
-                </div>
-              </a>
-
-              <a class="ops-item text-decoration-none" href="ops-approvals.html" id="ops-approvals-btn">
-                <span class="badge rounded-pill bg-danger d-none ops-badge" id="badge-approvals"
-                  data-initial="{{ pending_approvals_count or 0 }}">0</span>
-                <i class="bi bi-patch-check text-primary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Aprobaciones pendientes</div>
-                  <small>Validar pagos SINPE y confirmar reservas</small>
-                </div>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Llegadas / salidas -->
-      <div class="col-lg-7">
-        <div class="card shadow-sm border-0 mb-4">
-          <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
-            <h5 class="mb-0">Llegadas y salidas de hoy</h5>
-            <a href="ops-arrivals-departures.html" class="btn btn-success btn-sm">Ver lista completa</a>
-          </div>
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Hora</th>
-                    <th>Huésped</th>
-                    <th>Movimiento</th>
-                    <th>Hab.</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody id="tbl-adr">
-                  <tr>
-                    <td>11:00</td>
-                    <td>—</td>
-                    <td><span class="badge text-bg-light">Check-out</span></td>
-                    <td>—</td>
-                    <td><span class="badge text-bg-secondary">Pendiente</span></td>
-                  </tr>
-                  <tr>
-                    <td>15:00</td>
-                    <td>—</td>
-                    <td><span class="badge text-bg-light">Check-in</span></td>
-                    <td>—</td>
-                    <td><span class="badge text-bg-secondary">Pendiente</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bitácora -->
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
-            <h5 class="mb-0">Bitácora de turnos</h5>
-            <a href="ops-shift-log.html" class="btn btn-success btn-sm">Añadir nota</a>
-          </div>
-          <div class="card-body">
-            <ul class="list-group list-group-flush" id="shift-log">
-              <li class="list-group-item px-0">—</li>
-            </ul>
-            <div class="soft small mt-2">Conecta aquí tu endpoint si creas /api/ops/shift-log.</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- No-Show -->
-      <div class="col-lg-5">
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
-            <h5 class="mb-0">Corte de No-Show</h5>
-
-            <div class="d-flex gap-2">
-              <button id="btn-noshow-details" class="btn btn-outline-secondary btn-sm" type="button"
-                data-bs-toggle="collapse" data-bs-target="#noshow-details" aria-expanded="false"
-                aria-controls="noshow-details">
-                <i class="bi bi-table me-1"></i> Mostrar detalles
-              </button>
-
-              <button id="btn-noshow" class="btn btn-warning btn-sm" type="button">
-                <i class="bi bi-exclamation-triangle me-1"></i> Ejecutar
-              </button>
-            </div>
-          </div>
-
-          <div class="card-body">
-            <div id="noshow-out" class="soft small">
-              Ejecuta el job para marcar reservas sin check-in como No-Show, liberar habitación y aplicar penalización.
-            </div>
-
-            <div class="collapse mt-3" id="noshow-details">
-              <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Fecha registro</th>
-                      <th>Reserva</th>
-                      <th>Registro</th>
-                      <th>Estado reserva</th>
-                      <th>Hab.</th>
-                      <th>Estado hab.</th>
-                      <th>Penalización</th>
-                      <th>Total</th>
-                      <th>Entrada</th>
-                      <th>Salida</th>
-                    </tr>
-                  </thead>
-                  <tbody id="noshow-details-body">
-                    <tr>
-                      <td colspan="10" class="soft small">
-                        Sin datos. Presiona “Ejecutar” o “Mostrar detalles”.
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
               </div>
-
-              <div id="noshow-details-meta" class="soft small mt-2"></div>
             </div>
           </div>
-        </div>
+
+          <!-- Llegadas / salidas -->
+          <div class="col-lg-7">
+            <div class="card shadow-sm border-0 mb-4">
+              <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">Llegadas y salidas de hoy</h5>
+                <a href="ops-arrivals-departures.html" class="btn btn-success btn-sm">Ver lista completa</a>
+              </div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Hora</th><th>Huésped</th><th>Movimiento</th><th>Hab.</th><th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbl-adr">
+                      <tr><td>11:00</td><td>—</td><td><span class="badge text-bg-light">Check-out</span></td><td>—</td><td><span class="badge text-bg-secondary">Pendiente</span></td></tr>
+                      <tr><td>15:00</td><td>—</td><td><span class="badge text-bg-light">Check-in</span></td><td>—</td><td><span class="badge text-bg-secondary">Pendiente</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bitácora -->
+            <div class="card shadow-sm border-0">
+              <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">Bitácora de turnos</h5>
+                <a href="ops-shift-log.html" class="btn btn-success btn-sm">Añadir nota</a>
+              </div>
+              <div class="card-body">
+                <ul class="list-group list-group-flush" id="shift-log">
+                  <li class="list-group-item px-0">—</li>
+                </ul>
+                <div class="soft small mt-2">Conecta aquí tu endpoint si creas /api/ops/shift-log.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Estado y No-Show -->
+          <div class="col-lg-5">
+            
+            <div class="card shadow-sm border-0">
+              <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">Corte de No-Show</h5>
+            
+                <div class="d-flex gap-2">
+                  <button
+                    id="btn-noshow-details"
+                    class="btn btn-outline-secondary btn-sm"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#noshow-details"
+                    aria-expanded="false"
+                    aria-controls="noshow-details">
+                    <i class="bi bi-table me-1"></i> Mostrar detalles
+                  </button>
+            
+                  <button id="btn-noshow" class="btn btn-warning btn-sm">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Ejecutar
+                  </button>
+                </div>
+              </div>
+            
+              <div class="card-body">
+                <div id="noshow-out" class="soft small">
+                  Ejecuta el job para marcar reservas sin check-in como No-Show, liberar habitación y aplicar penalización.
+                </div>
+            
+                <div class="collapse mt-3" id="noshow-details">
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Fecha registro</th>
+                          <th>Reserva</th>
+                          <th>Registro</th>
+                          <th>Estado reserva</th>
+                          <th>Hab.</th>
+                          <th>Estado hab.</th>
+                          <th>Penalización</th>
+                          <th>Total</th>
+                          <th>Entrada</th>
+                          <th>Salida</th>
+                        </tr>
+                      </thead>
+                      <tbody id="noshow-details-body">
+                        <tr>
+                          <td colspan="10" class="soft small">
+                            Sin datos. Presiona “Ejecutar” o “Mostrar detalles”.
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+            
+                  <div id="noshow-details-meta" class="soft small mt-2"></div>
+                </div>
+              </div>
+            </div>
+            
+
+          </div>
+
+        </div> <!-- /row -->
       </div>
+    </section>
+  </main>
 
+  <!-- Footer -->
+  <footer id="footer" class="footer position-relative dark-background">
+    <div class="copyright text-center">
+      <div class="container">© <strong><span>Hotel Villa Grace</span></strong> · Cóbano, Puntarenas</div>
     </div>
-  </div>
-</section>
+  </footer>
 
-{% endblock %}
+  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+  <div id="preloader"></div>
 
-{% block scripts %}
-<script>
-  function moneyCRC(n) {
-    try { return new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC' }).format(Number(n || 0)); }
-    catch (_) { return '₡ ' + (Number(n || 0)).toFixed(2); }
-  }
+  <!-- JS -->
+  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
-  async function loadKpis() {
-    try {
-      const r = await fetch('/api/kpi/summary', { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-      const j = await r.json();
-      if (!j || !j.ok) return;
+  <script>
+    function moneyCRC(n){
+      try { return new Intl.NumberFormat('es-CR',{style:'currency',currency:'CRC'}).format(Number(n||0)); }
+      catch(_) { return '₡ ' + (Number(n||0)).toFixed(2); }
+    }
 
-      const d = j.day || {}, w = j.week || {}, m = j.month || {};
-      document.getElementById('kpi-day-res').textContent = d.reservas ?? '0';
-      document.getElementById('kpi-day-amt').textContent = moneyCRC(d.monto ?? 0);
+    async function loadKpis(){
+      try{
+        const r = await fetch('/api/kpi/summary', {headers:{Accept:'application/json'}});
+        const j = await r.json();
+        if(!j || !j.ok) return;
+        const d=j.day||{}, w=j.week||{}, m=j.month||{};
+        document.getElementById('kpi-day-res').textContent = d.reservas ?? '0';
+        document.getElementById('kpi-day-amt').textContent = moneyCRC(d.monto ?? 0);
+        // ADR (aprox)
+        const adr = (Number(d.reservas||0) > 0) ? (Number(d.monto||0) / Number(d.reservas||1)) : 0;
+        document.getElementById('kpi-day-adr').textContent = moneyCRC(adr);
 
-      const adr = (Number(d.reservas || 0) > 0) ? (Number(d.monto || 0) / Number(d.reservas || 1)) : 0;
-      document.getElementById('kpi-day-adr').textContent = moneyCRC(adr);
+        document.getElementById('kpi-week-res').textContent = w.reservas ?? '0';
+        document.getElementById('kpi-week-amt').textContent = moneyCRC(w.monto ?? 0);
+        document.getElementById('kpi-month-res').textContent = m.reservas ?? '0';
+        document.getElementById('kpi-month-amt').textContent = moneyCRC(m.monto ?? 0);
+      }catch(e){ console.warn('kpi error', e); }
+    }
 
-      document.getElementById('kpi-week-res').textContent = w.reservas ?? '0';
-      document.getElementById('kpi-week-amt').textContent = moneyCRC(w.monto ?? 0);
+    async function loadRooms(){
+      try{
+        const r = await fetch('/grr/api/rooms/status', {headers:{Accept:'application/json'}});
+        const j = await r.json();
+        if(!j || !j.ok) return;
+        const items = j.items || [];
+        let free=0, occ=0, hk=0, mt=0;
+        for(const it of items){
+          switch(String(it.estado||'').toLowerCase()){
+            case 'disponible': free++; break;
+            case 'ocupada':
+            case 'ocupada-temprana':
+            case 'ocupada-extendida': occ++; break;
+            case 'limpieza': hk++; break;
+            case 'mantenimiento': mt++; break;
+          }
+        }
+        document.getElementById('rooms-free').textContent = free;
+        document.getElementById('rooms-occ').textContent = occ;
+        document.getElementById('rooms-hk').textContent  = hk;
+        document.getElementById('rooms-mt').textContent  = mt;
 
-      document.getElementById('kpi-month-res').textContent = m.reservas ?? '0';
-      document.getElementById('kpi-month-amt').textContent = moneyCRC(m.monto ?? 0);
-    } catch (e) { console.warn('kpi error', e); }
-  }
+        const total = items.length || 0;
+        const occPct = total ? Math.round((occ / total) * 100) : 0;
+        document.getElementById('kpi-occ').textContent = total ? (occPct + '%') : '—';
+        document.getElementById('kpi-free').textContent = free;
+      }catch(e){ console.warn('rooms error', e); }
+    }
 
-  async function loadRooms() {
-    try {
-      const r = await fetch('/grr/api/rooms/status', { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-      const j = await r.json();
-      if (!j || !j.ok) return;
-
-      const items = j.items || [];
-      let free = 0, occ = 0;
-      for (const it of items) {
-        switch (String(it.estado || '').toLowerCase()) {
-          case 'disponible': free++; break;
-          case 'ocupada':
-          case 'ocupada-temprana':
-          case 'ocupada-extendida': occ++; break;
+    // Ejecutar No-Show (GRR-01-016)
+    // No-Show (GRR-01-016) — UI con evidencia (registro + estados)
+    (function(){
+      const btnRun = document.getElementById('btn-noshow');
+      const detailsBox = document.getElementById('noshow-details');
+      const tbody = document.getElementById('noshow-details-body');
+      const meta = document.getElementById('noshow-details-meta');
+      const out = document.getElementById('noshow-out');
+    
+      let detailsLoadedOnce = false;
+    
+      function fmtDateTime(s){
+        if(!s) return '—';
+        const raw = String(s);
+        // MySQL suele venir "YYYY-MM-DD HH:MM:SS", convertimos a ISO básico
+        const iso = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
+        const d = new Date(iso);
+        if(isNaN(d.getTime())) return raw;
+        try{
+          return new Intl.DateTimeFormat('es-CR',{dateStyle:'short', timeStyle:'short'}).format(d);
+        }catch(_){
+          return raw;
         }
       }
-
-      const total = items.length || 0;
-      const occPct = total ? Math.round((occ / total) * 100) : 0;
-      document.getElementById('kpi-occ').textContent = total ? (occPct + '%') : '—';
-      document.getElementById('kpi-free').textContent = free;
-    } catch (e) { console.warn('rooms error', e); }
-  }
-
-  (function () {
-    const btnRun = document.getElementById('btn-noshow');
-    const detailsBox = document.getElementById('noshow-details');
-    const tbody = document.getElementById('noshow-details-body');
-    const meta = document.getElementById('noshow-details-meta');
-    const out = document.getElementById('noshow-out');
-
-    let detailsLoadedOnce = false;
-
-    function fmtDateTime(s) {
-      if (!s) return '—';
-      const raw = String(s);
-      const iso = raw.includes(' ') ? raw.replace(' ', 'T') : raw;
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return raw;
-      try {
-        return new Intl.DateTimeFormat('es-CR', { dateStyle: 'short', timeStyle: 'short' }).format(d);
-      } catch (_) {
-        return raw;
+    
+      function makeBadge(label, kind){
+        const s = document.createElement('span');
+        s.className = 'badge ' + kind;
+        s.textContent = label;
+        return s;
       }
-    }
-
-    function makeBadge(label, kind) {
-      const s = document.createElement('span');
-      s.className = 'badge ' + kind;
-      s.textContent = label;
-      return s;
-    }
-
-    function clearTbody() {
-      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
-    }
-
-    function renderDetails(items) {
-      clearTbody();
-
-      if (!items || !items.length) {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.colSpan = 10;
-        td.className = 'soft small';
-        td.textContent = 'No hay registros recientes de No-Show en el período consultado.';
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-        return;
+    
+      function clearTbody(){
+        while(tbody.firstChild) tbody.removeChild(tbody.firstChild);
       }
-
-      for (const it of items) {
-        const tr = document.createElement('tr');
-
-        const reservaEstado = String(it.reserva_estado || '');
-        const habEstado = String(it.habitacion_estado || '');
-
-        const reservaOk = (reservaEstado === 'NoShow');
-        const habOk = (habEstado.toLowerCase() === 'disponible');
-
-        const cells = [
-          fmtDateTime(it.audit_fecha),
-          (it.reserva_id ?? '—'),
-          'AUDIT',
-          (reservaEstado || '—'),
-          (it.habitacion_id ?? '—'),
-          (habEstado || '—'),
-          moneyCRC(it.penalizacion || 0),
-          moneyCRC(it.monto_total || 0),
-          (it.fecha_entrada ?? '—'),
-          (it.fecha_salida ?? '—')
-        ];
-
-        cells.forEach((val, idx) => {
+    
+      function renderDetails(items){
+        clearTbody();
+    
+        if(!items || !items.length){
+          const tr = document.createElement('tr');
           const td = document.createElement('td');
-
-          if (idx === 2) {
+          td.colSpan = 10;
+          td.className = 'soft small';
+          td.textContent = 'No hay registros recientes de No-Show en el período consultado.';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+    
+        for(const it of items){
+          const tr = document.createElement('tr');
+    
+          const reservaEstado = String(it.reserva_estado || '');
+          const habEstado = String(it.habitacion_estado || '');
+    
+          const reservaOk = (reservaEstado === 'NoShow');
+          const habOk = (habEstado.toLowerCase() === 'disponible');
+    
+          // Fecha registro
+          {
+            const td = document.createElement('td');
+            td.textContent = fmtDateTime(it.audit_fecha);
+            tr.appendChild(td);
+          }
+    
+          // Reserva
+          {
+            const td = document.createElement('td');
+            td.textContent = it.reserva_id ?? '—';
+            tr.appendChild(td);
+          }
+    
+          // Registro (evidencia: auditoría)
+          {
+            const td = document.createElement('td');
             td.appendChild(makeBadge('Sí', 'text-bg-success'));
             const small = document.createElement('span');
             small.className = 'ms-2 soft small';
             small.textContent = `A#${it.audit_id ?? '—'}`;
             td.appendChild(small);
-          } else if (idx === 3) {
-            td.appendChild(
-              reservaOk ? makeBadge('NoShow', 'text-bg-success')
-                : makeBadge(val, 'text-bg-warning')
-            );
-          } else if (idx === 5) {
-            td.appendChild(
-              habOk ? makeBadge('Disponible', 'text-bg-success')
-                : makeBadge(val, 'text-bg-warning')
-            );
-          } else {
-            td.textContent = val;
+            tr.appendChild(td);
           }
-
-          tr.appendChild(td);
-        });
-
-        tbody.appendChild(tr);
+    
+          // Estado reserva
+          {
+            const td = document.createElement('td');
+            td.appendChild(
+              reservaOk
+                ? makeBadge('NoShow', 'text-bg-success')
+                : makeBadge(reservaEstado || '—', 'text-bg-warning')
+            );
+            tr.appendChild(td);
+          }
+    
+          // Hab.
+          {
+            const td = document.createElement('td');
+            td.textContent = it.habitacion_id ?? '—';
+            tr.appendChild(td);
+          }
+    
+          // Estado hab.
+          {
+            const td = document.createElement('td');
+            td.appendChild(
+              habOk
+                ? makeBadge('Disponible', 'text-bg-success')
+                : makeBadge(habEstado || '—', 'text-bg-warning')
+            );
+            tr.appendChild(td);
+          }
+    
+          // Penalización
+          {
+            const td = document.createElement('td');
+            td.textContent = moneyCRC(it.penalizacion || 0);
+            tr.appendChild(td);
+          }
+    
+          // Total
+          {
+            const td = document.createElement('td');
+            td.textContent = moneyCRC(it.monto_total || 0);
+            tr.appendChild(td);
+          }
+    
+          // Entrada
+          {
+            const td = document.createElement('td');
+            td.textContent = it.fecha_entrada ?? '—';
+            tr.appendChild(td);
+          }
+    
+          // Salida
+          {
+            const td = document.createElement('td');
+            td.textContent = it.fecha_salida ?? '—';
+            tr.appendChild(td);
+          }
+    
+          tbody.appendChild(tr);
+        }
       }
     
       async function loadDetails(opts){
@@ -588,15 +561,7 @@ accesos.{% endblock %}
         }catch(e){
           meta.textContent = 'Error de conexión al cargar detalles.';
           renderDetails([]);
-          return;
         }
-
-        renderDetails(j.items || []);
-        meta.textContent = `Actualizado: ${fmtDateTime(j.server_time_local)} · Mostrando ${(j.items || []).length} registro(s) · Rango: ${j.days} día(s).`;
-        detailsLoadedOnce = true;
-      } catch (e) {
-        meta.textContent = 'Error de conexión al cargar detalles.';
-        renderDetails([]);
       }
     
       // Cuando el usuario abra "Mostrar detalles", cargamos si aún no se cargó
@@ -640,51 +605,40 @@ accesos.{% endblock %}
           }finally{
             btnRun.disabled = false;
           }
+        });
+      }
+    })();
 
-          out.textContent = `Procesadas: ${j.processed || 0}. Liberadas: ${j.liberadas || j.released || 0}.`;
 
-          loadRooms();
-          loadKpis();
-          await loadDetails({ days: 1, limit: 100 });
-        } catch (e) {
-          out.textContent = 'Error de conexión al ejecutar el job.';
-        } finally {
-          btnRun.disabled = false;
-        }
-      });
-    }
-
-    window.__noshow_loadDetails = loadDetails;
-  })();
-
-  (function () {
-    const badge = document.getElementById('badge-approvals');
-    if (!badge) return;
-
-    const setCount = (n) => {
-      const v = Math.max(0, Number(n || 0));
-      badge.textContent = String(v);
-      badge.classList.toggle('d-none', v === 0);
-    };
-
-    setCount(badge.dataset.initial);
-
-    async function refresh() {
-      try {
-        const r = await fetch('/api/ops/approvals/count', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
-        if (!r.ok) return;
-        const j = await r.json();
-        if (j && j.ok) setCount(j.count);
-      } catch (_) { }
-    }
-
-    refresh();
-    setInterval(refresh, 30000);
-  })();
-
-  document.addEventListener('DOMContentLoaded', () => {
     loadKpis();
     loadRooms();
-  });
-</script>
-{% endblock %}
+  </script>
+  <script>
+    (function(){
+      const badge = document.getElementById('badge-approvals');
+      if(!badge) return;
+  
+      const setCount = (n) => {
+        const v = Math.max(0, Number(n || 0));
+        badge.textContent = String(v);
+        badge.classList.toggle('d-none', v === 0);
+      };
+  
+      setCount(badge.dataset.initial);
+  
+      async function refresh(){
+        try{
+          const r = await fetch('/api/ops/approvals/count', { headers: { 'Accept':'application/json' } });
+          if(!r.ok) return;
+          const j = await r.json();
+          if(j && j.ok) setCount(j.count);
+        }catch(_){}
+      }
+  
+      refresh();
+      setInterval(refresh, 30000);
+    })();
+  </script>
+  
+</body>
+</html>

@@ -1,31 +1,47 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Operaciones — Cupones | Hotel Villa Grace</title>
+  <meta name="description" content="Administración de cupones y reglas de tarifas (GRR-01-015).">
 
-{% block title %}Operaciones — Cupones | Hotel Villa Grace{% endblock %}
-{% block meta_description %}Administración de cupones y reglas de tarifas (GRR-01-015).{% endblock %}
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
 
-{% block body_class %}inner-page{% endblock %}
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 
-{% block head_extra %}
-<style>
-  .k { color:#6c757d }
-  .pill { border-radius: .75rem; padding: .25rem .5rem; background:#f1f3f5 }
-</style>
-{% endblock %}
+  <style>
+    .k { color:#6c757d }
+    .pill { border-radius: .75rem; padding: .25rem .5rem; background:#f1f3f5 }
+  </style>
+</head>
+<body class="inner-page">
+<header id="header" class="header d-flex align-items-center fixed-top">
+  <div class="container position-relative d-flex align-items-center justify-content-between">
+    <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
+      <h1 class="sitename">Hotel Villa Grace</h1>
+    </a>
+    <nav id="navmenu" class="navmenu">
+      <ul>
+        <li><a href="ops-dashboard.html">Tablero</a></li>
+        <li><a href="/ops/coupons" class="active">Cupones</a></li>
+        <li><a href="/ops/housekeeping">Limpieza</a></li>
+      </ul>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+    </nav>
+  </div>
+</header>
 
-{% block content %}
-
-  <div class="page-title dark-background" data-aos="fade"
-       style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+<main class="main">
+  <div class="page-title dark-background" data-aos="fade" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
     <div class="container position-relative">
       <h1>Cupones / Tarifas dinámicas</h1>
-      <p>Administra cupones de descuento: define códigos, vigencias, límites de uso y activa o desactiva promociones según la temporada.</p>
-
-      <nav class="breadcrumbs" aria-label="breadcrumbs">
-        <ol>
-          <li><a href="../ops-dashboard.html">Recepción</a></li>
-          <li class="current">Cupones</li>
-        </ol>
-      </nav>
+      <p class="mb-0">Define códigos, vigencias y límites. (GRR-01-015)</p>
+      <nav class="breadcrumbs"><ol><li><a href="ops-dashboard.html">Recepción</a></li><li class="current">Cupones</li></ol></nav>
     </div>
   </div>
 
@@ -104,10 +120,20 @@
 
     </div>
   </section>
+</main>
 
-{% endblock %}
+<footer id="footer" class="footer position-relative dark-background">
+  <div class="copyright text-center">
+    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
+  </div>
+</footer>
 
-{% block scripts %}
+<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+
+<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+
 <script>
   const $ = (s)=>document.querySelector(s);
   const money = (n)=> new Intl.NumberFormat("es-CR",{style:"currency",currency:"CRC"}).format(Number(n||0));
@@ -147,6 +173,7 @@
     e.preventDefault();
     const fd = new FormData(e.target);
 
+    // Mapear a las claves que el backend espera (minúsculas) y normalizar valores
     const payload = {
       codigo:        (fd.get('Codigo') || '').trim().toUpperCase(),
       tipo:          (fd.get('Tipo') || 'porcentaje').trim(),
@@ -154,7 +181,7 @@
       valido_desde:  fd.get('Valido_Desde') || null,
       valido_hasta:  fd.get('Valido_Hasta') || null,
       max_usos:      Number(fd.get('Max_Usos') || 0),
-      notas:         fd.get('Notas') || ''
+      notas:         fd.get('Notas') || ''   // si el modelo lo ignora, no afecta
     };
 
     const msg = document.querySelector('#cp-msg');
@@ -195,4 +222,5 @@
 
   loadCoupons();
 </script>
-{% endblock %}
+</body>
+</html>
