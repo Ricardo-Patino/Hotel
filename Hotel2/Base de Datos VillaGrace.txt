@@ -2986,6 +2986,222 @@ DEFAULT 'Pendiente';
   ALTER TABLE SAC_Feedback ADD COLUMN Conversation_Id INT NULL;
   ALTER TABLE SAC_Feedback ADD COLUMN Creada_At DATETIME NULL;
   ALTER TABLE SAC_Feedback ADD COLUMN Rating TINYINT NULL;
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /* =========================================================
+   PARCHE SAC COMPAT — 2026-01-08 (FINAL)
+   - Sin PREPARE
+   - Sin "ADD COLUMN IF NOT EXISTS"
+   - Idempotente con CONTINUE HANDLER (evita 1060, 1054, 1146, etc.)
+   - Cubre: SAC_Incident, SAC_KB_Doc, SAC_KB_Unanswered, SAC_ConversationMsg
+   ========================================================= */
+
+SET @__old_sql_safe_updates := @@SQL_SAFE_UPDATES;
+SET SQL_SAFE_UPDATES = 0;
+
+DROP PROCEDURE IF EXISTS sp_sac_patch_compat_20260108_final;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_sac_patch_compat_20260108_final()
+BEGIN
+  /* =========================================================
+     HANDLERS (para que el parche NO se caiga si ya existe algo)
+     =========================================================
+     1054: Unknown column
+     1060: Duplicate column name
+     1061: Duplicate key name
+     1091: Can't DROP ... doesn't exist
+     1146: Table doesn't exist
+     ========================================================= */
+  DECLARE CONTINUE HANDLER FOR 1054 BEGIN END;
+  DECLARE CONTINUE HANDLER FOR 1060 BEGIN END;
+  DECLARE CONTINUE HANDLER FOR 1061 BEGIN END;
+  DECLARE CONTINUE HANDLER FOR 1091 BEGIN END;
+  DECLARE CONTINUE HANDLER FOR 1146 BEGIN END;
+
+  /* =========================================================
+     1) INCIDENTES — SAC_Incident (y fallback sac_incident)
+     ========================================================= */
+
+  /* --- SAC_Incident --- */
+  ALTER TABLE `SAC_Incident` MODIFY COLUMN `Codigo_Reserva` INT NULL;
+  ALTER TABLE `SAC_Incident` MODIFY COLUMN `Descripcion` TEXT NULL;
+
+  ALTER TABLE `SAC_Incident` ADD COLUMN `Reportado_Por` VARCHAR(120) NULL;
+  ALTER TABLE `SAC_Incident` ADD COLUMN `Asignado_A`   VARCHAR(120) NULL;
+  ALTER TABLE `SAC_Incident` ADD COLUMN `Titulo`       VARCHAR(200) NULL;
+  ALTER TABLE `SAC_Incident` ADD COLUMN `Detalle`      TEXT NULL;
+  ALTER TABLE `SAC_Incident` ADD COLUMN `Creado_At`    DATETIME NULL;
+
+  /* Hacer Tipo/Estado permisivos (evita choques con ENUMs antiguos) */
+  ALTER TABLE `SAC_Incident` MODIFY COLUMN `Tipo`   VARCHAR(30) NOT NULL DEFAULT 'OPERATIVO';
+  ALTER TABLE `SAC_Incident` MODIFY COLUMN `Estado` VARCHAR(30) NOT NULL DEFAULT 'ABIERTO';
+
+  /* Backfill seguro (sin referenciar columnas que podrían no existir) */
+  UPDATE `SAC_Incident`
+     SET `Detalle` = COALESCE(`Detalle`, `Descripcion`),
+         `Titulo`  = COALESCE(`Titulo`, LEFT(COALESCE(`Descripcion`, ''), 200))
+   WHERE `Id` > 0;
+
+  UPDATE `SAC_Incident`
+     SET `Creado_At` = COALESCE(`Creado_At`, NOW())
+   WHERE `Id` > 0 AND `Creado_At` IS NULL;
+
+  /* Si existe Creada_At, completar desde ahí (si no existe, handler 1054 lo ignora) */
+  UPDATE `SAC_Incident`
+     SET `Creado_At` = COALESCE(`Creado_At`, `Creada_At`)
+   WHERE `Id` > 0 AND `Creado_At` IS NULL;
+
+  /* Sanitizar Codigo_Reserva inválido (si Reserva no existe, handler 1146 lo ignora) */
+  UPDATE `SAC_Incident` i
+  LEFT JOIN `Reserva` r ON r.Codigo_Reserva = i.Codigo_Reserva
+     SET i.Codigo_Reserva = NULL
+   WHERE i.Id > 0 AND i.Codigo_Reserva IS NOT NULL AND r.Codigo_Reserva IS NULL;
+
+  /* --- sac_incident (fallback) --- */
+  ALTER TABLE `sac_incident` MODIFY COLUMN `Codigo_Reserva` INT NULL;
+  ALTER TABLE `sac_incident` MODIFY COLUMN `Descripcion` TEXT NULL;
+
+  ALTER TABLE `sac_incident` ADD COLUMN `Reportado_Por` VARCHAR(120) NULL;
+  ALTER TABLE `sac_incident` ADD COLUMN `Asignado_A`   VARCHAR(120) NULL;
+  ALTER TABLE `sac_incident` ADD COLUMN `Titulo`       VARCHAR(200) NULL;
+  ALTER TABLE `sac_incident` ADD COLUMN `Detalle`      TEXT NULL;
+  ALTER TABLE `sac_incident` ADD COLUMN `Creado_At`    DATETIME NULL;
+
+  ALTER TABLE `sac_incident` MODIFY COLUMN `Tipo`   VARCHAR(30) NOT NULL DEFAULT 'OPERATIVO';
+  ALTER TABLE `sac_incident` MODIFY COLUMN `Estado` VARCHAR(30) NOT NULL DEFAULT 'ABIERTO';
+
+  UPDATE `sac_incident`
+     SET `Detalle` = COALESCE(`Detalle`, `Descripcion`),
+         `Titulo`  = COALESCE(`Titulo`, LEFT(COALESCE(`Descripcion`, ''), 200))
+   WHERE `Id` > 0;
+
+  UPDATE `sac_incident`
+     SET `Creado_At` = COALESCE(`Creado_At`, NOW())
+   WHERE `Id` > 0 AND `Creado_At` IS NULL;
+
+  UPDATE `sac_incident`
+     SET `Creado_At` = COALESCE(`Creado_At`, `Creada_At`)
+   WHERE `Id` > 0 AND `Creado_At` IS NULL;
+
+  UPDATE `sac_incident` i
+  LEFT JOIN `Reserva` r ON r.Codigo_Reserva = i.Codigo_Reserva
+     SET i.Codigo_Reserva = NULL
+   WHERE i.Id > 0 AND i.Codigo_Reserva IS NOT NULL AND r.Codigo_Reserva IS NULL;
+
+
+  /* =========================================================
+     2) KB DOC — SAC_KB_Doc (y fallback sac_kb_doc)
+        - Source_Type (backend puede usarlo)
+        - Doc_Id (backend puede seleccionarlo)
+        - Status a VARCHAR para permitir READY sin choque de ENUM
+     ========================================================= */
+
+  /* --- SAC_KB_Doc --- */
+  ALTER TABLE `SAC_KB_Doc` ADD COLUMN `Source_Type` VARCHAR(20) NULL;
+  ALTER TABLE `SAC_KB_Doc` ADD COLUMN `Doc_Id`      BIGINT NULL;
+
+  ALTER TABLE `SAC_KB_Doc` MODIFY COLUMN `Status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE';
+
+  UPDATE `SAC_KB_Doc`
+     SET `Source_Type` = COALESCE(`Source_Type`, `Source`)
+   WHERE `Id` > 0 AND `Source_Type` IS NULL;
+
+  UPDATE `SAC_KB_Doc`
+     SET `Doc_Id` = COALESCE(`Doc_Id`, `Id`)
+   WHERE `Id` > 0 AND (`Doc_Id` IS NULL OR `Doc_Id` = 0);
+
+  /* --- sac_kb_doc (fallback) --- */
+  ALTER TABLE `sac_kb_doc` ADD COLUMN `Source_Type` VARCHAR(20) NULL;
+  ALTER TABLE `sac_kb_doc` ADD COLUMN `Doc_Id`      BIGINT NULL;
+
+  ALTER TABLE `sac_kb_doc` MODIFY COLUMN `Status` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE';
+
+  UPDATE `sac_kb_doc`
+     SET `Source_Type` = COALESCE(`Source_Type`, `Source`)
+   WHERE `Id` > 0 AND `Source_Type` IS NULL;
+
+  UPDATE `sac_kb_doc`
+     SET `Doc_Id` = COALESCE(`Doc_Id`, `Id`)
+   WHERE `Id` > 0 AND (`Doc_Id` IS NULL OR `Doc_Id` = 0);
+
+
+  /* =========================================================
+     3) KB UNANSWERED — SAC_KB_Unanswered
+     ========================================================= */
+
+  ALTER TABLE `SAC_KB_Unanswered` MODIFY COLUMN `Question` TEXT NULL;
+
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Pregunta`      TEXT NULL;
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Detalle`       TEXT NULL;
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Origen`        VARCHAR(10) NULL;
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Session_Id`    VARCHAR(80) NULL;
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Cliente_Id`    INT NULL;
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Estado`        VARCHAR(20) NULL;
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Creada_At`     DATETIME NULL;
+  ALTER TABLE `SAC_KB_Unanswered` ADD COLUMN `Respondida_At` DATETIME NULL;
+
+  UPDATE `SAC_KB_Unanswered`
+     SET `Pregunta` = COALESCE(`Pregunta`, `Question`)
+   WHERE `Id` > 0 AND `Pregunta` IS NULL;
+
+  UPDATE `SAC_KB_Unanswered`
+     SET `Creada_At` = COALESCE(`Creada_At`, NOW())
+   WHERE `Id` > 0 AND `Creada_At` IS NULL;
+
+  /* Si existe Created_At, completar desde ahí (si no existe, handler 1054 lo ignora) */
+  UPDATE `SAC_KB_Unanswered`
+     SET `Creada_At` = COALESCE(`Creada_At`, `Created_At`)
+   WHERE `Id` > 0 AND `Creada_At` IS NULL;
+
+  UPDATE `SAC_KB_Unanswered`
+     SET `Origen` = COALESCE(`Origen`, 'WEB'),
+         `Estado` = COALESCE(`Estado`, 'NUEVA')
+   WHERE `Id` > 0;
+
+
+  /* =========================================================
+     4) Conversation Msg — aliases (SAC_ConversationMsg)
+     ========================================================= */
+
+  ALTER TABLE `SAC_ConversationMsg` ADD COLUMN `Conv_Id` BIGINT NULL;
+  ALTER TABLE `SAC_ConversationMsg` ADD COLUMN `Texto`   TEXT NULL;
+
+  UPDATE `SAC_ConversationMsg`
+     SET `Conv_Id` = COALESCE(`Conv_Id`, `Conversation_Id`)
+   WHERE `Id` > 0 AND `Conv_Id` IS NULL;
+
+  UPDATE `SAC_ConversationMsg`
+     SET `Texto` = COALESCE(`Texto`, `Msg_Text`)
+   WHERE `Id` > 0 AND `Texto` IS NULL;
+
+END$$
+
+DELIMITER ;
+
+CALL sp_sac_patch_compat_20260108_final();
+DROP PROCEDURE IF EXISTS sp_sac_patch_compat_20260108_final;
+
+SET SQL_SAFE_UPDATES = @__old_sql_safe_updates;
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
   /* =========================================================
      3) BACKFILL (sin romper Safe Updates)
