@@ -30,6 +30,9 @@
         </ol>
       </nav>
     </div>
+    
+
+    
   </div>
 
   <section class="section pt-3">
@@ -56,10 +59,23 @@
                   Reservas pendientes
                   <span class="badge bg-danger pill-count ms-2" id="pendingCount">0</span>
                 </h5>
-                <button class="btn btn-outline-secondary btn-sm" id="btnRefresh" type="button">
-                  <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
-                </button>
+              
+                <div class="d-flex flex-wrap gap-2">
+                  <button class="btn btn-outline-secondary btn-sm" id="btnRefresh">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+                  </button>
+              
+                  <a href="ops-approvals-cambios.html"
+                     class="btn btn-outline-primary btn-sm position-relative"
+                     id="btnCambiosPendientes">
+                    <i class="bi bi-pencil-square me-1"></i> Cambios pendientes
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                          id="changesPendingCount"
+                          style="display:none;">0</span>
+                  </a>
+                </div>
               </div>
+              
 
               <div class="table-responsive mt-3">
                 <table class="table table-sm table-hover align-middle">
@@ -343,6 +359,8 @@ function opsConfirm({ title, bodyHtml, okText = "Confirmar", okClass = "btn-succ
 
       confirmedTbody.innerHTML = c.length ? c.map(x => rowHtml(x,'confirmed')).join('') :
         `<tr><td colspan="6" class="text-muted">No hay reservas confirmadas.</td></tr>`;
+
+      await refreshChangesBadge();
     }catch(e){
       pendingTbody.innerHTML = `<tr><td colspan="6" class="text-danger">Error cargando pendientes: ${String(e.message||e)}</td></tr>`;
       confirmedTbody.innerHTML = `<tr><td colspan="6" class="text-danger">Error cargando confirmadas: ${String(e.message||e)}</td></tr>`;
@@ -359,6 +377,25 @@ function opsConfirm({ title, bodyHtml, okText = "Confirmar", okClass = "btn-succ
     if(!r.ok || j.ok === false) throw new Error(j.error || j.msg || `HTTP ${r.status}`);
     return j;
   }
+
+  
+  async function refreshChangesBadge() {
+    try {
+      const r = await fetch('/api/ops/cambios/count', { headers: { 'Accept':'application/json' } });
+      const j = await r.json();
+      const n = Number(j.count || 0);
+      const el = document.getElementById('changesPendingCount');
+      el.textContent = n;
+      el.style.display = n > 0 ? 'inline-block' : 'none';
+    } catch (e) {
+      // no bloquea la pantalla de aprobaciones
+    }
+  }
+
+
+  
+
+
 
   pendingTbody.addEventListener('click', async (ev) => {
     const btn = ev.target.closest('button[data-act]');

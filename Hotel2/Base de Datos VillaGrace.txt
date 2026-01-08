@@ -2455,6 +2455,26 @@ CREATE TABLE IF NOT EXISTS HabitacionImagen (
 
 
 
+
+
+CREATE TABLE IF NOT EXISTS ReservaCambioSolicitud (
+  Id_Cambio INT NOT NULL AUTO_INCREMENT,
+  Codigo_Reserva INT NOT NULL,
+  Estado ENUM('Pendiente','Aprobado','Rechazado','Retractado') NOT NULL DEFAULT 'Pendiente',
+  Monto_Adicional DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  Solicitud_JSON JSON NOT NULL,
+  Creado_En DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  Decidido_En DATETIME DEFAULT NULL,
+  Decidido_Por INT DEFAULT NULL,
+  Rechazo_Motivo TEXT DEFAULT NULL,
+  PRIMARY KEY (Id_Cambio),
+  KEY IX_RCC_Reserva (Codigo_Reserva),
+  KEY IX_RCC_Estado (Estado),
+  KEY IX_RCC_Creado (Creado_En)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
 /* ===================================================================== */
 /* SEEDS                                                                 */
 /* ===================================================================== */
@@ -2901,6 +2921,29 @@ BEGIN
        - error por columna inexistente en backfill
        - divergencias entre Script 1 y Script 2
      ========================================================= */
+
+/* HRM_Config */
+ALTER TABLE Usuario
+  ADD COLUMN Codigo_Funcionario INT NULL,
+  ADD UNIQUE KEY UQ_Usuario_Funcionario (Codigo_Funcionario),
+  ADD CONSTRAINT FK_Usuario_Funcionario
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE Funcionario
+  ADD COLUMN Codigo_Usuario INT NULL,
+  ADD INDEX idx_func_usuario (Codigo_Usuario);
+
+ALTER TABLE Funcionario
+  ADD CONSTRAINT fk_funcionario_usuario
+  FOREIGN KEY (Codigo_Usuario) REFERENCES Usuario(Codigo_Usuario)
+  ON UPDATE CASCADE
+  ON DELETE SET NULL;
+
+ALTER TABLE Marcacion
+MODIFY COLUMN Estado ENUM('Pendiente','Aprobado','Rechazado')
+NOT NULL
+DEFAULT 'Pendiente';
 
   /* SAC_Config */
   ALTER TABLE SAC_Config ADD COLUMN Actualizado DATETIME NULL;

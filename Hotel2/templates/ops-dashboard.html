@@ -185,10 +185,58 @@ accesos.{% endblock %}
                 </div>
               </a>
 
-              <a class="ops-item text-decoration-none" href="ops-checkout.html">
-                <i class="bi bi-box-arrow-right text-primary"></i>
-                <div class="txt">
-                  <div class="fw-semibold">Check-out</div><small>Salir y cobrar</small>
+          <!-- Menú de accesos (mejorado) -->
+          <div class="col-12">
+            <div class="card shadow-sm border-0">
+              <div class="card-header bg-white border-0">
+                <h5 class="mb-0"><i class="bi bi-menu-button-wide me-2"></i>Menú de operaciones</h5>
+              </div>
+              <div class="card-body">
+                <div class="ops-grid">
+                  <a class="ops-item text-decoration-none" href="ops-checkin.html">
+                    <i class="bi bi-person-badge text-primary"></i>
+                    <div class="txt"><div class="fw-semibold">Check-in</div><small>Registrar llegadas</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-checkout.html">
+                    <i class="bi bi-box-arrow-right text-primary"></i>
+                    <div class="txt"><div class="fw-semibold">Check-out</div><small>Salir y cobrar</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="/reserva-sin-sesion?ops=1">
+                    <i class="bi bi-person-plus text-primary"></i>
+                    <div class="txt"><div class="fw-semibold">Estancia sin reserva</div><small>Walk-in</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-arrivals-departures.html">
+                    <i class="bi bi-box-arrow-in-right text-secondary"></i>
+                    <div class="txt"><div class="fw-semibold">Llegadas/Salidas</div><small>Listado del día</small></div>
+                  </a>                  
+                  <a class="ops-item text-decoration-none" href="ops-reservas.html">
+                    <i class="bi bi-journal-text text-success"></i>
+                    <div class="txt">
+                      <div class="fw-semibold">Reservas</div>
+                      <small>Listado general y vista calendario</small>
+                    </div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-rooms.html">
+                    <i class="bi bi-door-open text-secondary"></i>
+                    <div class="txt"><div class="fw-semibold">Habitaciones</div><small>Gestión y dashboard</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="/ops/coupons">
+                    <i class="bi bi-tag text-secondary"></i>
+                    <div class="txt"><div class="fw-semibold">Cupones</div><small>GRR-01-015</small></div>
+                  </a>
+                  <a class="ops-item text-decoration-none" href="ops-approvals.html" id="ops-approvals-btn">
+                    <span
+                      class="badge rounded-pill bg-danger d-none ops-badge"
+                      id="badge-approvals"
+                      data-initial="{{ pending_approvals_count or 0 }}"
+                    >0</span>
+                    <i class="bi bi-patch-check text-primary"></i>
+                    <div class="txt">
+                      <div class="fw-semibold">Aprobaciones pendientes</div>
+                      <small>Validar pagos SINPE y confirmar reservas</small>
+                    </div>
+                  </a>
+                  
                 </div>
               </a>
 
@@ -516,20 +564,29 @@ accesos.{% endblock %}
 
         tbody.appendChild(tr);
       }
-    }
-
-    async function loadDetails(opts) {
-      const days = Number(opts?.days ?? 7);
-      const limit = Number(opts?.limit ?? 50);
-
-      meta.textContent = 'Cargando detalles…';
-      try {
-        const url = `/grr/jobs/noshow/recent?days=${encodeURIComponent(days)}&limit=${encodeURIComponent(limit)}`;
-        const r = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-        const j = await r.json().catch(() => ({}));
-
-        if (!j || !j.ok) {
-          meta.textContent = 'No se pudieron cargar los detalles del No-Show.';
+    
+      async function loadDetails(opts){
+        const days = Number(opts?.days ?? 7);
+        const limit = Number(opts?.limit ?? 50);
+    
+        meta.textContent = 'Cargando detalles…';
+        try{
+          const url = `/grr/jobs/noshow/recent?days=${encodeURIComponent(days)}&limit=${encodeURIComponent(limit)}`;
+          const r = await fetch(url, { headers:{Accept:'application/json'} });
+          const j = await r.json().catch(()=>({}));
+    
+          if(!j || !j.ok){
+            meta.textContent = 'No se pudieron cargar los detalles del No-Show.';
+            renderDetails([]);
+            return;
+          }
+    
+          renderDetails(j.items || []);
+          meta.textContent = `Actualizado: ${fmtDateTime(j.server_time_local)} · Mostrando ${Math.min((j.items||[]).length, limit)} registro(s) · Rango: ${j.days} día(s).`;
+          detailsLoadedOnce = true;
+    
+        }catch(e){
+          meta.textContent = 'Error de conexión al cargar detalles.';
           renderDetails([]);
           return;
         }
@@ -541,26 +598,47 @@ accesos.{% endblock %}
         meta.textContent = 'Error de conexión al cargar detalles.';
         renderDetails([]);
       }
-    }
-
-    if (detailsBox) {
-      detailsBox.addEventListener('show.bs.collapse', () => {
-        if (!detailsLoadedOnce) loadDetails({ days: 7, limit: 50 });
-      });
-    }
-
-    if (btnRun) {
-      btnRun.addEventListener('click', async () => {
-        out.textContent = 'Ejecutando corte…';
-        btnRun.disabled = true;
-
-        try {
-          const r = await fetch('/grr/jobs/run-noshow', { method: 'POST', credentials: 'same-origin' });
-          const j = await r.json().catch(() => ({}));
-
-          if (!j || !j.ok) {
-            out.textContent = 'No se pudo ejecutar el corte de No-Show.';
-            return;
+    
+      // Cuando el usuario abra "Mostrar detalles", cargamos si aún no se cargó
+      if(detailsBox){
+        detailsBox.addEventListener('show.bs.collapse', ()=>{
+          if(!detailsLoadedOnce) loadDetails({days:7, limit:50});
+        });
+      }
+    
+      // Ejecutar job
+      if(btnRun){
+        btnRun.addEventListener('click', async ()=>{
+          out.textContent = 'Ejecutando corte…';
+          btnRun.disabled = true;
+    
+          try{
+            const r = await fetch('/grr/jobs/run-noshow', { method:'POST' });
+            const j = await r.json().catch(()=>({}));
+    
+            if(!j || !j.ok){
+              out.textContent = 'No se pudo ejecutar el corte de No-Show.';
+              return;
+            }
+    
+            out.textContent = `Procesadas: ${j.processed||0}. Liberadas: ${j.liberadas||j.released||0}.`;
+    
+            // Refrescos operativos
+            loadRooms();
+            loadKpis();
+    
+            // Cargar evidencia desde auditoría (último día) para que la tabla pruebe lo ocurrido
+            await loadDetails({days: 1, limit: 100});
+    
+            // Si el usuario ya tiene abierto el panel, se actualiza; si no, queda listo al abrir
+            if(detailsBox && detailsBox.classList.contains('show')){
+              // ya se actualizó arriba, no hacemos nada extra
+            }
+    
+          }catch(e){
+            out.textContent = 'Error de conexión al ejecutar el job.';
+          }finally{
+            btnRun.disabled = false;
           }
 
           out.textContent = `Procesadas: ${j.processed || 0}. Liberadas: ${j.liberadas || j.released || 0}.`;
