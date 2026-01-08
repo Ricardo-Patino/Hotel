@@ -2922,6 +2922,29 @@ BEGIN
        - divergencias entre Script 1 y Script 2
      ========================================================= */
 
+/* HRM_Config */
+ALTER TABLE Usuario
+  ADD COLUMN Codigo_Funcionario INT NULL,
+  ADD UNIQUE KEY UQ_Usuario_Funcionario (Codigo_Funcionario),
+  ADD CONSTRAINT FK_Usuario_Funcionario
+    FOREIGN KEY (Codigo_Funcionario) REFERENCES Funcionario(Codigo_Funcionario)
+    ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE Funcionario
+  ADD COLUMN Codigo_Usuario INT NULL,
+  ADD INDEX idx_func_usuario (Codigo_Usuario);
+
+ALTER TABLE Funcionario
+  ADD CONSTRAINT fk_funcionario_usuario
+  FOREIGN KEY (Codigo_Usuario) REFERENCES Usuario(Codigo_Usuario)
+  ON UPDATE CASCADE
+  ON DELETE SET NULL;
+
+ALTER TABLE Marcacion
+MODIFY COLUMN Estado ENUM('Pendiente','Aprobado','Rechazado')
+NOT NULL
+DEFAULT 'Pendiente';
+
   /* SAC_Config */
   ALTER TABLE SAC_Config ADD COLUMN Actualizado DATETIME NULL;
   ALTER TABLE SAC_Config ADD COLUMN Actualizada_At DATETIME NULL;

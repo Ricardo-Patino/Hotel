@@ -169,7 +169,10 @@
                 <td class="text-center">
                   <div class="btn-group btn-group-sm flex-wrap gap-1">
                     <button class="btn btn-outline-secondary" onclick="guardarAjuste({{ m.Id }})"><i class="bi bi-save2"></i></button>
-                    <button class="btn btn-outline-theme" onclick="aprobarConAjuste({{ m.Id }})"><i class="bi bi-check2-square"></i></button>
+
+                    <!-- ✅ QUITADO: botón check con hoja -->
+                    <!-- <button class="btn btn-outline-theme" onclick="aprobarConAjuste({{ m.Id }})"><i class="bi bi-check2-square"></i></button> -->
+
                     <button class="btn btn-outline-success" onclick="aprobar({{ m.Id }})"><i class="bi bi-check2"></i></button>
                     <button class="btn btn-outline-danger" onclick="rechazar({{ m.Id }})"><i class="bi bi-x"></i></button>
                   </div>
@@ -182,43 +185,7 @@
         </div>
       </div>
 
-      <!-- ========================= -->
-      <!-- NUEVA SECCIÓN HRM-08-004 -->
-      <!-- ========================= -->
-      <h5 class="mt-5">Horas Extra Pendientes</h5>
-      <div class="card shadow-sm border-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered align-middle mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>Colaborador</th>
-                <th>Fecha</th>
-                <th class="text-end">Horas Extra</th>
-                <th>Motivo</th>
-                <th>Estado</th>
-                <th class="text-center">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for h in horas_extra %}
-              <tr>
-                <td>{{ h.Funcionario.Nombre }} {{ h.Funcionario.Apellido }}</td>
-                <td>{{ h.Fecha.strftime('%d/%m/%Y') }}</td>
-                <td class="text-end">{{ '%.2f'|format(h.Horas_Extras) }}</td>
-                <td>{{ h.Motivo }}</td>
-                <td>{{ h.Estado }}</td>
-                <td class="text-center">
-                  <button class="btn btn-success btn-sm" onclick="aprobarExtra({{ h.Id }})"><i class="bi bi-check-circle"></i></button>
-                  <button class="btn btn-danger btn-sm" onclick="rechazarExtra({{ h.Id }})"><i class="bi bi-x-circle"></i></button>
-                </td>
-              </tr>
-              {% else %}
-              <tr><td colspan="6" class="text-center text-muted py-3">No hay horas extra pendientes.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <!-- ✅ QUITADO: Sección Horas Extra Pendientes completa -->
 
     </div>
   </section>
@@ -253,14 +220,7 @@ async function guardarAjuste(id){
   }catch(e){alert('Error de red');}finally{setRowLoading(id,false);}
 }
 
-async function aprobarConAjuste(id){
-  try{
-    setRowLoading(id,true);
-    const r=await fetch(`/hrm/marcaciones/${id}/ajustar-aprobar`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(getPayloadFromRow(id))});
-    const j=await r.json();
-    if(r.ok&&j.ok) marcarFila(id,'Aprobado'); else alert('No se pudo aprobar: '+(j.error||'Error'));
-  }catch(e){alert('Error de red');}finally{setRowLoading(id,false);}
-}
+/* ✅ QUITADO: aprobarConAjuste() porque quitamos el botón */
 
 async function aprobar(id){
   try{
@@ -299,19 +259,9 @@ async function aprobarLote(){
   else alert('Error: '+(j.error||''));
 }
 
-/* -------------------------- */
-/* HRM-08-004 Horas Extra JS */
-/* -------------------------- */
-async function aprobarExtra(id){
-  const r=await fetch(`/hrm/horas-extra/aprobar/${id}`,{method:'POST'});
-  const j=await r.json();
-  if(r.ok&&j.ok) location.reload(); else alert(j.error||'Error al aprobar');
-}
-async function rechazarExtra(id){
-  const r=await fetch(`/hrm/horas-extra/rechazar/${id}`,{method:'POST'});
-  const j=await r.json();
-  if(r.ok&&j.ok) location.reload(); else alert(j.error||'Error al rechazar');
-}
+/* ✅ QUITADO: JS de Horas Extra (aprobarExtra/rechazarExtra) */
+
 </script>
 </body>
 </html>
+
