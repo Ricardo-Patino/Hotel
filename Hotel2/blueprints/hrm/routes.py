@@ -508,27 +508,29 @@ def mis_horas_ui():
     )
 
 
+from datetime import datetime
+
 @hrm_bp.route("/marcar/entrada", methods=["POST"])
 @require_roles("Limpieza")
 def marcar_entrada():
     fid = _current_funcionario_id()
     if not fid:
-        return jsonify({"ok": False, "error": "La entrada no fue registrada,ingrese al sistema y haga su marca"}), 401
+        return jsonify({"ok": False, "error": "La entrada no fue registrada, ingrese al sistema y haga su marca"}), 401
 
-    ahora = datetime.now()     # Hora local
+    ahora = datetime.now()
     hoy = ahora.date()
 
-    # ¿Ya hay una marcación abierta (sin salida) hoy?
     abierto = (
-    Marcacion.query
-    .filter(
-        Marcacion.Codigo_Funcionario == fid,
-        Marcacion.Fecha == hoy,
-        Marcacion.Hora_Salida.is_(None)  # jornada aún sin salida
+        Marcacion.query
+        .filter(
+            Marcacion.Codigo_Funcionario == fid,
+            Marcacion.Fecha == hoy,
+            Marcacion.Hora_Salida.is_(None)
+        )
+        .order_by(Marcacion.Id.desc())
+        .first()
     )
-    .order_by(Marcacion.Id.desc())
-    .first()
-)
+
     if abierto:
         return jsonify({"ok": False, "error": "Ya existe una marcación abierta para hoy."}), 400
 
@@ -539,14 +541,17 @@ def marcar_entrada():
     _set_if_attr(m, "Entrada", ahora)
     _set_if_attr(m, "Estado", "Pendiente")
     _set_if_attr(m, "Observacion", "Marcación de entrada")
-    _set_if_attr(m, "Observaciones", "Marcación de entrada")  # compat.
+    _set_if_attr(m, "Observaciones", "Marcación de entrada")
     _set_if_attr(m, "Registrado_Por", _registrado_por())
+
+    # ✅ ESTAS DOS LÍNEAS SON LA CLAVE
+    _set_if_attr(m, "Fecha_Creacion", ahora)
+    _set_if_attr(m, "Fecha_Actualiza", ahora)
 
     db.session.add(m)
     db.session.commit()
 
     return jsonify({"ok": True, "id": getattr(m, "Id", None)})
-
 
 @hrm_bp.route("/marcar/salida", methods=["POST"])
 def marcar_salida():

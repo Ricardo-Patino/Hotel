@@ -44,6 +44,7 @@ def role_required(*allowed_roles):
     def decorator(f):
         @wraps(f)
         def wrapped(*args, **kwargs):
+            print("SESSION COMPLETA:", dict(session))
             # 1) Leer rol desde cualquier esquema de sesión conocido
             rol_id = (
                 session.get("rol_id")
