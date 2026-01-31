@@ -223,14 +223,13 @@
                     <li>
                       <a href="{{ url_for('hrm.empleados_ui') }}">Empleados</a>
                     </li>
+                    {% if session.get('user_id') == 1 %}
                     <li>
-                      <a href="{{ url_for('hrm.mis_horas_ui') }}">Mis horas</a>
+                      <a href="{{ url_for('hrm.validar_horas_ui') }}">
+                        Validar horas
+                      </a>
                     </li>
-                    <li>
-                      <a href="{{ url_for('hrm.validar_horas_ui') }}"
-                        >Validar horas</a
-                      >
-                    </li>
+                    {% endif %}
                   </ul>
                 </li>
 

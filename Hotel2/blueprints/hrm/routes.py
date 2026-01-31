@@ -13,6 +13,8 @@ from models import Funcionario
 from models.usuario import Usuario
 from models.ausencia import Ausencia
 from models.amonestacion import Amonestacion
+from utils.decorators import require_user_id
+
 
 
 #from models import HoraExtra
@@ -695,6 +697,7 @@ def _filtro_equipo_query():
     return q
 
 @hrm_bp.route("/val-horas", methods=["GET"])
+@require_user_id(1)
 def validar_horas_ui():
     """
     UI del jefe para validar/corregir horas.
