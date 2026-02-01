@@ -1,351 +1,311 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Reservas – Buscar | Hotel Villa Grace</title>
-  <meta name="description" content="Busca disponibilidad y tarifas en Hotel Villa Grace.">
+{% extends "base.html" %}
 
-  <!-- Favicons -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}Reservas – Buscar | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Busca disponibilidad y tarifas en Hotel Villa Grace.{% endblock %}
 
-  <!-- Fuentes -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+{% block body_class %}booking-search-page{% endblock %}
 
-  <!-- Vendors -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
+{% block head_extra %}
+<style>
+  :root{
+    --vg-green:#1b7a4e;
+    --vg-green-600:#156543;
+    --vg-dark: #0f172a;
+  }
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
+  .hero{
+    --h: min(68vh, 560px);
+    background: radial-gradient(70% 110% at 20% 0%, rgba(0,0,0,.45), transparent 60%),
+                linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,.15)),
+                url("{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}") center/cover no-repeat;
+    height: var(--h);
+    color:#fff;
+    display:flex;align-items:center;
+  }
+  .hero .lead{opacity:.9}
+  .search-card{
+    margin-top:-72px;border:0;border-radius:20px;box-shadow:0 20px 50px rgba(2,6,23,.18);
+    backdrop-filter:saturate(140%) blur(2px);
+  }
+  .pill{
+    border:1px solid #e9ecef;border-radius:12px;padding:.7rem .9rem;background:#fff
+  }
+  .qty{display:flex;align-items:center;gap:.5rem}
+  .qty .btn{width:38px;height:38px;border-radius:10px;padding:0;line-height:38px}
+  .qty input{width:46px;text-align:center;border:0;background:transparent;font-weight:600}
+  .btn-success{background:var(--vg-green);border-color:var(--vg-green)}
+  .btn-success:hover{background:var(--vg-green-600);border-color:var(--vg-green-600)}
+  .hint{font-size:.9rem;color:#475569}
+  .kpi{display:flex;gap:1.25rem;flex-wrap:wrap}
+  .kpi .item{display:flex;align-items:center;gap:.5rem;padding:.4rem .75rem;border:1px dashed #e2e8f0;border-radius:999px;background:#fff}
+  .kpi .item i{color:var(--vg-green)}
+  .footer-cta{background:linear-gradient(180deg, rgba(27,122,78,.08), transparent)}
+  .form-label{font-weight:600}
 
-  <!-- Estilos del proyecto -->
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+  .hero-title-white{ color:#ffffff !important; }
+  .kpi-green{ color: var(--vg-green-600) !important; }
+  .kpi-green i{ color: var(--vg-green-600) !important; }
+</style>
+{% endblock %}
 
-  <style>
-    :root{
-      --vg-green:#1b7a4e;
-      --vg-green-600:#156543;
-      --vg-dark: #0f172a;
-    }
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
-    .hero{
-      --h: min(68vh, 560px);
-      background: radial-gradient(70% 110% at 20% 0%, rgba(0,0,0,.45), transparent 60%),
-                  linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,.15)),
-                  url("{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}") center/cover no-repeat;
-      height: var(--h);
-      color:#fff;
-      display:flex;align-items:center;
-    }
-    .hero .lead{opacity:.9}
-    .search-card{
-      margin-top:-72px;border:0;border-radius:20px;box-shadow:0 20px 50px rgba(2,6,23,.18);
-      backdrop-filter:saturate(140%) blur(2px);
-    }
-    .pill{
-      border:1px solid #e9ecef;border-radius:12px;padding:.7rem .9rem;background:#fff
-    }
-    .qty{display:flex;align-items:center;gap:.5rem}
-    .qty .btn{width:38px;height:38px;border-radius:10px;padding:0;line-height:38px}
-    .qty input{width:46px;text-align:center;border:0;background:transparent;font-weight:600}
-    .btn-success{background:var(--vg-green);border-color:var(--vg-green)}
-    .btn-success:hover{background:var(--vg-green-600);border-color:var(--vg-green-600)}
-    .hint{font-size:.9rem;color:#475569}
-    .kpi{display:flex;gap:1.25rem;flex-wrap:wrap}
-    .kpi .item{display:flex;align-items:center;gap:.5rem;padding:.4rem .75rem;border:1px dashed #e2e8f0;border-radius:999px;background:#fff}
-    .kpi .item i{color:var(--vg-green)}
-    .footer-cta{background:linear-gradient(180deg, rgba(27,122,78,.08), transparent)}
-    .form-label{font-weight:600}
+{% block content %}
 
-    /* ====== NUEVO: colores solicitados ====== */
-    .hero-title-white{ color:#ffffff !important; }
-    .kpi-green{ color: var(--vg-green-600) !important; }
-    .kpi-green i{ color: var(--vg-green-600) !important; }
-    /* ======================================= */
-  </style>
-</head>
+<!-- Hero -->
+<section class="hero" data-aos="fade">
+  <div class="container">
+    <div class="col-lg-8">
+      <h1 class="display-5 fw-bold hero-title-white">Reserva tu estadía en Villa Grace</h1>
 
-<body>
-  <!-- Header -->
-  <header id="header" class="header d-flex align-items-center fixed-top">
-    <div class="container position-relative d-flex align-items-center justify-content-between">
-      <a href="index.html" class="logo d-flex align-items-center me-auto me-xl-0">
-        <h1 class="sitename">Hotel Villa Grace</h1>
-      </a>
-      <nav id="navmenu" class="navmenu">
-        <ul>
-          <li><a href="index.html">Inicio</a></li>
-          <li><a href="rooms.html">Habitaciones</a></li>
-          <li><a href="booking-search.html" class="active">Reservar</a></li>
-          <li><a href="contact.html">Contacto</a></li>
-        </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-      </nav>
-      <a class="btn-getstarted d-none d-sm-block" href="portal-dashboard.html">Portal Huésped</a>
-    </div>
-  </header>
+      <p class="lead mb-0">
+        Elige fechas y huéspedes. <span class="d-inline d-md-none"><br></span>
+        Te mostraremos disponibilidad y tarifas en segundos.
+      </p>
 
-  <main class="main">
-
-    <!-- Hero -->
-    <section class="hero" data-aos="fade">
-      <div class="container">
-        <div class="col-lg-8">
-          <h1 class="display-5 fw-bold hero-title-white">Reserva tu estadía en Villa Grace</h1>
-
-          <p class="lead mb-0">Elige fechas y huéspedes. <span class="d-inline d-md-none"><br></span>Te mostraremos disponibilidad y tarifas en segundos.</p>
-          <div class="kpi mt-4">
-            <div class="item kpi-green"><i class="bi bi-shield-check"></i> Pago seguro</div>
-            <div class="item kpi-green"><i class="bi bi-cash-coin"></i> Mejor tarifa directa</div>
-            <div class="item kpi-green"><i class="bi bi-x-circle"></i> Cancelación flexible</div>
-          </div>
-        </div>
+      <div class="kpi mt-4">
+        <div class="item kpi-green"><i class="bi bi-shield-check"></i> Pago seguro</div>
+        <div class="item kpi-green"><i class="bi bi-cash-coin"></i> Mejor tarifa directa</div>
+        <div class="item kpi-green"><i class="bi bi-x-circle"></i> Cancelación flexible</div>
       </div>
-    </section>
+    </div>
+  </div>
+</section>
 
-    <!-- Buscador -->
-    <section class="section pt-0">
-      <div class="container" data-aos="fade-up">
-        <div class="card search-card">
-          <div class="card-body p-4 p-md-5">
-            <form id="search-form" class="row g-3 align-items-end" action="booking-results.html" method="get" novalidate>
-              <div class="col-12 col-md-4">
-                <label class="form-label" for="checkin">Check-in</label>
-                <input type="date" class="form-control pill" id="checkin" name="checkin" required>
-              </div>
-              <div class="col-12 col-md-4">
-                <label class="form-label" for="checkout">Check-out</label>
-                <input type="date" class="form-control pill" id="checkout" name="checkout" required>
-              </div>
+<!-- Buscador -->
+<section class="section pt-0">
+  <div class="container" data-aos="fade-up">
+    <div class="card search-card">
+      <div class="card-body p-4 p-md-5">
+        <form id="search-form" class="row g-3 align-items-end" action="booking-results.html" method="get" novalidate>
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="checkin">Check-in</label>
+            <input type="date" class="form-control pill" id="checkin" name="checkin" required>
+          </div>
 
-              <div class="col-12 col-md-4">
-                <div class="row g-3">
-                  <div class="col-6">
-                    <label class="form-label d-flex align-items-center gap-2" for="adults">
-                      <i class="bi bi-person-fill"></i> Adultos
-                    </label>
-                    <div class="qty pill">
-                      <button class="btn btn-outline-secondary" type="button" data-dec="adults" aria-label="Quitar adulto"><i class="bi bi-dash-lg"></i></button>
-                      <input id="adults" name="adults" value="2" inputmode="numeric" pattern="[0-9]*" aria-label="Adultos">
-                      <button class="btn btn-outline-secondary" type="button" data-inc="adults" aria-label="Agregar adulto"><i class="bi bi-plus-lg"></i></button>
-                    </div>
-                  </div>
-                  <div class="col-6">
-                    <label class="form-label d-flex align-items-center gap-2" for="children">
-                      <i class="bi bi-emoji-smile-fill"></i> Niños
-                    </label>
-                    <div class="qty pill">
-                      <button class="btn btn-outline-secondary" type="button" data-dec="children" aria-label="Quitar niño"><i class="bi bi-dash-lg"></i></button>
-                      <input id="children" name="children" value="0" inputmode="numeric" pattern="[0-9]*" aria-label="Niños">
-                      <button class="btn btn-outline-secondary" type="button" data-inc="children" aria-label="Agregar niño"><i class="bi bi-plus-lg"></i></button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="checkout">Check-out</label>
+            <input type="date" class="form-control pill" id="checkout" name="checkout" required>
+          </div>
 
-              <input type="hidden" id="rooms" name="rooms" value="1">
-
-              <div class="col-12 d-flex flex-wrap gap-3 align-items-center">
-                <div class="hint">
-                  <i class="bi bi-people me-1"></i>
-                  <span id="pill-guests">2 huéspedes</span>
-                  <span class="mx-2">•</span>
-                  <i class="bi bi-moon me-1"></i>
-                  <span id="pill-nights">1 noche</span>
-                </div>
-                <div class="ms-auto d-grid d-md-inline">
-                  <button id="btn-search" type="submit" class="btn btn-success px-4 py-2">
-                    <i class="bi bi-search me-1"></i> Buscar disponibilidad
+          <div class="col-12 col-md-4">
+            <div class="row g-3">
+              <div class="col-6">
+                <label class="form-label d-flex align-items-center gap-2" for="adults">
+                  <i class="bi bi-person-fill"></i> Adultos
+                </label>
+                <div class="qty pill">
+                  <button class="btn btn-outline-secondary" type="button" data-dec="adults" aria-label="Quitar adulto">
+                    <i class="bi bi-dash-lg"></i>
+                  </button>
+                  <input id="adults" name="adults" value="2" inputmode="numeric" pattern="[0-9]*" aria-label="Adultos">
+                  <button class="btn btn-outline-secondary" type="button" data-inc="adults" aria-label="Agregar adulto">
+                    <i class="bi bi-plus-lg"></i>
                   </button>
                 </div>
               </div>
 
-              <div class="col-12">
-                <div id="alert-error" class="alert alert-danger d-none"></div>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <p class="text-muted small mt-3">
-          <i class="bi bi-info-circle me-1"></i> Los precios se calculan por huésped. Impuestos no incluidos.
-        </p>
-      </div>
-    </section>
-
-    <!-- CTA secundaria -->
-    <section class="footer-cta section pt-0">
-      <div class="container">
-        <div class="row g-3 align-items-center">
-          <div class="col-md-8">
-            <div class="d-flex align-items-center gap-3">
-              <img src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}"
-                   alt="" style="width:56px;height:56px;object-fit:cover;border-radius:12px;border:1px solid #e2e8f0">
-              <div>
-                <div class="fw-semibold">¿Prefieres reservar por WhatsApp?</div>
-                <div class="text-muted small">Escríbenos y te asistimos con tu reserva.</div>
+              <div class="col-6">
+                <label class="form-label d-flex align-items-center gap-2" for="children">
+                  <i class="bi bi-emoji-smile-fill"></i> Niños
+                </label>
+                <div class="qty pill">
+                  <button class="btn btn-outline-secondary" type="button" data-dec="children" aria-label="Quitar niño">
+                    <i class="bi bi-dash-lg"></i>
+                  </button>
+                  <input id="children" name="children" value="0" inputmode="numeric" pattern="[0-9]*" aria-label="Niños">
+                  <button class="btn btn-outline-secondary" type="button" data-inc="children" aria-label="Agregar niño">
+                    <i class="bi bi-plus-lg"></i>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-          <div class="col-md-4 d-grid d-md-flex justify-content-md-end">
-            <a class="btn btn-outline-success" href="contact.html"><i class="bi bi-whatsapp me-1"></i> Contactar</a>
+
+          <input type="hidden" id="rooms" name="rooms" value="1">
+
+          <div class="col-12 d-flex flex-wrap gap-3 align-items-center">
+            <div class="hint">
+              <i class="bi bi-people me-1"></i>
+              <span id="pill-guests">2 huéspedes</span>
+              <span class="mx-2">•</span>
+              <i class="bi bi-moon me-1"></i>
+              <span id="pill-nights">1 noche</span>
+            </div>
+
+            <div class="ms-auto d-grid d-md-inline">
+              <button id="btn-search" type="submit" class="btn btn-success px-4 py-2">
+                <i class="bi bi-search me-1"></i> Buscar disponibilidad
+              </button>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div id="alert-error" class="alert alert-danger d-none"></div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-muted small mt-3">
+      <i class="bi bi-info-circle me-1"></i> Los precios se calculan por huésped. Impuestos no incluidos.
+    </p>
+  </div>
+</section>
+
+<!-- CTA secundaria -->
+<section class="footer-cta section pt-0">
+  <div class="container">
+    <div class="row g-3 align-items-center">
+      <div class="col-md-8">
+        <div class="d-flex align-items-center gap-3">
+          <img
+            src="{{ url_for('static', filename='assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg') }}"
+            alt=""
+            style="width:56px;height:56px;object-fit:cover;border-radius:12px;border:1px solid #e2e8f0">
+          <div>
+            <div class="fw-semibold">¿Prefieres reservar por WhatsApp?</div>
+            <div class="text-muted small">Escríbenos y te asistimos con tu reserva.</div>
           </div>
         </div>
       </div>
-    </section>
-  </main>
 
-  <!-- Footer -->
-  <footer id="footer" class="footer position-relative">
-    <div class="copyright text-center">
-      <div class="container">© <strong><span>Hotel Villa Grace</span></strong> · Cóbano, Puntarenas</div>
+      <div class="col-md-4 d-grid d-md-flex justify-content-md-end">
+        <a class="btn btn-outline-success" href="contact.html">
+          <i class="bi bi-whatsapp me-1"></i> Contactar
+        </a>
+      </div>
     </div>
-  </footer>
+  </div>
+</section>
 
-  <!-- Utilidades -->
-  <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-    <i class="bi bi-arrow-up-short"></i></a>
-  <div id="preloader"></div>
+{% endblock %}
 
-  <!-- JS -->
-  <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-  <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+{% block scripts %}
+<script>
+  (function () {
+    const $ = (s) => document.querySelector(s);
+    const form = $('#search-form');
+    const $in  = $('#checkin');
+    const $out = $('#checkout');
+    const $ad  = $('#adults');
+    const $ch  = $('#children');
+    const $err = $('#alert-error');
 
-  <!-- Lógica del buscador -->
-  <script>
-    (function () {
-      const $ = (s) => document.querySelector(s);
-      const form = $('#search-form');
-      const $in  = $('#checkin');
-      const $out = $('#checkout');
-      const $ad  = $('#adults');
-      const $ch  = $('#children');
-      const $err = $('#alert-error');
+    function todayISO(d=0) {
+      const t = new Date();
+      t.setDate(t.getDate() + d);
+      const m = (t.getMonth()+1).toString().padStart(2,'0');
+      const day = t.getDate().toString().padStart(2,'0');
+      return `${t.getFullYear()}-${m}-${day}`;
+    }
 
-      function todayISO(d=0) {
-        const t = new Date();
-        t.setDate(t.getDate() + d);
-        const m = (t.getMonth()+1).toString().padStart(2,'0');
-        const day = t.getDate().toString().padStart(2,'0');
-        return `${t.getFullYear()}-${m}-${day}`;
+    function setDefaults() {
+      const saved = (()=>{ try{return JSON.parse(sessionStorage.getItem('villaGrace.search')||'{}');}catch(_){return {};}})();
+      const today = todayISO(0);
+      const tomorrow = todayISO(1);
+      $in.min  = today;
+      $out.min = tomorrow;
+
+      $in.value  = saved.checkin  || $in.value  || today;
+      $out.value = saved.checkout || $out.value || tomorrow;
+      $ad.value  = saved.adults   || $ad.value  || '2';
+      $ch.value  = saved.children || $ch.value  || '0';
+      updatePills();
+    }
+
+    function nightsBetween(a,b){
+      const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00');
+      return Math.max(1, Math.round((d2-d1)/86400000));
+    }
+
+    function updatePills(){
+      const guests = Math.max(1, (parseInt($ad.value||'0',10)||0) + (parseInt($ch.value||'0',10)||0));
+      const nights = nightsBetween($in.value, $out.value);
+      $('#pill-guests').textContent = guests + ' huésped' + (guests>1?'es':'');
+      $('#pill-nights').textContent = nights + ' noche' + (nights>1?'s':'');
+    }
+
+    function clampInt(el, min, max){
+      const v = Math.max(min, Math.min(max, parseInt(el.value||'0',10)||0));
+      el.value = String(v);
+      updatePills();
+    }
+
+    document.addEventListener('click', (e)=>{
+      const inc = e.target.closest('[data-inc]');
+      const dec = e.target.closest('[data-dec]');
+      if (inc) {
+        const id = inc.getAttribute('data-inc');
+        const el = document.getElementById(id);
+        el.value = String((parseInt(el.value||'0',10)||0) + 1);
+        clampInt(el, 0, 10);
       }
-
-      function setDefaults() {
-        const saved = (()=>{ try{return JSON.parse(sessionStorage.getItem('villaGrace.search')||'{}');}catch(_){return {};}})();
-        const today = todayISO(0);
-        const tomorrow = todayISO(1);
-        $in.min  = today;
-        $out.min = tomorrow;
-
-        $in.value  = saved.checkin  || $in.value  || today;
-        $out.value = saved.checkout || $out.value || tomorrow;
-        $ad.value  = saved.adults   || $ad.value  || '2';
-        $ch.value  = saved.children || $ch.value  || '0';
-        updatePills();
+      if (dec) {
+        const id = dec.getAttribute('data-dec');
+        const el = document.getElementById(id);
+        el.value = String((parseInt(el.value||'0',10)||0) - 1);
+        clampInt(el, 0, 10);
       }
+    });
 
-      // pills
-      function nightsBetween(a,b){
-        const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00');
-        return Math.max(1, Math.round((d2-d1)/86400000));
-      }
-      function updatePills(){
-        const guests = Math.max(1, (parseInt($ad.value||'0',10)||0) + (parseInt($ch.value||'0',10)||0));
-        const nights = nightsBetween($in.value, $out.value);
-        $('#pill-guests').textContent = guests + ' huésped' + (guests>1?'es':'');
-        $('#pill-nights').textContent = nights + ' noche' + (nights>1?'s':'');
-      }
+    $in.addEventListener('change', () => {
+      const ci = new Date($in.value);
+      const co = new Date($out.value);
+      const next = new Date(ci); next.setDate(ci.getDate()+1);
+      const nextISO = next.toISOString().slice(0,10);
+      $out.min = nextISO;
+      if (!($out.value) || co <= ci) $out.value = nextISO;
+      updatePills();
+    });
+    $out.addEventListener('change', updatePills);
+    $ad.addEventListener('input', ()=>clampInt($ad,0,10));
+    $ch.addEventListener('input', ()=>clampInt($ch,0,10));
 
-      // +/-
-      function clampInt(el, min, max){
-        const v = Math.max(min, Math.min(max, parseInt(el.value||'0',10)||0));
-        el.value = String(v);
-        updatePills();
-      }
-      document.addEventListener('click', (e)=>{
-        const inc = e.target.closest('[data-inc]');
-        const dec = e.target.closest('[data-dec]');
-        if (inc) {
-          const id = inc.getAttribute('data-inc');
-          const el = document.getElementById(id);
-          el.value = String((parseInt(el.value||'0',10)||0) + 1);
-          clampInt(el, 0, 10);
-        }
-        if (dec) {
-          const id = dec.getAttribute('data-dec');
-          const el = document.getElementById(id);
-          el.value = String((parseInt(el.value||'0',10)||0) - 1);
-          clampInt(el, 0, 10);
-        }
-      });
+    function showError(msg) {
+      $err.textContent = msg || 'Revisa los campos.';
+      $err.classList.remove('d-none');
+    }
+    function hideError() {
+      $err.classList.add('d-none');
+    }
+    function validDates() {
+      const ci = new Date($in.value);
+      const co = new Date($out.value);
+      if (!($in.value && $out.value)) return false;
+      return co > ci;
+    }
 
-      // Validación fechas
-      $in.addEventListener('change', () => {
-        const ci = new Date($in.value);
-        const co = new Date($out.value);
-        const next = new Date(ci); next.setDate(ci.getDate()+1);
-        const nextISO = next.toISOString().slice(0,10);
-        $out.min = nextISO;
-        if (!($out.value) || co <= ci) $out.value = nextISO;
-        updatePills();
-      });
-      $out.addEventListener('change', updatePills);
-      $ad.addEventListener('input', ()=>clampInt($ad,0,10));
-      $ch.addEventListener('input', ()=>clampInt($ch,0,10));
-
-      function showError(msg) {
-        $err.textContent = msg || 'Revisa los campos.';
-        $err.classList.remove('d-none');
-      }
-      function hideError() {
-        $err.classList.add('d-none');
-      }
-      function validDates() {
-        const ci = new Date($in.value);
-        const co = new Date($out.value);
-        if (!($in.value && $out.value)) return false;
-        return co > ci;
-      }
-
-      form.addEventListener('submit', (e) => {
-        hideError();
-        if (!validDates()) {
-          e.preventDefault();
-          showError('La fecha de salida debe ser posterior a la de llegada.');
-          return;
-        }
-        // Guardamos búsqueda
-        const params = {
-          checkin:  $in.value,
-          checkout: $out.value,
-          adults:   $ad.value,
-          children: $ch.value,
-          rooms:    document.getElementById('rooms').value || '1',
-          // Derivado que usará el backend:
-          guests:   String(Math.max(1, (parseInt($ad.value||'0',10)||0) + (parseInt($ch.value||'0',10)||0)))
-        };
-        try { sessionStorage.setItem('villaGrace.search', JSON.stringify(params)); } catch(_) {}
-
-        // Asegura que el GET lleve también guests, además de adults/children
-        const qs = new URLSearchParams({
-          checkin: params.checkin,
-          checkout: params.checkout,
-          adults: params.adults,
-          children: params.children,
-          rooms: params.rooms,
-          guests: params.guests
-        }).toString();
-
-        // Cancelamos el submit por defecto para construir la URL final con el "guests" añadido
+    form.addEventListener('submit', (e) => {
+      hideError();
+      if (!validDates()) {
         e.preventDefault();
-        location.href = `booking-results.html?${qs}`;
-      });
+        showError('La fecha de salida debe ser posterior a la de llegada.');
+        return;
+      }
 
-      setDefaults();
-    })();
-  </script>
-</body>
-</html>
+      const params = {
+        checkin:  $in.value,
+        checkout: $out.value,
+        adults:   $ad.value,
+        children: $ch.value,
+        rooms:    document.getElementById('rooms').value || '1',
+        guests:   String(Math.max(1, (parseInt($ad.value||'0',10)||0) + (parseInt($ch.value||'0',10)||0)))
+      };
+      try { sessionStorage.setItem('villaGrace.search', JSON.stringify(params)); } catch(_) {}
+
+      const qs = new URLSearchParams({
+        checkin: params.checkin,
+        checkout: params.checkout,
+        adults: params.adults,
+        children: params.children,
+        rooms: params.rooms,
+        guests: params.guests
+      }).toString();
+
+      e.preventDefault();
+      location.href = `booking-results.html?${qs}`;
+    });
+
+    setDefaults();
+  })();
+</script>
+{% endblock %}
