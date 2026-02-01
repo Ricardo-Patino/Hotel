@@ -7748,4 +7748,29 @@ section,
   color: var(--contrast-color) !important;
 }
 
+/* =========================================================
+   Page-title (banner) consistente: texto blanco + overlay oscuro
+   Aplica solo a .page-title.dark-background (no a todo .dark-background)
+   ========================================================= */
+.page-title.dark-background {
+  --default-color: #ffffff;
+  --heading-color: #ffffff;
+  --contrast-color: #ffffff;
+}
+
+.page-title.dark-background:before {
+  background-color: rgba(0, 0, 0, 0.45);
+}
+
+.page-title.dark-background p,
+.page-title.dark-background .breadcrumbs ol,
+.page-title.dark-background .breadcrumbs ol li,
+.page-title.dark-background .breadcrumbs ol li + li::before,
+.page-title.dark-background .breadcrumbs ol a {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.page-title.dark-background .breadcrumbs ol a:hover {
+  color: #ffffff !important;
+}
 
