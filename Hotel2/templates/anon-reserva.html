@@ -307,6 +307,54 @@
   const FALLBACK_IMG = "{{ url_for('static', filename='assets/img/hotel/room-1.jpg') }}";
   const VAT_FALLBACK = 0.13;
 
+  function _pad2(n) { return String(n).padStart(2, "0"); }
+
+function _isoLocalDate(d) {
+  // YYYY-MM-DD en hora local (evita problemas de zona horaria con toISOString)
+  return `${d.getFullYear()}-${_pad2(d.getMonth() + 1)}-${_pad2(d.getDate())}`;
+}
+
+function _addDaysISO(iso, days) {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return _isoLocalDate(d);
+}
+
+function initDateLimits() {
+  const todayISO = _isoLocalDate(new Date());
+
+  // Check-in: desde hoy en adelante
+  checkin.min = todayISO;
+  if (!checkin.value || checkin.value < todayISO) {
+    checkin.value = todayISO;
+  }
+
+  // Check-out: mínimo 1 noche (checkin + 1 día)
+  const ensureCheckoutMin = () => {
+    const ci = checkin.value;
+    const minCO = _addDaysISO(ci, 1);
+    checkout.min = minCO;
+
+    if (!checkout.value || checkout.value < minCO) {
+      checkout.value = minCO;
+    }
+  };
+
+  ensureCheckoutMin();
+
+  checkin.addEventListener("change", () => {
+    if (checkin.value < checkin.min) checkin.value = checkin.min;
+    ensureCheckoutMin();
+  });
+
+  checkout.addEventListener("change", () => {
+    if (checkout.value && checkout.min && checkout.value < checkout.min) {
+      checkout.value = checkout.min;
+    }
+  });
+}
+
+
   const money = (n) =>
     new Intl.NumberFormat("es-CR", { style:"currency", currency:"CRC", minimumFractionDigits: 2 })
       .format(Number(n || 0));
@@ -367,19 +415,50 @@
   btnCopySinpeInline.addEventListener("click", () => copyText(state.sinpe.number));
   btnCopySinpeModal.addEventListener("click", () => copyText(state.sinpe.number));
 
-  function ensureTiposFromRooms(rooms){
-    const seen = new Set();
+  function ensureTiposFromRooms(rooms) {
     const current = new Set([...tipo.querySelectorAll("option")].map(o => o.value));
-    rooms.forEach(r => {
-      const t = (r.tipo || "").trim();
-      if(!t || seen.has(t) || current.has(t)) return;
-      seen.add(t);
+  
+    (rooms || []).forEach(r => {
+      const t = (r && r.tipo != null) ? String(r.tipo).trim() : "";
+      if (!t) return;
+      if (current.has(t)) return;
+  
       const opt = document.createElement("option");
       opt.value = t;
       opt.textContent = t;
       tipo.appendChild(opt);
+      current.add(t);
     });
   }
+
+  async function loadRoomTypes() {
+    try {
+      const resp = await fetch("/api/public/room-types", {
+        headers: { "Accept": "application/json" }
+      });
+  
+      const data = await resp.json().catch(() => null);
+      if (!data || !data.ok || !Array.isArray(data.items)) return;
+  
+      const current = new Set([...tipo.querySelectorAll("option")].map(o => o.value));
+  
+      data.items.forEach(raw => {
+        const t = (raw != null) ? String(raw).trim() : "";
+        if (!t) return;
+        if (current.has(t)) return;
+  
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        tipo.appendChild(opt);
+        current.add(t);
+      });
+    } catch (e) {
+      console.warn("[anon-reserva] loadRoomTypes error", e);
+    }
+  }
+  
+  
 
   function renderRooms(list){
     results.innerHTML = "";
@@ -606,7 +685,11 @@
   });
 
   // Init
+  initDateLimits();
+  loadRoomTypes();
   loadSinpe();
+  
+
 
 })();
 </script>
