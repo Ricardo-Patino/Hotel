@@ -291,10 +291,91 @@ endblock %}
     </div>
 
     <!-- Vista CALENDARIO -->
+    <!-- Vista CALENDARIO -->
     <div id="calendarView" style="display:none;">
-      <!-- (igual que tu bloque calendario; sin cambios) -->
-      <!-- pega aquí el calendario completo tal cual lo tenías -->
+      <div class="row g-3">
+    
+        <!-- Calendario -->
+        <div class="col-12 col-lg-8">
+          <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div class="fw-semibold">
+                <i class="bi bi-calendar3 me-2"></i>Calendario
+                <span class="badge bg-success ms-2" id="calModeBadge">Reservas</span>
+              </div>
+    
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+    
+                <!-- Modos -->
+                <div class="btn-group" role="group" aria-label="Modo calendario">
+                  <input type="radio" class="btn-check" name="calMode" id="calModeRes" autocomplete="off" checked>
+                  <label class="btn btn-outline-success btn-sm" for="calModeRes">
+                    <i class="bi bi-journal-text me-1"></i>Mostrar por reservas
+                  </label>
+    
+                  <input type="radio" class="btn-check" name="calMode" id="calModeDisp" autocomplete="off">
+                  <label class="btn btn-outline-success btn-sm" for="calModeDisp">
+                    <i class="bi bi-door-open me-1"></i>Mostrar por disponibilidad
+                  </label>
+                </div>
+    
+                <!-- Navegación -->
+                <button class="btn btn-outline-secondary btn-sm" id="calPrev" type="button" aria-label="Mes anterior">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+    
+                <div class="fw-semibold" id="calTitle">—</div>
+    
+                <button class="btn btn-outline-secondary btn-sm" id="calNext" type="button" aria-label="Mes siguiente">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+    
+                <button class="btn btn-success btn-sm" id="calToday" type="button">
+                  <i class="bi bi-geo-alt me-1"></i>Hoy
+                </button>
+              </div>
+            </div>
+    
+            <div class="card-body">
+              <!-- Loader calendario -->
+              <div class="d-flex align-items-center gap-2 mb-3" id="calLoading" style="display:none;" aria-live="polite">
+                <div class="spinner-border spinner-border-sm text-success" role="status" aria-label="Cargando"></div>
+                <div class="small soft">Cargando calendario…</div>
+              </div>
+    
+              <!-- Grid -->
+              <div class="cal-grid" id="calGrid" aria-label="Calendario">
+                <!-- IMPORTANTE: estos 7 headers deben existir (el JS los conserva y borra lo demás) -->
+                <div class="cal-head">Lun</div>
+                <div class="cal-head">Mar</div>
+                <div class="cal-head">Mié</div>
+                <div class="cal-head">Jue</div>
+                <div class="cal-head">Vie</div>
+                <div class="cal-head">Sáb</div>
+                <div class="cal-head">Dom</div>
+              </div>
+            </div>
+          </div>
+        </div>
+    
+        <!-- Detalle del día -->
+        <div class="col-12 col-lg-4">
+          <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0">
+              <div class="fw-semibold"><i class="bi bi-info-circle me-2"></i>Detalle del día</div>
+              <div class="small soft" id="daySubtitle">Selecciona un día del calendario.</div>
+            </div>
+    
+            <div class="card-body">
+              <div id="daySummary" class="mb-3"></div>
+              <div class="list-group" id="dayList"></div>
+            </div>
+          </div>
+        </div>
+    
+      </div>
     </div>
+    
 
   </div>
 </section>
@@ -479,45 +560,57 @@ endblock %}
 
 
   // Switch vista calendario (placeholder)
-  document.getElementById("toggleCalendar").addEventListener("change", async (e) => {
-    const on = e.target.checked;
-    document.getElementById("listView").style.display = on ? "none" : "block";
-    document.getElementById("calendarView").style.display = on ? "block" : "none";
+  // Helpers seguros (evita romper toda la página si falta algún nodo)
+  const $ = (id) => document.getElementById(id);
+  const on = (id, evt, fn) => {
+    const el = $(id);
+    if (el) el.addEventListener(evt, fn);
+  };
 
-    if (on) {
-      // carga calendario al entrar
+  // Switch vista calendario
+  on("toggleCalendar", "change", async (e) => {
+    const onView = e.target.checked;
+    const listView = $("listView");
+    const calView = $("calendarView");
+
+    if (listView) listView.style.display = onView ? "none" : "block";
+    if (calView) calView.style.display = onView ? "block" : "none";
+
+    if (onView) {
       try { await calendarEnsureInit(); } catch (err) { console.error(err); }
     }
   });
 
+  // Controles calendario
+  on("calModeRes", "change", () => setCalMode("reservas"));
+  on("calModeDisp", "change", () => setCalMode("disp"));
 
-  document.getElementById("calModeRes").addEventListener("change", () => setCalMode("reservas"));
-  document.getElementById("calModeDisp").addEventListener("change", () => setCalMode("disp"));
-
-  document.getElementById("calPrev").addEventListener("click", async () => {
+  on("calPrev", "click", async () => {
     __calMonth = new Date(__calMonth.getFullYear(), __calMonth.getMonth() - 1, 1);
     await calendarRefresh();
   });
-  document.getElementById("calNext").addEventListener("click", async () => {
+
+  on("calNext", "click", async () => {
     __calMonth = new Date(__calMonth.getFullYear(), __calMonth.getMonth() + 1, 1);
     await calendarRefresh();
   });
-  document.getElementById("calToday").addEventListener("click", async () => {
+
+  on("calToday", "click", async () => {
     const now = new Date();
     __calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     __calSelectedISO = toISODate(now);
     await calendarRefresh();
   });
 
+  // Filtros/listado
+  on("btnRefresh", "click", load);
 
-
-  document.getElementById("btnRefresh").addEventListener("click", load);
-
-  // Búsqueda con Enter
-  document.getElementById("q").addEventListener("keydown", (e) => {
+  on("q", "keydown", (e) => {
     if (e.key === "Enter") load();
   });
-  document.getElementById("estado").addEventListener("change", load);
+
+  on("estado", "change", load);
+
 
   // ======================
   // Paso 2 — Calendario
