@@ -1,433 +1,509 @@
-{% set title = "Nómina | Hotel Villa Grace" %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>{{ title }}</title>
+{% extends "base.html" %}
 
-  <!-- Favicon -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}Hotel Villa Grace | Nómina{% endblock %}
+{% block meta_description %}Gestione periodos y ejecute el cálculo de nómina quincenal del Hotel Villa Grace.{% endblock %}
+{% block body_class %}payroll-page{% endblock %}
+{% block nav_hrm %}active{% endblock %}
 
-  <!-- Tipografías -->
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+{% block content %}
 
-  <!-- CSS base -->
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-
-  <style>
-    :root{
-      --vg-green: #1c4b3c;
-      --vg-green-soft: #e0f2eb;
-      --vg-muted: #6c757d;
-    }
-
-    body{
-      font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background-color:#f5f6f7;
-      color:#212529;
-    }
-
-    /* wrapper central tipo card */
-    .hrm-wrapper{
-      background:#ffffff;
-      border-radius:1.5rem;
-      padding:1.75rem;
-      border:1px solid #edf1f4;
-      box-shadow:0 12px 30px rgba(15,34,58,0.08);
-    }
-
-    .hrm-header{
-      display:flex;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:space-between;
-      gap:.75rem;
-      margin-bottom:1.5rem;
-    }
-
-    .hrm-title{
-      display:flex;
-      align-items:center;
-      gap:.75rem;
-    }
-
-    .hrm-title-icon{
-      width:42px;
-      height:42px;
-      border-radius:999px;
-      background:var(--vg-green-soft);
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      color:var(--vg-green);
-    }
-
-    .hrm-title h2{
-      margin:0;
-      font-size:1.6rem;
-      font-weight:600;
-      color:#12212b;
-    }
-
-    .hrm-subtitle{
-      margin:0;
-      font-size:.9rem;
-      color:var(--vg-muted);
-    }
-
-    /* Cards formularios */
-    .vg-card{
-      border-radius:1.2rem;
-      border:1px solid #edf1f4;
-      background:#ffffff;
-      box-shadow:0 10px 28px rgba(15,34,58,0.08);
-    }
-
-    .vg-card h5{
-      font-size:1.05rem;
-      font-weight:600;
-      color:#12212b;
-    }
-
-    .vg-card small{
-      color:var(--vg-muted);
-    }
-
-    .form-control,
-    .form-select{
-      background-color:#ffffff;
-      border-radius:.75rem;
-      border:1px solid #dfe4ea;
-      color:#495057;
-      font-size:.86rem;
-    }
-
-    .form-control::placeholder{ color:#adb5bd; }
-
-    .form-control:focus,
-    .form-select:focus{
-      border-color:var(--vg-green);
-      box-shadow:0 0 0 .15rem rgba(28,75,60,.18);
-      background-color:#ffffff;
-      color:#212529;
-    }
-
-    .btn-primary{
-      background:var(--vg-green);
-      border:none;
-      color:#ffffff;
-      font-weight:600;
-      border-radius:999px;
-      padding-inline:1.4rem;
-    }
-
-    .btn-primary:hover{
-      filter:brightness(1.05);
-      color:#ffffff;
-    }
-
-    .btn-success{
-      border-radius:999px;
-      font-weight:600;
-    }
-
-    /* Tabla periodos */
-    .table-wrapper{
-      border-radius:1.1rem;
-      border:1px solid #edf1f4;
-      background:#ffffff;
-      overflow:hidden;
-      box-shadow:0 10px 26px rgba(15,34,58,0.08);
-    }
-
-    .table{
-      margin-bottom:0;
-      color:#212529;
-      font-size:.86rem;
-    }
-
-    .table thead{
-      background:#f7fafc;
-    }
-
-    .table thead th{
-      border-bottom:none;
-      font-weight:500;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      font-size:.75rem;
-      color:#4a5568;
-    }
-
-    .table tbody tr{
-      border-color:#edf1f4;
-    }
-
-    .badge-estado{
-      padding:.15rem .7rem;
-      border-radius:999px;
-      font-size:.72rem;
-      letter-spacing:.06em;
-      text-transform:uppercase;
-    }
-
-    .badge-estado.ACTIVO,
-    .badge-estado.CERRADO{
-      background:var(--vg-green-soft);
-      color:var(--vg-green);
-      border:1px solid #a3d4c4;
-    }
-
-    .badge-estado.ABIERTO,
-    .badge-estado.PENDIENTE{
-      background:#fff3cd;
-      color:#856404;
-      border:1px solid #ffe49b;
-    }
-
-    .badge-estado.CANCELADO{
-      background:#fde4e5;
-      color:#b3261e;
-      border:1px solid #f5b5ba;
-    }
-
-    hr{ border-color:#edf1f4; }
-
-    @media (max-width:768px){
-      .hrm-wrapper{ padding:1.25rem; border-radius:1.2rem; }
-      .hrm-header{ align-items:flex-start; }
-      .hrm-title h2{ font-size:1.3rem; }
-    }
-  </style>
-</head>
-<body>
-
-<!-- HEADER VERDE (igual al resto del sitio) -->
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="/">Inicio</a></li>
-        <li><a href="/grr">Reservas</a></li>
-        <li><a href="/fin">Finanzas</a></li>
-        <li><a href="/hrm/empleados-ui">Colaboradores</a></li>
-        <li><a href="/hrm/mis-horas">Mis horas</a></li>
-        <li><a href="/hrm" class="active">RRHH</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-    </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="/grr">Reservar</a>
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image: url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Nómina quincenal</h1>
+    <p>Gestione periodos y ejecute el cálculo de nómina del Hotel Villa Grace.</p>
   </div>
-</header>
+</div>
 
-<main class="main">
-  <!-- BANDA CON IMAGEN (mismo estilo que RRHH) -->
-  <div class="page-title dark-background"
-       data-aos="fade"
-       style="
-         background-image:url('https://images.pexels.com/photos/1181562/pexels-photo-1181562.jpeg?auto=compress&cs=tinysrgb&w=1600');
-         background-size: cover;
-         background-position: center 25%;
-       ">
-    <div class="container position-relative">
-      <h1>Nómina quincenal</h1>
-      <p>Gestione periodos y ejecute el cálculo de nómina del Hotel Villa Grace.</p>
-      <nav class="breadcrumbs">
-        <ol>
-          <li><a href="/">Inicio</a></li>
-          <li><a href="/hrm">RRHH</a></li>
-          <li class="current">Nómina</li>
-        </ol>
-      </nav>
-    </div>
-  </div>
+<section id="payroll" class="rooms section light-background">
+  <div class="container" data-aos="fade-up">
+    <div class="row g-4">
 
-  <section class="section">
-    <div class="container" data-aos="fade-up">
-      <div class="hrm-wrapper">
+      <!-- LEFT PANEL -->
+      <div class="col-lg-4">
+        <div class="filters-wrapper">
 
-        <!-- Encabezado interno -->
-        <div class="hrm-header">
-          <div class="hrm-title">
-            <span class="hrm-title-icon">
-              <i class="bi bi-cash-stack"></i>
-            </span>
-            <div>
-              <h2>Nómina quincenal</h2>
-              <p class="hrm-subtitle">
-                Defina el periodo, quincena y rango de fechas, y luego ejecute el cálculo de nómina.
-              </p>
+          <div class="filter-card shadow-sm">
+            <h3 class="filter-title">
+              <i class="bi bi-cash-stack me-2"></i>Nómina
+            </h3>
+
+            <div class="filter-group">
+              <label class="filter-label">Periodo</label>
+              <input id="pk" class="form-control" placeholder="2026-02">
             </div>
-          </div>
-        </div>
 
-        <!-- Formulario de creación de periodo -->
-        <div class="card vg-card p-3 p-md-4 mb-4">
-          <h5 class="mb-3">
-            <i class="bi bi-calendar-plus me-1"></i>
-            Nuevo periodo de nómina
-          </h5>
-          <small class="d-block mb-3">
-            Registre un nuevo periodo (año-mes y quincena) indicando el rango de fechas que corresponde.
-          </small>
-
-          <div class="row g-2 align-items-end">
-            <div class="col-md-3">
-              <label class="form-label">Periodo (YYYY-MM)</label>
-              <input id="pk" class="form-control" placeholder="2025-11">
-            </div>
-            <div class="col-md-2">
-              <label class="form-label">Quincena</label>
+            <div class="filter-group mt-3">
+              <label class="filter-label">Quincena</label>
               <select id="q" class="form-select">
                 <option>Q1</option>
                 <option>Q2</option>
               </select>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Desde</label>
-              <input id="d" type="date" class="form-control">
+
+            <div class="row g-2 mt-1">
+              <div class="col-6">
+                <label class="filter-label">Desde</label>
+                <input id="d" type="date" class="form-control">
+              </div>
+              <div class="col-6">
+                <label class="filter-label">Hasta</label>
+                <input id="h" type="date" class="form-control">
+              </div>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Hasta</label>
-              <input id="h" type="date" class="form-control">
+
+            <button id="btnNew" class="btn btn-success w-100 rounded-pill mt-4">
+              Crear periodo
+            </button>
+
+            <hr class="my-4">
+
+            <h4 class="stats-title mb-2">Periodo seleccionado</h4>
+
+            <div class="stats-item">
+              <span>Detalle</span>
+              <strong id="selText">Ninguno</strong>
             </div>
-            <div class="col-md-1 text-end">
-              <button id="btnNew" class="btn btn-primary">
-                <i class="bi bi-plus-circle"></i>
+
+            <div class="stats-item">
+              <span>Estado</span>
+              <strong>
+                <span id="selBadge" class="badge-estado PENDIENTE" style="display:none;"></span>
+              </strong>
+            </div>
+
+            <div class="d-grid gap-2 mt-3">
+
+              <button id="btnCalc" class="btn btn-success rounded-pill" disabled>
+                Calcular nómina
               </button>
+
+              <!-- 🔥 RECALCULAR -->
+              <button id="btnRecalc" class="btn btn-warning rounded-pill" disabled>
+                Recalcular nómina
+              </button>
+
+              <button id="btnRefresh" class="btn btn-outline-secondary rounded-pill" disabled>
+                Ver nómina
+              </button>
+
             </div>
           </div>
-        </div>
 
-        <!-- Tabla de periodos -->
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <div>
-            <h5 class="mb-0">Periodos existentes</h5>
-            <small class="text-muted">Consulte el estado de los periodos registrados.</small>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="col-lg-8">
+
+        <div class="room-card modern-room-card shadow-sm mb-4">
+          <div class="room-content p-4">
+
+            <h4 class="room-title mb-3">Periodos existentes</h4>
+
+            <div class="table-responsive table-wrapper">
+              <table class="table table-sm align-middle" id="tb">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Periodo</th>
+                    <th>Q</th>
+                    <th>Desde</th>
+                    <th>Hasta</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for p in periods %}
+                  <tr data-id="{{p.Id}}" data-key="{{p.Periodo_Key}}" data-q="{{p.Quincena}}">
+                    <td>{{p.Id}}</td>
+                    <td>{{p.Periodo_Key}}</td>
+                    <td>{{p.Quincena}}</td>
+                    <td>{{p.Fecha_Desde}}</td>
+                    <td>{{p.Fecha_Hasta}}</td>
+                    <td>
+                      <span class="badge-estado {{p.Estado}}">
+                        {{p.Estado}}
+                      </span>
+                    </td>
+                    <td class="text-end">
+                      <button class="btn btn-outline-secondary btn-sm btnView">
+                        Ver
+                      </button>
+                    </td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="7" class="text-center text-muted py-3">No hay periodos.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
           </div>
-          <button id="btnCalc" class="btn btn-success">
-            <i class="bi bi-calculator"></i> Calcular nómina
-          </button>
         </div>
 
-        <div class="table-responsive table-wrapper mt-2">
-          <table class="table table-sm align-middle" id="tb">
-            <thead>
-              <tr>
-                <th>Id</th>
-                <th>Periodo</th>
-                <th>Q</th>
-                <th>Desde</th>
-                <th>Hasta</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for p in periods %}
-              <tr data-id="{{p.Id}}">
-                <td>{{p.Id}}</td>
-                <td>{{p.Periodo_Key}}</td>
-                <td>{{p.Quincena}}</td>
-                <td>{{p.Fecha_Desde}}</td>
-                <td>{{p.Fecha_Hasta}}</td>
-                <td>
-                  <span class="badge-estado {{ p.Estado }}">
-                    {{ p.Estado }}
-                  </span>
-                </td>
-              </tr>
-              {% else %}
-              <tr>
-                <td colspan="6" class="text-center text-muted py-3">
-                  No hay periodos de nómina registrados aún.
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="room-card modern-room-card shadow-sm">
+          <div class="room-content p-4">
+
+            <h4 class="room-title mb-3">Nómina</h4>
+
+            <div class="table-responsive table-wrapper">
+              <table class="table table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th>Colaborador</th>
+                    <th>Bruto</th>
+                    <th>Neto</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="payBody">
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-3">
+                      Seleccione un periodo
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
         </div>
 
       </div>
     </div>
-  </section>
-</main>
-
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center">
-    <div class="container">
-      © <strong><span>Hotel Villa Grace</span></strong>
-    </div>
   </div>
-</footer>
+</section>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-  <i class="bi bi-arrow-up-short"></i>
-</a>
-<div id="preloader"></div>
+{% endblock %}
 
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+{% block scripts %}
+{{ super() }}
+
+<!-- ✅ SweetAlert2 (bonito) -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<style>
+/* Mini tema Villa Grace para SweetAlert2 */
+:root{
+  --vg-green: #1c4b3c;
+  --vg-green-soft: #e0f2eb;
+}
+.swal2-popup.vg-swal{
+  border-radius: 1.25rem !important;
+  box-shadow: 0 20px 60px rgba(15,34,58,.18) !important;
+  border: 1px solid rgba(0,0,0,.06);
+}
+.swal2-title.vg-swal-title{
+  font-weight: 700 !important;
+  color: #12212b !important;
+}
+.swal2-html-container.vg-swal-text{
+  color: #475467 !important;
+}
+.swal2-confirm.vg-btn-confirm{
+  background: var(--vg-green) !important;
+  border-radius: 999px !important;
+  padding: .65rem 1.2rem !important;
+  font-weight: 700 !important;
+}
+.swal2-cancel.vg-btn-cancel{
+  background: #ffffff !important;
+  color: #344054 !important;
+  border: 1px solid rgba(0,0,0,.12) !important;
+  border-radius: 999px !important;
+  padding: .65rem 1.2rem !important;
+  font-weight: 700 !important;
+}
+</style>
 
 <script>
-  let selectedId = null;
+let selectedId = null;
+let selectedEstado = null;
 
-  document.querySelectorAll("#tb tbody tr").forEach((tr) => {
-    tr.onclick = () => {
-      document
-        .querySelectorAll("#tb tbody tr")
-        .forEach((r) => r.classList.remove("table-active"));
-      tr.classList.add("table-active");
-      selectedId = tr.dataset.id;
-    };
+const btnCalc = document.getElementById("btnCalc");
+const btnRecalc = document.getElementById("btnRecalc");
+const btnRefresh = document.getElementById("btnRefresh");
+
+function vgSwalBase(){
+  return {
+    customClass: {
+      popup: 'vg-swal',
+      title: 'vg-swal-title',
+      htmlContainer: 'vg-swal-text',
+      confirmButton: 'vg-btn-confirm',
+      cancelButton: 'vg-btn-cancel'
+    },
+    buttonsStyling: false
+  };
+}
+
+function moneyCR(n){
+  const x = Number(n ?? 0);
+  return x.toLocaleString('es-CR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function setButtons(){
+  btnCalc.disabled = !(selectedEstado === "ABIERTO");
+  btnRecalc.disabled = !(selectedEstado === "CALCULADO");
+  btnRefresh.disabled = !selectedId;
+}
+
+document.querySelectorAll("#tb tbody tr").forEach((tr)=>{
+
+  tr.onclick = (ev)=>{
+
+    if (ev.target.closest(".btnView")) return;
+
+    selectedId = tr.dataset.id;
+    selectedEstado = tr.querySelector(".badge-estado").innerText.trim();
+
+    document.getElementById("selText").innerText =
+      (tr.dataset.key || "") + " - " + (tr.dataset.q || "");
+
+    const badge = document.getElementById("selBadge");
+    badge.innerText = selectedEstado;
+    badge.className = "badge-estado " + selectedEstado;
+    badge.style.display = "inline-flex";
+
+    setButtons();
+  }
+
+});
+
+/* Botón Ver de la fila */
+document.querySelectorAll(".btnView").forEach(btn=>{
+  btn.onclick = (ev)=>{
+    const tr = ev.target.closest("tr");
+    tr.click();
+    btnRefresh.click();
+  };
+});
+
+/* ✅ Crear periodo */
+document.getElementById("btnNew").onclick = async ()=>{
+
+  const body = {
+    periodo_key: document.getElementById("pk").value,
+    quincena: document.getElementById("q").value,
+    desde: document.getElementById("d").value,
+    hasta: document.getElementById("h").value,
+  };
+
+  if(!body.periodo_key || !body.desde || !body.hasta){
+    await Swal.fire({
+      ...vgSwalBase(),
+      icon: "warning",
+      title: "Faltan datos",
+      text: "Complete Periodo, Desde y Hasta para crear el periodo."
+    });
+    return;
+  }
+
+  Swal.fire({
+    ...vgSwalBase(),
+    title: "Creando periodo...",
+    allowOutsideClick: false,
+    didOpen: ()=> Swal.showLoading()
   });
 
-  document.getElementById("btnNew").onclick = async () => {
-    const body = {
-      periodo_key: document.getElementById("pk").value,
-      quincena: document.getElementById("q").value,
-      desde: document.getElementById("d").value,
-      hasta: document.getElementById("h").value,
-    };
+  const res = await fetch('{{ url_for("hrm.create_period") }}', {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
 
-    await fetch('{{ url_for("hrm.create_period") }}', {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+  if(!res.ok){
+    Swal.close();
+    await Swal.fire({
+      ...vgSwalBase(),
+      icon:"error",
+      title:"Error",
+      text:"No se pudo crear el periodo."
     });
+    return;
+  }
 
-    location.reload();
-  };
+  Swal.close();
+  await Swal.fire({
+    ...vgSwalBase(),
+    icon:"success",
+    title:"Periodo creado",
+    text:"Se creó el periodo correctamente."
+  });
 
-  document.getElementById("btnCalc").onclick = async () => {
-    if (!selectedId) {
-      alert("Seleccione un periodo");
-      return;
-    }
+  location.reload();
+};
 
-    await fetch('{{ url_for("hrm.payroll_generate") }}', {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ period_id: parseInt(selectedId) }),
+/* ✅ Calcular normal */
+btnCalc.onclick = async ()=>{
+
+  if(!selectedId){
+    await Swal.fire({ ...vgSwalBase(), icon:"warning", title:"Seleccione un periodo", text:"Primero seleccione un periodo." });
+    return;
+  }
+
+  Swal.fire({
+    ...vgSwalBase(),
+    title: "Generando nómina...",
+    text: "Esto puede tardar unos segundos.",
+    allowOutsideClick: false,
+    didOpen: ()=> Swal.showLoading()
+  });
+
+  const res = await fetch("/hrm/payroll/generate",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ period_id: Number(selectedId) })
+  });
+
+  const data = await res.json().catch(()=> ({}));
+
+  Swal.close();
+
+  if(!res.ok || !data.ok){
+    await Swal.fire({
+      ...vgSwalBase(),
+      icon:"error",
+      title:"No se pudo calcular",
+      text: data.error || "Ocurrió un error al generar la nómina."
     });
+    return;
+  }
 
-    alert("Nómina calculada");
-  };
+  await Swal.fire({
+    ...vgSwalBase(),
+    icon:"success",
+    title:"Nómina calculada",
+    text:"La nómina se generó correctamente."
+  });
+
+  location.reload();
+};
+
+/* ✅ Recalcular (force=true) */
+btnRecalc.onclick = async ()=>{
+
+  if(!selectedId) return;
+
+  const ask = await Swal.fire({
+    ...vgSwalBase(),
+    icon: "warning",
+    title: "Recalcular nómina",
+    html: `
+      <div style="text-align:left">
+        Esto hará lo siguiente:
+        <ul style="margin:10px 0 0 18px;">
+          <li>Eliminar la nómina calculada del periodo</li>
+          <li>Volver a generar la nómina con datos actuales</li>
+        </ul>
+        ¿Desea continuar?
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: "Sí, recalcular",
+    cancelButtonText: "Cancelar"
+  });
+
+  if(!ask.isConfirmed) return;
+
+  Swal.fire({
+    ...vgSwalBase(),
+    title: "Recalculando...",
+    allowOutsideClick: false,
+    didOpen: ()=> Swal.showLoading()
+  });
+
+  const res = await fetch("/hrm/payroll/generate",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ period_id: Number(selectedId), force:true })
+  });
+
+  const data = await res.json().catch(()=> ({}));
+
+  Swal.close();
+
+  if(!res.ok || !data.ok){
+    await Swal.fire({
+      ...vgSwalBase(),
+      icon:"error",
+      title:"No se pudo recalcular",
+      text: data.error || "Ocurrió un error al recalcular la nómina."
+    });
+    return;
+  }
+
+  await Swal.fire({
+    ...vgSwalBase(),
+    icon:"success",
+    title:"Nómina recalculada",
+    text:"Se recalculó correctamente."
+  });
+
+  location.reload();
+};
+
+/* ✅ Ver nómina */
+btnRefresh.onclick = async ()=>{
+
+  if(!selectedId) return;
+
+  Swal.fire({
+    ...vgSwalBase(),
+    title: "Cargando nómina...",
+    allowOutsideClick: false,
+    didOpen: ()=> Swal.showLoading()
+  });
+
+  const res = await fetch(`/hrm/payroll/period/${selectedId}/rows`);
+  const data = await res.json().catch(()=> ({}));
+
+  Swal.close();
+
+  if(!res.ok || !data.ok){
+    await Swal.fire({
+      ...vgSwalBase(),
+      icon:"error",
+      title:"Error",
+      text: data.error || "No se pudo cargar la nómina del periodo."
+    });
+    return;
+  }
+
+  const rows = data.data || [];
+  const body = document.getElementById("payBody");
+
+  if(rows.length === 0){
+    body.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">No hay registros para este periodo.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(r=>{
+    const nombre = `${r.Nombre || ""} ${r.Apellido || ""}`.trim() || ("Funcionario " + r.Codigo_Funcionario);
+    return `
+      <tr>
+        <td>${nombre}</td>
+        <td>${moneyCR(r.Bruto_Quincena)}</td>
+        <td><b>${moneyCR(r.Neto_Pagar)}</b></td>
+        <td class="text-end">
+          <a href="/hrm/payroll/${r.Id}/pdf" target="_blank"
+             class="btn btn-outline-secondary btn-sm rounded-pill">
+             <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+          </a>
+        </td>
+      </tr>
+    `;
+  }).join("");
+};
+
+setButtons();
 </script>
-</body>
-</html>
+
+{% endblock %}
+
+
 

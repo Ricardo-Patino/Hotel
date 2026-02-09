@@ -13,6 +13,23 @@ from models import Funcionario
 from models.usuario import Usuario
 from models.ausencia import Ausencia
 from models.amonestacion import Amonestacion
+from utils.decorators import require_user_id
+from decimal import Decimal
+
+from flask import send_file
+from io import BytesIO
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+
 
 
 #from models import HoraExtra
@@ -695,6 +712,7 @@ def _filtro_equipo_query():
     return q
 
 @hrm_bp.route("/val-horas", methods=["GET"])
+@require_user_id(1)
 def validar_horas_ui():
     """
     UI del jefe para validar/corregir horas.
@@ -795,6 +813,7 @@ def ajustar_marcacion(mid):
             horas_f = float(horas_payload)
             for name in ("Horas", "Total_Horas", "Horas_Regulares"):
                 _set_if_attr(m, name, horas_f)
+            _set_if_attr(m, "Horas_Validadas", horas_f)
             horas_calc = horas_f
         except Exception:
             pass
@@ -879,14 +898,16 @@ def aprobar_marcacion(mid):
     m = Marcacion.query.get(mid)
     if not m:
         return jsonify({"ok": False, "error": "Marcación no encontrada"}), 404
-
     _set_if_attr(m, "Estado", "Aprobado")
-    obs = payload.get("Observacion")
-    if obs is not None:
-        _set_if_attr(m, "Observacion", obs)
-        _set_if_attr(m, "Observaciones", obs)
+
+    if getattr(m, "Horas_Validadas", None) is None:
+        hv = _horas_val(m)
+        if hv is not None:
+            _set_if_attr(m, "Horas_Validadas", hv)
+
     _set_if_attr(m, "Validado_Por", _registrado_por())
     db.session.commit()
+
     return jsonify({"ok": True})
 
 @hrm_bp.route("/marcaciones/<int:mid>/rechazar", methods=["PATCH"])
@@ -1069,7 +1090,7 @@ def save_social():
       VALUES (:v, :ccss, :ivm, :bp, :renta, 1)
       ON DUPLICATE KEY UPDATE CCSS_Pct=:ccss, IVM_Pct=:ivm, BP_Pct=:bp, Renta_Pct=:renta, Activa=1
     """, v=p.get("vigente_desde", str(date.today().replace(day=1))),
-         ccss=p.get("ccss",10.67), ivm=p.get("ivm",2.67), bp=p.get("bp",1.0), renta=p.get("renta",10.0))
+         ccss=p.get("ccss",5.50), ivm=p.get("ivm",2.67), bp=p.get("bp",1.0), renta=p.get("renta",10.0))
     return jsonify({"ok": True})
 
 # =============== HRM-08-008 ===============
@@ -1121,108 +1142,812 @@ def create_period():
     """, pk=p["periodo_key"], q=p["quincena"], d=p["desde"], h=p["hasta"])
     return jsonify({"ok": True})
 
+# =============================
+# Helpers renta (CR, salario 2026)
+# =============================
+
+def _d(x) -> Decimal:
+    """Decimal seguro"""
+    if x is None:
+        return Decimal("0")
+    try:
+        return Decimal(str(x))
+    except Exception:
+        return Decimal("0")
+
+def _get_int(dct, *keys, default=0) -> int:
+    for k in keys:
+        if k in dct and dct[k] is not None and str(dct[k]) != "":
+            try:
+                return int(dct[k])
+            except Exception:
+                pass
+    return default
+
+def _get_bool(dct, *keys, default=False) -> bool:
+    for k in keys:
+        if k in dct and dct[k] is not None:
+            v = dct[k]
+            if isinstance(v, bool):
+                return v
+            s = str(v).strip().lower()
+            if s in ("1", "true", "t", "si", "sí", "yes", "y"):
+                return True
+            if s in ("0", "false", "f", "no", "n"):
+                return False
+    return default
+
+def calc_renta_salario_mensual_2026(base_gravable_mensual: Decimal,
+                                   hijos: int = 0,
+                                   conyuge: bool = False) -> Decimal:
+    """
+    Impuesto al salario CR (mensual) por tramos 2026.
+    Tramos (mensual):
+      - Hasta 918,000: 0%
+      - 918,000 a 1,347,000: 10%
+      - 1,347,000 a 2,364,000: 15%
+      - 2,364,000 a 4,727,000: 20%
+      - Exceso de 4,727,000: 25%
+    Créditos (mensual): 1,710 por hijo; 2,590 por cónyuge.
+    """
+    x = base_gravable_mensual
+    if x <= 0:
+        return Decimal("0.00")
+
+    # Límites 2026 (CRC)
+    t0 = Decimal("918000")
+    t1 = Decimal("1347000")
+    t2 = Decimal("2364000")
+    t3 = Decimal("4727000")
+
+    impuesto = Decimal("0")
+
+    # tramo 10%
+    if x > t0:
+        base = min(x, t1) - t0
+        if base > 0:
+            impuesto += base * Decimal("0.10")
+
+    # tramo 15%
+    if x > t1:
+        base = min(x, t2) - t1
+        if base > 0:
+            impuesto += base * Decimal("0.15")
+
+    # tramo 20%
+    if x > t2:
+        base = min(x, t3) - t2
+        if base > 0:
+            impuesto += base * Decimal("0.20")
+
+    # tramo 25%
+    if x > t3:
+        base = x - t3
+        if base > 0:
+            impuesto += base * Decimal("0.25")
+
+    # créditos fiscales (mensual)
+    cred_hijo = Decimal("1710")   # por hijo
+    cred_cony = Decimal("2590")   # por cónyuge
+
+    creditos = (Decimal(hijos) * cred_hijo) + (cred_cony if conyuge else Decimal("0"))
+
+    impuesto = impuesto - creditos
+    if impuesto < 0:
+        impuesto = Decimal("0")
+
+    return impuesto.quantize(Decimal("0.01"))
+
+
+from flask import request, jsonify
+from decimal import Decimal
+from datetime import date
+
+# ==========================================================
+# Helpers seguros
+# ==========================================================
+def _get_int(row, *keys, default=0):
+    for k in keys:
+        if k in row and row[k] is not None and str(row[k]).strip() != "":
+            try:
+                return int(row[k])
+            except Exception:
+                pass
+    return default
+
+def _get_bool(row, *keys, default=False):
+    for k in keys:
+        if k in row and row[k] is not None:
+            v = row[k]
+            if isinstance(v, bool):
+                return v
+            s = str(v).strip().lower()
+            if s in ("1", "true", "t", "si", "sí", "yes", "y"):
+                return True
+            if s in ("0", "false", "f", "no", "n"):
+                return False
+    return default
+
+def _safe_decimal(x, default="0.00"):
+    try:
+        if x is None or x == "":
+            return Decimal(default)
+        return Decimal(str(x))
+    except Exception:
+        return Decimal(default)
+
+# ==========================================================
+# Renta por tramos (motor genérico)
+# Espera tramos con: Desde, Hasta (nullable), Tarifa_Pct
+# ==========================================================
+def calc_renta_por_tramos(base_m, tramos):
+    base_m = _safe_decimal(base_m)
+    impuesto = Decimal("0.00")
+
+    for t in tramos:
+        desde = _safe_decimal(t.get("Desde", 0))
+        hasta_raw = t.get("Hasta", None)
+        tasa = _safe_decimal(t.get("Tarifa_Pct", 0)) / Decimal("100")
+
+        if base_m <= desde:
+            continue
+
+        if hasta_raw is None or str(hasta_raw).strip() == "":
+            gravable = base_m - desde
+        else:
+            hasta = _safe_decimal(hasta_raw)
+            gravable = min(base_m, hasta) - desde
+
+        if gravable > 0:
+            impuesto += (gravable * tasa)
+
+    return impuesto.quantize(Decimal("0.01"))
+
+# ==========================================================
+# Renta mensual (CR) - por tramos desde DB (recomendado)
+# - Si NO hay tabla o no hay tramos vigentes -> retorna 0
+#   y luego el endpoint puede aplicar fallback % si querés.
+# ==========================================================
+def calc_renta_salario_mensual_2026(base_gravable_m, hijos=0, conyuge=False, vigencia=None):
+    vig = vigencia or date.today()
+
+    # 1) Intentar cargar tramos desde una tabla (si existe)
+    tramos = []
+    try:
+        # 👉 Si NO tenés esta tabla, no pasa nada: cae al except.
+        # Estructura sugerida:
+        # HRM_RentaBracket(Desde, Hasta, Tarifa_Pct, Vigente_Desde, Vigente_Hasta)
+        tramos = q("""
+            SELECT Desde, Hasta, Tarifa_Pct
+            FROM HRM_RentaBracket
+            WHERE (Vigente_Desde IS NULL OR Vigente_Desde <= :v)
+              AND (Vigente_Hasta IS NULL OR Vigente_Hasta >= :v)
+            ORDER BY Desde ASC
+        """, v=vig) or []
+    except Exception:
+        tramos = []
+
+    impuesto = Decimal("0.00")
+    if tramos:
+        impuesto = calc_renta_por_tramos(base_gravable_m, tramos)
+
+    # 2) Créditos (si en tu sistema NO los manejás, dejalos en 0)
+    # Si algún día los querés: podés leerlos de una tabla de config.
+    credito_hijo = Decimal("0.00")
+    credito_conyuge = Decimal("0.00")
+
+    impuesto = impuesto - (credito_hijo * Decimal(int(hijos or 0))) - (credito_conyuge if conyuge else Decimal("0.00"))
+    if impuesto < 0:
+        impuesto = Decimal("0.00")
+
+    return impuesto.quantize(Decimal("0.01"))
+
+
+# ==========================================================
+# ENDPOINT: Generar nómina (con recalcular force)
+# Body:
+#  { "period_id": 123, "force": true/false }
+# ==========================================================
 @hrm_bp.post("/payroll/generate")
 def payroll_generate():
     p = request.get_json(silent=True) or {}
-    period = q("SELECT * FROM HRM_PayrollPeriod WHERE Id=:id", id=p["period_id"])[0]
-    # Config social vigente (la última activa por fecha)
-    cfg = q("""
-      SELECT * FROM HRM_ConfigSocial WHERE Activa=1 AND Vigente_Desde<=:h
-      ORDER BY Vigente_Desde DESC LIMIT 1
-    """, h=period["Fecha_Hasta"])[0]
-    funcs = q("SELECT * FROM Funcionario WHERE Estado_Empleado='Activo'")
+
+    if "period_id" not in p:
+        return jsonify({"ok": False, "error": "Falta period_id"}), 400
+
+    period_id = p["period_id"]
+    force = bool(p.get("force", False))
+
+    period_rows = q(
+        "SELECT * FROM HRM_PayrollPeriod WHERE Id=:id",
+        id=period_id
+    )
+    if not period_rows:
+        return jsonify({"ok": False, "error": "Periodo no existe"}), 404
+
+    period = period_rows[0]
+    estado = (period.get("Estado") or "").upper()
+
+    # ---- Reglas de seguridad ----
+    if estado in ("PAGADO", "CERRADO"):
+        return jsonify({"ok": False, "error": f"No se puede recalcular: periodo {estado}."}), 409
+
+    # Si NO es force, solo permitir calcular cuando está ABIERTO
+    if (not force) and estado != "ABIERTO":
+        return jsonify({
+            "ok": False,
+            "error": f"El periodo debe estar ABIERTO para calcular. Estado actual: {estado}. "
+                     f"Use force=true para recalcular si está CALCULADO."
+        }), 409
+
+    # ---- Si force=true: borrar nómina previa del periodo ----
+    if force:
+        # Si existe HRM_PaymentRecord, borrarlo primero para no quedar colgando
+        try:
+            exec_("""
+                DELETE FROM HRM_PaymentRecord
+                WHERE Payroll_Id IN (SELECT Id FROM HRM_Payroll WHERE Period_Id = :pid)
+            """, pid=period_id)
+        except Exception:
+            pass
+
+        exec_("DELETE FROM HRM_Payroll WHERE Period_Id = :pid", pid=period_id)
+        exec_("UPDATE HRM_PayrollPeriod SET Estado='ABIERTO' WHERE Id=:pid", pid=period_id)
+
+        # recargar periodo
+        period = q("SELECT * FROM HRM_PayrollPeriod WHERE Id=:id", id=period_id)[0]
+
+    # Configuración social vigente
+    cfg_rows = q("""
+        SELECT *
+        FROM HRM_ConfigSocial
+        WHERE Activa = 1
+          AND Vigente_Desde <= :h
+        ORDER BY Vigente_Desde DESC
+        LIMIT 1
+    """, h=period["Fecha_Hasta"])
+    if not cfg_rows:
+        return jsonify({"ok": False, "error": "No hay configuración social vigente"}), 400
+
+    cfg = cfg_rows[0]
+
+    funcs = q("""
+        SELECT *
+        FROM Funcionario
+        WHERE Estado_Empleado = 'Activo'
+    """)
+
+    # -----------------------------
+    # Helper internos seguros (no rompen si campos no existen)
+    # -----------------------------
+    def _get_int(obj, *keys, default=0):
+        for k in keys:
+            if k in obj and obj[k] is not None and str(obj[k]).strip() != "":
+                try:
+                    return int(obj[k])
+                except Exception:
+                    pass
+        return int(default)
+
+    def _get_bool(obj, *keys, default=False):
+        for k in keys:
+            if k in obj and obj[k] is not None:
+                v = str(obj[k]).strip().lower()
+                if v in ("1", "true", "t", "si", "sí", "y", "yes"):
+                    return True
+                if v in ("0", "false", "f", "no", "n"):
+                    return False
+        return bool(default)
+
     for f in funcs:
-        base = float(f["Salario_Base_Mensual"] or 0)
-        bruto_q = round(base/2.0, 2)
 
-        # Ausencias dentro del periodo -> rebajo: diario = base/30, hora = diario/8
+        # =============================
+        # 1. HORAS APROBADAS (VISTA)
+        # =============================
+        horas_q = q("""
+            SELECT IFNULL(horas_aprobadas, 0) AS h
+            FROM vw_nomina_quincenal
+            WHERE Codigo_Funcionario = :f
+              AND periodo = :p
+              AND quincena = :q
+        """,
+        f=f["Codigo_Funcionario"],
+        p=period["Periodo_Key"],
+        q=period["Quincena"]
+        )
+
+        horas_aprobadas = float(horas_q[0]["h"]) if horas_q else 0.0
+
+        # =============================
+        # 2. SALARIO PROPORCIONAL
+        # =============================
+        base_dec = Decimal(f["Salario_Base_Mensual"] or 0)
+
+        salario_quincenal = base_dec / Decimal("2")
+        valor_hora = salario_quincenal / Decimal("92")
+
+        horas_dec = Decimal(str(horas_aprobadas))
+        bruto_q = (valor_hora * horas_dec).quantize(Decimal("0.01"))
+
+        # =============================
+        # 3. AUSENCIAS
+        # =============================
         aus = q("""
-          SELECT IFNULL(SUM(CASE WHEN a.Horas IS NULL OR a.Horas=0 THEN 1 ELSE 0 END),0) AS dias,
-                 IFNULL(SUM(CASE WHEN a.Horas IS NOT NULL AND a.Horas>0 THEN a.Horas ELSE 0 END),0) AS horas
-          FROM HRM_Absence a
-          WHERE a.Codigo_Funcionario=:f AND a.Fecha BETWEEN :d AND :h
-        """, f=f["Codigo_Funcionario"], d=period["Fecha_Desde"], h=period["Fecha_Hasta"])[0]
-        diario = base/30.0
-        por_hora = diario/8.0
-        reb_aus = round(aus["dias"]*diario + aus["horas"]*por_hora, 2)
+            SELECT
+                IFNULL(SUM(
+                    CASE
+                        WHEN a.Horas IS NULL OR a.Horas = 0 THEN 1
+                        ELSE 0
+                    END
+                ), 0) AS dias,
+                IFNULL(SUM(
+                    CASE
+                        WHEN a.Horas IS NOT NULL AND a.Horas > 0 THEN a.Horas
+                        ELSE 0
+                    END
+                ), 0) AS horas
+            FROM HRM_Absence a
+            WHERE a.Codigo_Funcionario = :f
+              AND a.Fecha BETWEEN :d AND :h
+        """,
+        f=f["Codigo_Funcionario"],
+        d=period["Fecha_Desde"],
+        h=period["Fecha_Hasta"]
+        )[0]
 
-        # Incapacidades -> rebajo porcentaje sobre días dentro del periodo (aprox mensual / 30)
+        base_dec = Decimal(f["Salario_Base_Mensual"] or 0)
+
+        diario = base_dec / Decimal("30")
+        por_hora = diario / Decimal("8")
+
+        dias_aus = Decimal(aus["dias"] or 0)
+        horas_aus = Decimal(aus["horas"] or 0)
+
+        reb_aus = (dias_aus * diario + horas_aus * por_hora).quantize(Decimal("0.01"))
+
+        # =============================
+        # 4. INCAPACIDADES
+        # =============================
         inc = q("""
-          SELECT IFNULL(SUM(DATEDIFF(LEAST(:h, Fecha_Hasta), GREATEST(:d, Fecha_Desde))+1),0) AS dias,
-                 IFNULL(MAX(Porcentaje_Rebajo),0) AS pct
-          FROM HRM_Incapacity
-          WHERE Codigo_Funcionario=:f AND Fecha_Hasta>=:d AND Fecha_Desde<=:h
-        """, f=f["Codigo_Funcionario"], d=period["Fecha_Desde"], h=period["Fecha_Hasta"])[0]
-        reb_inc = round((inc["dias"] or 0) * diario * (float(inc["pct"] or 0)/100.0), 2)
+            SELECT
+                IFNULL(SUM(
+                    DATEDIFF(
+                        LEAST(:h, Fecha_Hasta),
+                        GREATEST(:d, Fecha_Desde)
+                    ) + 1
+                ), 0) AS dias,
+                IFNULL(MAX(Porcentaje_Rebajo), 0) AS pct
+            FROM HRM_Incapacity
+            WHERE Codigo_Funcionario = :f
+              AND Fecha_Hasta >= :d
+              AND Fecha_Desde <= :h
+        """,
+        f=f["Codigo_Funcionario"],
+        d=period["Fecha_Desde"],
+        h=period["Fecha_Hasta"]
+        )[0]
 
-        # Cargas sociales (colaborador)
-        ccss = round(bruto_q * float(cfg["CCSS_Pct"])/100.0, 2)
-        ivm  = round(bruto_q * float(cfg["IVM_Pct"])/100.0, 2)
-        bp   = round(bruto_q * float(cfg["BP_Pct"])/100.0, 2)
+        dias_inc = Decimal(inc["dias"] or 0)
+        pct_inc  = Decimal(inc["pct"] or 0) / Decimal("100")
 
-        # Renta (simplificada)
-        renta = round(bruto_q * float(cfg["Renta_Pct"])/100.0, 2)
+        reb_inc = (dias_inc * diario * pct_inc).quantize(Decimal("0.01"))
 
-        # Deducciones voluntarias
-        vol = q("SELECT * FROM HRM_VoluntaryDed WHERE Codigo_Funcionario=:f AND Activa=1", f=f["Codigo_Funcionario"])
-        vol_total = 0.0
+        # =============================
+        # 5. CARGAS SOCIALES
+        # =============================
+        ccss_pct  = Decimal(cfg["CCSS_Pct"] or 0) / Decimal("100")
+        ivm_pct   = Decimal(cfg["IVM_Pct"] or 0) / Decimal("100")
+        bp_pct    = Decimal(cfg["BP_Pct"] or 0) / Decimal("100")
+
+        # Se mantiene lectura por compatibilidad (solo si usas PORCENTAJE)
+        renta_pct = Decimal(cfg.get("Renta_Pct", 0) or 0) / Decimal("100")
+
+        ccss  = (bruto_q * ccss_pct).quantize(Decimal("0.01"))
+        ivm   = (bruto_q * ivm_pct).quantize(Decimal("0.01"))
+        bp    = (bruto_q * bp_pct).quantize(Decimal("0.01"))
+
+        # =============================
+        # 5.1 RENTA (CONTROLADA: TRAMOS / PORCENTAJE / OFF)
+        # =============================
+        renta_mode = (cfg.get("Renta_Mode") or "TRAMOS").upper()  # TRAMOS | PORCENTAJE | OFF
+
+        if renta_mode in ("OFF", "NO", "NONE", "0"):
+            renta = Decimal("0.00")
+
+        elif renta_mode == "PORCENTAJE":
+            renta = (bruto_q * renta_pct).quantize(Decimal("0.01"))
+
+        else:
+            # TRAMOS (mensual) y prorrateo a quincena
+            hijos = _get_int(f, "Cantidad_Hijos", "Hijos", "Num_Hijos", default=0)
+            conyuge = _get_bool(f, "Tiene_Conyuge", "Conyuge", "TieneConyuge", default=False)
+
+            base_gravable_q = bruto_q - ccss - ivm - bp
+            if base_gravable_q < 0:
+                base_gravable_q = Decimal("0.00")
+
+            base_gravable_m = (base_gravable_q * Decimal("2")).quantize(Decimal("0.01"))
+
+            renta_m = calc_renta_salario_mensual_2026(
+                base_gravable_m,
+                hijos=hijos,
+                conyuge=conyuge,
+                vigencia=period["Fecha_Hasta"]
+            )
+            renta = (renta_m / Decimal("2")).quantize(Decimal("0.01"))
+
+        # ✅ IMPORTANTE:
+        # Eliminado el fallback que te rebajaba renta aunque por tramos diera 0:
+        # if renta == 0 and renta_pct > 0: ...
+
+        # =============================
+        # 6. DEDUCCIONES VOLUNTARIAS
+        # =============================
+        vol = q("""
+            SELECT *
+            FROM HRM_VoluntaryDed
+            WHERE Codigo_Funcionario = :f
+              AND Activa = 1
+        """, f=f["Codigo_Funcionario"])
+
+        vol_total = Decimal("0.00")
+
         for d in vol:
-            if d["Monto_Fijo"]:
-                vol_total += float(d["Monto_Fijo"])
-            elif d["Porcentaje"]:
-                vol_total += bruto_q * float(d["Porcentaje"])/100.0
-        vol_total = round(vol_total, 2)
+            if d.get("Monto_Fijo"):
+                vol_total += Decimal(d["Monto_Fijo"])
+            elif d.get("Porcentaje"):
+                pct = Decimal(d["Porcentaje"]) / Decimal("100")
+                vol_total += (bruto_q * pct)
 
-        neto = max(0.0, round(bruto_q - reb_aus - reb_inc - ccss - ivm - bp - renta - vol_total, 2))
+        vol_total = vol_total.quantize(Decimal("0.01"))
 
-        # UPSERT header
+        # =============================
+        # 7. NETO A PAGAR
+        # =============================
+        neto = (
+            bruto_q
+            - reb_aus
+            - reb_inc
+            - ccss
+            - ivm
+            - bp
+            - renta
+            - vol_total
+        )
+
+        if neto < 0:
+            neto = Decimal("0.00")
+
+        neto = neto.quantize(Decimal("0.01"))
+
+        # =============================
+        # 8. UPSERT NÓMINA
+        # =============================
         exec_("""
-          INSERT INTO HRM_Payroll (Period_Id, Codigo_Funcionario, Salario_Base_Mensual, Bruto_Quincena,
-                                   Rebajo_Ausencias, Rebajo_Incap, Deduccion_CCSS, Deduccion_IVM,
-                                   Deduccion_BP, Deduccion_Renta, Deduccion_Vol, Neto_Pagar)
-          VALUES (:pid,:f,:base,:b,:ra,:ri,:cc,:ivm,:bp,:r,:vol,:net)
-          ON DUPLICATE KEY UPDATE Salario_Base_Mensual=:base, Bruto_Quincena=:b,
-              Rebajo_Ausencias=:ra, Rebajo_Incap=:ri, Deduccion_CCSS=:cc, Deduccion_IVM=:ivm,
-              Deduccion_BP=:bp, Deduccion_Renta=:r, Deduccion_Vol=:vol, Neto_Pagar=:net
-        """, pid=period["Id"], f=f["Codigo_Funcionario"], base=base, b=bruto_q,
-             ra=reb_aus, ri=reb_inc, cc=ccss, ivm=ivm, bp=bp, r=renta, vol=vol_total, net=neto)
+            INSERT INTO HRM_Payroll (
+                Period_Id,
+                Codigo_Funcionario,
+                Salario_Base_Mensual,
+                Bruto_Quincena,
+                Rebajo_Ausencias,
+                Rebajo_Incap,
+                Deduccion_CCSS,
+                Deduccion_IVM,
+                Deduccion_BP,
+                Deduccion_Renta,
+                Deduccion_Vol,
+                Neto_Pagar
+            )
+            VALUES (
+                :pid, :f, :base, :b,
+                :ra, :ri, :cc, :ivm,
+                :bp, :r, :vol, :net
+            )
+            ON DUPLICATE KEY UPDATE
+                Salario_Base_Mensual = :base,
+                Bruto_Quincena       = :b,
+                Rebajo_Ausencias     = :ra,
+                Rebajo_Incap         = :ri,
+                Deduccion_CCSS       = :cc,
+                Deduccion_IVM        = :ivm,
+                Deduccion_BP         = :bp,
+                Deduccion_Renta      = :r,
+                Deduccion_Vol        = :vol,
+                Neto_Pagar           = :net
+        """,
+        pid=period["Id"],
+        f=f["Codigo_Funcionario"],
+        base=base_dec,
+        b=bruto_q,
+        ra=reb_aus,
+        ri=reb_inc,
+        cc=ccss,
+        ivm=ivm,
+        bp=bp,
+        r=renta,
+        vol=vol_total,
+        net=neto
+        )
 
-    exec_("UPDATE HRM_PayrollPeriod SET Estado='CALCULADO' WHERE Id=:id", id=period["Id"])
-    return jsonify({"ok": True})
+    exec_("""
+        UPDATE HRM_PayrollPeriod
+        SET Estado = 'CALCULADO'
+        WHERE Id = :id
+    """, id=period["Id"])
+
+    return jsonify({"ok": True, "recalculo": force})
+
 
 @hrm_bp.get("/payroll/<int:pay_id>/pdf")
 def payroll_pdf(pay_id):
-    row = q("""
-      SELECT p.*, f.Nombre, f.Apellido, f.Cedula, f.Departamento
-      FROM HRM_Payroll p JOIN Funcionario f ON f.Codigo_Funcionario=p.Codigo_Funcionario
-      WHERE p.Id=:id
-    """, id=pay_id)[0]
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.units import cm
+    # ----------------------------------------------------------
+    # 1) Cargar datos (incluye periodo para que el PDF sea completo)
+    # ----------------------------------------------------------
+    rows = q("""
+        SELECT
+            p.*,
+            f.Nombre, f.Apellido, f.Cedula, f.Departamento,
+            per.Periodo_Key, per.Quincena, per.Fecha_Desde, per.Fecha_Hasta, per.Estado AS Periodo_Estado
+        FROM HRM_Payroll p
+        JOIN Funcionario f ON f.Codigo_Funcionario = p.Codigo_Funcionario
+        JOIN HRM_PayrollPeriod per ON per.Id = p.Period_Id
+        WHERE p.Id = :id
+        LIMIT 1
+    """, id=pay_id)
+
+    if not rows:
+        return jsonify({"ok": False, "error": "Nómina no encontrada"}), 404
+
+    row = rows[0]
+
+    # ----------------------------------------------------------
+    # 2) Helpers de formato
+    # ----------------------------------------------------------
+    def _dec(x):
+        try:
+            if x is None or x == "":
+                return Decimal("0.00")
+            return Decimal(str(x))
+        except Exception:
+            return Decimal("0.00")
+
+    def money(x):
+        v = _dec(x).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return f"CRC {v:,.2f}"
+
+
+    def safe_str(x, default="-"):
+        return default if x is None or str(x).strip() == "" else str(x)
+
+    # Valores
+    salario_base = _dec(row.get("Salario_Base_Mensual"))
+    bruto        = _dec(row.get("Bruto_Quincena"))
+    reb_aus      = _dec(row.get("Rebajo_Ausencias"))
+    reb_inc      = _dec(row.get("Rebajo_Incap"))
+    d_ccss       = _dec(row.get("Deduccion_CCSS"))
+    d_ivm        = _dec(row.get("Deduccion_IVM"))
+    d_bp         = _dec(row.get("Deduccion_BP"))
+    d_renta      = _dec(row.get("Deduccion_Renta"))
+    d_vol        = _dec(row.get("Deduccion_Vol"))
+    neto         = _dec(row.get("Neto_Pagar"))
+
+    # Fechas / periodo
+    periodo_key = safe_str(row.get("Periodo_Key"))
+    quincena    = safe_str(row.get("Quincena"))
+    f_desde     = row.get("Fecha_Desde")
+    f_hasta     = row.get("Fecha_Hasta")
+    generado_en = row.get("Generado_En") or datetime.now()
+
+    # ----------------------------------------------------------
+    # 3) Estilos Villa Grace (A4)
+    # ----------------------------------------------------------
+    # Colores (ajustables)
+    VG_GREEN = colors.HexColor("#0F3D2E")   # verde profundo
+    VG_GOLD  = colors.HexColor("#C9A24D")   # dorado
+    VG_SOFT  = colors.HexColor("#F3F6F4")   # fondo suave
+    VG_GRAY  = colors.HexColor("#6B7280")   # gris texto
+
+    styles = getSampleStyleSheet()
+
+    title = ParagraphStyle(
+        "VGTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        textColor=VG_GREEN,
+        alignment=TA_LEFT,
+        spaceAfter=6
+    )
+
+    subtitle = ParagraphStyle(
+        "VGSub",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        textColor=VG_GRAY,
+        leading=13,
+        spaceAfter=10
+    )
+
+    label = ParagraphStyle(
+        "VGLabel",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=9,
+        textColor=VG_GREEN,
+        leading=12
+    )
+
+    normal = ParagraphStyle(
+        "VGNormal",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        textColor=colors.black,
+        leading=12
+    )
+
+    small = ParagraphStyle(
+        "VGSmall",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        textColor=VG_GRAY,
+        leading=11
+    )
+
+    right = ParagraphStyle(
+        "VGRight",
+        parent=normal,
+        alignment=TA_RIGHT
+    )
+
+    # ----------------------------------------------------------
+    # 4) Construcción del PDF (Platypus)
+    # ----------------------------------------------------------
     buf = BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    W,H = A4; y = H-2*cm
-    c.setFont("Helvetica-Bold",14); c.drawString(2*cm,y,"Comprobante de Pago — Hotel Villa Grace"); y-=0.8*cm
-    c.setFont("Helvetica",10)
-    c.drawString(2*cm,y,f"Funcionario: {row['Nombre']} {row['Apellido']}  |  Cédula: {row['Cedula']}  |  Depto: {row.get('Departamento','-')}"); y-=0.5*cm
-    c.drawString(2*cm,y,f"Periodo: {row['Period_Id']}  |  Generado: {row['Generado_En']}"); y-=0.8*cm
-    def line(t,v): 
-        nonlocal y; c.drawString(2*cm,y,t); c.drawRightString(W-2*cm,y,f"{v:,.2f}"); y-=0.4*cm
-    c.setFont("Helvetica-Bold",11); c.drawString(2*cm,y,"Resumen"); y-=0.5*cm
-    c.setFont("Helvetica",10)
-    line("Salario base mensual", row["Salario_Base_Mensual"])
-    line("Bruto quincena", row["Bruto_Quincena"])
-    line("Rebajo ausencias", -row["Rebajo_Ausencias"])
-    line("Rebajo incapacidades", -row["Rebajo_Incap"])
-    line("Deducción CCSS", -row["Deduccion_CCSS"])
-    line("Deducción IVM", -row["Deduccion_IVM"])
-    line("Deducción BP", -row["Deduccion_BP"])
-    line("Deducción Renta", -row["Deduccion_Renta"])
-    line("Deducciones voluntarias", -row["Deduccion_Vol"])
-    c.setFont("Helvetica-Bold",12); line("NETO A PAGAR", row["Neto_Pagar"])
-    c.showPage(); c.save(); buf.seek(0)
-    return send_file(buf, as_attachment=True, download_name=f"payslip_{pay_id}.pdf", mimetype="application/pdf")
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=2.0 * cm,
+        rightMargin=2.0 * cm,
+        topMargin=1.6 * cm,
+        bottomMargin=1.6 * cm
+    )
+
+    story = []
+
+    # Header “banda” (tabla con fondo verde)
+    header_tbl = Table(
+        [[
+            Paragraph("<b>Hotel Villa Grace</b><br/><font size=9>Comprobante de pago</font>", ParagraphStyle(
+                "HeaderLeft",
+                fontName="Helvetica-Bold",
+                fontSize=14,
+                textColor=colors.white,
+                leading=16
+            )),
+            Paragraph(
+                f"<font size=9>{safe_str(periodo_key)} · {safe_str(quincena)}</font><br/>"
+                f"<font size=8>Generado: {safe_str(generado_en)}</font>",
+                ParagraphStyle("HeaderRight", fontName="Helvetica", fontSize=9, textColor=colors.white, alignment=TA_RIGHT, leading=12)
+            )
+        ]],
+        colWidths=[11.5 * cm, 4.5 * cm]
+    )
+    header_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), VG_GREEN),
+        ("BOX", (0,0), (-1,-1), 0, VG_GREEN),
+        ("LEFTPADDING", (0,0), (-1,-1), 12),
+        ("RIGHTPADDING", (0,0), (-1,-1), 12),
+        ("TOPPADDING", (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+    ]))
+    story.append(header_tbl)
+    story.append(Spacer(1, 10))
+
+    # Línea dorada fina
+    story.append(HRFlowable(width="100%", thickness=2, color=VG_GOLD, spaceBefore=2, spaceAfter=10))
+
+    # Info colaborador / periodo
+    nombre_full = f"{safe_str(row.get('Nombre'))} {safe_str(row.get('Apellido'))}"
+    info_tbl = Table([
+        [Paragraph("Colaborador", label), Paragraph(nombre_full, normal),
+         Paragraph("Cédula", label), Paragraph(safe_str(row.get("Cedula")), normal)],
+        [Paragraph("Departamento", label), Paragraph(safe_str(row.get("Departamento")), normal),
+         Paragraph("Periodo", label), Paragraph(f"{safe_str(periodo_key)} / {safe_str(quincena)}", normal)],
+        [Paragraph("Rango", label), Paragraph(f"{safe_str(f_desde)} → {safe_str(f_hasta)}", normal),
+         Paragraph("Estado", label), Paragraph(safe_str(row.get("Periodo_Estado")), normal)],
+    ], colWidths=[2.6*cm, 6.4*cm, 2.1*cm, 4.9*cm])
+
+    info_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), VG_SOFT),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#D6E1DA")),
+        ("INNERGRID", (0,0), (-1,-1), 0.25, colors.HexColor("#D6E1DA")),
+        ("LEFTPADDING", (0,0), (-1,-1), 10),
+        ("RIGHTPADDING", (0,0), (-1,-1), 10),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+    ]))
+    story.append(info_tbl)
+    story.append(Spacer(1, 14))
+
+    story.append(Paragraph("Resumen de nómina", title))
+    story.append(Paragraph("Detalle de ingresos y deducciones aplicadas para esta quincena.", subtitle))
+
+    # Tabla de resumen
+    resumen = [
+        ["Concepto", "Monto"],
+        ["Salario base mensual", money(salario_base)],
+        ["Bruto quincena", money(bruto)],
+        ["Rebajo ausencias", f"- {money(reb_aus)}" if reb_aus > 0 else money(0)],
+        ["Rebajo incapacidades", f"- {money(reb_inc)}" if reb_inc > 0 else money(0)],
+        ["Deducción CCSS", f"- {money(d_ccss)}" if d_ccss > 0 else money(0)],
+        ["Deducción IVM", f"- {money(d_ivm)}" if d_ivm > 0 else money(0)],
+        ["Deducción BP", f"- {money(d_bp)}" if d_bp > 0 else money(0)],
+        ["Deducción Renta", f"- {money(d_renta)}" if d_renta > 0 else money(0)],
+        ["Deducciones voluntarias", f"- {money(d_vol)}" if d_vol > 0 else money(0)],
+    ]
+
+    t = Table(resumen, colWidths=[11.5*cm, 4.5*cm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), VG_GREEN),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE", (0,0), (-1,0), 10),
+        ("ALIGN", (1,1), (1,-1), "RIGHT"),
+        ("FONTNAME", (0,1), (-1,-1), "Helvetica"),
+        ("FONTSIZE", (0,1), (-1,-1), 9),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, VG_SOFT]),
+        ("INNERGRID", (0,0), (-1,-1), 0.25, colors.HexColor("#D6E1DA")),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#D6E1DA")),
+        ("LEFTPADDING", (0,0), (-1,-1), 10),
+        ("RIGHTPADDING", (0,0), (-1,-1), 10),
+        ("TOPPADDING", (0,0), (-1,-1), 8),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 14))
+
+    # Neto destacado
+    net_tbl = Table(
+        [[Paragraph("NETO A PAGAR", ParagraphStyle("NetLabel", fontName="Helvetica-Bold", fontSize=12, textColor=colors.white)),
+          Paragraph(money(neto), ParagraphStyle("NetValue", fontName="Helvetica-Bold", fontSize=12, textColor=colors.white, alignment=TA_RIGHT))]],
+        colWidths=[11.5*cm, 4.5*cm]
+    )
+    net_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), VG_GREEN),
+        ("BOX", (0,0), (-1,-1), 0, VG_GREEN),
+        ("LEFTPADDING", (0,0), (-1,-1), 12),
+        ("RIGHTPADDING", (0,0), (-1,-1), 12),
+        ("TOPPADDING", (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+    ]))
+    story.append(net_tbl)
+    story.append(Spacer(1, 12))
+
+    # Footer
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#D6E1DA"), spaceBefore=6, spaceAfter=8))
+    story.append(Paragraph(
+        "Documento generado automáticamente por el sistema de RRHH de Hotel Villa Grace. "
+        "Si requiere una corrección, contacte a administración.",
+        small
+    ))
+
+    # Build
+    doc.build(story)
+    buf.seek(0)
+
+    filename = f"Comprobante_{periodo_key}_{quincena}_{safe_str(row.get('Apellido'),'')}_{pay_id}.pdf".replace(" ", "_")
+
+    # as_attachment=False lo abre bonito en el navegador (tu botón ya abre target=_blank)
+    return send_file(
+        buf,
+        as_attachment=False,
+        download_name=filename,
+        mimetype="application/pdf"
+    )
 
 @hrm_bp.post("/payroll/<int:pay_id>/send")
 def payroll_send(pay_id):
@@ -1315,3 +2040,41 @@ def rrhh_ui():
         resumen=resumen,
         periodos=periodos,
     )
+
+@hrm_bp.get("/payroll/period/<int:period_id>/rows")
+def payroll_period_rows(period_id):
+    # trae la nómina calculada para ese periodo
+    rows = q("""
+        SELECT
+          p.Id,
+          p.Codigo_Funcionario,
+          p.Bruto_Quincena,
+          p.Neto_Pagar,
+          f.Nombre,
+          f.Apellido
+        FROM HRM_Payroll p
+        JOIN Funcionario f
+          ON f.Codigo_Funcionario = p.Codigo_Funcionario
+        WHERE p.Period_Id = :pid
+        ORDER BY f.Nombre, f.Apellido
+    """, pid=period_id)
+
+    def _to_float(x):
+        try:
+            return float(x or 0)
+        except Exception:
+            return 0.0
+
+    data = []
+    for r in rows:
+        data.append({
+            "Id": r["Id"],  # <-- ESTE es el payId que usa el link /hrm/payroll/<payId>/pdf
+            "Codigo_Funcionario": r["Codigo_Funcionario"],
+            "Nombre": r.get("Nombre"),
+            "Apellido": r.get("Apellido"),
+            "Bruto_Quincena": _to_float(r.get("Bruto_Quincena")),
+            "Neto_Pagar": _to_float(r.get("Neto_Pagar")),
+        })
+
+    return jsonify({"ok": True, "data": data})
+
