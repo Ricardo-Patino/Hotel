@@ -1,858 +1,578 @@
-<!DOCTYPE html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Administración – Tablero | Hotel Villa Grace</title>
+{% extends "base.html" %}
 
-    <link
-      href="{{ url_for('static', filename='assets/img/favicon.png') }}"
-      rel="icon"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}"
-      rel="apple-touch-icon"
-    />
+{% block title %}Administración – Tablero | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Tablero de administración: accesos a módulos de gestión, RRHH, inventario y chatbot.{%
+endblock %}
+{% block body_class %}inner-page{% endblock %}
 
-    <link href="https://fonts.googleapis.com" rel="preconnect" />
-    <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
-      rel="stylesheet"
-    />
+{% block head_extra %}
+<link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet" />
+<style>
+  .metric .label {
+    font-size: 0.85rem;
+    color: #6c757d;
+  }
 
-    <link
-      href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/css/main.css') }}"
-      rel="stylesheet"
-    />
-    <link
-      href="{{ url_for('static', filename='assets/css/style.css') }}"
-      rel="stylesheet"
-    />
-    <style>
-      .metric .label {
-        font-size: 0.85rem;
-        color: #6c757d;
-      }
-      .metric .value {
-        font-size: 1.75rem;
-        font-weight: 700;
-      }
-      .skeleton {
-        background: linear-gradient(90deg, #eee, #f5f5f5, #eee);
-        background-size: 200% 100%;
-        animation: s 1.2s infinite;
-        color: transparent;
-      }
-      @keyframes s {
-        0% {
-          background-position: 0 0;
-        }
-        100% {
-          background-position: -200% 0;
-        }
-      }
-    
-      /* Auditoría (Cambios recientes) */
-      .audit-table th,
-      .audit-table td {
-        vertical-align: top;
-      }
-      .audit-table td {
-        white-space: normal;
-        word-break: break-word;
-      }
-      .audit-detail {
-        font-size: 0.92rem;
-        line-height: 1.2rem;
-      }
-      .audit-detail ul {
-        margin: 0;
-        padding-left: 1.1rem;
-      }
-      .audit-detail li {
-        margin: 0 0 0.15rem 0;
-      }
-      .audit-detail .k {
-        color: #6c757d;
-      }
-      .audit-detail .v {
-        font-weight: 600;
-      }
+  .metric .value {
+    font-size: 1.75rem;
+    font-weight: 700;
+  }
 
-    </style>
-  </head>
-  <body class="inner-page">
-    <header id="header" class="header d-flex align-items-center fixed-top">
-      <div
-        class="container position-relative d-flex align-items-center justify-content-between"
-      >
-        <a
-          href="{{ url_for('index_html') }}"
-          class="logo d-flex align-items-center me-auto me-xl-0"
-          ><h1 class="sitename">Hotel Villa Grace</h1></a
-        >
-        <nav id="navmenu" class="navmenu">
-          <ul>
-            <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
-            <li class="dropdown">
-              <a href="#" class="active"
-                ><span>Administración</span>
-                <i class="bi bi-chevron-down toggle-dropdown"></i
-              ></a>
-              <ul>
-                <li>
-                  <a class="active" href="{{ url_for('admin_dashboard_html') }}"
-                    >Tablero</a
-                  >
-                </li>
-                <li><a href="admin-users.html">Usuarios y roles</a></li>
-                <!--<li><a href="admin-hotel.html">Perfil del hotel</a></li>-->
-                <li><a href="admin-rooms.html">Habitaciones</a></li>
-                <li><a href="admin-rates.html">Tarifas y temporadas</a></li>
-                <li>
-                  <a href="admin-taxes.html">Impuestos y cargos</a>
-                </li>
-                <li><a href="admin-channels.html">Canales / OTAs</a></li>
-                <!--<li><a href="#">Bitácora</a></li>-->
-                <!--<li class="nav-item">
-                  <a
-                    class="nav-link"
-                    href="{{ url_for('evt.calendario_evt') }}"
-                  >
-                    <i class="bi bi-calendar3"></i> Eventos</a
-                  >
-                </li>-->
-                <li class="nav-item">
-                  <a class="nav-link" href="{{ url_for('hrm.dashboard') }}">
-                    <i class="bi bi-people"></i> RRHH
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="{{ url_for('hrm.payroll_home') }}">
-                    <i class="bi bi-cash-coin"></i> Nómina
-                  </a>
-                </li>
-              </ul>
-            </li>
-          </ul>
-          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-        </nav>
-        <a class="btn-getstarted d-none d-sm-block" href="admin-users.html"
-          >Nuevo usuario</a
-        >
-      </div>
-    </header>
+  .skeleton {
+    background: linear-gradient(90deg, #eee, #f5f5f5, #eee);
+    background-size: 200% 100%;
+    animation: s 1.2s infinite;
+    color: transparent;
+  }
 
-    <main class="main">
-      <div
-        class="page-title dark-background"
-        data-aos="fade"
-        style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});"
-      >
-        <div class="container position-relative">
-          <h1>Administración</h1>
-          <p>Configuración del hotel, seguridad, tarifas e integraciones.</p>
-          <nav class="breadcrumbs">
-            <ol>
-              <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
-              <li class="current">Administración</li>
-            </ol>
-          </nav>
+  @keyframes s {
+    0% {
+      background-position: 0 0;
+    }
+
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .hub-title {
+    font-family: var(--heading-font);
+    font-size: 1.1rem;
+    margin: 0;
+  }
+
+  .hub-card {
+    border: 1px solid rgba(0, 0, 0, .06);
+    border-radius: 14px;
+    transition: transform .12s ease, box-shadow .12s ease;
+    background: #fff;
+  }
+
+  .hub-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .08);
+  }
+
+  .hub-icon {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(27, 122, 78, 0.10);
+    color: #1b7a4e;
+    font-size: 18px;
+    flex: 0 0 auto;
+  }
+
+  .hub-sub {
+    color: #6c757d;
+    font-size: .9rem;
+    margin: 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-title dark-background" data-aos="fade"
+  style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Administración</h1>
+    <p>KPIs y accesos a módulos.</p>
+    <nav class="breadcrumbs">
+      <ol>
+        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+        <li class="current">Administración</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<section class="section">
+  <div class="container" data-aos="fade-up">
+
+    <!-- KPIs (si quieres dejarlos como Operaciones, aquí quedan igual) -->
+    <div class="row g-4 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body metric">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="label">Reservas HOY</div>
+                <div id="kpiDayRes" class="value skeleton">—</div>
+                <div id="kpiDayAmt" class="small text-muted skeleton">—</div>
+              </div>
+              <i class="bi bi-calendar-day fs-3 text-success"></i>
+            </div>
+          </div>
         </div>
       </div>
 
-      <section class="section">
-        <div class="container" data-aos="fade-up">
-          <div class="row g-4">
-            <!-- KPIs en vivo -->
-            <div class="col-6 col-lg-3">
-              <div class="card shadow-sm border-0 h-100">
-                <div class="card-body metric">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <div class="label">Reservas HOY</div>
-                      <div id="kpiDayRes" class="value skeleton">—</div>
-                      <div id="kpiDayAmt" class="small text-muted skeleton">
-                        —
-                      </div>
-                    </div>
-                    <i class="bi bi-calendar-day fs-3 text-success"></i>
-                  </div>
-                </div>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body metric">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="label">Semana (ISO)</div>
+                <div id="kpiWeekRes" class="value skeleton">—</div>
+                <div id="kpiWeekAmt" class="small text-muted skeleton">—</div>
               </div>
+              <i class="bi bi-calendar-week fs-3 text-success"></i>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div class="col-6 col-lg-3">
-              <div class="card shadow-sm border-0 h-100">
-                <div class="card-body metric">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <div class="label">Semana (ISO)</div>
-                      <div id="kpiWeekRes" class="value skeleton">—</div>
-                      <div id="kpiWeekAmt" class="small text-muted skeleton">
-                        —
-                      </div>
-                    </div>
-                    <i class="bi bi-calendar-week fs-3 text-success"></i>
-                  </div>
-                </div>
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-body metric">
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="label">Mes</div>
+                <div id="kpiMonthRes" class="value skeleton">—</div>
+                <div id="kpiMonthAmt" class="small text-muted skeleton">—</div>
               </div>
+              <i class="bi bi-calendar-month fs-3 text-success"></i>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div class="col-6 col-lg-3">
-              <div class="card shadow-sm border-0 h-100">
-                <div class="card-body metric">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <div class="label">Mes</div>
-                      <div id="kpiMonthRes" class="value skeleton">—</div>
-                      <div id="kpiMonthAmt" class="small text-muted skeleton">
-                        —
-                      </div>
-                    </div>
-                    <i class="bi bi-calendar-month fs-3 text-success"></i>
-                  </div>
+      <div class="col-6 col-lg-3">
+        <a class="text-decoration-none" href="#" id="auditKpiLink">
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body metric">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <div class="label">Eventos de auditoría HOY</div>
+                  <div id="auditToday" class="value skeleton">—</div>
+                  <div class="small text-muted">Click para descargar la Bitácora</div>
                 </div>
-              </div>
-            </div>
-
-            <div class="col-6 col-lg-3">
-              <a class="text-decoration-none" href="#" id="auditKpiLink">
-                <div class="card shadow-sm border-0 h-100">
-                  <div class="card-body metric">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <div class="label">Eventos de auditoría HOY</div>
-                        <div id="auditToday" class="value skeleton">—</div>
-                        <div class="small text-muted">
-                          Click para descargar la Bitácora
-                        </div>
-                      </div>
-                      <i class="bi bi-clipboard-data fs-3 text-success"></i>
-                    </div>
-                  </div>
-                </div>
-              </a>
-            </div>
-
-            <!-- Tareas rápidas -->
-            <div class="col-lg-6">
-              <div class="card shadow-sm border-0">
-                <div class="card-header bg-white border-0">
-                  <h5 class="mb-0">Tareas rápidas</h5>
-                </div>
-                <div class="card-body">
-                  <div class="row g-3">
-                    <div class="col-sm-6">
-                      
-                    </div>
-                    <div class="col-sm-6">
-                      <a href="admin-rates.html" class="btn btn-success w-100"
-                        >Nueva tarifa/temporada</a
-                      >
-                    </div>
-                    <div class="col-sm-6">
-                      <a href="admin-taxes.html" class="btn btn-success w-100"
-                        >Configurar impuestos</a
-                      >
-                    </div>
-                    <div class="col-sm-6">
-                      <a
-                        href="admin-channels.html"
-                        class="btn btn-success w-100"
-                        >Conectar canal</a
-                      >
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Cambios recientes (dinámico) -->
-            <div class="col-lg-6">
-              <div class="card shadow-sm border-0 h-100">
-                <div
-                  class="card-header bg-white border-0 d-flex justify-content-between align-items-center"
-                >
-                  <h5 class="mb-0">Cambios recientes</h5>
-                  <a
-                    href="#" id="auditDownloadBtn"
-                     class="btn btn-outline-secondary btn-sm"
-                     ><i class="bi bi-download me-1"></i> Descargar bitácora</a
-                  >
-                </div>
-                <div class="card-body p-0">
-                  <div class="table-responsive">
-                    <table class="table align-middle mb-0 audit-table">
-                      <thead>
-                        <tr>
-                          <th>Fecha</th>
-                          <th>Usuario</th>
-                          <th>Acción</th>
-                          <th>Detalle</th>
-                        </tr>
-                      </thead>
-                      <tbody id="auditTableBody">
-                        <tr>
-                          <td colspan="4" class="p-4">
-                            <span class="skeleton">Cargando auditoría…</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <i class="bi bi-clipboard-data fs-3 text-success"></i>
               </div>
             </div>
           </div>
-          <!-- row -->
-        </div>
-      </section>
-    </main>
+        </a>
+      </div>
+    </div>
 
-    <footer id="footer" class="footer position-relative dark-background">
-      <div class="copyright text-center">
-        <div class="container">
-          ©
-          <strong><span>Vista Administrativa - Hotel Villa Grace</span></strong>
+    <!-- Menú de Administración (como Operaciones) -->
+    <!-- Menú de Administración (como Operaciones) -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <i class="bi bi-grid-1x2-fill text-success"></i>
+          <h3 class="hub-title">Menú de administración</h3>
+        </div>
+
+        <div class="row g-3">
+
+          <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('ops_dashboard_html') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon"><i class="bi bi-speedometer2"></i></div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark">Panel de Operaciones</div>
+                    <p class="hub-sub">KPIs y accesos operativos</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('sac.conversaciones_html') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon"><i class="bi bi-chat-dots"></i></div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark">Conversaciones</div>
+                    <p class="hub-sub">Historial y seguimiento</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('hrm.empleados_ui') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon"><i class="bi bi-people"></i></div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark">RR. HH.</div>
+                    <p class="hub-sub">Empleados y gestión</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('hrm.validar_horas_ui') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon"><i class="bi bi-clock-history"></i></div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark">Validación de Horas</div>
+                    <p class="hub-sub">Revisar y aprobar horas</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('inv.insumos_list') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon"><i class="bi bi-box-seam"></i></div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark">Inventario</div>
+                    <p class="hub-sub">Insumos y categorías</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('sac.sac_chat_admin') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon"><i class="bi bi-robot"></i></div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark">Chatbot</div>
+                    <p class="hub-sub">Administración del bot</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <div class="col-md-6 col-lg-4">
+            <a href="{{ url_for('hrm.payroll_home') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon">
+                    <i class="bi bi-cash-stack"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark">Nómina</div>
+                    <p class="hub-sub">Gestión y procesamiento de planilla</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
+          <!-- Finanzas (sin link aún) -->
+          <div class="col-md-6 col-lg-4">
+            <a href="#" class="text-decoration-none" aria-disabled="true" tabindex="-1"
+              onclick="event.preventDefault();">
+              <div class="hub-card p-3 h-100" style="opacity:.65; cursor:not-allowed;">
+                <div class="d-flex gap-3">
+                  <div class="hub-icon"><i class="bi bi-cash-coin"></i></div>
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold text-dark d-flex align-items-center gap-2">
+                      Finanzas <span class="badge bg-secondary">Próximamente</span>
+                    </div>
+                    <p class="hub-sub">Módulo en construcción</p>
+                  </div>
+                </div>
+              </div>
+            </a>
+          </div>
+
         </div>
       </div>
-    </footer>
-    <a
-      href="#"
-      id="scroll-top"
-      class="scroll-top d-flex align-items-center justify-content-center"
-      ><i class="bi bi-arrow-up-short"></i
-    ></a>
-    <div id="preloader"></div>
+    </div>
 
-    <script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-    <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
-    <script>
-      (function () {
-        const nfMoney = new Intl.NumberFormat("es-CR", {
-          style: "currency",
-          currency: "CRC",
-          maximumFractionDigits: 2,
+    <!-- Cambios recientes (si quieres mantener auditoría como antes) -->
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Cambios recientes</h5>
+        <a href="#" id="auditDownloadBtn" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-download me-1"></i> Descargar bitácora
+        </a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0 audit-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Usuario</th>
+                <th>Acción</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <tr>
+                <td colspan="4" class="p-4">
+                  <span class="skeleton">Cargando auditoría…</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const nfMoney = new Intl.NumberFormat("es-CR", {
+      style: "currency",
+      currency: "CRC",
+      maximumFractionDigits: 2,
+    });
+    const nfInt = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 0 });
+
+    function setText(id, text) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = text;
+        el.classList.remove("skeleton");
+      }
+    }
+
+    function money(v) {
+      return nfMoney.format(Number(v || 0));
+    }
+
+    fetch("/api/kpi/summary", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d || !d.ok) throw new Error("No OK KPI");
+        const day = d.day || { reservas: 0, monto: 0 };
+        const week = d.week || { reservas: 0, monto: 0 };
+        const month = d.month || { reservas: 0, monto: 0 };
+
+        setText("kpiDayRes", nfInt.format(day.reservas || 0));
+        setText("kpiDayAmt", money(day.monto || 0));
+
+        setText("kpiWeekRes", nfInt.format(week.reservas || 0));
+        setText("kpiWeekAmt", money(week.monto || 0));
+
+        setText("kpiMonthRes", nfInt.format(month.reservas || 0));
+        setText("kpiMonthAmt", money(month.monto || 0));
+      })
+      .catch(() => {
+        setText("kpiDayRes", "0");
+        setText("kpiDayAmt", money(0));
+        setText("kpiWeekRes", "0");
+        setText("kpiWeekAmt", money(0));
+        setText("kpiMonthRes", "0");
+        setText("kpiMonthAmt", money(0));
+      });
+
+    let _auditItems = [];
+
+    const htmlEscMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+    function esc(v) { return String(v ?? "").replace(/[&<>"']/g, (c) => htmlEscMap[c] || c); }
+
+    function fmtDate(iso) {
+      if (!iso) return "-";
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return String(iso).replace("T", " ").slice(0, 16);
+      try {
+        return new Intl.DateTimeFormat("es-CR", {
+          year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+        }).format(d);
+      } catch (e) {
+        return String(iso).replace("T", " ").slice(0, 16);
+      }
+    }
+
+    const ACTION_EXACT = {
+      "checkin.completed": "Check-in completado",
+      "checkout.completed": "Check-out completado",
+      "reserva.created": "Reserva creada",
+      "reserva.updated": "Reserva actualizada",
+      "reserva.cancelled": "Reserva cancelada",
+      "reserva.canceled": "Reserva cancelada",
+      "cambio.approved": "Cambio aprobado",
+      "cambio.rejected": "Cambio rechazado",
+      "cambio.retracted": "Cambio retractado",
+      "payment.paid": "Pago registrado",
+      "payment.refund": "Reembolso registrado",
+      "user.created": "Usuario creado",
+      "user.updated": "Usuario actualizado",
+      "user.deleted": "Usuario eliminado",
+      "role.updated": "Roles actualizados",
+      "login.success": "Inicio de sesión",
+      "logout": "Cierre de sesión",
+    };
+
+    const ACTION_WORD = {
+      "checkin": "Check-in", "checkout": "Check-out", "reserva": "Reserva", "booking": "Reserva",
+      "cliente": "Cliente", "habitacion": "Habitación", "room": "Habitación", "fin": "Finanzas",
+      "invoice": "Factura", "receipt": "Recibo", "kpi": "KPI", "audit": "Auditoría", "user": "Usuario",
+      "role": "Rol", "channel": "Canal", "ota": "OTA",
+      "created": "creado", "updated": "actualizado", "deleted": "eliminado", "completed": "completado",
+      "approved": "aprobado", "rejected": "rechazado", "retracted": "retractado", "cancelled": "cancelado",
+      "canceled": "cancelado", "paid": "pagado", "posted": "publicado", "opened": "abierto", "closed": "cerrado",
+      "success": "exitoso", "failed": "fallido",
+    };
+
+    function prettyAction(action) {
+      if (!action) return "-";
+      if (ACTION_EXACT[action]) return ACTION_EXACT[action];
+      const parts = String(action).trim().replace(/_/g, ".").split(".").filter(Boolean);
+      if (!parts.length) return action;
+      const pretty = parts.map((p) => {
+        const k = p.toLowerCase();
+        if (ACTION_WORD[k]) return ACTION_WORD[k];
+        return k.charAt(0).toUpperCase() + k.slice(1);
+      }).join(" ");
+      return pretty.replace(/\s+/g, " ").trim();
+    }
+
+    function isPlainObject(x) { return x && typeof x === "object" && !Array.isArray(x); }
+
+    function flatten(obj, prefix = "") {
+      const out = [];
+      if (!isPlainObject(obj)) return out;
+      for (const [k, v] of Object.entries(obj)) {
+        const path = prefix ? `${prefix}.${k}` : k;
+        if (v === null || v === undefined || v === "") continue;
+        if (isPlainObject(v)) out.push(...flatten(v, path));
+        else if (Array.isArray(v)) out.push([path, v.join(", ")]);
+        else out.push([path, v]);
+      }
+      return out;
+    }
+
+    function formatDetailsHtml(det) {
+      if (det === null || det === undefined) return '<span class="text-muted">-</span>';
+      if (typeof det === "string") {
+        try { return formatDetailsHtml(JSON.parse(det)); }
+        catch (e) { return `<div class="audit-detail"><span class="v">${esc(det)}</span></div>`; }
+      }
+      if (isPlainObject(det)) {
+        const flat = flatten(det);
+        if (!flat.length) return '<span class="text-muted">-</span>';
+        const items = flat.slice(0, 8).map(([path, val]) => {
+          const key = path.split(".").slice(-1)[0];
+          return `<li><span class="k">${esc(key)}</span>: <span class="v">${esc(String(val))}</span></li>`;
         });
-        const nfInt = new Intl.NumberFormat("es-CR", {
-          maximumFractionDigits: 0,
-        });
+        return `<div class="audit-detail"><ul>${items.join("")}</ul></div>`;
+      }
+      return `<div class="audit-detail"><span class="v">${esc(String(det))}</span></div>`;
+    }
 
-        function setText(id, text) {
-          const el = document.getElementById(id);
-          if (el) {
-            el.textContent = text;
-            el.classList.remove("skeleton");
-          }
-        }
+    function csvEscape(v) {
+      const s = String(v ?? "");
+      return `"${s.replace(/"/g, '""')}"`;
+    }
 
-        function money(v) {
-          return nfMoney.format(Number(v || 0));
-        }
+    function downloadAuditCsv(items) {
+      const rows = (items || []).map((it) => {
+        const fecha = fmtDate(it.fecha);
+        const usuario = it.usuario || "-";
+        const accion = prettyAction(it.accion || "-");
+        const detalle = typeof it.detalles === "string" ? it.detalles : JSON.stringify(it.detalles ?? "");
+        return [fecha, usuario, accion, detalle];
+      });
 
-        // KPIs
-        fetch("/api/kpi/summary", { credentials: "same-origin" })
-          .then((r) => r.json())
-          .then((d) => {
-            if (!d || !d.ok) throw new Error("No OK KPI");
-            const day = d.day || { reservas: 0, monto: 0 };
-            const week = d.week || { reservas: 0, monto: 0 };
-            const month = d.month || { reservas: 0, monto: 0 };
+      const header = ["Fecha", "Usuario", "Acción", "Detalle"];
+      const delimiter = ";";
+      const csv = [header.map(csvEscape).join(delimiter), ...rows.map((r) => r.map(csvEscape).join(delimiter))].join("\r\n");
 
-            setText("kpiDayRes", nfInt.format(day.reservas || 0));
-            setText("kpiDayAmt", money(day.monto || 0));
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      const hh = String(now.getHours()).padStart(2, "0");
+      const mm = String(now.getMinutes()).padStart(2, "0");
+      const filename = `bitacora_${y}${m}${d}_${hh}${mm}.csv`;
 
-            setText("kpiWeekRes", nfInt.format(week.reservas || 0));
-            setText("kpiWeekAmt", money(week.monto || 0));
+      const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
 
-            setText("kpiMonthRes", nfInt.format(month.reservas || 0));
-            setText("kpiMonthAmt", money(month.monto || 0));
-          })
-          .catch(() => {
-            setText("kpiDayRes", "0");
-            setText("kpiDayAmt", money(0));
-            setText("kpiWeekRes", "0");
-            setText("kpiWeekAmt", money(0));
-            setText("kpiMonthRes", "0");
-            setText("kpiMonthAmt", money(0));
-          });
+    function ensureAuditLoadedThenDownload() {
+      if (_auditItems && _auditItems.length) {
+        downloadAuditCsv(_auditItems);
+        return;
+      }
+      fetch("/api/audit/recent", { credentials: "same-origin" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (!d || !d.ok) throw new Error("No OK AUDIT");
+          _auditItems = d.items || [];
+          downloadAuditCsv(_auditItems);
+        })
+        .catch(() => alert("No fue posible descargar la bitácora en este momento."));
+    }
 
+    const btnDownload = document.getElementById("auditDownloadBtn");
+    if (btnDownload) btnDownload.addEventListener("click", (e) => {
+      e.preventDefault();
+      ensureAuditLoadedThenDownload();
+    });
 
-        // ---------------- Auditoría (Cambios recientes) ----------------
-        const AUDIT_DOWNLOAD_LIMIT = 50; // viene del endpoint /api/audit/recent
-        let _auditItems = [];
+    const kpiLink = document.getElementById("auditKpiLink");
+    if (kpiLink) kpiLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      ensureAuditLoadedThenDownload();
+    });
 
-        const htmlEscMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-        function esc(v) {
-          return String(v ?? "").replace(/[&<>"']/g, (c) => htmlEscMap[c] || c);
-        }
+    fetch("/api/audit/recent", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((d) => {
+        const tbody = document.getElementById("auditTableBody");
+        if (!tbody) return;
+        if (!d || !d.ok) throw new Error("No OK AUDIT");
+        const items = d.items || [];
+        _auditItems = items;
 
-        function fmtDate(iso) {
-          if (!iso) return "-";
-          const d = new Date(iso);
-          if (isNaN(d.getTime())) return String(iso).replace("T", " ").slice(0, 16);
-          try {
-            return new Intl.DateTimeFormat("es-CR", {
-              year: "numeric",
-              month: "2-digit",
-              day: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-            }).format(d);
-          } catch (e) {
-            return String(iso).replace("T", " ").slice(0, 16);
-          }
-        }
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const dd = String(today.getDate()).padStart(2, "0");
+        const ymd = `${yyyy}-${mm}-${dd}`;
+        const eventsToday = items.filter((x) => (x.fecha || "").startsWith(ymd)).length;
+        setText("auditToday", nfInt.format(eventsToday));
 
-        const ACTION_EXACT = {
-          "checkin.completed": "Check-in completado",
-          "checkout.completed": "Check-out completado",
-          "reserva.created": "Reserva creada",
-          "reserva.updated": "Reserva actualizada",
-          "reserva.cancelled": "Reserva cancelada",
-          "reserva.canceled": "Reserva cancelada",
-          "cambio.approved": "Cambio aprobado",
-          "cambio.rejected": "Cambio rechazado",
-          "cambio.retracted": "Cambio retractado",
-          "payment.paid": "Pago registrado",
-          "payment.refund": "Reembolso registrado",
-          "user.created": "Usuario creado",
-          "user.updated": "Usuario actualizado",
-          "user.deleted": "Usuario eliminado",
-          "role.updated": "Roles actualizados",
-          "login.success": "Inicio de sesión",
-          "logout": "Cierre de sesión",
-        };
+        const rows = items.slice(0, 8).map((it) => {
+          const fecha = fmtDate(it.fecha);
+          const user = esc(it.usuario || "-");
+          const accion = esc(prettyAction(it.accion || "-"));
+          const detalleHtml = formatDetailsHtml(it.detalles);
+          return `<tr>
+            <td>${esc(fecha)}</td>
+            <td>${user}</td>
+            <td>${accion}</td>
+            <td>${detalleHtml}</td>
+          </tr>`;
+        }).join("");
 
-        const ACTION_WORD = {
-          // Módulos / entidades
-          "checkin": "Check-in",
-          "checkout": "Check-out",
-          "reserva": "Reserva",
-          "booking": "Reserva",
-          "cliente": "Cliente",
-          "habitacion": "Habitación",
-          "room": "Habitación",
-          "fin": "Finanzas",
-          "invoice": "Factura",
-          "receipt": "Recibo",
-          "kpi": "KPI",
-          "audit": "Auditoría",
-          "user": "Usuario",
-          "role": "Rol",
-          "channel": "Canal",
-          "ota": "OTA",
-          // Verbos / estados
-          "created": "creado",
-          "updated": "actualizado",
-          "deleted": "eliminado",
-          "completed": "completado",
-          "approved": "aprobado",
-          "rejected": "rechazado",
-          "retracted": "retractado",
-          "cancelled": "cancelado",
-          "canceled": "cancelado",
-          "paid": "pagado",
-          "posted": "publicado",
-          "opened": "abierto",
-          "closed": "cerrado",
-          "success": "exitoso",
-          "failed": "fallido",
-        };
+        tbody.innerHTML = rows || '<tr><td colspan="4" class="p-4 text-muted">Sin eventos recientes.</td></tr>';
+      })
+      .catch(() => {
+        setText("auditToday", "0");
+        const tbody = document.getElementById("auditTableBody");
+        if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-muted">No fue posible cargar la bitácora.</td></tr>';
+      });
 
-        function prettyAction(action) {
-          if (!action) return "-";
-          if (ACTION_EXACT[action]) return ACTION_EXACT[action];
-
-          const parts = String(action)
-            .trim()
-            .replace(/_/g, ".")
-            .split(".")
-            .filter(Boolean);
-
-          if (!parts.length) return action;
-
-          const pretty = parts
-            .map((p) => {
-              const k = p.toLowerCase();
-              if (ACTION_WORD[k]) return ACTION_WORD[k];
-              // Capitaliza la primera letra, mantiene números
-              return k.charAt(0).toUpperCase() + k.slice(1);
-            })
-            .join(" ");
-
-          // Normaliza algunos detalles de presentación
-          return pretty.replace(/\s+/g, " ").trim();
-        }
-
-        const KEY_LABEL = {
-          // Reserva / Cliente
-          "Codigo_Reserva": "Código de reserva",
-          "reserva_id": "Reserva",
-          "Numero_Comprobante": "Comprobante",
-          "numero": "Número",
-          "ClienteCorreo": "Correo del cliente",
-          "ClienteNombre": "Cliente",
-          "Correo": "Correo",
-          "Nombre": "Nombre",
-          "Apellido": "Apellido",
-          // Habitación
-          "Numero_Habitacion": "Habitación",
-          "Codigo_Habitacion": "Habitación (código)",
-          "Tipo_Habitacion": "Tipo de habitación",
-          // Finanzas
-          "Monto_Total": "Monto total",
-          "monto": "Monto",
-          "total": "Total",
-          // Auditoría genérica (triggers)
-          "Entidad": "Entidad",
-          "Entidad_Id": "ID entidad",
-          "Operacion": "Operación",
-          "Datos": "Datos",
-          // Otros comunes
-          "Estado": "Estado",
-          "Canal": "Canal",
-          "Motivo": "Motivo",
-          "Observaciones": "Observaciones",
-          "Antes": "Antes",
-          "Despues": "Después",
-          "old": "Antes",
-          "new": "Después",
-          "raw": "Detalle",
-        };
-
-        function labelForKey(key) {
-          if (KEY_LABEL[key]) return KEY_LABEL[key];
-          // Convierte "ClienteCorreo" -> "Cliente correo", "checkin_completed" -> "Checkin completed"
-          const spaced = String(key)
-            .replace(/_/g, " ")
-            .replace(/([a-z])([A-Z])/g, "$1 $2")
-            .trim();
-          return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-        }
-
-        function isPlainObject(x) {
-          return x && typeof x === "object" && !Array.isArray(x);
-        }
-
-        function flatten(obj, prefix = "") {
-          const out = [];
-          if (!isPlainObject(obj)) return out;
-
-          for (const [k, v] of Object.entries(obj)) {
-            const path = prefix ? `${prefix}.${k}` : k;
-
-            if (v === null || v === undefined || v === "") continue;
-
-            if (isPlainObject(v)) {
-              // Evita expandir "Datos" si trae un JSON grande; lo convertimos a texto si es muy profundo
-              const nested = flatten(v, path);
-              if (nested.length) out.push(...nested);
-              else out.push([path, v]);
-            } else if (Array.isArray(v)) {
-              out.push([path, v.join(", ")]);
-            } else {
-              out.push([path, v]);
-            }
-          }
-          return out;
-        }
-
-        function fmtValue(key, value) {
-          if (value === null || value === undefined) return "-";
-
-          // Montos (heurística)
-          const k = String(key).toLowerCase();
-          if (
-            typeof value === "number" &&
-            (k.includes("monto") || k.includes("total") || k.includes("price") || k.includes("saldo"))
-          ) {
-            return money(value);
-          }
-
-          // ISO dates
-          if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}t\d{2}:\d{2}/i.test(value)) {
-            return fmtDate(value);
-          }
-
-          if (typeof value === "object") {
-            try {
-              return JSON.stringify(value);
-            } catch (e) {
-              return String(value);
-            }
-          }
-
-          return String(value);
-        }
-
-        function formatDetailsHtml(det) {
-          if (det === null || det === undefined) return '<span class="text-muted">-</span>';
-
-          // Si viene como string JSON
-          if (typeof det === "string") {
-            try {
-              const parsed = JSON.parse(det);
-              return formatDetailsHtml(parsed);
-            } catch (e) {
-              return `<div class="audit-detail"><span class="v">${esc(det)}</span></div>`;
-            }
-          }
-
-          // Si es objeto
-          if (isPlainObject(det)) {
-            const flat = flatten(det);
-            if (!flat.length) return '<span class="text-muted">-</span>';
-
-            // Prioriza llaves más relevantes
-            const priority = [
-              "Codigo_Reserva",
-              "reserva_id",
-              "Numero_Comprobante",
-              "numero",
-              "ClienteNombre",
-              "ClienteCorreo",
-              "Numero_Habitacion",
-              "Estado",
-              "Canal",
-              "Motivo",
-              "Observaciones",
-              "Entidad",
-              "Entidad_Id",
-              "Operacion",
-            ];
-
-            flat.sort((a, b) => {
-              const ka = a[0].split(".").slice(-1)[0];
-              const kb = b[0].split(".").slice(-1)[0];
-              const ia = priority.indexOf(ka);
-              const ib = priority.indexOf(kb);
-              const pa = ia === -1 ? 999 : ia;
-              const pb = ib === -1 ? 999 : ib;
-              if (pa !== pb) return pa - pb;
-              return ka.localeCompare(kb);
-            });
-
-            // Presentación amigable: muestra hasta 8 items y permite expandir si hay más
-            const MAX_VISIBLE = 8;
-
-            const visible = flat.slice(0, MAX_VISIBLE).map(([path, val]) => {
-              const key = path.split(".").slice(-1)[0];
-              const label = labelForKey(key);
-              const v = fmtValue(key, val);
-              return `<li><span class="k">${esc(label)}</span>: <span class="v">${esc(v)}</span></li>`;
-            });
-
-            let extra = "";
-            if (flat.length > MAX_VISIBLE) {
-              const hidden = flat
-                .slice(MAX_VISIBLE)
-                .map(([path, val]) => {
-                  const key = path.split(".").slice(-1)[0];
-                  const label = labelForKey(key);
-                  const v = fmtValue(key, val);
-                  return `<li><span class="k">${esc(label)}</span>: <span class="v">${esc(v)}</span></li>`;
-                })
-                .join("");
-
-              const moreCount = flat.length - MAX_VISIBLE;
-              extra = `
-                <details class="mt-1">
-                  <summary class="text-muted" style="cursor:pointer;">Ver ${moreCount} detalle(s) más</summary>
-                  <ul class="mt-2">${hidden}</ul>
-                </details>
-              `;
-            }
-
-            return `<div class="audit-detail"><ul>${visible.join("")}</ul>${extra}</div>`;
-          }
-
-          // Fallback
-          return `<div class="audit-detail"><span class="v">${esc(String(det))}</span></div>`;
-        }
-
-        function formatDetailsText(det) {
-          if (det === null || det === undefined) return "-";
-          if (typeof det === "string") {
-            try {
-              const parsed = JSON.parse(det);
-              return formatDetailsText(parsed);
-            } catch (e) {
-              return det;
-            }
-          }
-          if (isPlainObject(det)) {
-            const flat = flatten(det);
-            if (!flat.length) return "-";
-            // Versión texto: no limita cantidad
-            return flat
-              .map(([path, val]) => {
-                const key = path.split(".").slice(-1)[0];
-                const label = labelForKey(key);
-                const v = fmtValue(key, val);
-                return `${label}: ${v}`;
-              })
-              .join(" | ");
-          }
-          return String(det);
-        }
-
-        function csvEscape(v) {
-          const s = String(v ?? "");
-          // CSV compatible Excel (comillas dobles duplicadas)
-          return `"${s.replace(/"/g, '""')}"`;
-        }
-
-        function downloadAuditCsv(items) {
-          const rows = (items || []).map((it) => {
-            const fecha = fmtDate(it.fecha);
-            const usuario = it.usuario || "-";
-            const accion = prettyAction(it.accion || "-");
-            const detalle = formatDetailsText(it.detalles);
-            return [fecha, usuario, accion, detalle];
-          });
-
-          const header = ["Fecha", "Usuario", "Acción", "Detalle"];
-          const delimiter = ";";
-          const csv = [
-            header.map(csvEscape).join(delimiter),
-            ...rows.map((r) => r.map(csvEscape).join(delimiter)),
-          ].join("\r\n");
-
-          const now = new Date();
-          const y = now.getFullYear();
-          const m = String(now.getMonth() + 1).padStart(2, "0");
-          const d = String(now.getDate()).padStart(2, "0");
-          const hh = String(now.getHours()).padStart(2, "0");
-          const mm = String(now.getMinutes()).padStart(2, "0");
-          const filename = `bitacora_${y}${m}${d}_${hh}${mm}.csv`;
-
-          // BOM UTF-8 para Excel
-          const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
-          const url = URL.createObjectURL(blob);
-
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-        }
-
-        function ensureAuditLoadedThenDownload() {
-          if (_auditItems && _auditItems.length) {
-            downloadAuditCsv(_auditItems);
-            return;
-          }
-          fetch("/api/audit/recent", { credentials: "same-origin" })
-            .then((r) => r.json())
-            .then((d) => {
-              if (!d || !d.ok) throw new Error("No OK AUDIT");
-              _auditItems = d.items || [];
-              downloadAuditCsv(_auditItems);
-            })
-            .catch(() => {
-              alert("No fue posible descargar la bitácora en este momento.");
-            });
-        }
-
-        // Botones (header + KPI card)
-        const btnDownload = document.getElementById("auditDownloadBtn");
-        if (btnDownload)
-          btnDownload.addEventListener("click", (e) => {
-            e.preventDefault();
-            ensureAuditLoadedThenDownload();
-          });
-
-        const kpiLink = document.getElementById("auditKpiLink");
-        if (kpiLink)
-          kpiLink.addEventListener("click", (e) => {
-            e.preventDefault();
-            ensureAuditLoadedThenDownload();
-          });
-
-        // Carga y render de tabla
-        fetch("/api/audit/recent", { credentials: "same-origin" })
-          .then((r) => r.json())
-          .then((d) => {
-            const tbody = document.getElementById("auditTableBody");
-            if (!tbody) return;
-
-            if (!d || !d.ok) throw new Error("No OK AUDIT");
-
-            const items = d.items || [];
-            _auditItems = items; // cache para descarga
-
-            // Conteo de hoy (para KPI)
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, "0");
-            const dd = String(today.getDate()).padStart(2, "0");
-            const ymd = `${yyyy}-${mm}-${dd}`;
-            const eventsToday = items.filter((x) => (x.fecha || "").startsWith(ymd)).length;
-            setText("auditToday", nfInt.format(eventsToday));
-
-            // Render tabla (máx 8 visibles)
-            const rows = items
-              .slice(0, 8)
-              .map((it) => {
-                const fecha = fmtDate(it.fecha);
-                const user = esc(it.usuario || "-");
-                const accion = esc(prettyAction(it.accion || "-"));
-                const detalleHtml = formatDetailsHtml(it.detalles);
-
-                return `<tr>
-                  <td>${esc(fecha)}</td>
-                  <td>${user}</td>
-                  <td>${accion}</td>
-                  <td>${detalleHtml}</td>
-                </tr>`;
-              })
-              .join("");
-
-            tbody.innerHTML =
-              rows || '<tr><td colspan="4" class="p-4 text-muted">Sin eventos recientes.</td></tr>';
-          })
-          .catch(() => {
-            setText("auditToday", "0");
-            const tbody = document.getElementById("auditTableBody");
-            if (tbody)
-              tbody.innerHTML =
-                '<tr><td colspan="4" class="p-4 text-muted">No fue posible cargar la bitácora.</td></tr>';
-          });
-
-
-      })();
-    </script>
-  </body>
-</html>
+  })();
+</script>
+{% endblock %}
