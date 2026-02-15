@@ -26,13 +26,8 @@ endblock %}
   }
 
   @keyframes s {
-    0% {
-      background-position: 0 0;
-    }
-
-    100% {
-      background-position: -200% 0;
-    }
+    0% { background-position: 0 0; }
+    100% { background-position: -200% 0; }
   }
 
   .hub-title {
@@ -71,6 +66,39 @@ endblock %}
     font-size: .9rem;
     margin: 0;
   }
+
+  /* Auditoría (Cambios recientes) */
+  .audit-table th,
+  .audit-table td {
+    vertical-align: top;
+  }
+  .audit-table td {
+    white-space: normal;
+    word-break: break-word;
+  }
+  .audit-detail {
+    font-size: 0.92rem;
+    line-height: 1.2rem;
+  }
+  .audit-detail ul {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+  .audit-detail li {
+    margin: 0 0 0.15rem 0;
+  }
+  .audit-detail .k {
+    color: #6c757d;
+  }
+  .audit-detail .v {
+    font-weight: 600;
+  }
+
+  /* Paginación */
+  #auditPagerWrap {
+    border-top: 1px solid rgba(0,0,0,.06);
+    background: #fff;
+  }
 </style>
 {% endblock %}
 
@@ -93,7 +121,7 @@ endblock %}
 <section class="section">
   <div class="container" data-aos="fade-up">
 
-    <!-- KPIs (si quieres dejarlos como Operaciones, aquí quedan igual) -->
+    <!-- KPIs -->
     <div class="row g-4 mb-4">
       <div class="col-6 col-lg-3">
         <div class="card shadow-sm border-0 h-100">
@@ -158,8 +186,7 @@ endblock %}
       </div>
     </div>
 
-    <!-- Menú de Administración (como Operaciones) -->
-    <!-- Menú de Administración (como Operaciones) -->
+    <!-- Menú de Administración -->
     <div class="card shadow-sm border-0 mb-4">
       <div class="card-body">
         <div class="d-flex align-items-center gap-2 mb-3">
@@ -291,8 +318,7 @@ endblock %}
       </div>
     </div>
 
-
-    <!-- Cambios recientes (si quieres mantener auditoría como antes) -->
+    <!-- Cambios recientes -->
     <div class="card shadow-sm border-0">
       <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Cambios recientes</h5>
@@ -300,6 +326,7 @@ endblock %}
           <i class="bi bi-download me-1"></i> Descargar bitácora
         </a>
       </div>
+
       <div class="card-body p-0">
         <div class="table-responsive">
           <table class="table align-middle mb-0 audit-table">
@@ -320,6 +347,15 @@ endblock %}
             </tbody>
           </table>
         </div>
+
+        <!-- Paginación -->
+        <div id="auditPagerWrap" class="p-3 d-flex justify-content-between align-items-center flex-wrap gap-2 d-none">
+          <div id="auditPagerInfo" class="small text-muted">—</div>
+          <nav aria-label="Paginación de auditoría">
+            <ul id="auditPager" class="pagination pagination-sm mb-0"></ul>
+          </nav>
+        </div>
+
       </div>
     </div>
 
@@ -350,6 +386,7 @@ endblock %}
       return nfMoney.format(Number(v || 0));
     }
 
+    // KPIs
     fetch("/api/kpi/summary", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((d) => {
@@ -376,7 +413,10 @@ endblock %}
         setText("kpiMonthAmt", money(0));
       });
 
+    // ---------------- Auditoría (Cambios recientes) ----------------
+    const PAGE_SIZE = 4;
     let _auditItems = [];
+    let _auditPage = 1;
 
     const htmlEscMap = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
     function esc(v) { return String(v ?? "").replace(/[&<>"']/g, (c) => htmlEscMap[c] || c); }
@@ -487,7 +527,10 @@ endblock %}
 
       const header = ["Fecha", "Usuario", "Acción", "Detalle"];
       const delimiter = ";";
-      const csv = [header.map(csvEscape).join(delimiter), ...rows.map((r) => r.map(csvEscape).join(delimiter))].join("\r\n");
+      const csv = [
+        header.map(csvEscape).join(delimiter),
+        ...rows.map((r) => r.map(csvEscape).join(delimiter))
+      ].join("\r\n");
 
       const now = new Date();
       const y = now.getFullYear();
@@ -535,42 +578,152 @@ endblock %}
       ensureAuditLoadedThenDownload();
     });
 
+    function totalPages() {
+      return Math.max(1, Math.ceil((_auditItems || []).length / PAGE_SIZE));
+    }
+
+    function setPagerInfo() {
+      const info = document.getElementById("auditPagerInfo");
+      if (!info) return;
+
+      const total = (_auditItems || []).length;
+      if (!total) {
+        info.textContent = "Sin eventos.";
+        return;
+      }
+
+      const start = (_auditPage - 1) * PAGE_SIZE + 1;
+      const end = Math.min(_auditPage * PAGE_SIZE, total);
+      info.textContent = `Mostrando ${start}–${end} de ${total}`;
+    }
+
+    function pageSeries(total, current) {
+      // Devuelve algo como: [1, 2, 3, "...", 10]
+      if (total <= 7) {
+        return Array.from({ length: total }, (_, i) => i + 1);
+      }
+      const keep = new Set([1, total, current, current - 1, current + 1, current - 2, current + 2]);
+      const nums = Array.from(keep).filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+
+      const out = [];
+      let prev = null;
+      for (const n of nums) {
+        if (prev !== null && n - prev > 1) out.push("...");
+        out.push(n);
+        prev = n;
+      }
+      return out;
+    }
+
+    function buildPager() {
+      const wrap = document.getElementById("auditPagerWrap");
+      const pager = document.getElementById("auditPager");
+      if (!wrap || !pager) return;
+
+      const total = totalPages();
+      const show = (_auditItems || []).length > PAGE_SIZE;
+      wrap.classList.toggle("d-none", !show);
+
+      pager.innerHTML = "";
+      if (!show) return;
+
+      function li(label, page, disabled, active) {
+        const el = document.createElement("li");
+        el.className = "page-item" + (disabled ? " disabled" : "") + (active ? " active" : "");
+        const a = document.createElement("a");
+        a.className = "page-link";
+        a.href = "#";
+        a.textContent = label;
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          if (disabled) return;
+          renderPage(page);
+        });
+        el.appendChild(a);
+        return el;
+      }
+
+      // Prev
+      pager.appendChild(li("«", Math.max(1, _auditPage - 1), _auditPage === 1, false));
+
+      // Numbers
+      const series = pageSeries(total, _auditPage);
+      for (const x of series) {
+        if (x === "...") {
+          const el = document.createElement("li");
+          el.className = "page-item disabled";
+          const span = document.createElement("span");
+          span.className = "page-link";
+          span.textContent = "…";
+          el.appendChild(span);
+          pager.appendChild(el);
+        } else {
+          pager.appendChild(li(String(x), x, false, x === _auditPage));
+        }
+      }
+
+      // Next
+      pager.appendChild(li("»", Math.min(total, _auditPage + 1), _auditPage === total, false));
+
+      setPagerInfo();
+    }
+
+    function renderPage(page) {
+      const tbody = document.getElementById("auditTableBody");
+      if (!tbody) return;
+
+      const total = totalPages();
+      _auditPage = Math.min(Math.max(1, page), total);
+
+      const start = (_auditPage - 1) * PAGE_SIZE;
+      const pageItems = (_auditItems || []).slice(start, start + PAGE_SIZE);
+
+      const rows = pageItems.map((it) => {
+        const fecha = fmtDate(it.fecha);
+        const user = esc(it.usuario || "-");
+        const accion = esc(prettyAction(it.accion || "-"));
+        const detalleHtml = formatDetailsHtml(it.detalles);
+        return `<tr>
+          <td>${esc(fecha)}</td>
+          <td>${user}</td>
+          <td>${accion}</td>
+          <td>${detalleHtml}</td>
+        </tr>`;
+      }).join("");
+
+      tbody.innerHTML = rows || '<tr><td colspan="4" class="p-4 text-muted">Sin eventos recientes.</td></tr>';
+      buildPager();
+    }
+
+    // Load & Render
     fetch("/api/audit/recent", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((d) => {
         const tbody = document.getElementById("auditTableBody");
         if (!tbody) return;
         if (!d || !d.ok) throw new Error("No OK AUDIT");
-        const items = d.items || [];
-        _auditItems = items;
 
+        _auditItems = d.items || [];
+
+        // Conteo de hoy (para KPI) basado en TODO el arreglo
         const today = new Date();
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, "0");
         const dd = String(today.getDate()).padStart(2, "0");
         const ymd = `${yyyy}-${mm}-${dd}`;
-        const eventsToday = items.filter((x) => (x.fecha || "").startsWith(ymd)).length;
+        const eventsToday = _auditItems.filter((x) => (x.fecha || "").startsWith(ymd)).length;
         setText("auditToday", nfInt.format(eventsToday));
 
-        const rows = items.slice(0, 8).map((it) => {
-          const fecha = fmtDate(it.fecha);
-          const user = esc(it.usuario || "-");
-          const accion = esc(prettyAction(it.accion || "-"));
-          const detalleHtml = formatDetailsHtml(it.detalles);
-          return `<tr>
-            <td>${esc(fecha)}</td>
-            <td>${user}</td>
-            <td>${accion}</td>
-            <td>${detalleHtml}</td>
-          </tr>`;
-        }).join("");
-
-        tbody.innerHTML = rows || '<tr><td colspan="4" class="p-4 text-muted">Sin eventos recientes.</td></tr>';
+        // Render primera página (4 items)
+        renderPage(1);
       })
       .catch(() => {
         setText("auditToday", "0");
         const tbody = document.getElementById("auditTableBody");
-        if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-muted">No fue posible cargar la bitácora.</td></tr>';
+        if (tbody) tbody.innerHTML =
+          '<tr><td colspan="4" class="p-4 text-muted">No fue posible cargar la bitácora.</td></tr>';
+        const wrap = document.getElementById("auditPagerWrap");
+        if (wrap) wrap.classList.add("d-none");
       });
 
   })();

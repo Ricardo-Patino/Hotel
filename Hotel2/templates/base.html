@@ -106,7 +106,11 @@
                 <a href="#"><span>RR. HH.</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
                 <ul>
                   <li><a href="{{ url_for('hrm.empleados_ui') }}">Empleados</a></li>
+
+                  {% if session.get('user_role') == 'Administrador' %}
                   <li><a href="{{ url_for('hrm.validar_horas_ui') }}">Validar horas</a></li>
+                  <li><a href="{{ url_for('hrm.payroll_home') }}">Nómina</a></li>
+                  {% endif %}
                 </ul>
               </li>
 
@@ -327,16 +331,16 @@
 
 
   <script>
-  window.ROOM_IMAGE_FALLBACK = "{{ url_for('static', filename='assets/img/hotel/default-room.webp') }}";
-</script>
-<script src="{{ url_for('static', filename='assets/js/room-images.js') }}"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    if (window.RoomImage) window.RoomImage.hydrate();
-  });
-</script>
+    window.ROOM_IMAGE_FALLBACK = "{{ url_for('static', filename='assets/img/hotel/default-room.webp') }}";
+  </script>
+  <script src="{{ url_for('static', filename='assets/js/room-images.js') }}"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.RoomImage) window.RoomImage.hydrate();
+    });
+  </script>
 
-  
+
 
   <!-- Script alertas inventario (tu mismo script) -->
   <script>
