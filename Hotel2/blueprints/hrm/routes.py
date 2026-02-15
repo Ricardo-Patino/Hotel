@@ -475,7 +475,7 @@ def ver_empleado_detalle_alias(codigo_func):
 # HU-08-002 — Registro de horas por el colaborador
 # =============================================================================
 @hrm_bp.route("/mis-horas", methods=["GET"])
-@require_roles("Limpieza")
+@require_roles("Limpieza", "Recepcionista")
 def mis_horas_ui():
     """
     Panel del colaborador para ver/registrar sus horas.
