@@ -1,17 +1,22 @@
 # blueprints/fin_cash/routes.py
+import os
 from flask import request, jsonify, current_app, send_file, abort, render_template, session
 from . import fin_cash_bp
 from sqlalchemy import text
 from datetime import datetime, date
 from io import BytesIO
 
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
-from reportlab.lib import colors
-
 from extensions import db
 
+# ReportLab (PDF)
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import cm
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+)
 
 # =========================
 # Helpers de BD / utilidades
@@ -37,18 +42,14 @@ def _is_locked(d: date) -> bool:
 
 def _is_locked_effective(d: date) -> bool:
     """
-    Política contable nueva (HU-06 / Periodos):
+    Política contable (HU-06 / Periodos):
     - Si existe fila en fin_period_lock para ese period_key:
         * status = 'closed'    => bloqueado
         * status = 'open'      => NO bloqueado
         * status = 'reopened'  => NO bloqueado
     - Si NO existe fila:
-        * si es el mes actual (según date.today()) => NO bloqueado
+        * si es el mes actual => NO bloqueado
         * si NO es el mes actual => BLOQUEADO
-
-    Resultado: por defecto todos los meses están bloqueados,
-    excepto el mes actual que está abierto, a menos que un admin
-    meta una fila 'open'/'reopened' para otro mes o 'closed' para cerrar el actual.
     """
     pk = _month_key(d)
 
@@ -65,16 +66,13 @@ def _is_locked_effective(d: date) -> bool:
     if row:
         st = (row["status"] or "").lower()
         if st == "closed":
-            return True  # bloqueado
-        # 'open' o 'reopened' => permitido
+            return True
         return False
 
-    # No hay fila. ¿Es el mes actual?
     current_month = date.today().strftime("%Y-%m")
     if pk == current_month:
-        return False  # mes actual libre por defecto
-    return True       # cualquier otro mes bloqueado por defecto
-
+        return False
+    return True
 
 def _is_admin() -> bool:
     """Permite controlar acciones reservadas al Admin (según sesión)."""
@@ -82,7 +80,6 @@ def _is_admin() -> bool:
         return (session.get("user_role") or "").strip().lower() == "administrador"
     except Exception:
         return False
-
 
 # =========================
 # Caja helpers
@@ -99,18 +96,16 @@ def _get_any_open_session():
     ).fetchone()
     return bool(row)
 
-
 def _create_session_unique(fecha: date, opened_by: int, opening_cash: float = 0.0):
     """
     Crea una nueva caja solo si no hay otra abierta en todo el sistema
     y si el periodo contable de esa fecha está permitido.
     """
-    # bloqueado? entonces no abras caja
     if _is_locked_effective(fecha):
         return None
 
     if _get_any_open_session():
-        return None  # No permite abrir otra caja mientras exista una abierta
+        return None
 
     _db().session.execute(
         text("""
@@ -133,7 +128,6 @@ def _create_session_unique(fecha: date, opened_by: int, opening_cash: float = 0.
     ).fetchone()
     return (row[0] if row else None)
 
-
 def _get_open_session(fecha: date):
     """Devuelve la sesión de caja ABIERTA (open/reopened) para la fecha indicada."""
     row = _db().session.execute(
@@ -148,6 +142,60 @@ def _get_open_session(fecha: date):
     ).fetchone()
     return (row[0] if row else None)
 
+def _get_session_info(fecha: date):
+    """
+    Info útil para el PDF (si existe sesión del día).
+    Compatible con tablas que NO tienen opened_at/closed_at.
+    """
+    # 1) Descubrir columnas reales en MySQL
+    cols = _db().session.execute(
+        text("""
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'fin_cash_session'
+        """)
+    ).fetchall()
+
+    colset = {c[0].lower() for c in cols}
+
+    def pick(*names):
+        for n in names:
+            if n.lower() in colset:
+                return n
+        return None
+
+    opened_at_col = pick("opened_at", "openedAt", "apertura_at", "created_at", "createdAt", "created_on")
+    closed_at_col = pick("closed_at", "closedAt", "cierre_at", "updated_at", "updatedAt", "updated_on")
+
+    # 2) Armar SELECT dinámico SIN columnas que no existan
+    select_cols = [
+        "id_session", "fecha", "status",
+        "opened_by", "opening_cash",
+        "closed_by", "closing_cash_counted"
+    ]
+
+    if opened_at_col:
+        select_cols.append(f"{opened_at_col} AS opened_at")
+    else:
+        select_cols.append("NULL AS opened_at")
+
+    if closed_at_col:
+        select_cols.append(f"{closed_at_col} AS closed_at")
+    else:
+        select_cols.append("NULL AS closed_at")
+
+    sql = f"""
+        SELECT {", ".join(select_cols)}
+        FROM fin_cash_session
+        WHERE fecha = :f
+        ORDER BY id_session DESC
+        LIMIT 1
+    """
+
+    row = _db().session.execute(text(sql), {"f": fecha}).mappings().fetchone()
+    return dict(row) if row else None
+
 
 def _calc_resume(fecha: date):
     """Lee la vista de resumen y devuelve dict o None."""
@@ -157,24 +205,16 @@ def _calc_resume(fecha: date):
     ).mappings().fetchone()
     return dict(row) if row else None
 
-
 # =========================
 # Endpoints JSON
 # =========================
-
 @fin_cash_bp.post("/apertura")
 def apertura():
-    """
-    Abre caja del día.
-    Solo se permite UNA caja abierta a la vez (sin importar usuario).
-    También respeta el bloqueo contable efectivo.
-    """
     payload = request.get_json(force=True, silent=True) or {}
     opened_by = int(payload.get("opened_by", 1))
     opening_cash = float(payload.get("opening_cash", 0.0))
     fecha = datetime.fromisoformat(payload.get("fecha") or date.today().isoformat()).date()
 
-    # Regla nueva HU-06
     if _is_locked_effective(fecha):
         return jsonify({
             "ok": False,
@@ -182,7 +222,6 @@ def apertura():
             "message": f"El periodo {_month_key(fecha)} está bloqueado. No se puede abrir caja."
         }), 423
 
-    # (legacy check explícito por si marcaron 'closed' manualmente)
     if _is_locked(fecha):
         return jsonify({
             "ok": False,
@@ -200,13 +239,8 @@ def apertura():
 
     return jsonify({"ok": True, "id_session": sid})
 
-
 @fin_cash_bp.post("/movimiento")
 def movimiento():
-    """
-    Inserta un movimiento MANUAL en la caja ABIERTA del día.
-    Respeta bloqueo contable.
-    """
     payload = request.get_json(force=True, silent=True) or {}
     required = ("tipo", "metodo", "concepto", "monto", "created_by")
     if not all(k in payload for k in required):
@@ -256,13 +290,8 @@ def movimiento():
     _db().session.commit()
     return jsonify({"ok": True, "session_id": sid})
 
-
 @fin_cash_bp.post("/cierre")
 def cierre():
-    """
-    Cierra la caja ABIERTA del día (si existe).
-    Respeta bloqueo contable.
-    """
     payload = request.get_json(force=True, silent=True) or {}
     fecha = datetime.fromisoformat(payload.get("fecha") or date.today().isoformat()).date()
     closed_by = int(payload.get("closed_by", 1))
@@ -300,16 +329,11 @@ def cierre():
     )
     _db().session.commit()
 
-    resumen = _calc_resume(fecha) or {}
+    resumen = _calc_resume(fecha) or None
     return jsonify({"ok": True, "resumen": resumen})
-
 
 @fin_cash_bp.post("/reabrir")
 def reabrir():
-    """
-    Reabre una caja (solo Administrador).
-    Respeta bloqueo contable + unicidad de caja abierta.
-    """
     if not _is_admin():
         return jsonify({"ok": False, "error": "forbidden", "message": "Solo Administrador puede reabrir cajas."}), 403
 
@@ -370,88 +394,314 @@ def reabrir():
 
     return jsonify({"ok": True, "id_session": sid, "status": "reopened"})
 
-
 @fin_cash_bp.get("/estado")
 def estado():
-    """Devuelve el id de caja abierta (si existe) para la fecha dada (o hoy por defecto)."""
     fecha = datetime.fromisoformat(request.args.get("fecha") or date.today().isoformat()).date()
     sid = _get_open_session(fecha)
     return jsonify({"ok": True, "fecha": fecha.isoformat(), "id_open_session": sid})
 
-
 @fin_cash_bp.get("/conciliacion")
 def conciliacion():
-    """Devuelve el resumen de conciliación de la vista para la fecha dada."""
     fecha = datetime.fromisoformat(request.args.get("fecha") or date.today().isoformat()).date()
     return jsonify({"ok": True, "resumen": _calc_resume(fecha)})
 
+# =========================
+# PDF profesional
+# =========================
+def _money(x):
+    try:
+        v = float(x or 0.0)
+    except Exception:
+        v = 0.0
+    # Formato CR (separador de miles)
+    return f"CRC {v:,.2f}"
 
 @fin_cash_bp.get("/reporte.pdf")
 def reporte_pdf():
-    """Genera el PDF de conciliación para la fecha indicada."""
+    """
+    Genera el PDF de conciliación para la fecha indicada.
+    ✅ IMPORTANTE: ya NO devuelve 404 cuando no hay datos.
+    En su lugar genera un PDF "SIN MOVIMIENTOS" (proforma) con totales en 0.
+    """
     fecha = datetime.fromisoformat(request.args.get("fecha") or date.today().isoformat()).date()
+
     resumen = _calc_resume(fecha)
+    has_data = bool(resumen)
+
+    # Si no hay resumen, armamos estructura en 0 (PDF vacío / proforma)
     if not resumen:
-        abort(404, description="No hay datos para esa fecha")
+        resumen = {}
+
+    # Asegurar llaves esperadas (por si tu vista no trae algo)
+    resumen.setdefault("opening_cash", 0)
+    resumen.setdefault("ingresos_efectivo", 0)
+    resumen.setdefault("egresos_efectivo", 0)
+    resumen.setdefault("ajustes_mas", 0)
+    resumen.setdefault("ajustes_menos", 0)
+    resumen.setdefault("efectivo_esperado", 0)
+    resumen.setdefault("efectivo_contado", resumen.get("closing_cash_counted", 0) or 0)
+    resumen.setdefault("descuadre", 0)
+
+    # Info de sesión (si existe)
+    sess = _get_session_info(fecha) or {}
+
+    hotel_name = "Hotel Villa Grace"
+    generado_por = (session.get("user_name") or "—").strip()
+    rol = (session.get("user_role") or "—").strip()
+
+    # Logo opcional
+    logo_path = os.path.join(current_app.root_path, "static", "assets", "img", "favicon.png")
+    logo_exists = os.path.exists(logo_path)
 
     buf = BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    W, H = A4
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=2*cm,
+        rightMargin=2*cm,
+        topMargin=2.0*cm,
+        bottomMargin=2.0*cm
+    )
 
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(2*cm, H-2*cm, "Conciliación diaria de caja")
-    c.setFont("Helvetica", 10)
-    c.drawString(2*cm, H-2.6*cm, f"Fecha: {fecha.isoformat()}")
-    c.drawString(12*cm, H-2.6*cm, "Hotel Villa Grace")
+    styles = getSampleStyleSheet()
+    s_title = ParagraphStyle(
+        "title",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=16,
+        leading=18,
+        alignment=TA_LEFT,
+        textColor=colors.HexColor("#1b7a4e")
+    )
+    s_sub = ParagraphStyle(
+        "sub",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=12,
+        textColor=colors.HexColor("#3b3b3b")
+    )
+    s_small = ParagraphStyle(
+        "small",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=10,
+        textColor=colors.HexColor("#6b7280")
+    )
+    s_right = ParagraphStyle(
+        "right",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=12,
+        alignment=TA_RIGHT
+    )
+    s_center = ParagraphStyle(
+        "center",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=12,
+        alignment=TA_CENTER
+    )
 
-    def row(y, label, value):
-        c.setFont("Helvetica", 10)
-        c.drawString(2*cm, y, label)
+    def _on_page(canv, _doc):
+        # Barra superior fina
+        canv.saveState()
+        canv.setFillColor(colors.HexColor("#1b7a4e"))
+        canv.rect(0, A4[1]-1.0*cm, A4[0], 0.18*cm, stroke=0, fill=1)
+        canv.restoreState()
+
+        # Pie de página
+        canv.saveState()
+        canv.setStrokeColor(colors.HexColor("#e5e7eb"))
+        canv.setLineWidth(0.8)
+        canv.line(2*cm, 1.55*cm, A4[0]-2*cm, 1.55*cm)
+
+        canv.setFont("Helvetica", 8.5)
+        canv.setFillColor(colors.HexColor("#6b7280"))
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        canv.drawString(2*cm, 1.1*cm, f"Generado: {now}")
+        canv.drawRightString(A4[0]-2*cm, 1.1*cm, f"Página {canv.getPageNumber()}")
+        canv.restoreState()
+
+    elements = []
+
+    # Header (logo + títulos)
+    left_block = []
+    if logo_exists:
         try:
-            val = float(value or 0)
+            left_block.append(Image(logo_path, width=1.5*cm, height=1.5*cm))
         except Exception:
-            val = 0.0
-        c.drawRightString(W-2*cm, y, f"₡ {val:,.2f}")
+            pass
 
-    y = H - 4*cm
-    row(y, "Efectivo inicial", resumen.get("opening_cash", 0)); y -= 0.6*cm
-    row(y, "Ingresos (efectivo)", resumen.get("ingresos_efectivo", 0)); y -= 0.6*cm
-    row(y, "Egresos (efectivo)", resumen.get("egresos_efectivo", 0)); y -= 0.6*cm
-    row(y, "Ajustes (+)", resumen.get("ajustes_mas", 0)); y -= 0.6*cm
-    row(y, "Ajustes (-)", resumen.get("ajustes_menos", 0)); y -= 0.6*cm
+    title = Paragraph("Conciliación diaria de caja", s_title)
+    subtitle = Paragraph(f"Fecha: <b>{fecha.isoformat()}</b>", s_sub)
+    meta = Paragraph(f"{hotel_name}<br/>Usuario: <b>{generado_por}</b> · Rol: <b>{rol}</b>", s_small)
 
-    c.setLineWidth(0.5)
-    c.line(2*cm, y-0.2*cm, W-2*cm, y-0.2*cm)
-    y -= 0.8*cm
+    # Armado header en tabla
+    header_data = []
+    if left_block:
+        header_data = [[left_block[0], title]]
+        header_tbl = Table(header_data, colWidths=[1.8*cm, (A4[0]-4*cm)-1.8*cm])
+        header_tbl.setStyle(TableStyle([
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("LEFTPADDING", (0,0), (-1,-1), 0),
+            ("RIGHTPADDING", (0,0), (-1,-1), 0),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+        ]))
+        elements.append(header_tbl)
+    else:
+        elements.append(title)
 
+    elements.append(subtitle)
+    elements.append(Spacer(1, 6))
+    elements.append(meta)
+    elements.append(Spacer(1, 12))
+
+    # Si NO hay datos, sello / aviso
+    if not has_data:
+        warn = Paragraph(
+            "<b>Estado:</b> SIN MOVIMIENTOS / SIN INFORMACIÓN REGISTRADA PARA ESTA FECHA.",
+            ParagraphStyle(
+                "warn",
+                parent=styles["Normal"],
+                fontName="Helvetica-Bold",
+                fontSize=10.5,
+                leading=13,
+                textColor=colors.HexColor("#b45309")
+            )
+        )
+        elements.append(warn)
+        elements.append(Spacer(1, 10))
+
+    # Info sesión (si existe)
+    sid = sess.get("id_session") or "—"
+    st = (sess.get("status") or "—")
+    opened_at = sess.get("opened_at")
+    closed_at = sess.get("closed_at")
+
+    info_txt = f"""
+    <b>Sesión:</b> {sid} &nbsp;&nbsp; <b>Estado:</b> {st}<br/>
+    <b>Apertura:</b> {opened_at or "—"} &nbsp;&nbsp; <b>Cierre:</b> {closed_at or "—"}
+    """
+    elements.append(Paragraph(info_txt, s_small))
+    elements.append(Spacer(1, 10))
+
+    # Tabla principal (resumen)
+    rows = [
+        ["Concepto", "Monto"],
+        ["Efectivo inicial", _money(resumen.get("opening_cash"))],
+        ["Ingresos (efectivo)", _money(resumen.get("ingresos_efectivo"))],
+        ["Egresos (efectivo)", _money(resumen.get("egresos_efectivo"))],
+        ["Ajustes (+)", _money(resumen.get("ajustes_mas"))],
+        ["Ajustes (-)", _money(resumen.get("ajustes_menos"))],
+    ]
+    tbl = Table(rows, colWidths=[(A4[0]-4*cm)*0.68, (A4[0]-4*cm)*0.32])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#1b7a4e")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE", (0,0), (-1,0), 10),
+        ("ALIGN", (1,1), (1,-1), "RIGHT"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.HexColor("#e5e7eb")),
+        ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f9fafb")]),
+        ("LEFTPADDING", (0,0), (-1,-1), 8),
+        ("RIGHTPADDING", (0,0), (-1,-1), 8),
+        ("TOPPADDING", (0,0), (-1,-1), 6),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+    ]))
+    elements.append(tbl)
+    elements.append(Spacer(1, 12))
+
+    # Totales destacados
     esperado = resumen.get("efectivo_esperado", 0)
     contado = resumen.get("efectivo_contado", 0)
     desc = resumen.get("descuadre", 0)
-
-    c.setFont("Helvetica-Bold", 11)
-    row(y, "Efectivo ESPERADO", esperado); y -= 0.6*cm
-    row(y, "Efectivo CONTADO", contado); y -= 0.6*cm
-
-    c.setStrokeColor(colors.black)
-    box_y = y - 0.2*cm
-    c.rect(2*cm, box_y-0.4*cm, W-4*cm, 1.2*cm, stroke=1, fill=0)
-    c.setFont("Helvetica-Bold", 12)
     try:
         desc_val = float(desc or 0)
     except Exception:
         desc_val = 0.0
-    c.drawString(2.3*cm, box_y+0.1*cm, f"DESCUADRE: ₡ {desc_val:,.2f}")
 
-    c.showPage()
-    c.save()
+    desc_bg = colors.HexColor("#fee2e2") if abs(desc_val) > 0.01 else colors.HexColor("#dcfce7")
+    desc_fg = colors.HexColor("#991b1b") if abs(desc_val) > 0.01 else colors.HexColor("#166534")
+
+    totals = [
+        ["Efectivo ESPERADO", _money(esperado)],
+        ["Efectivo CONTADO", _money(contado)],
+        ["DESCUADRE", _money(desc)],
+    ]
+    tot_tbl = Table([["Totales", ""], *totals], colWidths=[(A4[0]-4*cm)*0.68, (A4[0]-4*cm)*0.32])
+    tot_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#0f172a")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE", (0,0), (-1,0), 10),
+
+        ("GRID", (0,0), (-1,-1), 0.5, colors.HexColor("#e5e7eb")),
+        ("ALIGN", (1,1), (1,-1), "RIGHT"),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+
+        ("FONTNAME", (0,1), (-1,-1), "Helvetica-Bold"),
+        ("FONTSIZE", (0,1), (-1,-1), 10),
+
+        ("BACKGROUND", (0,3), (-1,3), desc_bg),
+        ("TEXTCOLOR", (0,3), (-1,3), desc_fg),
+
+        ("LEFTPADDING", (0,0), (-1,-1), 8),
+        ("RIGHTPADDING", (0,0), (-1,-1), 8),
+        ("TOPPADDING", (0,0), (-1,-1), 7),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+    ]))
+    elements.append(tot_tbl)
+    elements.append(Spacer(1, 14))
+
+    # Firmas / observaciones
+    elements.append(Paragraph("<b>Firmas</b>", ParagraphStyle(
+        "h2",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        textColor=colors.HexColor("#111827")
+    )))
+    elements.append(Spacer(1, 8))
+
+    sig_tbl = Table(
+        [
+            ["Entregado por:", "Recibido por:"],
+            ["______________________________", "______________________________"],
+            ["Nombre y firma", "Nombre y firma"],
+            ["", ""],
+            ["Observaciones:", ""],
+            ["______________________________________________", ""],
+        ],
+        colWidths=[(A4[0]-4*cm)*0.5, (A4[0]-4*cm)*0.5]
+    )
+    sig_tbl.setStyle(TableStyle([
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE", (0,0), (-1,0), 9.5),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor("#374151")),
+
+        ("FONTSIZE", (0,1), (-1,-1), 9),
+        ("TEXTCOLOR", (0,1), (-1,-1), colors.HexColor("#6b7280")),
+
+        ("TOPPADDING", (0,0), (-1,-1), 4),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+    ]))
+    elements.append(sig_tbl)
+
+    # Construir PDF
+    doc.build(elements, onFirstPage=_on_page, onLaterPages=_on_page)
     buf.seek(0)
+
     return send_file(
         buf,
         mimetype="application/pdf",
         as_attachment=True,
         download_name=f"Conciliacion_Caja_{fecha.isoformat()}.pdf"
     )
-
 
 # =========================
 # UI mínima

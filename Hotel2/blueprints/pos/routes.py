@@ -1,4 +1,5 @@
-from flask import Blueprint, request, jsonify
+from flask import request, jsonify
+from . import pos_bp 
 from sqlalchemy import text
 from datetime import date
 from extensions import db
@@ -73,8 +74,6 @@ def _get_reserva(reserva_id: int):
 # =============================
 # Blueprint POS
 # =============================
-
-pos_bp = Blueprint("pos", __name__, url_prefix="/pos")
 
 
 @pos_bp.post("/checkout")
@@ -423,8 +422,8 @@ def _get_reserva(reserva_id: int):
 # FAC-07-002: Integración POS
 # =============================
 
-@pos_bp.post("/checkout")
-def pos_checkout():
+@pos_bp.post("/checkout_v2")
+def pos_checkout_v2():
     """
     FAC-07-002 Integrar con POS:
     Cada transacción del POS enviará automáticamente sus líneas contables
