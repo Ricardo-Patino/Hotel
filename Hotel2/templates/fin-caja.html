@@ -1,261 +1,488 @@
-<!-- templates/fin-caja.html -->
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Finanzas – Cierre de caja | Hotel Villa Grace</title>
+{# templates/fin-caja.html #}
+{% extends "base.html" %}
 
-  <!-- Iconos / fuentes / vendors igual que otras páginas -->
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon">
+{% block title %}Hotel Villa Grace | Cierre de caja{% endblock %}
+{% block meta_description %}Apertura, movimientos manuales, conciliación y cierre diario con reporte PDF.{% endblock %}
+{% block body_class %}cash-page{% endblock %}
 
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+{# Si querés marcar algo como activo en el menú, en tu layout tenés blocks como nav_inicio_active.
+   No hay uno de finanzas, así que lo dejamos sin marcar. #}
 
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/aos/aos.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/swiper/swiper-bundle.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/glightbox/css/glightbox.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/drift-zoom/drift-basic.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
+{% block head_extra %}
+  {# Si tu proyecto usa style.css adicional (como en tu HTML original de caja), lo cargamos aquí #}
   <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+{% endblock %}
 
-  <style>
-    .card { border-radius: 1rem; }
-    .form-control, .btn, .form-select { border-radius: .75rem; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-    .kv { font-size:.95rem; }
-  </style>
-</head>
-<body>
+{% block content %}
 
-<!-- ===== Header igual al tema ===== -->
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="{{ url_for('index_html') }}" class="logo d-flex align-items-center me-auto me-xl-0">
-      <h1 class="sitename">Hotel Villa Grace</h1>
-    </a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li class="dropdown">
-          <a href="#" class="active"><span>Finanzas</span> <i class="bi bi-chevron-down toggle-dropdown"></i></a>
-          <ul>
-            <li><a href="#">Tablero</a></li>
-            <li><a href="/fin-payments.html">Cobros y folios</a></li>
-            <li><a href="{{ url_for('fin_invoices_html') }}">Facturas</a></li>
-            <li><a class="active" href="{{ url_for('fin_cash.ui') }}">Cierre de caja</a></li>
-          </ul>
-        </li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+<!-- Backdrop + Toast centrado -->
+<div id="toastBackdrop" class="toast-backdrop"></div>
+<div id="toastStack" class="toast-stack"></div>
+
+<div class="page-title dark-background" data-aos="fade"
+     style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Conciliación de caja</h1>
+    <p>Apertura, movimientos manuales y cierre diario con reporte.</p>
+    <nav class="breadcrumbs">
+      <ol>
+        <li><a href="#">Finanzas</a></li>
+        <li class="current">Cierre de caja</li>
+      </ol>
     </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="#" onclick="window.print()">Imprimir</a>
   </div>
-</header>
+</div>
 
-<main class="main">
-  <div class="page-title dark-background" data-aos="fade"
-       style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Conciliación de caja</h1>
-      <p>Apertura, movimientos manuales, cobros POS y cierre diario con reporte.</p>
-      <nav class="breadcrumbs">
-        <ol>
-          <li><a href="#">Finanzas</a></li>
-          <li class="current">Cierre de caja</li>
-        </ol>
-      </nav>
-    </div>
-  </div>
+<section class="section">
+  <div class="container" data-aos="fade-up">
+    <div class="row g-4">
 
-  <!-- Toast -->
-  <div class="position-fixed top-0 end-0 p-3" style="z-index:1080">
-    <div id="appToast" class="toast align-items-center text-bg-success border-0" role="status" aria-live="polite" aria-atomic="true">
-      <div class="d-flex">
-        <div class="toast-body" id="appToastBody">...</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+      <!-- Guía rápida -->
+      <div class="col-12">
+        <div class="card shadow-sm border-0 soft">
+          <div class="card-body">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-info-circle text-success"></i>
+              <h5 class="mb-0">Guía rápida para el personal</h5>
+            </div>
+            <div class="help mb-3">
+              Esto es lo recomendado para operar la caja sin errores. Si algo no cuadra, revisá <strong>Conciliación</strong> antes de cerrar.
+            </div>
+
+            <div class="row g-2">
+              <div class="col-md-6">
+                <div class="d-flex gap-2 align-items-start">
+                  <span class="step-badge">1</span>
+                  <div>
+                    <div class="fw-semibold">Abrir caja</div>
+                    <div class="help">Al inicio del turno, registrá el efectivo inicial (si aplica) y la fecha.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="d-flex gap-2 align-items-start">
+                  <span class="step-badge">2</span>
+                  <div>
+                    <div class="fw-semibold">Registrar movimientos manuales</div>
+                    <div class="help">Ingresos/egresos/ajustes que no vienen del POS (ej: vuelto inicial, compra urgente, etc.).</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="d-flex gap-2 align-items-start">
+                  <span class="step-badge">3</span>
+                  <div>
+                    <div class="fw-semibold">Conciliación y Cierre</div>
+                    <div class="help">Consultá el resumen del día, contá efectivo, cerrá y descargá el PDF para archivo.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="badge bg-success-subtle text-success">
+                <i class="bi bi-person-badge me-1"></i>
+                Usuario: {{ session.get('user_name', '—') }}
+              </span>
+              <span class="badge bg-secondary-subtle text-secondary">
+                <i class="bi bi-shield-lock me-1"></i>
+                Rol: {{ session.get('user_role', '—') }}
+              </span>
+              <span class="badge bg-light text-dark">
+                <i class="bi bi-calendar-event me-1"></i>
+                Fecha local: <span id="todayBadge">—</span>
+              </span>
+            </div>
+
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <section class="section">
-    <div class="container" data-aos="fade-up">
-      <div class="row g-4">
+      <!-- Apertura -->
+      <div class="col-12">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <h5 class="mb-0">Apertura</h5>
+            <div class="help mt-1">
+              <i class="bi bi-lightbulb me-1"></i>
+              Usá esto al <strong>inicio del turno</strong>. Si ya existe una apertura para la fecha, el sistema puede rechazar una segunda.
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row g-2">
 
-        <!-- Apertura -->
-        <div class="col-12">
-          <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-0"><h5 class="mb-0">Apertura</h5></div>
-            <div class="card-body">
-              <div class="row g-2">
-                <div class="col-md-2"><input id="ap_opened_by" class="form-control" type="number" placeholder="opened_by" value="1"></div>
-                <div class="col-md-3"><input id="ap_opening_cash" class="form-control" type="number" step="0.01" placeholder="Efectivo inicial"></div>
-                <div class="col-md-3"><input id="ap_fecha" class="form-control" type="date"></div>
-                <div class="col-md-4 d-grid"><button class="btn btn-primary" onclick="apertura()"><i class="bi bi-box-arrow-in-right me-1"></i> Abrir caja</button></div>
+              <input id="ap_opened_by_id" type="hidden" value="{{ session.get('user_id', 1) }}">
+
+              <div class="col-md-3">
+                <label class="form-label kv">Abierto por</label>
+                <input id="ap_opened_by_name" class="form-control" type="text"
+                       value="{{ session.get('user_name', 'Administrador') }}" readonly>
+                <div class="help">Se toma automáticamente del usuario logueado.</div>
               </div>
+
+              <div class="col-md-3">
+                <label class="form-label kv">Efectivo inicial</label>
+                <input id="ap_opening_cash" class="form-control" type="number" step="0.01" placeholder="CRC 0.00">
+                <div class="help">Si inician con caja chica / cambio, ponelo aquí.</div>
+              </div>
+
+              <div class="col-md-3">
+                <label class="form-label kv">Fecha</label>
+                <input id="ap_fecha" class="form-control" type="date">
+                <div class="help">Por defecto: hoy.</div>
+              </div>
+
+              <div class="col-md-3 d-grid align-self-end">
+                <button class="btn btn-primary" onclick="apertura()">
+                  <i class="bi bi-box-arrow-in-right me-1"></i> Abrir caja
+                </button>
+                <div class="help mt-2">Si te sale error, revisá si ya había una apertura hoy.</div>
+              </div>
+
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Movimiento -->
-        <div class="col-lg-6">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white border-0"><h5 class="mb-0">Movimiento manual</h5></div>
-            <div class="card-body">
-              <div class="row g-2">
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">Tipo</label>
-                  <select id="mv_tipo" class="form-select">
-                    <option>Ingreso</option><option>Egreso</option><option>Ajuste</option>
-                  </select>
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">Método</label>
-                  <select id="mv_metodo" class="form-select">
-                    <option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option><option>Otro</option>
-                  </select>
-                </div>
-                <div class="col-12 col-md-8">
-                  <label class="form-label kv">Concepto</label>
-                  <input id="mv_concepto" class="form-control" placeholder="Concepto">
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">Monto</label>
-                  <input id="mv_monto" class="form-control" type="number" step="0.01" placeholder="0.00">
-                </div>
-                <div class="col-6 col-md-4 d-grid">
-                  <label class="form-label d-none d-md-block">&nbsp;</label>
-                  <button class="btn btn-success" onclick="movimiento()"><i class="bi bi-plus-circle me-1"></i> Agregar</button>
-                </div>
-              </div>
-              <small class="text-muted d-block mt-2">Para restar efectivo con <strong>Ajuste</strong>, ingresa el monto en negativo.</small>
+      <!-- Movimiento manual -->
+      <div class="col-12">
+        <div class="card shadow-sm border-0">
+          <div class="card-header bg-white border-0">
+            <h5 class="mb-0">Movimiento manual</h5>
+            <div class="help mt-1">
+              <i class="bi bi-lightbulb me-1"></i>
+              Para registrar entradas/salidas que no vienen del POS (ej: compras pequeñas, retiros, ajustes de contado).
             </div>
           </div>
-        </div>
+          <div class="card-body">
+            <input id="mv_created_by_id" type="hidden" value="{{ session.get('user_id', 1) }}">
 
-        <!-- Cobro POS a Reserva -->
-        <div class="col-lg-6">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white border-0">
-              <h5 class="mb-0">Cobro POS a Reserva</h5>
-              <small class="text-muted">Registra el pago en caja, aplica abono y genera asiento contable.</small>
-            </div>
-            <div class="card-body">
-              <div class="row g-2">
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">ID Reserva</label>
-                  <input id="pos_reserva_id" class="form-control" type="number" placeholder="Ej: 2">
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">Monto (₡)</label>
-                  <input id="pos_monto" class="form-control" type="number" step="0.01" placeholder="10000">
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">Método</label>
-                  <select id="pos_metodo" class="form-select">
-                    <option value="Efectivo">Efectivo</option>
-                    <option value="Tarjeta">Tarjeta</option>
-                    <option value="Transferencia">Transferencia</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                </div>
-                <div class="col-12 col-md-6">
-                  <label class="form-label kv">Concepto</label>
-                  <input id="pos_concepto" class="form-control" placeholder="Pago de estadía / minibar / etc">
-                </div>
-                <div class="col-12 col-md-6">
-                  <label class="form-label kv">Referencia</label>
-                  <input id="pos_referencia" class="form-control" placeholder="VISA AUTH 12345">
-                </div>
+            <div class="row g-2">
+              <div class="col-6 col-md-3">
+                <label class="form-label kv">Tipo</label>
+                <select id="mv_tipo" class="form-select">
+                  <option>Ingreso</option>
+                  <option>Egreso</option>
+                  <option>Ajuste</option>
+                </select>
+                <div class="help">Ajuste: correcciones puntuales.</div>
               </div>
 
-              <div class="mt-3 d-grid">
-                <button class="btn btn-warning" onclick="enviarCobroPOS()">
-                  <i class="bi bi-cash-coin me-1"></i> Cobrar reserva
+              <div class="col-6 col-md-3">
+                <label class="form-label kv">Método</label>
+                <select id="mv_metodo" class="form-select">
+                  <option>Efectivo</option>
+                  <option>Tarjeta</option>
+                  <option>Transferencia</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+
+              <div class="col-12 col-md-6">
+                <label class="form-label kv">Concepto</label>
+                <input id="mv_concepto" class="form-control" placeholder="Ej: Compra urgente, cambio, retiro, etc.">
+                <div class="help">Descripción clara para auditoría.</div>
+              </div>
+
+              <div class="col-6 col-md-3">
+                <label class="form-label kv">Monto</label>
+                <input id="mv_monto" class="form-control" type="number" step="0.01" placeholder="0.00">
+              </div>
+
+              <div class="col-6 col-md-3 d-grid">
+                <label class="form-label d-none d-md-block">&nbsp;</label>
+                <button class="btn btn-success" onclick="movimiento()">
+                  <i class="bi bi-plus-circle me-1"></i> Agregar
                 </button>
               </div>
-              <div id="pos_resultado" class="small text-muted mt-2"></div>
             </div>
+
+            <small class="text-muted d-block mt-2">
+              Tip: si el movimiento es <strong>Egreso</strong>, poné concepto + método (ej. “Compra hielo - Efectivo”).
+            </small>
           </div>
         </div>
-
-        <!-- Cierre -->
-        <div class="col-lg-6">
-          <div class="card shadow-sm border-0 h-100">
-            <div class="card-header bg-white border-0"><h5 class="mb-0">Cierre</h5></div>
-            <div class="card-body">
-              <div class="row g-2">
-                <div class="col-12 col-md-4">
-                  <label class="form-label kv">Efectivo contado</label>
-                  <input id="ci_contado" class="form-control" type="number" step="0.01" placeholder="0.00">
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">Fecha</label>
-                  <input id="ci_fecha" class="form-control" type="date">
-                </div>
-                <div class="col-6 col-md-4">
-                  <label class="form-label kv">closed_by</label>
-                  <input id="ci_closed_by" class="form-control" type="number" value="1">
-                </div>
-                <div class="col-12 d-grid mt-1">
-                  <button class="btn btn-danger" onclick="cierre()"><i class="bi bi-lock-fill me-1"></i> Cerrar caja</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Conciliación -->
-        <div class="col-12">
-          <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">Conciliación</h5>
-              <div class="d-flex gap-2">
-                <input id="co_fecha" class="form-control form-control-sm" type="date">
-                <button class="btn btn-outline-primary btn-sm" onclick="conciliacion()"><i class="bi bi-search"></i></button>
-                <a id="pdf_link" class="btn btn-outline-secondary btn-sm" target="_blank"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
-              </div>
-            </div>
-            <div class="card-body">
-              <pre class="mono mt-2 mb-0" id="co_out" style="white-space:pre-wrap"></pre>
-            </div>
-          </div>
-        </div>
-
       </div>
+
+      <!-- Cierre -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-white border-0">
+            <h5 class="mb-0">Cierre</h5>
+            <div class="help mt-1">
+              <i class="bi bi-lightbulb me-1"></i>
+              Al final del turno: contá el efectivo, compará con conciliación y cerrá. Luego descargá el PDF.
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row g-2">
+
+              <div class="col-12 col-md-4">
+                <label class="form-label kv">Efectivo contado</label>
+                <input id="ci_contado" class="form-control" type="number" step="0.01" placeholder="0.00">
+                <div class="help">Lo que físicamente tenés en caja.</div>
+              </div>
+
+              <div class="col-6 col-md-4">
+                <label class="form-label kv">Fecha</label>
+                <input id="ci_fecha" class="form-control" type="date">
+                <div class="help">Por defecto: hoy.</div>
+              </div>
+
+              <input id="ci_closed_by_id" type="hidden" value="{{ session.get('user_id', 1) }}">
+              <div class="col-6 col-md-4">
+                <label class="form-label kv">Cerrado por</label>
+                <input id="ci_closed_by_name" class="form-control" type="text"
+                       value="{{ session.get('user_name', 'Administrador') }}" readonly>
+                <div class="help">Se toma del usuario logueado.</div>
+              </div>
+
+              <div class="col-12 d-grid mt-1">
+                <button class="btn btn-danger" onclick="cierre()">
+                  <i class="bi bi-lock-fill me-1"></i> Cerrar caja
+                </button>
+                <div class="help mt-2">Si el cierre falla: revisá que exista apertura del día o que no esté ya cerrada.</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conciliación -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+          <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+            <div>
+              <h5 class="mb-0">Conciliación</h5>
+              <div class="help mt-1">
+                <i class="bi bi-lightbulb me-1"></i>
+                Te muestra el resumen del día (movimientos manuales, esperado vs contado, etc.)
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <input id="co_fecha" class="form-control form-control-sm" type="date">
+              <button class="btn btn-outline-primary btn-sm" onclick="conciliacion()">
+                <i class="bi bi-search"></i>
+              </button>
+              <a id="pdf_link" class="btn btn-outline-secondary btn-sm" target="_blank" href="#">
+                <i class="bi bi-file-earmark-pdf"></i> PDF
+              </a>
+            </div>
+          </div>
+          <div class="card-body">
+            <pre class="mono mt-2 mb-0" id="co_out" style="white-space:pre-wrap">Presioná Buscar para ver la conciliación del día.</pre>
+            <div class="help mt-2">Tip: descargá el PDF y guardalo como respaldo diario.</div>
+          </div>
+        </div>
+      </div>
+
     </div>
-  </section>
-</main>
-
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center">
-    <div class="container">© <strong><span>Hotel Villa Grace</span></strong></div>
   </div>
-</footer>
+</section>
 
-<a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-  <i class="bi bi-arrow-up-short"></i>
-</a>
-<div id="preloader"></div>
+{% endblock %}
 
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/vendor/aos/aos.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
+{% block scripts %}
+{{ super() }}
+
+<style>
+  .card { border-radius: 1rem; }
+  .form-control, .btn, .form-select { border-radius: .75rem; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  .kv { font-size:.95rem; }
+  .help { color:#6c757d; font-size:.92rem; }
+  .help i { opacity:.85; }
+  .step-badge{
+    width:26px;height:26px;border-radius:999px;
+    display:inline-flex;align-items:center;justify-content:center;
+    background:rgba(27,122,78,.12);color:#1b7a4e;font-weight:700;font-size:.85rem;flex:0 0 auto;
+  }
+  .soft{
+    background:rgba(0,0,0,.02);
+    border:1px solid rgba(0,0,0,.06);
+    border-radius:14px;
+  }
+
+  /* ===== Popup centrado (bonito) SIN detalles sensibles ===== */
+  .toast-backdrop{
+    position:fixed;
+    inset:0;
+    background: rgba(15, 23, 42, .35);
+    backdrop-filter: blur(3px);
+    opacity:0;
+    pointer-events:none;
+    transition: opacity .18s ease;
+    z-index:1090;
+  }
+  .toast-backdrop.show{ opacity:1; pointer-events:auto; }
+
+  .toast-stack{
+    position:fixed;
+    inset:0;
+    z-index:1100;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 1rem;
+    pointer-events:none;
+  }
+
+  .toast-card{
+    width: 430px;
+    max-width: 92vw;
+    border: 0 !important;
+    border-radius: 18px !important;
+    overflow: hidden;
+    box-shadow: 0 18px 45px rgba(0,0,0,.22);
+    pointer-events:auto;
+    transform: translateY(12px) scale(.985);
+    opacity: 0;
+    transition: transform .18s ease, opacity .18s ease;
+  }
+  .toast-card.show{ transform: translateY(0) scale(1); opacity: 1; }
+
+  .toast-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: .95rem 1rem;
+    color:#fff;
+  }
+  .toast-head .left{ display:flex; align-items:center; gap:.75rem; }
+
+  .toast-icon{
+    width: 42px; height: 42px; border-radius: 999px;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(255,255,255,.18);
+  }
+
+  .toast-head .title{ font-weight: 800; font-size: 1rem; line-height: 1.1; }
+
+  .toast-bodyx{ padding: .95rem 1rem 1rem 1rem; background:#fff; color:#212529; }
+  .toast-msg{ margin:0; font-size: .97rem; }
+  .toast-meta{ margin-top:.45rem; font-size:.85rem; color:#6c757d; }
+
+  .t-success{ background: linear-gradient(135deg,#1b7a4e,#28a066); }
+  .t-info{ background: linear-gradient(135deg,#0d6efd,#2a8cff); }
+  .t-warning{ background: linear-gradient(135deg,#f0ad00,#ffcc3a); color:#1f1f1f; }
+  .t-danger{ background: linear-gradient(135deg,#dc3545,#ff4d5f); }
+  .t-warning .title, .t-warning i{ color:#1f1f1f; }
+</style>
 
 <script>
+  // BASE toma el prefijo del blueprint fin_cash sin hardcodearlo
   const BASE = "{{ url_for('fin_cash.conciliacion') }}".replace('/conciliacion','');
-  const POS_BASE = "/pos"; // nuevo blueprint
 
-  function toast(msg, type='success', ms=2500) {
-    const el = document.getElementById('appToast');
-    const body = document.getElementById('appToastBody');
-    const map = {success:'success', info:'info', warning:'warning', danger:'danger', error:'danger'};
-    el.className = `toast align-items-center text-bg-${map[type]||'success'} border-0`;
-    body.textContent = msg;
-    new bootstrap.Toast(el, { delay: ms }).show();
+  // ======= Popup centrado seguro =======
+  function setBackdrop(on){
+    const b = document.getElementById("toastBackdrop");
+    if (!b) return;
+    if (on) b.classList.add("show");
+    else b.classList.remove("show");
+  }
+
+  function closeActiveToast(){
+    const stack = document.getElementById("toastStack");
+    if (!stack) return;
+    const el = stack.querySelector(".toast");
+    if (!el) return;
+    const inst = bootstrap.Toast.getInstance(el);
+    if (inst) inst.hide();
+    else { el.remove(); setBackdrop(false); }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const b = document.getElementById("toastBackdrop");
+    if (b) b.addEventListener("click", closeActiveToast);
+  });
+
+  function notify({type="info", title="Info", message="", meta="", ms=4500}){
+    const stack = document.getElementById("toastStack");
+    const id = "t" + Date.now() + Math.random().toString(16).slice(2);
+
+    const icons = {
+      success: "bi-check-circle-fill",
+      info: "bi-info-circle-fill",
+      warning: "bi-exclamation-triangle-fill",
+      danger: "bi-x-octagon-fill",
+      error: "bi-x-octagon-fill"
+    };
+
+    const t = (type === "error") ? "danger" : type;
+    const headClass = (t === "success") ? "t-success"
+                    : (t === "warning") ? "t-warning"
+                    : (t === "danger")  ? "t-danger"
+                    : "t-info";
+
+    const html = `
+      <div id="${id}" class="toast toast-card" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-head ${headClass}">
+          <div class="left">
+            <div class="toast-icon">
+              <i class="bi ${icons[t] || icons.info}"></i>
+            </div>
+            <div class="title">${title || "Mensaje"}</div>
+          </div>
+          <button type="button" class="btn-close ${t === "warning" ? "" : "btn-close-white"}" aria-label="Cerrar"></button>
+        </div>
+        <div class="toast-bodyx">
+          <p class="toast-msg">${message || ""}</p>
+          ${meta ? `<div class="toast-meta">${meta}</div>` : ""}
+        </div>
+      </div>
+    `;
+
+    stack.innerHTML = "";
+    stack.insertAdjacentHTML("beforeend", html);
+
+    const el = document.getElementById(id);
+    const closeBtn = el.querySelector(".btn-close");
+
+    setBackdrop(true);
+
+    closeBtn.addEventListener("click", () => {
+      const inst = bootstrap.Toast.getInstance(el);
+      if (inst) inst.hide(); else el.remove();
+    });
+
+    const toast = new bootstrap.Toast(el, { delay: ms, autohide: true });
+    el.addEventListener("hidden.bs.toast", () => {
+      el.remove();
+      if (stack.childElementCount === 0) setBackdrop(false);
+    });
+
+    toast.show();
+  }
+
+  // ======= Helpers fetch robustos =======
+  async function readResponse(resp){
+    const status = resp.status;
+    const ct = (resp.headers.get("content-type") || "").toLowerCase();
+    const raw = await resp.text();
+
+    let json = null;
+    try { json = JSON.parse(raw); } catch (e) { json = null; }
+
+    return { status, ok_http: resp.ok, content_type: ct, raw, json };
+  }
+
+  function pickMessage(obj){
+    if (!obj || typeof obj !== "object") return "";
+    return obj.message || obj.msg || obj.error_description || "";
+  }
+
+  function friendlyError(code, fallback){
+    const map = {
+      already_open: "Ya existe una caja abierta o reabierta para esa fecha (o el período está bloqueado).",
+      no_open_session: "No hay una caja abierta para esa fecha. Primero debés abrir caja.",
+      already_closed: "Esa caja ya fue cerrada."
+    };
+    return map[code] || fallback || "No se pudo completar la operación.";
   }
 
   function valOrToday(id) {
@@ -263,16 +490,80 @@
     return el.value || new Date().toISOString().slice(0,10);
   }
 
+  function setTodayDefaults(){
+    const today = new Date().toISOString().slice(0,10);
+    ["ap_fecha","ci_fecha","co_fecha"].forEach((x)=>{
+      const el=document.getElementById(x);
+      if(el && !el.value) el.value = today;
+    });
+    const badge = document.getElementById("todayBadge");
+    if (badge) badge.textContent = today;
+  }
+
+  // ======= Formato bonito (NO JSON crudo en UI) =======
+  function money(x){
+    const n = Number(x ?? 0);
+    return "CRC " + n.toLocaleString("es-CR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function resumenToText(res, fecha){
+    const opening = money(res.opening_cash ?? 0);
+    const ingEf   = money(res.ingresos_efectivo ?? 0);
+    const egrEf   = money(res.egresos_efectivo ?? 0);
+    const ajMas   = money(res.ajustes_mas ?? 0);
+    const ajMen   = money(res.ajustes_menos ?? 0);
+
+    const esperado = money(res.efectivo_esperado ?? 0);
+    const contado  = money(res.efectivo_contado ?? 0);
+    const desc     = money(res.descuadre ?? 0);
+
+    return [
+      `Conciliación de caja – ${fecha}`,
+      ``,
+      `Efectivo inicial:      ${opening}`,
+      `Ingresos (efectivo):   ${ingEf}`,
+      `Egresos (efectivo):    ${egrEf}`,
+      `Ajustes (+):           ${ajMas}`,
+      `Ajustes (-):           ${ajMen}`,
+      ``,
+      `EFECTIVO ESPERADO:     ${esperado}`,
+      `EFECTIVO CONTADO:      ${contado}`,
+      `DESCUADRE:             ${desc}`,
+    ].join("\\n");
+  }
+
+  // ======= Acciones =======
   async function apertura(){
     const body = {
-      opened_by: parseInt(document.getElementById('ap_opened_by').value||'1'),
+      opened_by: parseInt(document.getElementById('ap_opened_by_id').value||'1'),
       opening_cash: parseFloat(document.getElementById('ap_opening_cash').value||'0'),
       fecha: valOrToday('ap_fecha')
     };
-    const r = await fetch(BASE+'/apertura', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    const txt = await r.text();
-    try { const j = JSON.parse(txt); if (j.ok) toast(`Apertura OK. Sesión: ${j.id_session}`, 'success'); else toast(`Apertura: ${txt}`, 'warning', 4500); }
-    catch { toast(`Error apertura: ${txt}`, 'danger', 6000); }
+
+    const resp = await fetch(BASE+'/apertura', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const r = await readResponse(resp);
+
+    if (r.json && typeof r.json === "object") {
+      if (r.json.ok) {
+        notify({ type:"success", title:"Apertura OK", message:`Sesión #${r.json.id_session}`, meta:`Fecha: ${body.fecha}` });
+      } else {
+        const code = r.json.error || r.json.code || "error";
+        const msg = friendlyError(code, pickMessage(r.json) || "No se pudo abrir la caja.");
+        notify({ type:"warning", title:"Apertura rechazada", message: msg, meta:`Fecha: ${body.fecha}`, ms: 6500 });
+        console.warn("Apertura rechazada (debug):", r.json);
+      }
+      return;
+    }
+
+    const hint = (r.status === 404) ? "Ruta no encontrada (404)."
+               : (r.status >= 500) ? "Error interno del servidor."
+               : "Respuesta inválida del servidor.";
+    notify({ type:"danger", title:"Apertura falló", message: hint, meta: `HTTP ${r.status}`, ms: 7000 });
+    console.error("Apertura no-JSON (debug):", {status:r.status, raw:r.raw});
   }
 
   async function movimiento(){
@@ -281,71 +572,123 @@
       metodo: document.getElementById('mv_metodo').value,
       concepto: document.getElementById('mv_concepto').value,
       monto: parseFloat(document.getElementById('mv_monto').value||'0'),
-      created_by: 1
+      created_by: parseInt(document.getElementById('mv_created_by_id').value||'1')
     };
-    const r = await fetch(BASE+'/movimiento', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    const txt = await r.text();
-    try { const j = JSON.parse(txt); if (j.ok) toast(`Movimiento agregado. Sesión: ${j.session_id}`, 'success'); else toast(`Movimiento: ${txt}`, 'warning', 4500); }
-    catch { toast(`Error movimiento: ${txt}`, 'danger', 6000); }
-  }
 
-  async function enviarCobroPOS() {
-    const body = {
-      reserva_id: parseInt(document.getElementById('pos_reserva_id').value||'0'),
-      monto: parseFloat(document.getElementById('pos_monto').value||'0'),
-      metodo: document.getElementById('pos_metodo').value,
-      concepto: document.getElementById('pos_concepto').value,
-      referencia: document.getElementById('pos_referencia').value,
-      created_by: 1
-    };
-    const box = document.getElementById('pos_resultado');
-    box.textContent = "Procesando...";
-
-    const r = await fetch(POS_BASE+'/checkout', {
+    const resp = await fetch(BASE+'/movimiento', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body)
     });
-    const data = await r.json();
+    const r = await readResponse(resp);
 
-    if (!data.ok) {
-      box.className = "small text-danger";
-      box.textContent = `Error: ${data.error || 'desconocido'} - ${data.message || ''}`;
-      toast('Error en cobro POS', 'danger');
-    } else {
-      box.className = "small text-success";
-      box.innerHTML = `
-        Cobro OK. Saldo pendiente: ₡${Number(data.saldo_pendiente || 0).toLocaleString('es-CR', {minimumFractionDigits:2})}
-        <br>Estado: <strong>${data.estado_pago}</strong>
-        <br>Movimiento #${data.cash_movement_id} | Ledger #${data.ledger_entry_id}
-      `;
-      toast('Cobro POS registrado correctamente', 'success');
+    if (r.json && typeof r.json === "object") {
+      if (r.json.ok) {
+        notify({
+          type:"success",
+          title:"Movimiento agregado",
+          message:`Sesión #${r.json.session_id}`,
+          meta:`${body.tipo} · ${body.metodo} · CRC${Number(body.monto||0).toLocaleString('es-CR')}`
+        });
+      } else {
+        const code = r.json.error || r.json.code || "error";
+        const msg = friendlyError(code, pickMessage(r.json) || "No se pudo registrar el movimiento.");
+        notify({ type:"warning", title:"Movimiento rechazado", message: msg, ms: 6500 });
+        console.warn("Movimiento rechazado (debug):", r.json);
+      }
+      return;
     }
+
+    notify({ type:"danger", title:"Movimiento falló", message:"Respuesta inválida del servidor.", meta:`HTTP ${r.status}`, ms:7000 });
+    console.error("Movimiento no-JSON (debug):", {status:r.status, raw:r.raw});
   }
 
   async function cierre(){
     const body = {
       closing_cash_counted: parseFloat(document.getElementById('ci_contado').value||'0'),
-      closed_by: parseInt(document.getElementById('ci_closed_by').value||'1'),
+      closed_by: parseInt(document.getElementById('ci_closed_by_id').value||'1'),
       fecha: valOrToday('ci_fecha')
     };
-    const r = await fetch(BASE+'/cierre', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-    const txt = await r.text();
-    try { const j = JSON.parse(txt); if (j.ok) toast('Caja cerrada correctamente.', 'success'); else toast(`Cierre: ${txt}`, 'warning', 4500); }
-    catch { toast(`Error cierre: ${txt}`, 'danger', 6000); }
+
+    const resp = await fetch(BASE+'/cierre', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const r = await readResponse(resp);
+
+    if (r.json && typeof r.json === "object") {
+      if (r.json.ok) {
+        notify({ type:"success", title:"Caja cerrada", message:"Cierre registrado correctamente.", meta:`Fecha: ${body.fecha}` });
+      } else {
+        const code = r.json.error || r.json.code || "error";
+        const msg = friendlyError(code, pickMessage(r.json) || "No se pudo cerrar la caja.");
+        notify({ type:"warning", title:"Cierre rechazado", message: msg, meta:`Fecha: ${body.fecha}`, ms: 7500 });
+        console.warn("Cierre rechazado (debug):", r.json);
+      }
+      return;
+    }
+
+    notify({ type:"danger", title:"Cierre falló", message:"Respuesta inválida del servidor.", meta:`HTTP ${r.status}`, ms:8000 });
+    console.error("Cierre no-JSON (debug):", {status:r.status, raw:r.raw});
   }
 
   async function conciliacion(){
     const fecha = valOrToday('co_fecha');
-    const r = await fetch(BASE+'/conciliacion?fecha='+fecha);
-    const data = await r.json();
-    document.getElementById('co_out').textContent = JSON.stringify(data, null, 2);
-    document.getElementById('pdf_link').href = BASE+'/reporte.pdf?fecha='+fecha;
-    toast('Resumen actualizado.', 'info', 1500);
-  }
-</script>
-</body>
-</html>
 
+    const pdfEl = document.getElementById('pdf_link');
+    if (pdfEl) pdfEl.href = `${BASE}/reporte.pdf?fecha=${encodeURIComponent(fecha)}`;
+
+    const resp = await fetch(BASE + '/conciliacion?fecha=' + encodeURIComponent(fecha));
+    const r = await readResponse(resp);
+
+    const out = document.getElementById('co_out');
+
+    if (r.json && r.json.ok) {
+
+      if (!r.json.resumen) {
+        if (out) {
+          out.textContent =
+            `No hay información registrada para esta fecha (${fecha}).\\n\\n` +
+            `Qué hacer:\\n` +
+            `1) Abrí la caja del día (Apertura).\\n` +
+            `2) Registrá movimientos manuales y/o cobros POS.\\n` +
+            `3) Volvé a presionar Buscar para ver la conciliación.\\n\\n` +
+            `Podés descargar el PDF y quedará como “SIN MOVIMIENTOS” para respaldo.`;
+        }
+
+        notify({
+          type:"warning",
+          title:"Sin información",
+          message:"No hay información registrada para esta fecha.",
+          meta:`Fecha: ${fecha}`,
+          ms: 4500
+        });
+
+        return;
+      }
+
+      if (out) out.textContent = resumenToText(r.json.resumen, fecha);
+
+      notify({
+        type:"info",
+        title:"Conciliación actualizada",
+        message:"Se actualizó el resumen del día.",
+        meta:`Fecha: ${fecha}`,
+        ms: 1800
+      });
+
+      return;
+    }
+
+    if (out) out.textContent = "No se pudo cargar la conciliación. Revisá el servidor o contactá al administrador.";
+    notify({ type:"danger", title:"Conciliación falló", message:"Respuesta inválida del servidor.", meta:`HTTP ${r.status}`, ms:8000 });
+    console.error("Conciliación error (debug):", {status:r.status, raw:r.raw, json:r.json});
+  }
+
+  document.addEventListener("DOMContentLoaded", () => setTodayDefaults());
+</script>
+
+{% endblock %}
 
 
