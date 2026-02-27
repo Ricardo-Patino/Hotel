@@ -31,3 +31,13 @@ build/
 backup/
 temp/
 tmp/
+
+# --- local / temporales ---
+Hotel 2/
+Hotel2/blueprints/fin_invoices.zip
+Hotel2/blueprints/hrm.zip
+Hotel2/static/uploads/invoices/
+*.pdf
+*.zip
+
+Hotel 2/

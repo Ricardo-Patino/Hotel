@@ -1,0 +1,54 @@
+{% extends "pdf/_base.html" %}
+{% block content %}
+
+<div class="grid">
+  <div class="box">
+    <h4>Cliente</h4>
+    <div class="row"><span>Nombre</span><span class="mono">{{ cliente_nombre or '-' }}</span></div>
+    <div class="row"><span>Correo</span><span class="mono">{{ cliente_email or '-' }}</span></div>
+  </div>
+
+  <div class="box">
+    <h4>Referencia</h4>
+    <div class="row"><span>Reserva</span><span class="mono">{{ reserva_id or '-' }}</span></div>
+    <div class="row"><span>Moneda</span><span class="mono">{{ moneda }}</span></div>
+  </div>
+</div>
+
+<div class="box">
+  <h4>Detalle</h4>
+  <div class="small">{{ descripcion or '—' }}</div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Concepto</th>
+      <th class="right">Monto</th>
+    </tr>
+  </thead>
+  <tbody>
+    {# Si luego metés líneas/items reales, aquí va el loop #}
+    <tr>
+      <td>{{ descripcion or 'Servicio' }}</td>
+      <td class="right mono">{{ moneda }} {{ "%.2f"|format(monto_total) }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="totalbox">
+  <div class="totals">
+    <div class="line"><span>Subtotal</span><span class="mono">{{ moneda }} {{ "%.2f"|format(subtotal or monto_total) }}</span></div>
+    <div class="line"><span>Impuestos</span><span class="mono">{{ moneda }} {{ "%.2f"|format(impuestos or 0) }}</span></div>
+    <div class="line grand"><span>Total</span><span class="mono">{{ moneda }} {{ "%.2f"|format(monto_total) }}</span></div>
+  </div>
+</div>
+
+{% if notas %}
+  <div class="box" style="margin-top:10px">
+    <h4>Notas</h4>
+    <div class="small">{{ notas }}</div>
+  </div>
+{% endif %}
+
+{% endblock %}

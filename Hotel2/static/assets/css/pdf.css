@@ -1,0 +1,123 @@
+/* ===== PDF BASE ===== */
+@page {
+  size: A4;
+  margin: 14mm 14mm 16mm 14mm;
+}
+
+:root{
+  --brand: #1c4b3c;      /* Villa Grace */
+  --brand-2: #e0f2eb;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+}
+
+* { box-sizing: border-box; }
+html, body { font-family: "Poppins", "Roboto", Arial, sans-serif; color: var(--text); }
+.small { font-size: 12px; color: var(--muted); }
+.mono  { font-variant-numeric: tabular-nums; }
+
+.header{
+  display:flex; justify-content:space-between; align-items:flex-start;
+  border-bottom: 2px solid var(--brand);
+  padding-bottom: 10px; margin-bottom: 14px;
+}
+.brand{
+  display:flex; gap:10px; align-items:center;
+}
+.brand img{ height:42px; }
+.brand .title{ font-weight:700; font-size:18px; color: var(--brand); line-height:1.1; }
+.brand .subtitle{ font-size:12px; color: var(--muted); }
+
+.docbox{
+  text-align:right;
+}
+.docbox .doctype{
+  font-size:14px; font-weight:700; color: var(--brand);
+}
+.docbox .docno{
+  font-size:12px; color: var(--muted);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.box{
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.box h4{
+  margin:0 0 6px 0; font-size:12px; color: var(--muted); font-weight:600;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.box .row{ display:flex; justify-content:space-between; gap:10px; font-size:13px; }
+.box .row + .row{ margin-top:4px; }
+
+table{
+  width:100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+thead th{
+  text-align:left;
+  font-size:12px;
+  color: #fff;
+  background: var(--brand);
+  padding: 8px;
+}
+tbody td{
+  font-size:12.5px;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+td.right, th.right{ text-align:right; }
+tfoot td{
+  padding: 8px;
+  font-size:12.5px;
+}
+.totalbox{
+  margin-top: 10px;
+  display:flex;
+  justify-content:flex-end;
+}
+.totalbox .totals{
+  width: 55%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.totals .line{ display:flex; justify-content:space-between; margin: 4px 0; }
+.totals .grand{
+  border-top: 1px solid var(--line);
+  margin-top: 8px; padding-top: 8px;
+  font-weight: 800; font-size: 14px;
+  color: var(--brand);
+}
+
+.footer{
+  position: running(footer);
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--muted);
+  display:flex; justify-content:space-between; gap:10px;
+}
+
+.watermark{
+  position: fixed;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  font-size: 64px;
+  font-weight: 900;
+  color: rgba(220, 38, 38, 0.10); /* rojo suave */
+  letter-spacing: .08em;
+  z-index: -1;
+  user-select: none;
+}

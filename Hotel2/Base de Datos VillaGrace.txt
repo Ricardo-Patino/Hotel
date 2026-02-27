@@ -3195,3 +3195,101 @@ SELECT * FROM Cliente;
 -- SELECT * FROM KPI_Stats;
 -- SELECT * FROM Coupon;
 -- SELECT * FROM EvtSalon;
+
+-- nuevo para nomina
+
+CREATE OR REPLACE VIEW vw_nomina_quincenal AS
+SELECT
+    m.Codigo_Funcionario,
+    CONCAT(f.Nombre, ' ', f.Apellido) AS Colaborador,
+    DATE_FORMAT(m.Fecha, '%Y-%m') AS periodo,
+    CASE 
+        WHEN DAY(m.Fecha) <= 15 THEN 'Q1'
+        ELSE 'Q2'
+    END AS quincena,
+    ROUND(SUM(COALESCE(m.Horas_Regulares, 0)), 2) AS horas_aprobadas
+FROM marcacion m
+JOIN funcionario f 
+    ON f.Codigo_Funcionario = m.Codigo_Funcionario
+WHERE m.Estado = 'Aprobado'
+GROUP BY
+    m.Codigo_Funcionario,
+    Colaborador,
+    periodo,
+    quincena;
+
+SELECT *
+FROM vw_nomina_quincenal
+WHERE periodo = '2026-01'
+  AND quincena = 'Q2'
+ORDER BY Colaborador;
+
+SELECT
+    v.Codigo_Funcionario,
+    v.Colaborador,
+    v.periodo,
+    v.quincena,
+    v.horas_aprobadas,
+    f.Salario_Base_Mensual,
+    ROUND(f.Salario_Base_Mensual / 2, 2) AS salario_quincenal,
+    ROUND((f.Salario_Base_Mensual / 2) / 92, 2) AS valor_hora,
+    ROUND(((f.Salario_Base_Mensual / 2) / 92) * v.horas_aprobadas, 2) AS monto_bruto_pagar
+FROM vw_nomina_quincenal v
+JOIN funcionario f
+  ON f.Codigo_Funcionario = v.Codigo_Funcionario
+WHERE v.periodo = '2026-02'
+  AND v.quincena = 'Q1';
+
+SELECT 
+    p.Id,
+    f.Nombre,
+    f.Apellido,
+    pp.Periodo_Key,
+    pp.Quincena,
+    p.Bruto_Quincena,
+    p.Neto_Pagar
+FROM HRM_Payroll p
+JOIN Funcionario f ON f.Codigo_Funcionario = p.Codigo_Funcionario
+JOIN HRM_PayrollPeriod pp ON pp.Id = p.Period_Id
+ORDER BY f.Nombre;
+
+UPDATE HRM_ConfigSocial
+SET CCSS_Pct = 5.50,
+    IVM_Pct  = 4.17,
+    BP_Pct   = 1.00
+WHERE Id = 1;
+
+select * from HRM_ConfigSocial
+
+# Arreglo finanzas
+
+-- Arreglo finanzas (nombres correctos)
+
+ALTER TABLE fin_receipts
+  ADD COLUMN created_at DATETIME NULL,
+  ADD COLUMN created_by INT NULL;
+
+ALTER TABLE fin_notes
+  ADD COLUMN created_at DATETIME NULL,
+  ADD COLUMN created_by INT NULL;
+
+SET SQL_SAFE_UPDATES = 0;
+
+UPDATE fin_receipts
+SET created_at = COALESCE(created_at, creado_en),
+    created_by = COALESCE(created_by, emitido_por)
+WHERE (created_at IS NULL OR created_by IS NULL);
+
+UPDATE fin_notes
+SET created_at = COALESCE(created_at, creado_en),
+    created_by = COALESCE(created_by, emitido_por)
+WHERE (created_at IS NULL OR created_by IS NULL);
+
+SET SQL_SAFE_UPDATES = 1;
+
+select * from fin_receipts
+
+SHOW KEYS FROM fin_receipts WHERE Key_name='PRIMARY';
+SHOW KEYS FROM fin_notes    WHERE Key_name='PRIMARY';
+
+SHOW COLUMNS FROM fin_notes;

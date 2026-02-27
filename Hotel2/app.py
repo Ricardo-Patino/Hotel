@@ -1562,6 +1562,11 @@ def create_app() -> Flask:
     #Bluprint de HRM
     from blueprints.hrm import hrm_bp
     app.register_blueprint(hrm_bp)
+
+    #Blueprint de fin_cash_bp
+    from blueprints.fin_invoices import fin_invoices_bp
+    app.register_blueprint(fin_invoices_bp)
+
     
     @app.get("/dashboard")
     @role_required("Administrador", "Recepcionista")
@@ -9321,6 +9326,7 @@ def create_app() -> Flask:
         flash("Factura anulada.", "info")
         return redirect(url_for("fin_invoices_html"))
 
+    app.config["FIN_PDF_ENGINE"] = "weasyprint"
 
     return app
 
@@ -9384,7 +9390,6 @@ def convert_to_base(amount: float, currency: str, rate_date: date) -> Tuple[floa
 
     fx = get_fx_rate_for_date(currency, rate_date)
     return float(amount) * fx, fx
-
 
 app = create_app()
 # =========================

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>{{ titulo or 'Documento' }}</title>
+
+  {# Importante: para PDF mejor NO depender de CDNs.
+     Usa tu CSS local #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/pdf.css') }}">
+</head>
+<body>
+
+{% if watermark %}
+  <div class="watermark">{{ watermark }}</div>
+{% endif %}
+
+<div class="header">
+  <div class="brand">
+    <img src="{{ url_for('static', filename='assets/img/favicon.png') }}" alt="Logo">
+    <div>
+      <div class="title">Hotel Villa Grace</div>
+      <div class="subtitle">Cóbano, Puntarenas • Tel: {{ hotel_tel or '-' }}</div>
+    </div>
+  </div>
+
+  <div class="docbox">
+    <div class="doctype">{{ doctype }}</div>
+    <div class="docno mono">{{ docno }}</div>
+    <div class="small mono">Emitido: {{ fecha_emision }}</div>
+  </div>
+</div>
+
+{% block content %}{% endblock %}
+
+<div class="footer">
+  <div>Gracias por su preferencia.</div>
+  <div class="mono">Generado por Villa Grace • {{ generado_en }}</div>
+</div>
+
+</body>
+</html>
