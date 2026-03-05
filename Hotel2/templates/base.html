@@ -111,19 +111,20 @@
                   {% if session.get('user_role') == 'Administrador' %}
                   <li><a href="{{ url_for('hrm.validar_horas_ui') }}">Validar horas</a></li>
                   <li><a href="{{ url_for('hrm.payroll_home') }}">Nómina</a></li>
+                  <li><a href="/hrm/dashboard">Ausencias</a></li>
                   {% endif %}
                 </ul>
               </li>
 
-              {# ✅ NUEVO: Finanzas #}
-              <li class="dropdown">
-                <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
-                <ul>
-                  <li><a href="/fin/caja/ui">Caja</a></li>
-                  <li><a href="/fin/periods/ui">Períodos</a></li>
-                  <li><a href="/fin-invoices.html">Facturas</a></li>
-                </ul>
-              </li>
+            {# ✅ NUEVO: Finanzas #}
+            <li class="dropdown">
+              <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+              <ul>
+                <li><a href="/fin/caja/ui">Caja</a></li>
+                <li><a href="/fin/periods/ui">Períodos</a></li>
+                <li><a href="/fin-invoices.html">Facturas</a></li>
+              </ul>
+            </li>
 
               <li class="dropdown">
                 <a href="#"><span>Inventario</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
