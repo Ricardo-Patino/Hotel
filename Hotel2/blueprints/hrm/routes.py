@@ -981,23 +981,26 @@ def exec_(sql, **params):
 
 @hrm_bp.get("/dashboard")
 def dashboard():
+    marker = "DASHBOARD_V2_OK"
+
+    # DEBUG DB
+    debug_db = q("SELECT DATABASE() AS db, USER() AS user, @@hostname AS host")[0]
+    debug_cnt = q("SELECT COUNT(*) AS total FROM Funcionario")[0]
+
     # mini-resumen para tarjetas
     resumen = q("""
         SELECT 
           (SELECT COUNT(*) 
              FROM Funcionario 
-            WHERE Estado_Empleado='Activo') AS activos,
+            WHERE TRIM(LOWER(Estado_Empleado)) = 'activo') AS activos,
 
-          -- dejamos esto aunque no se use ahora
           (SELECT COUNT(*) 
              FROM HRM_VacationRequest 
             WHERE Estado='PENDIENTE') AS vac_pend,
 
-          -- TOTAL de amonestaciones registradas
           (SELECT COUNT(*) 
              FROM HRM_Warning) AS amon_pend,
 
-          -- TOTAL de ausencias registradas
           (SELECT COUNT(*) 
              FROM HRM_Absence) AS aus_hoy
     """)[0]
@@ -1009,12 +1012,25 @@ def dashboard():
         LIMIT 6
     """)
 
+    funcionarios = q("""
+        SELECT
+            Codigo_Funcionario AS id,
+            CONCAT(Nombre, ' ', Apellido) AS nombre,
+            Estado_Empleado AS estado
+        FROM Funcionario
+        WHERE TRIM(LOWER(Estado_Empleado)) = 'activo'
+        ORDER BY Nombre, Apellido
+    """)
+
     return render_template(
         "hrm-dashboard.html",
         resumen=resumen,
-        periodos=periodos
+        periodos=periodos,
+        funcionarios=funcionarios,
+        marker=marker,
+        debug_db=debug_db,
+        debug_cnt=debug_cnt
     )
-
 
 # =============== HRM-08-005 ===============
 @hrm_bp.post("/absences")
@@ -2007,39 +2023,6 @@ def aguinaldo_generate():
           ON DUPLICATE KEY UPDATE Bruto_Quincena=:b, Neto_Pagar=:b
         """, pid=per["Id"], f=r["Codigo_Funcionario"], base=base, b=bruto)
     return jsonify({"ok": True})
-
-@hrm_bp.route("/", methods=["GET"])
-def rrhh_ui():
-    resumen = {
-        "activos": db.session.query(Funcionario)
-            .filter(Funcionario.Estado_Empleado == "Activo")
-            .count(),
-
-        "vac_pend": db.session.query(HRMAbsence)
-            .filter(HRMAbsence.Tipo == "VACACIONES")
-            .count(),
-
-        "amon_pend": db.session.query(text("HRM_Warning"))
-            .filter(text("Estado='REGISTRADA'"))
-            .count(),
-
-        "aus_hoy": db.session.query(HRMAbsence)
-            .filter(HRMAbsence.Fecha == func.curdate())
-            .count(),
-    }
-
-    periodos = (
-        db.session.query(HRMPayrollPeriod)
-        .order_by(HRMPayrollPeriod.Fecha_Desde.desc())
-        .limit(5)
-        .all()
-    )
-
-    return render_template(
-        "rrhh.html",
-        resumen=resumen,
-        periodos=periodos,
-    )
 
 @hrm_bp.get("/payroll/period/<int:period_id>/rows")
 def payroll_period_rows(period_id):
