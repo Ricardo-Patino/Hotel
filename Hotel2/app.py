@@ -2219,7 +2219,8 @@ def create_app() -> Flask:
     @app.route("/ops-reservas-dashboard.html")
     @role_required("Administrador", "Recepcionista")
     def ops_reservas_dashboard_html():
-        return render_template("ops-reservas-dashboard.html")
+        result = db.session.execute(text("SELECT * FROM Reserva"))
+        return render_template("ops-reservas-dashboard.html", reservas=result)
     
     
         
@@ -3983,6 +3984,7 @@ def create_app() -> Flask:
             # SINPE (Paso 1)
             "sinpe_mobile": _sac_cfg("sinpe_mobile", None),
             "sinpe_beneficiary": _sac_cfg("sinpe_beneficiary", "Hotel Villa Grace"),
+            "coupon": request.values.get("coupon", ""),
         }
         return render_template("booking-checkout.html", **ctx)
     
@@ -9396,10 +9398,10 @@ app = create_app()
 # EJECUCIÓN
 # =========================
 # al final de app.py
-if __name__ == "__main__":
-    app.run(
-        host="127.0.0.1",
-        port=int(os.getenv("PORT", 5000)),
-        debug=True,
-        use_reloader=True,   # <-- clave para quitar ese error
-    )
+#if __name__ == "__main__":
+#    app.run(
+#        host="127.0.0.1",
+#        port=int(os.getenv("PORT", 5000)),
+#        debug=True,
+#        use_reloader=True,   # <-- clave para quitar ese error
+#    )
