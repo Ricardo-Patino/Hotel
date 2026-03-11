@@ -2219,7 +2219,7 @@ def create_app() -> Flask:
     @app.route("/ops-reservas-dashboard.html")
     @role_required("Administrador", "Recepcionista")
     def ops_reservas_dashboard_html():
-        result = db.session.execute(text("SELECT * FROM Reserva"))
+        result = db.session.execute(text("SELECT * FROM Reserva, Cliente WHERE Reserva.Codigo_Cliente = Cliente.Codigo_Cliente"))
         return render_template("ops-reservas-dashboard.html", reservas=result)
     
     
