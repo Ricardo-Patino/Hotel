@@ -9,6 +9,7 @@ from typing import Optional, Tuple, Dict, List, Any
 from flask import current_app
 from sqlalchemy import text
 from extensions import db
+from html import escape
 
 # ============================================================
 # Utilidades básicas
@@ -170,25 +171,149 @@ def _get_cliente_contacto(codigo_cliente: Optional[int]) -> Tuple[Optional[str],
 # ============================================================
 # Envío bajo nivel
 # ============================================================
+_URL_RE = re.compile(r'(?P<url>https?://[^\s<>"\'\]\)]+[^\s<>"\'\]\)\.,;:!?\n\r])')
 
-def _send_email_smtp(to_email: str, subject: str, body: str) -> None:
+def _linkify_notif_html_text(text: str) -> str:
+    text = text or ""
+    out = []
+    last = 0
+
+    for m in _URL_RE.finditer(text):
+        start, end = m.span()
+        url = m.group("url")
+
+        if start > last:
+            out.append(escape(text[last:start]))
+
+        safe_href = escape(url, quote=True)
+        safe_label = escape(url)
+        out.append(
+            f'<a href="{safe_href}" '
+            f'style="color:#1b7a4e; text-decoration:none; font-weight:700; word-break:break-all;">'
+            f'{safe_label}</a>'
+        )
+        last = end
+
+    if last < len(text):
+        out.append(escape(text[last:]))
+
+    return "".join(out)
+
+
+
+def _notif_text_to_html(body: str) -> str:
+    parts = []
+    in_list = False
+
+    for raw in (body or "").splitlines():
+        line = raw.strip()
+
+        if not line:
+            if in_list:
+                parts.append("</ul>")
+                in_list = False
+            parts.append('<div style="height:10px; line-height:10px;">&nbsp;</div>')
+            continue
+
+        is_bullet = line.startswith(("•", "-", "–", "—", "*"))
+
+        if is_bullet:
+            if not in_list:
+                parts.append(
+                    '<ul style="margin:0 0 16px; padding-left:20px; color:#334155; font-size:15px; line-height:1.7;">'
+                )
+                in_list = True
+
+            item_html = _linkify_notif_html_text(line.lstrip("•-–—* ").strip())
+            parts.append(f'<li style="margin:0 0 8px;">{item_html}</li>')
+        else:
+            if in_list:
+                parts.append("</ul>")
+                in_list = False
+
+            line_html = _linkify_notif_html_text(line)
+            parts.append(
+                f'<p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">{line_html}</p>'
+            )
+
+    if in_list:
+        parts.append("</ul>")
+
+    return "".join(parts)
+
+
+def _wrap_hotel_email_html(subject: str, body: str) -> str:
+    hotel_name = _cfg("hotel_nombre", "Hotel Villa Grace")
+    hotel_tel  = _cfg("hotel_tel", "+506 2642 0225")
+    hotel_dir  = _cfg("hotel_dir", "100 m del Banco Nacional, Cóbano 60111")
+
+    return f"""\
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{escape(subject)}</title>
+  </head>
+  <body style="margin:0; padding:0; background:#f4f7fb; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f7fb;">
+      <tr>
+        <td align="center" style="padding:28px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;">
+            <tr>
+              <td style="background:linear-gradient(135deg, #1b7a4e 0%, #155c3b 100%); color:#ffffff; padding:28px 30px; border-radius:22px 22px 0 0;">
+                <div style="font-size:28px; font-weight:800;">{hotel_name}</div>
+                <div style="font-size:14px; opacity:.92; margin-top:6px;">Tu hogar fuera de casa</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff; padding:30px; border-radius:0 0 22px 22px; box-shadow:0 14px 45px rgba(15,23,42,.08);">
+                <h1 style="margin:0 0 18px; font-size:28px; line-height:1.2; color:#0f172a;">{escape(subject)}</h1>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:18px; padding:22px;">
+                  {_notif_text_to_html(body)}
+                </div>
+                <div style="margin-top:24px; padding-top:18px; border-top:1px solid #e5e7eb; font-size:14px; line-height:1.7; color:#64748b;">
+                  <strong style="color:#334155;">{hotel_name}</strong><br>
+                  {hotel_dir}<br>
+                  Tel: {hotel_tel}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""
+
+
+def _send_email_smtp(to_email: str, subject: str, body: str, html_body: Optional[str] = None) -> None:
     cfg = _smtp_cfg()
     host, port, user, pwd = cfg["host"], cfg["port"], cfg["user"], cfg["pwd"]
     if not (host and user and pwd):
         raise RuntimeError("SMTP not configured")
+
     sender = cfg["sender"] or user or "no-reply@hotel.local"
+
     msg = EmailMessage()
-    msg["From"] = sender; msg["To"] = to_email; msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = to_email
+    msg["Subject"] = subject
     msg.set_content(body)
+    msg.add_alternative(html_body or _wrap_hotel_email_html(subject, body), subtype="html")
+
     if cfg["use_ssl"]:
         context = ssl.create_default_context()
         with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as s:
-            s.login(user, pwd); s.send_message(msg)
+            s.login(user, pwd)
+            s.send_message(msg)
     else:
         with smtplib.SMTP(host, port, timeout=30) as s:
             if cfg["use_tls"]:
                 s.starttls(context=ssl.create_default_context())
-            s.login(user, pwd); s.send_message(msg)
+            s.login(user, pwd)
+            s.send_message(msg)
 
 def _send_sms_twilio(to_phone: str, body: str) -> str:
     sid, token, from_phone, messaging_sid = _twilio_cfg()
@@ -416,13 +541,13 @@ class NotificationService:
 
     @staticmethod
     def _resolve_kwargs(kwargs: Dict) -> Dict:
-        # Admite alias usados en el proyecto
         return {
             "cliente_id": kwargs.get("cliente_id") or kwargs.get("codigo_cliente") or kwargs.get("Codigo_Cliente"),
-            "email": kwargs.get("email") or kwargs.get("email_fallback") or kwargs.get("correo"),
-            "phone": kwargs.get("phone") or kwargs.get("tel_fallback") or kwargs.get("telefono"),
+            "email": kwargs.get("email") or kwargs.get("to_email") or kwargs.get("email_fallback") or kwargs.get("correo"),
+            "phone": kwargs.get("phone") or kwargs.get("to_phone") or kwargs.get("tel_fallback") or kwargs.get("telefono"),
             "subject": kwargs.get("subject") or kwargs.get("asunto"),
-            "body": kwargs.get("body") or kwargs.get("cuerpo"),
+            "body": kwargs.get("body") or kwargs.get("message") or kwargs.get("cuerpo"),
+            "html": kwargs.get("html") or kwargs.get("html_body") or kwargs.get("cuerpo_html"),
             "sms": kwargs.get("sms") or kwargs.get("sms_body"),
             "ref_entidad": kwargs.get("ref_entidad") or kwargs.get("ref_tipo") or "SAC",
             "ref_id": kwargs.get("ref_id") or kwargs.get("refid") or "-",
@@ -455,7 +580,8 @@ class NotificationService:
         if canal_pref in ("email", "ambos"):
             if to_email:
                 try:
-                    _send_email_smtp(to_email, subject, body)
+                    html_body = p.get("html") or _wrap_hotel_email_html(subject, body)
+                    _send_email_smtp(to_email, subject, body, html_body)
                     sent_email = True
                 except Exception as e:
                     if current_app:

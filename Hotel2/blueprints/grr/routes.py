@@ -9,6 +9,13 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, Tuple, List, Optional
 
+import glob
+import logging
+import os
+import re
+from html import escape
+from sqlalchemy.exc import DataError, IntegrityError
+
 
 from flask import Blueprint, jsonify, request, session, current_app, render_template, url_for
 from sqlalchemy.orm import selectinload
@@ -83,22 +90,59 @@ def _precio_noche(h: Habitacion) -> float:
 
 def _room_image_url(h: Habitacion) -> str:
     """
-    Devuelve la URL pública (src) de la imagen principal de una habitación,
-    basada en HabitacionImagen (imagenes). Mantiene fallback al campo legacy
-    si existiera.
+    Devuelve la URL pública de la imagen principal de una habitación.
+
+    Prioridad:
+    1) principal en relación Habitacion.imagenes
+    2) campo legacy si existiera
+    3) alias persistente en disco: uploads/rooms/<id>/__primary.*
+    4) cualquier imagen válida en la carpeta de la habitación
+    5) fallback default
     """
+    DEFAULT_ROOM_IMAGE_REL = "assets/img/hotel/room-1.jpg"
+    PRIMARY_ALIAS_PREFIX = "__primary"
+    ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
+    def _to_public(rel_or_url: str) -> str:
+        if not rel_or_url:
+            return url_for("static", filename=DEFAULT_ROOM_IMAGE_REL)
+
+        u = str(rel_or_url).strip().replace("\\", "/")
+
+        if u.startswith("http://") or u.startswith("https://") or u.startswith("data:image"):
+            return u
+
+        if u.startswith("/"):
+            return u
+
+        if u.startswith("static/"):
+            u = u[len("static/"):]
+
+        return url_for("static", filename=u)
+
+    def _static_abs(rel_path: str) -> str:
+        rel = str(rel_path or "").replace("\\", "/").lstrip("/")
+        if rel.startswith("static/"):
+            rel = rel[len("static/"):]
+        return os.path.join(current_app.static_folder, rel)
+
+    def _static_exists(rel_path: str) -> bool:
+        if not rel_path:
+            return False
+        return os.path.isfile(_static_abs(rel_path))
+
     try:
-        # 1) Nuevo modelo: relación Habitacion.imagenes
+        fp = None
+
+        # 1) Relación ORM Habitacion.imagenes
         imgs = getattr(h, "imagenes", None) or []
         chosen = None
 
-        # preferir principal
         for it in imgs:
             if getattr(it, "Is_Principal", False):
                 chosen = it
                 break
 
-        # si no hay principal, preferir menor Sort_Order, luego el primero
         if chosen is None and imgs:
             try:
                 chosen = sorted(
@@ -111,29 +155,53 @@ def _room_image_url(h: Habitacion) -> str:
             except Exception:
                 chosen = imgs[0]
 
-        fp = getattr(chosen, "File_Path", None) if chosen else None
+        candidate = getattr(chosen, "File_Path", None) if chosen else None
+        if candidate and (
+            str(candidate).startswith(("http://", "https://", "/", "data:image"))
+            or _static_exists(candidate)
+        ):
+            fp = candidate
 
-        # 2) Fallback legacy (por compatibilidad)
+        # 2) Legacy
         if not fp:
-            fp = getattr(h, "Imagen_URL", None) or getattr(h, "img", None) or None
+            for legacy_attr in ("Imagen_URL", "img"):
+                candidate = getattr(h, legacy_attr, None)
+                if candidate and (
+                    str(candidate).startswith(("http://", "https://", "/", "data:image"))
+                    or _static_exists(candidate)
+                ):
+                    fp = candidate
+                    break
 
+        room_id = int(getattr(h, "Codigo_Habitacion"))
+
+        # 3) Alias persistente
         if not fp:
-            return ""
+            for ext in (".webp", ".jpg", ".jpeg", ".png"):
+                candidate = f"uploads/rooms/{room_id}/{PRIMARY_ALIAS_PREFIX}{ext}"
+                if _static_exists(candidate):
+                    fp = candidate
+                    break
 
-        u = str(fp).strip().replace("\\", "/")
+        # 4) Primer archivo válido dentro de la carpeta
+        if not fp:
+            folder = os.path.join(current_app.static_folder, "uploads", "rooms", str(room_id))
+            if os.path.isdir(folder):
+                files = sorted(os.listdir(folder))
+                for name in files:
+                    ext = os.path.splitext(name)[1].lower()
+                    if ext in ALLOWED_EXTS and not name.startswith(f"{PRIMARY_ALIAS_PREFIX}."):
+                        fp = f"uploads/rooms/{room_id}/{name}"
+                        break
 
-        # si ya es URL absoluta o raíz
-        if u.startswith("http") or u.startswith("data:image") or u.startswith("/"):
-            return u
+        # 5) Fallback default
+        if not fp:
+            fp = DEFAULT_ROOM_IMAGE_REL
 
-        # si viene como "static/...." normalizar a url_for('static', filename=...)
-        if u.startswith("static/"):
-            u = u[len("static/") :]
-
-        return url_for("static", filename=u)
+        return _to_public(fp)
 
     except Exception:
-        return ""
+        return url_for("static", filename=DEFAULT_ROOM_IMAGE_REL)
 
 
 # --- Helpers para columnas y funcionario por defecto ---
@@ -1028,31 +1096,149 @@ def _ensure_user_and_reset(email: str, nombre: str) -> tuple[str | None, str | N
     return temp_pwd, reset_url
 
 
+_URL_RE = re.compile(r'(?P<url>https?://[^\s<>"\'\]\)]+[^\s<>"\'\]\)\.,;:!?\n\r])')
 
-def _send_mail_simple(to_email: str, subject: str, body: str):
+def _linkify_grr_html_text(text: str) -> str:
+    text = text or ""
+    out = []
+    last = 0
+
+    for m in _URL_RE.finditer(text):
+        start, end = m.span()
+        url = m.group("url")
+
+        if start > last:
+            out.append(escape(text[last:start]))
+
+        safe_href = escape(url, quote=True)
+        safe_label = escape(url)
+        out.append(
+            f'<a href="{safe_href}" '
+            f'style="color:#1b7a4e; text-decoration:none; font-weight:700; word-break:break-all;">'
+            f'{safe_label}</a>'
+        )
+        last = end
+
+    if last < len(text):
+        out.append(escape(text[last:]))
+
+    return "".join(out)
+
+
+def _wrap_hotel_mail_html(title: str, body: str) -> str:
+    html_lines = []
+    in_list = False
+    
+    for raw in (body or "").splitlines():
+        line = raw.strip()
+    
+        if not line:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+            html_lines.append('<div style="height:10px; line-height:10px;">&nbsp;</div>')
+            continue
+    
+        is_bullet = line.startswith(("•", "-", "–", "—", "*"))
+    
+        if is_bullet:
+            if not in_list:
+                html_lines.append(
+                    '<ul style="margin:0 0 16px; padding-left:20px; color:#334155; font-size:15px; line-height:1.7;">'
+                )
+                in_list = True
+    
+            item_html = _linkify_grr_html_text(line.lstrip("•-–—* ").strip())
+            html_lines.append(f'<li style="margin:0 0 8px;">{item_html}</li>')
+        else:
+            if in_list:
+                html_lines.append("</ul>")
+                in_list = False
+    
+            line_html = _linkify_grr_html_text(line)
+            html_lines.append(
+                f'<p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">{line_html}</p>'
+            )
+    
+    if in_list:
+        html_lines.append("</ul>")
+
+    return f"""\
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{escape(title)}</title>
+  </head>
+  <body style="margin:0; padding:0; background:#f4f7fb; font-family:Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f7fb;">
+      <tr>
+        <td align="center" style="padding:28px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;">
+            <tr>
+              <td style="background:linear-gradient(135deg, #1b7a4e 0%, #155c3b 100%); color:#ffffff; padding:28px 30px; border-radius:22px 22px 0 0;">
+                <div style="font-size:28px; font-weight:800;">Hotel Villa Grace</div>
+                <div style="font-size:14px; opacity:.92; margin-top:6px;">Tu hogar fuera de casa</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff; padding:30px; border-radius:0 0 22px 22px; box-shadow:0 14px 45px rgba(15,23,42,.08);">
+                <h1 style="margin:0 0 18px; font-size:28px; line-height:1.2; color:#0f172a;">{escape(title)}</h1>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:18px; padding:22px;">
+                  {''.join(html_lines)}
+                </div>
+                <div style="margin-top:24px; padding-top:18px; border-top:1px solid #e5e7eb; font-size:14px; line-height:1.7; color:#64748b;">
+                  <strong style="color:#334155;">Hotel Villa Grace</strong><br>
+                  100 m del Banco Nacional, Cóbano 60111<br>
+                  Tel: +506 2642 0225
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""
+
+
+def _send_mail_simple(to_email: str, subject: str, body: str, html_body: Optional[str] = None):
     try:
         host = current_app.config.get("MAIL_SERVER")
         port = int(current_app.config.get("MAIL_PORT", 0) or 0)
-        user = current_app.config.get("MAIL_USERNAME"); pwd = current_app.config.get("MAIL_PASSWORD")
+        user = current_app.config.get("MAIL_USERNAME")
+        pwd = current_app.config.get("MAIL_PASSWORD")
         sender = current_app.config.get("MAIL_DEFAULT_SENDER") or user or "no-reply@hotel.local"
         use_tls = bool(current_app.config.get("MAIL_USE_TLS", False))
         use_ssl = bool(current_app.config.get("MAIL_USE_SSL", False))
+
         if not (host and port and user and pwd):
             current_app.logger.info(f"[MAIL MOCK]\nTo: {to_email}\nSubj: {subject}\n\n{body}")
             return
+
         from email.message import EmailMessage
         import ssl, smtplib
+
         msg = EmailMessage()
-        msg["Subject"] = subject; msg["From"] = sender; msg["To"] = to_email
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = to_email
         msg.set_content(body)
+        msg.add_alternative(html_body or _wrap_hotel_mail_html(subject, body), subtype="html")
+
         if use_ssl:
             ctx = ssl.create_default_context()
             with smtplib.SMTP_SSL(host, port, context=ctx, timeout=30) as s:
-                s.login(user, pwd); s.send_message(msg)
+                s.login(user, pwd)
+                s.send_message(msg)
         else:
             with smtplib.SMTP(host, port, timeout=30) as s:
-                if use_tls: s.starttls(context=ssl.create_default_context())
-                s.login(user, pwd); s.send_message(msg)
+                if use_tls:
+                    s.starttls(context=ssl.create_default_context())
+                s.login(user, pwd)
+                s.send_message(msg)
     except Exception as e:
         current_app.logger.warning(f"[MAIL] {e}")
 
@@ -1806,34 +1992,44 @@ def ops_housekeeping():
 # =========================
 from datetime import datetime, timedelta
 
-def _send_offer_email(to_email: str, subject: str, body: str):
+def _send_offer_email(to_email: str, subject: str, body: str, html_body: Optional[str] = None):
     """
     Envío mínimo: si no hay SMTP configurado, log a consola.
-    (Puedes unificar con utilidades de app.py si prefieres).
     """
     try:
         host = current_app.config.get("MAIL_SERVER")
         port = int(current_app.config.get("MAIL_PORT", 0) or 0)
-        user = current_app.config.get("MAIL_USERNAME"); pwd = current_app.config.get("MAIL_PASSWORD")
+        user = current_app.config.get("MAIL_USERNAME")
+        pwd = current_app.config.get("MAIL_PASSWORD")
         sender = current_app.config.get("MAIL_DEFAULT_SENDER") or user or "no-reply@hotel.local"
         use_tls = bool(current_app.config.get("MAIL_USE_TLS", False))
         use_ssl = bool(current_app.config.get("MAIL_USE_SSL", False))
+
         if not (host and port and user and pwd):
             current_app.logger.info(f"[WAITLIST OFFER MOCK]\nTo: {to_email}\nSubj: {subject}\n\n{body}")
             return
+
         from email.message import EmailMessage
         import ssl, smtplib
+
         msg = EmailMessage()
-        msg["Subject"] = subject; msg["From"] = sender; msg["To"] = to_email
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = to_email
         msg.set_content(body)
+        msg.add_alternative(html_body or _wrap_hotel_mail_html(subject, body), subtype="html")
+
         if use_ssl:
             ctx = ssl.create_default_context()
             with smtplib.SMTP_SSL(host, port, context=ctx, timeout=30) as s:
-                s.login(user, pwd); s.send_message(msg)
+                s.login(user, pwd)
+                s.send_message(msg)
         else:
             with smtplib.SMTP(host, port, timeout=30) as s:
-                if use_tls: s.starttls(context=ssl.create_default_context())
-                s.login(user, pwd); s.send_message(msg)
+                if use_tls:
+                    s.starttls(context=ssl.create_default_context())
+                s.login(user, pwd)
+                s.send_message(msg)
     except Exception as e:
         current_app.logger.warning(f"[WAITLIST MAIL] {e}")
 
@@ -2134,7 +2330,70 @@ def waitlist_process():
                 f"Puedes completar tu reserva desde el portal. Oferta válida hasta {exp} UTC.\n\n"
                 f"— Hotel Villa Grace"
             )
-            _send_offer_email(w["Correo"], "Oferta de disponibilidad — Hotel Villa Grace", body)
+            
+            html_body = f"""\
+            <!doctype html>
+            <html lang="es">
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Oferta de disponibilidad — Hotel Villa Grace</title>
+              </head>
+              <body style="margin:0; padding:0; background:#f4f7fb; font-family:Arial, Helvetica, sans-serif;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f7fb;">
+                  <tr>
+                    <td align="center" style="padding:28px 16px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;">
+                        <tr>
+                          <td style="background:linear-gradient(135deg, #1b7a4e 0%, #155c3b 100%); color:#ffffff; padding:28px 30px; border-radius:22px 22px 0 0;">
+                            <div style="font-size:28px; font-weight:800;">Hotel Villa Grace</div>
+                            <div style="font-size:14px; opacity:.92; margin-top:6px;">Tu hogar fuera de casa</div>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="background:#ffffff; padding:30px; border-radius:0 0 22px 22px; box-shadow:0 14px 45px rgba(15,23,42,.08);">
+                            <div style="margin:0 0 16px;">
+                              <span style="display:inline-block; background:#e8f3ed; color:#1b7a4e; border:1px solid #cfe6d7; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700;">
+                                Lista de espera
+                              </span>
+                            </div>
+                            <h1 style="margin:0 0 12px; font-size:28px; color:#0f172a;">Hay una habitación disponible para ti</h1>
+                            <p style="margin:0 0 18px; font-size:15px; line-height:1.7; color:#64748b;">
+                              Tu solicitud pasó de espera a oportunidad disponible.
+                            </p>
+            
+                            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:18px; padding:22px;">
+                              <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">
+                                Hola <strong>{escape(str(w['Nombre']))}</strong>,
+                              </p>
+                              <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">
+                                Se liberó una habitación para tu solicitud <strong>{escape(str(tipo))}</strong> del
+                                <strong>{escape(str(ci))}</strong> al <strong>{escape(str(co))}</strong>.
+                              </p>
+                              <div style="padding:16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
+                                <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Vigencia de la oferta</div>
+                                <div style="font-size:16px; font-weight:800; color:#0f172a;">{escape(str(exp))} UTC</div>
+                              </div>
+                              <p style="margin:16px 0 0; font-size:14px; line-height:1.7; color:#64748b;">
+                                Completa tu reserva cuanto antes para no perder la disponibilidad.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </body>
+            </html>
+            """
+            
+            _send_offer_email(
+                w["Correo"],
+                "Oferta de disponibilidad — Hotel Villa Grace",
+                body,
+                html_body=html_body
+            )
             _audit_log(w["Correo"], "waitlist.offer", {"id": int(w["Id"]), "hab": int(hab.Codigo_Habitacion), "expira": exp.isoformat()})
             processed += 1
         except Exception as e:

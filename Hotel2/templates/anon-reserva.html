@@ -21,10 +21,16 @@
 {% block content %}
 
 <!-- Page Title -->
-<div class="page-title dark-background" data-aos="fade">
+<div
+  class="page-title dark-background"
+  data-aos="fade"
+  style="background-image: url('{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}');"
+>
   <div class="container position-relative">
     <h1>Reservar sin iniciar sesión</h1>
-    <p class="muted-mini mb-0">Solicita tu reserva, paga por SINPE Móvil y quedará <strong>pendiente</strong> para aprobación.</p>
+    <p class="muted-mini mb-0">
+      Solicita tu reserva, paga por SINPE Móvil y quedará <strong>pendiente</strong> para aprobación.
+    </p>
     <nav class="breadcrumbs">
       <ol>
         <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
