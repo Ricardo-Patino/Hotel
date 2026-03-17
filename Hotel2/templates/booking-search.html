@@ -13,20 +13,81 @@
     --vg-dark: #0f172a;
   }
   body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
+
   .hero{
-    --h: min(68vh, 560px);
-    background: radial-gradient(70% 110% at 20% 0%, rgba(0,0,0,.45), transparent 60%),
-                linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,.15)),
-                url("{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}") center/cover no-repeat;
-    height: var(--h);
-    color:#fff;
-    display:flex;align-items:center;
+  min-height: 330px;
+  padding: 160px 0 80px 0;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.72) 0%,
+      rgba(0, 0, 0, 0.55) 45%,
+      rgba(0, 0, 0, 0.62) 100%
+    ),
+    url("{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}") center/cover no-repeat;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  text-align:center;
+}
+
+.hero .container{
+  position: relative;
+  z-index: 2;
+}
+
+.hero .col-lg-8{
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero h1{
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #fff !important;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.60);
+}
+
+.hero .lead{
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  font-weight: 400;
+  max-width: 900px;
+  margin: 0 auto 16px auto;
+  color: rgba(255,255,255,.96);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.50);
+  opacity: 1;
+}
+
+.hero .kpi{
+  justify-content: center;
+}
+
+@media (max-width: 768px){
+  .hero{
+    min-height: 300px;
+    padding: 130px 0 70px 0;
   }
-  .hero .lead{opacity:.9}
-  .search-card{
-    margin-top:-72px;border:0;border-radius:20px;box-shadow:0 20px 50px rgba(2,6,23,.18);
-    backdrop-filter:saturate(140%) blur(2px);
+
+  .hero h1{
+    font-size: 34px;
   }
+
+  .hero .lead{
+    font-size: 1.05rem;
+    padding: 0 14px;
+  }
+}
+ .search-card{
+  margin-top:-24px;
+  border:0;
+  border-radius:20px;
+  box-shadow:0 20px 50px rgba(2,6,23,.18);
+  backdrop-filter:saturate(140%) blur(2px);
+}
   .pill{
     border:1px solid #e9ecef;border-radius:12px;padding:.7rem .9rem;background:#fff
   }

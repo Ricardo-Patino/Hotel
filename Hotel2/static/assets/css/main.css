@@ -686,7 +686,7 @@ h6 {
 # Global Page Titles & Breadcrumbs
 --------------------------------------------------------------*/
 .page-title {
-  color: var(--default-color);
+  color: #ffffff;
   background-color: var(--background-color);
   background-size: cover;
   background-position: center;
@@ -694,19 +694,45 @@ h6 {
   padding: 160px 0 80px 0;
   text-align: center;
   position: relative;
+  overflow: hidden;
 }
 
-.page-title:before {
+.page-title::before {
   content: "";
-  background-color: color-mix(in srgb, var(--background-color), transparent 50%);
   position: absolute;
   inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.55),
+    rgba(0, 0, 0, 0.38)
+  );
+  z-index: 1;
+}
+
+.page-title .container,
+.page-title .container.position-relative,
+.page-title h1,
+.page-title p,
+.page-title .breadcrumbs,
+.page-title .breadcrumbs ol,
+.page-title .breadcrumbs li,
+.page-title .breadcrumbs a,
+.page-title .breadcrumbs .current {
+  position: relative;
+  z-index: 2;
 }
 
 .page-title h1 {
   font-size: 42px;
   font-weight: 700;
   margin-bottom: 10px;
+  color: #ffffff;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.page-title p {
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .page-title .breadcrumbs ol {
@@ -720,8 +746,11 @@ h6 {
   font-weight: 400;
 }
 
-.page-title .breadcrumbs ol a {
-  color: color-mix(in srgb, var(--accent-color) 90%, white 15%);
+.page-title .breadcrumbs ol a,
+.page-title .breadcrumbs ol li,
+.page-title .breadcrumbs .current {
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .page-title .breadcrumbs ol li+li {
@@ -732,7 +761,7 @@ h6 {
   content: "/";
   display: inline-block;
   padding-right: 10px;
-  color: color-mix(in srgb, var(--default-color), transparent 50%);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 /*--------------------------------------------------------------
@@ -840,11 +869,13 @@ section,
 
 .hotel-hero .hero-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--background-color), transparent 20%) 0%, color-mix(in srgb, var(--background-color), transparent 20%) 100%);
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.58) 0%,
+    rgba(0, 0, 0, 0.42) 45%,
+    rgba(0, 0, 0, 0.52) 100%
+  );
   z-index: 2;
 }
 
@@ -864,6 +895,7 @@ section,
   margin-bottom: 1.5rem;
   line-height: 1.2;
   color: #ffffff;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
 }
 
 @media (max-width: 768px) {
@@ -876,12 +908,12 @@ section,
 .hotel-hero .hero-text .hero-subtitle {
   font-size: 1.25rem;
   margin-bottom: 2rem;
-  opacity: 0.9;
   line-height: 1.6;
   max-width: 600px;
   margin-left: auto;
   margin-right: auto;
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 @media (max-width: 768px) {
@@ -1034,14 +1066,16 @@ section,
 }
 
 .hotel-hero .hero-actions .btn.btn-outline-light {
-  color: var(--default-color);
-  border: 2px solid var(--default-color);
+  color: #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(4px);
 }
 
 .hotel-hero .hero-actions .btn.btn-outline-light:hover {
-  border-color: var(--accent-color);
-  background-color: var(--accent-color);
-  color: var(--contrast-color);
+  border-color: #ffffff;
+  background-color: #ffffff;
+  color: var(--accent-color);
   transform: translateY(-2px);
 }
 
@@ -7774,3 +7808,239 @@ section,
   color: #ffffff !important;
 }
 
+/* ===== FIX ACCESIBILIDAD HERO VIDEO Y BANNERS ===== */
+
+.page-title {
+  color: #ffffff !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.58),
+    rgba(0, 0, 0, 0.40)
+  ) !important;
+  z-index: 1;
+}
+
+.page-title .container,
+.page-title .container.position-relative,
+.page-title h1,
+.page-title p,
+.page-title .breadcrumbs,
+.page-title .breadcrumbs ol,
+.page-title .breadcrumbs li,
+.page-title .breadcrumbs a,
+.page-title .breadcrumbs .current {
+  position: relative;
+  z-index: 2;
+}
+
+.page-title h1,
+.page-title p,
+.page-title .breadcrumbs,
+.page-title .breadcrumbs a,
+.page-title .breadcrumbs li,
+.page-title .breadcrumbs .current {
+  color: #fff !important;
+  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.45);
+}
+
+.hotel-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.hotel-hero .hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    rgba(0, 0, 0, 0.55) 100%
+  ) !important;
+  z-index: 2;
+}
+
+.hotel-hero .container {
+  position: relative;
+  z-index: 3;
+}
+
+.hotel-hero .hero-text h1 {
+  color: #ffffff !important;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.hotel-hero .hero-text .hero-subtitle,
+.hotel-hero .hero-features,
+.hotel-hero .hero-features .feature-item,
+.hotel-hero .hero-stats,
+.hotel-hero .hero-stats .stat-number,
+.hotel-hero .hero-stats .stat-label,
+.hotel-hero .small,
+.hotel-hero .text-white {
+  color: #ffffff !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.hotel-hero .hero-actions .btn.btn-outline-light {
+  color: #ffffff !important;
+  border: 2px solid rgba(255, 255, 255, 0.95) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(4px);
+}
+
+.hotel-hero .hero-actions .btn.btn-outline-light:hover {
+  background: #ffffff !important;
+  color: #285b4b !important;
+  border-color: #ffffff !important;
+}
+
+.page-title {
+  color: #ffffff !important;
+  background-color: var(--background-color);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  padding: 160px 0 80px 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.58) 0%,
+    rgba(0, 0, 0, 0.42) 45%,
+    rgba(0, 0, 0, 0.48) 100%
+  ) !important;
+  z-index: 1;
+}
+
+.page-title .container,
+.page-title .container.position-relative {
+  position: relative;
+  z-index: 2;
+}
+
+.page-title h1 {
+  color: #ffffff !important;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+
+.page-title p {
+  color: rgba(255, 255, 255, 0.98) !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.40);
+}
+
+.page-title .breadcrumbs,
+.page-title .breadcrumbs ol,
+.page-title .breadcrumbs li,
+.page-title .breadcrumbs a,
+.page-title .breadcrumbs .current {
+  color: rgba(255, 255, 255, 0.96) !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.40);
+}
+
+.page-title .breadcrumbs ol li+li::before {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+.page-title p {
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.page-title::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    rgba(0, 0, 0, 0.62) 100%
+  ) !important;
+  z-index: 1;
+}
+
+.page-title h1 {
+  color: #ffffff !important;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.60);
+}
+
+.page-title p {
+  color: rgba(255, 255, 255, 0.98) !important;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
+}
+
+.page-title .breadcrumbs,
+.page-title .breadcrumbs ol,
+.page-title .breadcrumbs li,
+.page-title .breadcrumbs a,
+.page-title .breadcrumbs .current {
+  color: rgba(255, 255, 255, 0.98) !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.page-title p {
+  font-size: 1.15rem !important;
+  line-height: 1.6;
+  font-weight: 400;
+  max-width: 900px;
+  margin: 0 auto 16px auto;
+  color: rgba(255, 255, 255, 0.96) !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.50);
+}
+
+.page-title .breadcrumbs ol {
+  font-size: 1.15rem !important;
+  font-weight: 500;
+  gap: 4px;
+}
+
+.page-title .breadcrumbs a,
+.page-title .breadcrumbs li,
+.page-title .breadcrumbs .current {
+  color: rgba(255, 255, 255, 0.98) !important;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+@media (max-width: 768px) {
+  .page-title p {
+    font-size: 1.05rem !important;
+  }
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: 'Playfair Display', serif !important;
+}
+
+:root {
+  --heading-font: 'Playfair Display', serif;
+  --default-font: 'Poppins', sans-serif;
+}
+
+.accordion-button {
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 1.15rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.accordion-body {
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 1rem;
+  line-height: 1.7;
+}
