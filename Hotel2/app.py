@@ -17,6 +17,7 @@ from typing import Optional
 from werkzeug.utils import secure_filename
 import reportlab  # noqa
 import re
+from html import escape
 
 from functools import lru_cache
 from sqlalchemy import text, func, inspect
@@ -340,20 +341,222 @@ def role_required(*roles):
 def _get_serializer(app: Flask) -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(app.config["SECRET_KEY"], salt="pwd-reset")
 
+_URL_RE = re.compile(r'(?P<url>https?://[^\s<>"\'\]\)]+[^\s<>"\'\]\)\.,;:!?\n\r])')
 
-def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
+def _linkify_html_text(text: str) -> str:
+    """
+    Escapa HTML y convierte URLs en enlaces seguros sin romper el resto del texto.
+    Evita errores como:
+    Portal" style="...">del huésped
+    """
+    text = text or ""
+    out = []
+    last = 0
+
+    for m in _URL_RE.finditer(text):
+        start, end = m.span()
+        url = m.group("url")
+
+        if start > last:
+            out.append(escape(text[last:start]))
+
+        safe_href = escape(url, quote=True)
+        safe_label = escape(url)
+        out.append(
+            f'<a href="{safe_href}" '
+            f'style="color:#1b7a4e; text-decoration:none; font-weight:700; word-break:break-all;">'
+            f'{safe_label}</a>'
+        )
+        last = end
+
+    if last < len(text):
+        out.append(escape(text[last:]))
+
+    return "".join(out)
+
+def _email_lines_to_html(text: str) -> str:
+    lines = (text or "").splitlines()
+    chunks = []
+    in_list = False
+
+    for raw in lines:
+        stripped = raw.strip()
+
+        if not stripped:
+            if in_list:
+                chunks.append("</ul>")
+                in_list = False
+            chunks.append('<div style="height:12px; line-height:12px;">&nbsp;</div>')
+            continue
+
+        is_bullet = stripped.startswith(("•", "-", "–", "—", "*"))
+
+        if is_bullet:
+            if not in_list:
+                chunks.append(
+                    '<ul style="margin:0 0 16px; padding-left:20px; color:#334155; font-size:15px; line-height:1.7;">'
+                )
+                in_list = True
+
+            item_html = _linkify_html_text(stripped.lstrip("•-–—* ").strip())
+            chunks.append(f'<li style="margin:0 0 8px;">{item_html}</li>')
+        else:
+            if in_list:
+                chunks.append("</ul>")
+                in_list = False
+
+            line_html = _linkify_html_text(stripped)
+            chunks.append(
+                f'<p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">{line_html}</p>'
+            )
+
+    if in_list:
+        chunks.append("</ul>")
+
+    return "".join(chunks) or (
+        '<p style="margin:0; font-size:15px; line-height:1.7; color:#334155;">'
+        'Hotel Villa Grace'
+        "</p>"
+    )
+
+
+def _email_brand_shell(
+    *,
+    title: str,
+    subtitle: str = "",
+    body_html: str = "",
+    cta_label: Optional[str] = None,
+    cta_url: Optional[str] = None,
+    badge: Optional[str] = None,
+) -> str:
+    hotel_name = "Hotel Villa Grace"
+    hotel_tagline = "Tu hogar fuera de casa"
+    hotel_phone = "+506 2642 0225"
+    hotel_email = "hotelvillagrace@gmail.com"
+    hotel_address = "100 m del Banco Nacional, Cóbano 60111"
+    preheader = escape((subtitle or title or hotel_name)[:140])
+
+    badge_html = ""
+    if badge:
+        badge_html = f"""
+          <div style="margin:0 0 16px;">
+            <span style="
+              display:inline-block;
+              background:#e8f3ed;
+              color:#1b7a4e;
+              border:1px solid #cfe6d7;
+              border-radius:999px;
+              padding:6px 12px;
+              font-size:12px;
+              font-weight:700;
+              letter-spacing:.2px;
+            ">{escape(badge)}</span>
+          </div>
+        """
+
+    cta_html = ""
+    if cta_label and cta_url:
+        cta_html = f"""
+          <div style="margin:24px 0 8px; text-align:center;">
+            <a href="{escape(cta_url, quote=True)}" style="
+              display:inline-block;
+              background:#1b7a4e;
+              color:#ffffff;
+              text-decoration:none;
+              font-size:15px;
+              font-weight:700;
+              padding:14px 24px;
+              border-radius:12px;
+            ">{escape(cta_label)}</a>
+          </div>
+        """
+
+    return f"""\
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{escape(title)}</title>
+  </head>
+  <body style="margin:0; padding:0; background:#f4f7fb; font-family:Arial, Helvetica, sans-serif;">
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">
+      {preheader}
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f7fb;">
+      <tr>
+        <td align="center" style="padding:28px 16px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;">
+            <tr>
+              <td style="
+                background:linear-gradient(135deg, #1b7a4e 0%, #155c3b 100%);
+                border-radius:22px 22px 0 0;
+                padding:30px 32px 24px;
+                color:#ffffff;
+              ">
+                <div style="font-size:28px; font-weight:800; letter-spacing:.2px;">{hotel_name}</div>
+                <div style="font-size:14px; opacity:.92; margin-top:6px;">{hotel_tagline}</div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="background:#ffffff; padding:32px; border-radius:0 0 22px 22px; box-shadow:0 14px 45px rgba(15, 23, 42, .08);">
+                {badge_html}
+                <h1 style="margin:0 0 10px; font-size:28px; line-height:1.2; color:#0f172a;">{escape(title)}</h1>
+                <p style="margin:0 0 22px; font-size:15px; line-height:1.7; color:#64748b;">{escape(subtitle)}</p>
+
+                <div style="
+                  background:#f8fafc;
+                  border:1px solid #e2e8f0;
+                  border-radius:18px;
+                  padding:22px;
+                ">
+                  {body_html}
+                </div>
+
+                {cta_html}
+
+                <div style="margin-top:28px; padding-top:20px; border-top:1px solid #e5e7eb;">
+                  <p style="margin:0 0 8px; font-size:14px; color:#475569;">
+                    <strong>{hotel_name}</strong><br>
+                    {hotel_address}
+                  </p>
+                  <p style="margin:0; font-size:14px; color:#64748b;">
+                    Tel: {hotel_phone} &nbsp;|&nbsp; Email: {hotel_email}
+                  </p>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:14px 10px 0; text-align:center; color:#94a3b8; font-size:12px;">
+                © {datetime.now().year} {hotel_name}. Todos los derechos reservados.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""
+
+
+def _send_email_branded(
+    app: Flask,
+    *,
+    to_email: str,
+    subject: str,
+    text_body: str,
+    html_body: Optional[str] = None,
+    reply_to: Optional[str] = None,
+    attachments: Optional[list[dict]] = None,
+) -> None:
     sender = (
         app.config.get("MAIL_DEFAULT_SENDER")
         or app.config.get("MAIL_USERNAME")
         or "no-reply@hotel.local"
-    )
-    subject = "Restablecimiento de contraseña — Hotel Villa Grace"
-    body = (
-        "Hola,\n\n"
-        "Recibimos una solicitud para restablecer tu contraseña en Hotel Villa Grace.\n"
-        f"Para continuar, abre este enlace:\n\n{reset_url}\n\n"
-        "Si no fuiste tú, ignora este mensaje. El enlace expira en 1 hora.\n\n"
-        "Atentamente,\nHotel Villa Grace"
     )
 
     host = app.config.get("MAIL_SERVER")
@@ -365,19 +568,38 @@ def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
 
     if not (host and port and user and pwd):
         app.logger.warning("[MAIL] Config SMTP incompleta; usando consola.")
-        app.logger.info(f"[RESET LINK] Para {to_email}: {reset_url}")
+        app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n{text_body}")
         return
 
     if not sender or ("@" not in sender):
         sender = user
 
-    try:
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = sender
-        msg["To"] = to_email
-        msg.set_content(body)
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = to_email
 
+    if reply_to:
+        msg["Reply-To"] = reply_to
+
+    msg.set_content(text_body)
+
+    html_to_send = html_body or _email_brand_shell(
+        title=subject,
+        subtitle="Hotel Villa Grace",
+        body_html=_email_lines_to_html(text_body),
+    )
+    msg.add_alternative(html_to_send, subtype="html")
+
+    for att in (attachments or []):
+        msg.add_attachment(
+            att["data"],
+            maintype=att.get("maintype", "application"),
+            subtype=att.get("subtype", "octet-stream"),
+            filename=att.get("filename", "adjunto.bin"),
+        )
+
+    try:
         if use_ssl:
             context = ssl.create_default_context()
             with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
@@ -391,11 +613,53 @@ def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
                 smtp.send_message(msg)
 
         app.logger.info(
-            f"[MAIL SENT] Reset a {to_email} vía {host}:{port} (TLS={use_tls}, SSL={use_ssl})"
+            f"[MAIL SENT] To={to_email} via {host}:{port} (TLS={use_tls}, SSL={use_ssl})"
         )
     except Exception as e:
         app.logger.error(f"[MAIL ERROR] {type(e).__name__}: {e}")
-        app.logger.info(f"[RESET LINK] Para {to_email}: {reset_url}")
+        app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n{text_body}")
+
+
+def _send_reset_email(app: Flask, to_email: str, reset_url: str) -> None:
+    subject = "Restablecimiento de contraseña — Hotel Villa Grace"
+    text_body = (
+        "Hola,\n\n"
+        "Recibimos una solicitud para restablecer tu contraseña en Hotel Villa Grace.\n"
+        f"Para continuar, abre este enlace:\n\n{reset_url}\n\n"
+        "Si no fuiste tú, ignora este mensaje. El enlace expira en 1 hora.\n\n"
+        "Atentamente,\nHotel Villa Grace"
+    )
+
+    html_body = _email_brand_shell(
+        badge="Seguridad",
+        title="Restablece tu contraseña",
+        subtitle="Recibimos una solicitud para cambiar tu acceso al portal.",
+        body_html=f"""
+          <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">
+            Recibimos una solicitud para restablecer tu contraseña en <strong>Hotel Villa Grace</strong>.
+          </p>
+          <p style="margin:0 0 14px; font-size:15px; line-height:1.7; color:#334155;">
+            Usa el botón de abajo para continuar. Por seguridad, el enlace expira en <strong>1 hora</strong>.
+          </p>
+          <div style="margin:18px 0 0; padding:14px 16px; background:#ffffff; border:1px dashed #cbd5e1; border-radius:14px;">
+            <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Enlace directo</div>
+            <div style="font-size:13px; line-height:1.6; color:#334155; word-break:break-all;">{escape(reset_url)}</div>
+          </div>
+          <p style="margin:18px 0 0; font-size:14px; line-height:1.7; color:#64748b;">
+            Si no realizaste esta solicitud, puedes ignorar este mensaje con tranquilidad.
+          </p>
+        """,
+        cta_label="Restablecer contraseña",
+        cta_url=reset_url,
+    )
+
+    _send_email_branded(
+        app,
+        to_email=to_email,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+    )
 
 
 # =========================
@@ -1990,30 +2254,24 @@ def create_app() -> Flask:
         ip: str = "",
         user_agent: str = "",
     ) -> None:
-        # Destino fijo solicitado
         to_email = "hotelvillagrace@gmail.com"
-
-        # Tomar SMTP desde config (Config/.env) con fallback a env directo
+    
         host = current_app.config.get("MAIL_SERVER") or os.getenv("MAIL_SERVER")
         port = int(current_app.config.get("MAIL_PORT") or os.getenv("MAIL_PORT") or 0)
         user = current_app.config.get("MAIL_USERNAME") or os.getenv("MAIL_USERNAME")
         pwd  = current_app.config.get("MAIL_PASSWORD") or os.getenv("MAIL_PASSWORD")
-
-        use_tls = _truthy(current_app.config.get("MAIL_USE_TLS", os.getenv("MAIL_USE_TLS", "0")))
-        use_ssl = _truthy(current_app.config.get("MAIL_USE_SSL", os.getenv("MAIL_USE_SSL", "0")))
-
+    
         sender = (
             current_app.config.get("MAIL_DEFAULT_SENDER")
             or os.getenv("MAIL_DEFAULT_SENDER")
             or user
             or "no-reply@hotel.local"
         )
-
-        # Evitar header injection en subject
+    
         subject_clean = re.sub(r"[\r\n]+", " ", (subject_raw or "")).strip()
         subject = f"[Web Contacto] {subject_clean}" if subject_clean else "[Web Contacto] Nuevo mensaje"
-
-        body = (
+    
+        text_body = (
             "Nuevo mensaje desde el formulario 'Escríbenos' (contact.html)\n\n"
             f"Nombre: {name}\n"
             f"Email: {email}\n"
@@ -2026,29 +2284,61 @@ def create_app() -> Flask:
             f"User-Agent: {user_agent}\n"
             f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         )
-
+    
         if not (host and port and user and pwd):
             raise RuntimeError("Configuración SMTP incompleta (MAIL_SERVER/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD).")
-
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = sender
-        msg["To"] = to_email
-        # Para que al responder, respondan al huésped
-        msg["Reply-To"] = email
-        msg.set_content(body)
-
-        if use_ssl:
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
-                smtp.login(user, pwd)
-                smtp.send_message(msg)
-        else:
-            with smtplib.SMTP(host, port, timeout=30) as smtp:
-                if use_tls:
-                    smtp.starttls(context=ssl.create_default_context())
-                smtp.login(user, pwd)
-                smtp.send_message(msg)
+    
+        html_body = _email_brand_shell(
+            badge="Contacto web",
+            title="Nuevo mensaje desde el sitio web",
+            subtitle=subject_clean or "Solicitud recibida desde el formulario de contacto.",
+            body_html=f"""
+              <div style="display:block; margin-bottom:18px;">
+                <div style="margin-bottom:12px; padding:14px 16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
+                  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Nombre</div>
+                  <div style="font-size:15px; color:#0f172a; font-weight:700;">{escape(name)}</div>
+                </div>
+    
+                <div style="margin-bottom:12px; padding:14px 16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
+                  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Correo</div>
+                  <div style="font-size:15px; color:#0f172a;">{escape(email)}</div>
+                </div>
+    
+                <div style="margin-bottom:12px; padding:14px 16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
+                  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Teléfono / WhatsApp</div>
+                  <div style="font-size:15px; color:#0f172a;">{escape(phone or '(no indicado)')}</div>
+                </div>
+    
+                <div style="margin-bottom:12px; padding:14px 16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
+                  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Asunto</div>
+                  <div style="font-size:15px; color:#0f172a;">{escape(subject_clean or '(sin asunto)')}</div>
+                </div>
+              </div>
+    
+              <div style="margin-bottom:18px; padding:18px; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px;">
+                <div style="font-size:13px; color:#64748b; margin-bottom:10px;">Mensaje</div>
+                <div style="font-size:15px; line-height:1.75; color:#334155; white-space:pre-wrap;">{escape(message)}</div>
+              </div>
+    
+              <div style="padding:14px 16px; background:#ffffff; border:1px dashed #cbd5e1; border-radius:14px;">
+                <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Metadatos</div>
+                <div style="font-size:13px; line-height:1.7; color:#475569;">
+                  <strong>IP:</strong> {escape(ip or "-")}<br>
+                  <strong>User-Agent:</strong> {escape(user_agent or "-")}<br>
+                  <strong>Fecha:</strong> {escape(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}
+                </div>
+              </div>
+            """,
+        )
+    
+        _send_email_branded(
+            current_app,
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+            reply_to=email,
+        )
 
     @app.post("/forms/contact.php")
     def forms_contact_php_bridge():
@@ -3029,7 +3319,10 @@ def create_app() -> Flask:
     
         portal_link = url_for("portal_reservas_html", _external=True)
         subject = f"Confirmación de Reserva {numero} — Hotel Villa Grace"
-        body = (
+    
+        monto_fmt = f"₡ {monto:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    
+        text_body = (
             "¡Gracias por tu reserva en Hotel Villa Grace!\n\n"
             f"Número de reserva: {numero}\n"
             f"Estado: {estado}\n"
@@ -3038,60 +3331,67 @@ def create_app() -> Flask:
             f"Check-in: {ci}\n"
             f"Check-out: {co}\n"
             f"Canal: {canal}\n"
-            f"Total: ₡ {monto:,.2f}\n\n".replace(",", "X").replace(".", ",").replace("X", ".")
-            + f"Puedes ver tus reservas y descargar tus comprobantes aquí: {portal_link}\n\n"
+            f"Total: {monto_fmt}\n\n"
+            f"Puedes ver tus reservas y descargar tus comprobantes aquí: {portal_link}\n\n"
             "Si no fuiste tú quien realizó esta reserva, por favor contáctanos de inmediato.\n\n"
             "— Hotel Villa Grace"
         )
     
-        host = current_app.config.get("MAIL_SERVER")
-        port = int(current_app.config.get("MAIL_PORT", 0) or 0)
-        user = current_app.config.get("MAIL_USERNAME")
-        pwd  = current_app.config.get("MAIL_PASSWORD")
-        use_tls = bool(current_app.config.get("MAIL_USE_TLS", False))
-        use_ssl = bool(current_app.config.get("MAIL_USE_SSL", False))
-        sender = (current_app.config.get("MAIL_DEFAULT_SENDER")
-                  or current_app.config.get("MAIL_USERNAME")
-                  or "no-reply@hotel.local")
+        attachment_payload = []
+        if pdf_path and pdf_path.exists():
+            with open(pdf_path, "rb") as f:
+                attachment_payload.append({
+                    "filename": pdf_path.name,
+                    "data": f.read(),
+                    "maintype": "application",
+                    "subtype": "pdf",
+                })
     
-        # Fallback consola si SMTP no está configurado
-        if not (host and port and user and pwd):
-            current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n{body}")
-            return
+        html_body = _email_brand_shell(
+            badge="Reserva confirmada",
+            title="Tu reserva está confirmada",
+            subtitle="Aquí tienes un resumen claro de tu estancia.",
+            body_html=f"""
+              <div style="display:block;">
+                <div style="margin-bottom:12px; padding:16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
+                  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Número de reserva</div>
+                  <div style="font-size:20px; font-weight:800; color:#0f172a;">{escape(str(numero))}</div>
+                </div>
     
-        try:
-            msg = EmailMessage()
-            msg["Subject"] = subject
-            msg["From"] = sender
-            msg["To"] = to_email
-            msg.set_content(body)
+                <div style="margin-bottom:12px; padding:16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
+                  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Detalles</div>
+                  <div style="font-size:15px; line-height:1.8; color:#334155;">
+                    <strong>Estado:</strong> {escape(str(estado))}<br>
+                    <strong>Habitación:</strong> {escape(str(tipo))}<br>
+                    <strong>Huéspedes:</strong> {escape(str(pax))}<br>
+                    <strong>Check-in:</strong> {escape(ci)}<br>
+                    <strong>Check-out:</strong> {escape(co)}<br>
+                    <strong>Canal:</strong> {escape(str(canal))}
+                  </div>
+                </div>
     
-            if pdf_path and pdf_path.exists():
-                with open(pdf_path, "rb") as f:
-                    data = f.read()
-                msg.add_attachment(
-                    data,
-                    maintype="application",
-                    subtype="pdf",
-                    filename=pdf_path.name,
-                )
+                <div style="padding:16px; background:#ecfdf5; border:1px solid #bbf7d0; border-radius:14px;">
+                  <div style="font-size:12px; color:#166534; margin-bottom:6px;">Total</div>
+                  <div style="font-size:24px; font-weight:800; color:#166534;">{escape(monto_fmt)}</div>
+                </div>
     
-            if use_ssl:
-                context = ssl.create_default_context()
-                with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
-                    smtp.login(user, pwd)
-                    smtp.send_message(msg)
-            else:
-                with smtplib.SMTP(host, port, timeout=30) as smtp:
-                    if use_tls:
-                        smtp.starttls(context=ssl.create_default_context())
-                    smtp.login(user, pwd)
-                    smtp.send_message(msg)
+                <p style="margin:18px 0 0; font-size:14px; line-height:1.75; color:#64748b;">
+                  {"Adjuntamos tu comprobante en PDF en este correo." if attachment_payload else "Puedes descargar tu comprobante desde el portal del huésped."}
+                </p>
+              </div>
+            """,
+            cta_label="Ver mis reservas",
+            cta_url=portal_link,
+        )
     
-            current_app.logger.info(f"[MAIL SENT] Confirmación a {to_email} (reserva {numero})")
-        except Exception as e:
-            current_app.logger.warning(f"[MAIL ERROR] {e}. Fallback consola:")
-            current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n{body}")
+        _send_email_branded(
+            current_app,
+            to_email=to_email,
+            subject=subject,
+            text_body=text_body,
+            html_body=html_body,
+            attachments=attachment_payload,
+        )
             
             
     def send_reserva_pending(self, reserva_id: int) -> Dict[str, object]:
@@ -9405,3 +9705,4 @@ app = create_app()
 #        debug=True,
 #        use_reloader=True,   # <-- clave para quitar ese error
 #    )
+#

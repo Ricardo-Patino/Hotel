@@ -1,5 +1,7 @@
+import glob
 import logging
 import os
+import shutil
 import uuid
 from typing import Literal
 
@@ -10,7 +12,6 @@ from services.grr.housekeeping_sync import create_cleaning_task_if_needed
 from sqlalchemy.exc import DataError, IntegrityError
 from utils.auth import role_required
 from werkzeug.utils import secure_filename
-
 
 from . import rooms_bp
 
@@ -60,25 +61,22 @@ def _coerce_room_payload(payload: dict) -> dict:
 
 
 def _serialize_room(h: Habitacion) -> dict:
-    data = {col.name: str(getattr(h, col.name)) for col in h.__table__.columns}
+    data = {}
+    for col in h.__table__.columns:
+        value = getattr(h, col.name)
+        data[col.name] = None if value is None else str(value)
 
-    primary = (
-        HabitacionImagen.query.filter_by(Codigo_Habitacion=h.Codigo_Habitacion, Is_Principal=True)
-        .order_by(HabitacionImagen.Sort_Order.asc(), HabitacionImagen.Id.asc())
-        .first()
-    )
+    imgs = _list_room_images_safe(h.Codigo_Habitacion)
+    primary = next((x for x in imgs if bool(x.Is_Principal)), None) or (imgs[0] if imgs else None)
 
     if primary:
         data["Primary_Image_Path"] = primary.File_Path
         data["Primary_Image_Url"] = url_for("static", filename=primary.File_Path)
     else:
-        data["Primary_Image_Path"] = None
-        data["Primary_Image_Url"] = None
+        data["Primary_Image_Path"] = DEFAULT_ROOM_IMAGE_REL
+        data["Primary_Image_Url"] = url_for("static", filename=DEFAULT_ROOM_IMAGE_REL)
 
-    data["Images_Count"] = (
-        HabitacionImagen.query.filter_by(Codigo_Habitacion=h.Codigo_Habitacion).count()
-    )
-
+    data["Images_Count"] = len(imgs)
     return data
 
 
@@ -176,12 +174,246 @@ def _cleanup_room_folder(room_id: int) -> None:
 
 
 # =========================================================
+# Persistencia robusta de imagen principal
+# - Conserva la imagen principal aunque se borren los registros
+#   de HabitacionImagen en un reinicio manual de BD.
+# - Siempre garantiza al menos una imagen por habitación.
+# =========================================================
+DEFAULT_ROOM_IMAGE_REL = "assets/img/hotel/room-1.jpg"
+PRIMARY_ALIAS_PREFIX = "__primary"
+
+
+def _static_abs(rel_path: str) -> str:
+    rel = str(rel_path or "").replace("\\", "/").lstrip("/")
+    if rel.startswith("static/"):
+        rel = rel[len("static/"):]
+    return os.path.join(current_app.static_folder, rel)
+
+
+def _static_exists(rel_path: str) -> bool:
+    if not rel_path:
+        return False
+    return os.path.isfile(_static_abs(rel_path))
+
+
+def _guess_mime_from_rel(rel_path: str) -> str | None:
+    ext = os.path.splitext(str(rel_path or ""))[1].lower()
+    return {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }.get(ext)
+
+
+def _room_primary_alias_rel(room_id: int, ext: str) -> str:
+    ext = (ext or ".jpg").lower()
+    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+        ext = ".jpg"
+    return f"uploads/rooms/{room_id}/{PRIMARY_ALIAS_PREFIX}{ext}"
+
+
+def _remove_room_primary_aliases(room_id: int, keep_abs: str | None = None) -> None:
+    folder = _room_upload_dir(room_id)
+    if not os.path.isdir(folder):
+        return
+
+    pattern = os.path.join(folder, f"{PRIMARY_ALIAS_PREFIX}.*")
+    for old_path in glob.glob(pattern):
+        try:
+            if keep_abs and os.path.abspath(old_path) == os.path.abspath(keep_abs):
+                continue
+            os.remove(old_path)
+        except Exception:
+            rooms_logger.exception("No se pudo eliminar alias principal: %s", old_path)
+
+
+def _sync_primary_alias(room_id: int, source_rel_path: str) -> str | None:
+    """
+    Crea/actualiza una copia persistente de la imagen principal:
+    static/uploads/rooms/<room_id>/__primary.<ext>
+
+    Esta copia sobrevive aunque la tabla HabitacionImagen se vacíe.
+    """
+    if not source_rel_path or not _static_exists(source_rel_path):
+        return None
+
+    source_abs = _static_abs(source_rel_path)
+    source_name = os.path.basename(source_abs).lower()
+
+    # Si la propia fuente ya es el alias, no rehacer nada
+    if source_name.startswith(f"{PRIMARY_ALIAS_PREFIX}."):
+        return _safe_relpath(source_abs)
+
+    ext = os.path.splitext(source_abs)[1].lower() or ".jpg"
+    alias_rel = _room_primary_alias_rel(room_id, ext)
+    alias_abs = _static_abs(alias_rel)
+
+    os.makedirs(os.path.dirname(alias_abs), exist_ok=True)
+    _remove_room_primary_aliases(room_id, keep_abs=alias_abs)
+
+    try:
+        shutil.copy2(source_abs, alias_abs)
+    except Exception:
+        rooms_logger.exception("No se pudo sincronizar alias principal para habitación %s", room_id)
+        return None
+
+    return _safe_relpath(alias_abs)
+
+
+def _provision_default_image_for_room(room_id: int) -> str:
+    """
+    Copia la imagen default a la carpeta de la habitación como alias principal.
+    """
+    if not _static_exists(DEFAULT_ROOM_IMAGE_REL):
+        raise FileNotFoundError(
+            f"No existe la imagen default configurada: {DEFAULT_ROOM_IMAGE_REL}"
+        )
+
+    default_abs = _static_abs(DEFAULT_ROOM_IMAGE_REL)
+    ext = os.path.splitext(default_abs)[1].lower() or ".jpg"
+    alias_rel = _room_primary_alias_rel(room_id, ext)
+    alias_abs = _static_abs(alias_rel)
+
+    os.makedirs(os.path.dirname(alias_abs), exist_ok=True)
+    _remove_room_primary_aliases(room_id, keep_abs=alias_abs)
+
+    if os.path.abspath(default_abs) != os.path.abspath(alias_abs):
+        shutil.copy2(default_abs, alias_abs)
+
+    return _safe_relpath(alias_abs)
+
+
+def _list_valid_db_images(room_id: int) -> list[HabitacionImagen]:
+    """
+    Devuelve solo imágenes cuyo archivo sí existe.
+    Si encuentra registros rotos, los elimina de la BD.
+    """
+    imgs = (
+        HabitacionImagen.query.filter_by(Codigo_Habitacion=room_id)
+        .order_by(
+            HabitacionImagen.Is_Principal.desc(),
+            HabitacionImagen.Sort_Order.asc(),
+            HabitacionImagen.Id.asc(),
+        )
+        .all()
+    )
+
+    valid: list[HabitacionImagen] = []
+    dirty = False
+
+    for img in imgs:
+        if _static_exists(img.File_Path):
+            valid.append(img)
+        else:
+            db.session.delete(img)
+            dirty = True
+
+    if dirty:
+        db.session.commit()
+
+    return valid
+
+
+def _ensure_primary_image(room_id: int) -> HabitacionImagen | None:
+    """
+    Garantiza que la habitación tenga una imagen principal válida.
+
+    Orden de recuperación:
+    1) Registro válido en BD
+    2) Alias persistente __primary.<ext> en disco
+    3) Imagen default
+    """
+    valid = _list_valid_db_images(room_id)
+
+    if valid:
+        primary = next((x for x in valid if bool(x.Is_Principal)), None) or valid[0]
+
+        # Asegurar una sola principal
+        changed = False
+        for img in valid:
+            should_be_primary = img.Id == primary.Id
+            if bool(img.Is_Principal) != should_be_primary:
+                img.Is_Principal = should_be_primary
+                changed = True
+
+        if changed:
+            db.session.commit()
+            db.session.refresh(primary)
+
+        _sync_primary_alias(room_id, primary.File_Path)
+        return primary
+
+    # Buscar alias persistente en disco
+    alias_rel = None
+    for ext in (".webp", ".jpg", ".jpeg", ".png"):
+        candidate = _room_primary_alias_rel(room_id, ext)
+        if _static_exists(candidate):
+            alias_rel = candidate
+            break
+
+    # Si no existe alias, provisionar imagen default
+    if not alias_rel:
+        alias_rel = _provision_default_image_for_room(room_id)
+
+    img = HabitacionImagen(
+        Codigo_Habitacion=room_id,
+        File_Path=alias_rel,
+        Mime_Type=_guess_mime_from_rel(alias_rel),
+        Bytes=os.path.getsize(_static_abs(alias_rel)) if _static_exists(alias_rel) else None,
+        Is_Principal=True,
+        Sort_Order=0,
+        Alt_Text="Imagen principal de la habitación",
+    )
+    db.session.add(img)
+    db.session.commit()
+    db.session.refresh(img)
+    return img
+
+
+def _list_room_images_safe(room_id: int) -> list[HabitacionImagen]:
+    """
+    Lista imágenes válidas; si no hay ninguna, restaura una principal.
+    """
+    imgs = _list_valid_db_images(room_id)
+    if imgs:
+        primary = next((x for x in imgs if bool(x.Is_Principal)), None)
+        if not primary and imgs:
+            imgs[0].Is_Principal = True
+            db.session.commit()
+            db.session.refresh(imgs[0])
+            primary = imgs[0]
+
+        if primary:
+            _sync_primary_alias(room_id, primary.File_Path)
+
+        return (
+            HabitacionImagen.query.filter_by(Codigo_Habitacion=room_id)
+            .order_by(
+                HabitacionImagen.Is_Principal.desc(),
+                HabitacionImagen.Sort_Order.asc(),
+                HabitacionImagen.Id.asc(),
+            )
+            .all()
+        )
+
+    restored = _ensure_primary_image(room_id)
+    return [restored] if restored else []
+
+
+
+# =========================================================
 # CRUD Habitaciones (ya existía, se extiende con imágenes)
 # =========================================================
 def _create(payload: dict) -> Habitacion:
     habitacion = Habitacion(**payload)
     db.session.add(habitacion)
     db.session.commit()
+    db.session.refresh(habitacion)
+
+    # Garantiza que toda habitación nueva nazca con imagen
+    _ensure_primary_image(habitacion.Codigo_Habitacion)
+
     db.session.refresh(habitacion)
     return habitacion
 
@@ -302,11 +534,7 @@ def room_images_list(room_id: int):
     if not exists:
         return _json_error("Habitación no encontrada", 404)
 
-    imgs = (
-        HabitacionImagen.query.filter_by(Codigo_Habitacion=room_id)
-        .order_by(HabitacionImagen.Is_Principal.desc(), HabitacionImagen.Sort_Order.asc(), HabitacionImagen.Id.asc())
-        .all()
-    )
+    imgs = _list_room_images_safe(room_id)
     return jsonify([_serialize_image(i) for i in imgs])
 
 
@@ -356,6 +584,10 @@ def room_images_upload(room_id: int):
         db.session.add(img)
         db.session.commit()
         db.session.refresh(img)
+
+        if img.Is_Principal:
+            _sync_primary_alias(room_id, img.File_Path)
+
         return jsonify(_serialize_image(img))
 
     except ValueError as ve:
@@ -379,6 +611,7 @@ def room_image_update(image_id: int):
     try:
         if "Alt_Text" in payload:
             img.Alt_Text = payload.get("Alt_Text")
+
         if "Sort_Order" in payload:
             try:
                 img.Sort_Order = int(payload.get("Sort_Order") or 0)
@@ -386,12 +619,19 @@ def room_image_update(image_id: int):
                 img.Sort_Order = 0
 
         if payload.get("Is_Principal") is True:
-            HabitacionImagen.query.filter_by(Codigo_Habitacion=img.Codigo_Habitacion).update({"Is_Principal": False})
+            HabitacionImagen.query.filter_by(Codigo_Habitacion=img.Codigo_Habitacion).update(
+                {"Is_Principal": False}
+            )
             img.Is_Principal = True
 
         db.session.commit()
         db.session.refresh(img)
+
+        if img.Is_Principal:
+            _sync_primary_alias(img.Codigo_Habitacion, img.File_Path)
+
         return jsonify(_serialize_image(img))
+
     except Exception:
         db.session.rollback()
         rooms_logger.exception("Error actualizando metadata de imagen")
@@ -414,20 +654,25 @@ def room_image_delete(image_id: int):
         db.session.commit()
         _delete_static_file(rel_path)
 
-        # Si se eliminó la principal, escoger otra
-        if was_primary:
-            next_img = (
-                HabitacionImagen.query.filter_by(Codigo_Habitacion=room_id)
-                .order_by(HabitacionImagen.Sort_Order.asc(), HabitacionImagen.Id.asc())
-                .first()
-            )
-            if next_img:
-                HabitacionImagen.query.filter_by(Codigo_Habitacion=room_id).update({"Is_Principal": False})
+        remaining = _list_valid_db_images(room_id)
+
+        if remaining:
+            if was_primary:
+                next_img = remaining[0]
+                HabitacionImagen.query.filter_by(Codigo_Habitacion=room_id).update(
+                    {"Is_Principal": False}
+                )
                 next_img.Is_Principal = True
                 db.session.commit()
+                db.session.refresh(next_img)
+                _sync_primary_alias(room_id, next_img.File_Path)
+        else:
+            # Si ya no queda ninguna, recrear la default para no dejar la habitación sin imagen
+            _ensure_primary_image(room_id)
 
         _cleanup_room_folder(room_id)
         return jsonify({"ok": True})
+
     except Exception:
         db.session.rollback()
         rooms_logger.exception("Error eliminando imagen")
