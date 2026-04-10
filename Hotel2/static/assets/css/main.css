@@ -646,14 +646,17 @@ h6 {
   position: fixed;
   visibility: hidden;
   opacity: 0;
-  right: 15px;
-  bottom: -15px;
-  z-index: 99999;
+  right: 18px;
+  bottom: 96px;
+  z-index: 1040;
   background-color: var(--accent-color);
-  width: 44px;
-  height: 44px;
-  border-radius: 50px;
-  transition: all 0.4s;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  transform: translateY(20px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease, background-color 0.25s ease;
 }
 
 .scroll-top i {
@@ -670,7 +673,21 @@ h6 {
 .scroll-top.active {
   visibility: visible;
   opacity: 1;
-  bottom: 15px;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (max-width: 575.98px) {
+  .scroll-top {
+    right: 12px;
+    bottom: 84px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .scroll-top i {
+    font-size: 22px;
+  }
 }
 
 /*--------------------------------------------------------------
