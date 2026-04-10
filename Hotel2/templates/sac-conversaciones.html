@@ -51,6 +51,120 @@
     background-color: #fff5f5;
   }
 
+  .conv-row.attended {
+    border-left: 4px solid #198754;
+    background-color: #f1fbf5;
+  }
+
+  .sac-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 2000;
+  }
+
+  .sac-confirm-backdrop.d-none {
+    display: none !important;
+  }
+
+  .sac-confirm-card {
+    width: min(100%, 460px);
+    background: #ffffff;
+    border-radius: 1rem;
+    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28);
+    overflow: hidden;
+    animation: sacConfirmIn 0.18s ease-out;
+  }
+
+  .sac-confirm-header {
+    padding: 1rem 1.25rem 0.75rem;
+    border-bottom: 1px solid #eef2f7;
+    background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  }
+
+  .sac-confirm-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .sac-confirm-subtitle {
+    margin: 0.35rem 0 0;
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .sac-confirm-body {
+    padding: 1rem 1.25rem 0.75rem;
+  }
+
+  .sac-confirm-note {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.9rem 1rem;
+    border-radius: 0.85rem;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .sac-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 0 1.25rem 1.15rem;
+  }
+
+  .sac-toast-wrap {
+    position: fixed;
+    right: 18px;
+    top: 18px;
+    z-index: 2100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .sac-toast {
+    min-width: 260px;
+    max-width: 380px;
+    background: #111827;
+    color: #fff;
+    border-radius: 0.8rem;
+    padding: 0.8rem 0.95rem;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
+    font-size: 0.88rem;
+    line-height: 1.35;
+    animation: sacToastIn 0.18s ease-out;
+  }
+
+  .sac-toast.success {
+    background: #166534;
+  }
+
+  .sac-toast.error {
+    background: #991b1b;
+  }
+
+  @keyframes sacConfirmIn {
+    from { opacity: 0; transform: translateY(10px) scale(.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes sacToastIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
   .conv-row .last-snippet {
     display: block;
     font-size: 0.75rem;
@@ -122,21 +236,58 @@
                 placeholder="Escribe tu respuesta como agente…"
               ></textarea>
             </div>
-            <div class="d-flex justify-content-between align-items-center">
+          
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
               <div id="agent-reply-helper" class="small text-muted">
-                La respuesta quedará registrada como mensaje de agente en esta conversación.
+                La respuesta quedará registrada como mensaje de agente y la conversación seguirá abierta hasta que usted la marque como atendida.
               </div>
-              <button type="submit" class="btn btn-primary btn-sm">
-                <i class="bi bi-send me-1"></i> Enviar respuesta
-              </button>
+          
+              <div class="d-flex gap-2">
+                <button type="button" id="btn-close-conv" class="btn btn-outline-success btn-sm">
+                  <i class="bi bi-check2-circle me-1"></i> Marcar como atendida
+                </button>
+                <button type="submit" class="btn btn-primary btn-sm">
+                  <i class="bi bi-send me-1"></i> Enviar respuesta
+                </button>
+              </div>
             </div>
           </form>
-
+          
           <div id="agent-reply-disabled" class="mt-auto small text-muted" style="display:none;">
-            Esta conversación no está marcada para atención de agente o se encuentra cerrada.
+            Esta conversación está cerrada o todavía no está en flujo de atención humana.
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+<div id="sac-toast-wrap" class="sac-toast-wrap"></div>
+
+<div id="close-conv-modal" class="sac-confirm-backdrop d-none" aria-hidden="true">
+  <div class="sac-confirm-card" role="dialog" aria-modal="true" aria-labelledby="close-conv-title">
+    <div class="sac-confirm-header">
+      <h3 id="close-conv-title" class="sac-confirm-title">Marcar conversación como atendida</h3>
+      <p class="sac-confirm-subtitle">
+        Esta acción cerrará la conversación y la moverá al estado <strong>Atendida</strong>.
+      </p>
+    </div>
+
+    <div class="sac-confirm-body">
+      <div class="sac-confirm-note">
+        <i class="bi bi-check2-circle fs-5"></i>
+        <div>
+          El cliente ya no aparecerá como “Requiere atención” y la conversación quedará cerrada manualmente por el asesor.
+        </div>
+      </div>
+    </div>
+
+    <div class="sac-confirm-actions">
+      <button type="button" id="close-conv-cancel" class="btn btn-outline-secondary btn-sm">
+        Cancelar
+      </button>
+      <button type="button" id="close-conv-confirm" class="btn btn-success btn-sm">
+        <i class="bi bi-check2-circle me-1"></i> Sí, marcar como atendida
+      </button>
     </div>
   </div>
 </div>
@@ -146,6 +297,11 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   let currentConvId = null;
+  let autoRefreshHandle = null;
+  let lastListSignature = "";
+  let lastConversationSignature = "";
+  let isClosingConversation = false;
+  let isSendingReply = false;
 
   const listEl = document.getElementById("conv-list");
   const btnRefresh = document.getElementById("btn-refresh-conv");
@@ -159,61 +315,196 @@ document.addEventListener("DOMContentLoaded", function () {
   const replyText = document.getElementById("agent-reply-text");
   const replyHelper = document.getElementById("agent-reply-helper");
   const replyDisabled = document.getElementById("agent-reply-disabled");
+  const btnCloseConv = document.getElementById("btn-close-conv");
 
-  async function loadConversations() {
+  const closeModal = document.getElementById("close-conv-modal");
+  const closeModalCancel = document.getElementById("close-conv-cancel");
+  const closeModalConfirm = document.getElementById("close-conv-confirm");
+  const toastWrap = document.getElementById("sac-toast-wrap");
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function defaultLabelForRole(role) {
+    const r = (role || "").toLowerCase();
+    if (r === "user") return "Cliente";
+    if (r === "agent") return "Asesor Hotel Villa Grace";
+    if (r === "bot") return "Bot Hotel Villa Grace";
+    return "Sistema";
+  }
+
+  function variantFromStatus(status) {
+    const s = String(status || "").toLowerCase();
+    if (s === "closed") return "success";
+    if (s === "agent_pending" || s === "handoff_offer") return "danger";
+    if (s === "agent_active") return "primary";
+    if (s === "bot") return "light";
+    return "secondary";
+  }
+
+  function showToast(message, type = "info") {
+    if (!toastWrap) return;
+
+    const el = document.createElement("div");
+    el.className = `sac-toast ${type}`;
+    el.innerHTML = escapeHtml(message);
+    toastWrap.appendChild(el);
+
+    setTimeout(() => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(-6px)";
+      el.style.transition = "opacity .18s ease, transform .18s ease";
+      setTimeout(() => el.remove(), 180);
+    }, 2600);
+  }
+
+  function showCloseModal() {
+    if (!closeModal) return;
+    closeModal.classList.remove("d-none");
+    closeModal.setAttribute("aria-hidden", "false");
+  }
+
+  function hideCloseModal() {
+    if (!closeModal) return;
+    closeModal.classList.add("d-none");
+    closeModal.setAttribute("aria-hidden", "true");
+  }
+
+  function listSignature(items) {
+    return JSON.stringify(
+      (items || []).map(i => [
+        i.id,
+        i.status,
+        i.status_label,
+        i.status_variant,
+        i.requires_attention,
+        i.guest_label,
+        i.last_snippet
+      ])
+    );
+  }
+
+  function detailSignature(conv, messages) {
+    return JSON.stringify({
+      conv: conv ? {
+        id: conv.id,
+        status: conv.status,
+        status_label: conv.status_label,
+        status_variant: conv.status_variant,
+        requires_attention: conv.requires_attention,
+        can_agent_reply: conv.can_agent_reply,
+        is_closed: conv.is_closed,
+        guest_label: conv.guest_label
+      } : null,
+      messages: (messages || []).map(m => [
+        m.id,
+        m.role,
+        m.sender_name,
+        m.content,
+        m.created_at_human || m.created_at
+      ])
+    });
+  }
+
+  function renderConversationList(items, selectedId) {
     if (!listEl) return;
-    listEl.innerHTML = '<div class="p-3 text-muted small">Cargando conversaciones…</div>';
+
+    if (!items || items.length === 0) {
+      listEl.innerHTML = '<div class="p-3 text-muted small">No hay conversaciones registradas todavía.</div>';
+      return;
+    }
+
+    listEl.innerHTML = "";
+
+    items.forEach(item => {
+      const badgeVariant = item.status_variant || variantFromStatus(item.status);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "list-group-item list-group-item-action conv-row" +
+        (item.requires_attention ? " needs-agent" : "") +
+        (item.status === "closed" ? " attended" : "") +
+        (String(item.id) === String(selectedId) ? " active" : "");
+
+      btn.dataset.convId = item.id;
+
+      btn.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <div class="fw-semibold">#${item.id}</div>
+          <div class="text-end">
+            ${item.requires_attention ? '<span class="badge bg-danger me-1">Requiere atención</span>' : ''}
+            <span class="badge bg-${escapeHtml(badgeVariant)} ${badgeVariant === "light" ? "text-muted" : ""}">
+              ${escapeHtml(item.status_label || item.status || "")}
+            </span>
+          </div>
+        </div>
+        <div class="small">${escapeHtml(item.guest_label || "Visitante web")}</div>
+        <span class="last-snippet">${escapeHtml(item.last_snippet || "")}</span>
+      `;
+
+      btn.addEventListener("click", async () => {
+        currentConvId = item.id;
+        document.querySelectorAll(".conv-row").forEach(r => r.classList.remove("active"));
+        btn.classList.add("active");
+        await loadConversation(item.id, { silent: false, forceRender: false });
+      });
+
+      listEl.appendChild(btn);
+    });
+  }
+
+  async function loadConversations(options = {}) {
+    const preserveSelection = options.preserveSelection !== false;
+    const silent = !!options.silent;
+    const forceRender = !!options.forceRender;
+
+    if (!listEl) return [];
+
+    const selectedId = preserveSelection ? currentConvId : null;
+
+    if (!silent && !listEl.dataset.loadedOnce) {
+      listEl.innerHTML = '<div class="p-3 text-muted small">Cargando conversaciones…</div>';
+    }
 
     try {
-      const resp = await fetch("{{ url_for('sac.conversations_list') }}");
+      const resp = await fetch("{{ url_for('sac.conversations_list') }}", {
+        cache: "no-store"
+      });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
+
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error || "Error al cargar conversaciones");
 
       const items = data.items || [];
-      if (items.length === 0) {
-        listEl.innerHTML = '<div class="p-3 text-muted small">No hay conversaciones registradas todavía.</div>';
-        return;
+      const sig = listSignature(items);
+
+      if (forceRender || sig !== lastListSignature) {
+        renderConversationList(items, selectedId);
+        lastListSignature = sig;
+        listEl.dataset.loadedOnce = "1";
+      } else if (selectedId != null) {
+        const activeBtn = listEl.querySelector(`.conv-row[data-conv-id="${selectedId}"]`);
+        if (activeBtn) {
+          document.querySelectorAll(".conv-row").forEach(r => r.classList.remove("active"));
+          activeBtn.classList.add("active");
+        }
       }
 
-      listEl.innerHTML = "";
-      items.forEach(item => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className =
-          "list-group-item list-group-item-action conv-row" +
-          (item.requires_attention ? " needs-agent" : "");
-        btn.dataset.convId = item.id;
-
-        btn.innerHTML = `
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <div class="fw-semibold">#${item.id}</div>
-            <div class="text-end">
-              ${item.requires_attention ? '<span class="badge bg-danger me-1">Requiere atención</span>' : ''}
-              <span class="badge bg-light text-muted">${item.status_label || item.status}</span>
-            </div>
-          </div>
-          <div class="small">${item.guest_label || "Visitante web"}</div>
-          <span class="last-snippet">${item.last_snippet || ""}</span>
-        `;
-
-        btn.addEventListener("click", () => {
-          selectRow(btn);
-          loadConversation(item.id);
-        });
-
-        listEl.appendChild(btn);
-      });
+      return items;
     } catch (err) {
       console.error(err);
-      listEl.innerHTML =
-        '<div class="p-3 text-danger small">Error al cargar conversaciones.</div>';
+      if (!silent) {
+        listEl.innerHTML =
+          '<div class="p-3 text-danger small">Error al cargar conversaciones.</div>';
+      }
+      return [];
     }
-  }
-
-  function selectRow(row) {
-    document.querySelectorAll(".conv-row").forEach(r => r.classList.remove("active"));
-    if (row) row.classList.add("active");
   }
 
   function renderHeader(conv) {
@@ -223,6 +514,7 @@ document.addEventListener("DOMContentLoaded", function () {
       badgesEl.innerHTML = "";
       replyForm.style.display = "none";
       replyDisabled.style.display = "none";
+      if (btnCloseConv) btnCloseConv.disabled = true;
       return;
     }
 
@@ -233,19 +525,27 @@ document.addEventListener("DOMContentLoaded", function () {
     if (conv.requires_attention) {
       badges += '<span class="badge bg-danger me-1">Requiere atención</span>';
     }
+
     if (conv.status_label || conv.status) {
-      badges += `<span class="badge bg-secondary">${conv.status_label || conv.status}</span>`;
+      const badgeVariant = conv.status_variant || variantFromStatus(conv.status);
+      badges += `<span class="badge bg-${escapeHtml(badgeVariant)} me-1">${escapeHtml(conv.status_label || conv.status)}</span>`;
     }
+
     badgesEl.innerHTML = badges;
 
     if (conv.can_agent_reply) {
       replyForm.style.display = "";
       replyDisabled.style.display = "none";
+      if (btnCloseConv) btnCloseConv.disabled = false;
       replyHelper.textContent =
-        "La respuesta quedará registrada como mensaje de agente en esta conversación.";
+        "La conversación seguirá abierta hasta que usted pulse “Marcar como atendida”.";
     } else {
       replyForm.style.display = "none";
       replyDisabled.style.display = "";
+      if (btnCloseConv) btnCloseConv.disabled = !!conv.is_closed;
+      replyDisabled.textContent = conv.is_closed
+        ? "Esta conversación ya fue cerrada manualmente."
+        : "Esta conversación todavía no está en flujo de atención humana.";
     }
   }
 
@@ -260,20 +560,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let html = "";
     messages.forEach(msg => {
-      const role = msg.role || "user";
+      const role = (msg.role || "user").toLowerCase();
       let cls = "conv-message-bot";
-      let label = "Bot";
 
-      if (role === "user") { cls = "conv-message-user"; label = "Cliente"; }
-      else if (role === "agent") { cls = "conv-message-agent"; label = "Agente"; }
-      else if (role === "system") { cls = "conv-message-system"; label = "Sistema"; }
+      if (role === "user") cls = "conv-message-user";
+      else if (role === "agent") cls = "conv-message-agent";
+      else if (role === "system") cls = "conv-message-system";
 
       const ts = msg.created_at_human || msg.created_at || "";
-      const content = (msg.content || "").replace(/\n/g, "<br>");
+      const sender = msg.sender_name || defaultLabelForRole(role);
+      const content = escapeHtml(msg.content || "").replace(/\n/g, "<br>");
 
       html += `
         <div class="conv-message ${cls}">
-          <div class="conv-message-meta mb-1">${label} · ${ts}</div>
+          <div class="conv-message-meta mb-1">
+            <strong>${escapeHtml(sender)}</strong> · ${escapeHtml(ts)}
+          </div>
           <div>${content}</div>
         </div>
       `;
@@ -283,34 +585,55 @@ document.addEventListener("DOMContentLoaded", function () {
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  async function loadConversation(convId) {
-    if (!convId) return;
+  async function loadConversation(convId, options = {}) {
+    if (!convId) return null;
+
+    const silent = !!options.silent;
+    const forceRender = !!options.forceRender;
+
     currentConvId = convId;
-    messagesEl.innerHTML =
-      '<p class="text-muted small mb-0">Cargando conversación…</p>';
+
+    if (!silent && !messagesEl.dataset.loadedOnce) {
+      messagesEl.innerHTML =
+        '<p class="text-muted small mb-0">Cargando conversación…</p>';
+    }
 
     try {
       const url = "{{ url_for('sac.conversation_detail', conversation_id=0) }}".replace("0", convId);
-      const resp = await fetch(url);
+      const resp = await fetch(url, { cache: "no-store" });
       if (!resp.ok) throw new Error("HTTP " + resp.status);
+
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error || "Error al cargar conversación");
 
-      renderHeader(data.conversation);
-      renderMessages(data.messages || []);
+      const sig = detailSignature(data.conversation, data.messages || []);
+
+      if (forceRender || sig !== lastConversationSignature) {
+        renderHeader(data.conversation);
+        renderMessages(data.messages || []);
+        lastConversationSignature = sig;
+        messagesEl.dataset.loadedOnce = "1";
+      }
+
+      return data;
     } catch (err) {
       console.error(err);
-      messagesEl.innerHTML =
-        '<p class="text-danger small mb-0">Error al cargar la conversación.</p>';
+      if (!silent) {
+        messagesEl.innerHTML =
+          '<p class="text-danger small mb-0">Error al cargar la conversación.</p>';
+      }
+      return null;
     }
   }
 
   async function handleAgentReply(ev) {
     ev.preventDefault();
-    if (!currentConvId) return;
+    if (!currentConvId || isSendingReply) return;
 
     const text = (replyText.value || "").trim();
     if (!text) return;
+
+    isSendingReply = true;
 
     const btn = replyForm.querySelector("button[type='submit']");
     if (btn) {
@@ -333,12 +656,14 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       replyText.value = "";
-      await loadConversations();
-      await loadConversation(currentConvId);
+      await loadConversations({ preserveSelection: true, silent: true, forceRender: true });
+      await loadConversation(currentConvId, { silent: true, forceRender: true });
+      showToast("Respuesta enviada correctamente.", "success");
     } catch (err) {
       console.error(err);
-      alert("No se pudo enviar la respuesta del agente.");
+      showToast("No se pudo enviar la respuesta del agente.", "error");
     } finally {
+      isSendingReply = false;
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-send me-1"></i> Enviar respuesta';
@@ -346,10 +671,109 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  if (replyForm) replyForm.addEventListener("submit", handleAgentReply);
-  if (btnRefresh) btnRefresh.addEventListener("click", loadConversations);
+  function handleCloseConversation() {
+    if (!currentConvId || isClosingConversation) return;
+    showCloseModal();
+  }
 
-  loadConversations();
+  async function confirmCloseConversation() {
+    if (!currentConvId || isClosingConversation) return;
+
+    isClosingConversation = true;
+    hideCloseModal();
+
+    if (btnCloseConv) {
+      btnCloseConv.disabled = true;
+      btnCloseConv.innerHTML =
+        '<span class="spinner-border spinner-border-sm me-1"></span>Cerrando…';
+    }
+
+    if (closeModalConfirm) {
+      closeModalConfirm.disabled = true;
+      closeModalConfirm.innerHTML =
+        '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+    }
+
+    try {
+      const url = "{{ url_for('sac.conversation_close', conversation_id=0) }}".replace("0", currentConvId);
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || ("HTTP " + resp.status));
+      }
+
+      await loadConversations({ preserveSelection: true, silent: true, forceRender: true });
+      await loadConversation(currentConvId, { silent: true, forceRender: true });
+      showToast("La conversación fue marcada como atendida.", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("No se pudo cerrar la conversación.", "error");
+    } finally {
+      isClosingConversation = false;
+
+      if (btnCloseConv) {
+        btnCloseConv.disabled = false;
+        btnCloseConv.innerHTML =
+          '<i class="bi bi-check2-circle me-1"></i> Marcar como atendida';
+      }
+
+      if (closeModalConfirm) {
+        closeModalConfirm.disabled = false;
+        closeModalConfirm.innerHTML =
+          '<i class="bi bi-check2-circle me-1"></i> Sí, marcar como atendida';
+      }
+    }
+  }
+
+  function startAutoRefresh() {
+    if (autoRefreshHandle) clearInterval(autoRefreshHandle);
+
+    autoRefreshHandle = setInterval(async () => {
+      if (document.hidden || isClosingConversation || isSendingReply) return;
+
+      await loadConversations({ preserveSelection: true, silent: true, forceRender: false });
+
+      if (currentConvId) {
+        await loadConversation(currentConvId, { silent: true, forceRender: false });
+      }
+    }, 3000);
+  }
+
+  if (replyForm) replyForm.addEventListener("submit", handleAgentReply);
+
+  if (btnRefresh) {
+    btnRefresh.addEventListener("click", async () => {
+      await loadConversations({ preserveSelection: true, silent: false, forceRender: true });
+      if (currentConvId) {
+        await loadConversation(currentConvId, { silent: false, forceRender: true });
+      }
+    });
+  }
+
+  if (btnCloseConv) btnCloseConv.addEventListener("click", handleCloseConversation);
+  if (closeModalCancel) closeModalCancel.addEventListener("click", hideCloseModal);
+  if (closeModalConfirm) closeModalConfirm.addEventListener("click", confirmCloseConversation);
+
+  if (closeModal) {
+    closeModal.addEventListener("click", function (ev) {
+      if (ev.target === closeModal) {
+        hideCloseModal();
+      }
+    });
+  }
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") {
+      hideCloseModal();
+    }
+  });
+
+  loadConversations({ preserveSelection: false, silent: false, forceRender: true });
+  startAutoRefresh();
 });
 </script>
 {% endblock %}

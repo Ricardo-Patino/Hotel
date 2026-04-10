@@ -54,70 +54,153 @@
     bottom: 16px;
     z-index: 1050;
   }
+
   .sac-widget-toggle {
     border-radius: 999px;
-    box-shadow: 0 3px 10px rgba(0,0,0,.25);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, .25);
   }
+
   .sac-chat-panel {
     position: absolute;
     right: 0;
     bottom: 60px;
-    width: 320px;
-    max-height: 520px;
-    border-radius: 12px;
+    width: min(420px, calc(100vw - 24px));
+    height: min(680px, calc(100vh - 90px));
+    border-radius: 16px;
     overflow: hidden;
   }
+
+  .sac-chat-panel.card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sac-chat-panel .card-header {
+    flex: 0 0 auto;
+  }
+
+  .sac-chat-panel .card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px !important;
+  }
+
+  .sac-chat-panel .card-footer {
+    flex: 0 0 auto;
+    background: #fff;
+  }
+
   .sac-messages {
-    max-height: 360px;
+    flex: 1 1 auto;
+    min-height: 220px;
     overflow-y: auto;
-    background:#f8f9fa;
-    padding: 6px;
-    border-radius: 8px;
+    background: #f8f9fa;
+    padding: 8px;
+    border-radius: 10px;
   }
+
   .sac-msg-row {
-    display:flex;
-    margin-bottom: 6px;
+    display: flex;
+    margin-bottom: 10px;
   }
-  .sac-msg-row.user { justify-content: flex-end; }
-  .sac-msg-row.bot  { justify-content: flex-start; }
+
+  .sac-msg-row.user {
+    justify-content: flex-end;
+  }
+
+  .sac-msg-row.bot {
+    justify-content: flex-start;
+  }
+
+  .sac-msg-col {
+    display: flex;
+    flex-direction: column;
+    max-width: 88%;
+  }
+
+  .sac-msg-row.user .sac-msg-col {
+    align-items: flex-end;
+    margin-left: auto;
+  }
+
+  .sac-msg-author {
+    font-size: 0.72rem;
+    color: #6c757d;
+    margin-bottom: 3px;
+    font-weight: 600;
+  }
+
+  .sac-msg-row.user .sac-msg-author {
+    text-align: right;
+  }
+
   .sac-msg-bubble {
     border-radius: 12px;
-    padding: 6px 10px;
-    max-width: 80%;
-    font-size: 0.9rem;
+    padding: 8px 11px;
+    max-width: 100%;
+    font-size: 0.92rem;
     word-wrap: break-word;
     white-space: pre-wrap;
+    line-height: 1.38;
   }
+
   .sac-msg-bubble.user {
-    background:#0d6efd;
-    color:#fff;
+    background: #0d6efd;
+    color: #fff;
   }
+
   .sac-msg-bubble.bot {
-    background:#ffffff;
-    border:1px solid #dee2e6;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
   }
+
   .sac-msg-meta {
-    font-size:0.7rem;
-    color:#6c757d;
-    margin-top:2px;
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-top: 3px;
+  }
+
+  .sac-handoff-box {
+    flex: 0 0 auto;
+    margin: 0 !important;
+    border-radius: 14px;
+  }
+
+  .sac-handoff-box .d-flex {
+    flex-wrap: wrap;
+  }
+
+  .sac-handoff-box .btn {
+    white-space: normal;
   }
 
   @media (max-width: 575.98px) {
+    .sac-widget-container {
+      right: 8px;
+      left: 8px;
+      bottom: 8px;
+    }
+
     .sac-chat-panel {
-      width: 100vw;
+      width: auto;
       right: 0;
+      left: 0;
       bottom: 56px;
+      height: min(78vh, 720px);
     }
   }
 </style>
 
 <script>
+  window.__VG_SAC_WIDGET_V2__ = true;
+
   window.addEventListener('DOMContentLoaded', function () {
     const widget      = document.getElementById('sac-widget');
-    if (!widget) {
-      console.warn('[SAC] No se encontró #sac-widget en el DOM.');
-      return;
-    }
+    if (!widget) return;
 
     const openBtn     = document.getElementById('sac-open-btn');
     const panel       = document.getElementById('sac-chat-panel');
@@ -129,119 +212,137 @@
     const handoffYes  = document.getElementById('sac-handoff-yes');
     const handoffNo   = document.getElementById('sac-handoff-no');
 
-    if (!openBtn || !panel || !closeBtn || !messagesBox || !form || !input) {
-      console.warn('[SAC] Widget no inicializado: faltan elementos clave en la plantilla.');
+    if (!openBtn || !panel || !closeBtn || !messagesBox || !form || !input || !handoffBox) {
+      console.warn('[SAC] Widget no inicializado: faltan elementos del DOM.');
       return;
     }
 
-    console.log('[SAC] Widget SAC inicializado correctamente.');
-
-    // --- Sesión persistente por visitante ---
     let sid = localStorage.getItem('sac_sid');
     if (!sid) {
       sid = 'sac-' + Date.now() + '-' + Math.random().toString(16).slice(2);
       localStorage.setItem('sac_sid', sid);
     }
 
-    // --- Estado de conversación / polling ---
-    let lastMsgAt = null;      // string ISO del último mensaje
+    let lastMessageId = 0;
+    let polling = false;
     let pollTimer = null;
-    let polling   = false;
-    let convId    = null;
-    const seenIds = new Set(); // ids ya pintados
+    let syncInFlight = false;
+    let sendInFlight = false;
+    let welcomeInjected = false;
 
-    function formatTime(ts) {
-      if (!ts) return '';
+    const seenIds = new Set();
+
+    function formatTime(raw) {
+      if (!raw) return '';
       try {
-        const parts = ts.split(' ');
-        if (parts.length !== 2) return '';
-        return parts[1].slice(0,5); // HH:MM
+        const str = String(raw);
+        const parts = str.split(' ');
+        if (parts.length < 2) return '';
+        return parts[1].slice(0, 5);
       } catch (_) {
         return '';
       }
     }
 
-    function appendMessage(role, text, createdAt) {
+    function senderLabel(role, senderName) {
+      if (senderName && String(senderName).trim()) {
+        return String(senderName).trim();
+      }
+
+      const r = String(role || '').toLowerCase();
+      if (r === 'user') return 'Cliente';
+      if (r === 'agent') return 'Asesor Hotel Villa Grace';
+      return 'Bot Hotel Villa Grace';
+    }
+
+    function appendMessage(role, text, createdAt, senderName, id) {
       if (!text) return;
 
-      const isUser  = (role === 'user');
-      const isAgent = (role === 'agent');
+      const msgId = (id !== undefined && id !== null) ? String(id) : null;
+      if (msgId && seenIds.has(msgId)) return;
+      if (msgId) seenIds.add(msgId);
+
+      const normalizedRole = String(role || 'bot').toLowerCase();
+      const isUser = normalizedRole === 'user';
 
       const row = document.createElement('div');
-      row.classList.add('sac-msg-row');
-      row.classList.add(isUser ? 'user' : 'bot');
+      row.className = 'sac-msg-row ' + (isUser ? 'user' : 'bot');
 
       const col = document.createElement('div');
+      col.className = 'sac-msg-col';
+
+      const author = document.createElement('div');
+      author.className = 'sac-msg-author';
+      author.textContent = senderLabel(normalizedRole, senderName);
 
       const bubble = document.createElement('div');
-      bubble.classList.add('sac-msg-bubble');
-      bubble.classList.add(isUser ? 'user' : 'bot');
+      bubble.className = 'sac-msg-bubble ' + (isUser ? 'user' : 'bot');
       bubble.textContent = text;
 
       const meta = document.createElement('div');
-      meta.classList.add('sac-msg-meta');
+      meta.className = 'sac-msg-meta';
+      const timeStr = formatTime(createdAt);
+      meta.textContent = timeStr || '';
 
-      let label = '';
-      if (isUser) {
-        label = 'Tú';
-      } else if (isAgent) {
-        label = 'Agente de recepción';
-      } else {
-        label = 'Asistente Hotel Villa Grace';
+      col.appendChild(author);
+      col.appendChild(bubble);
+      if (timeStr) {
+        col.appendChild(meta);
       }
 
-      const timeStr = formatTime(createdAt);
-      meta.textContent = timeStr ? (label + ' · ' + timeStr) : label;
-
-      col.appendChild(bubble);
-      col.appendChild(meta);
       row.appendChild(col);
-
       messagesBox.appendChild(row);
       messagesBox.scrollTop = messagesBox.scrollHeight;
     }
 
     function showHandoffOffer() {
-      if (handoffBox) {
-        handoffBox.classList.remove('d-none');
-      }
+      handoffBox.classList.remove('d-none');
     }
 
     function hideHandoffOffer() {
-      if (handoffBox) {
-        handoffBox.classList.add('d-none');
-      }
+      handoffBox.classList.add('d-none');
     }
 
-    // --- Historial completo / incremental ---
-    async function syncHistoryOnce(initial) {
+    function setFormDisabled(disabled) {
+      input.disabled = disabled;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = disabled;
+    }
+
+    function setHandoffButtonsDisabled(disabled) {
+      if (handoffYes) handoffYes.disabled = disabled;
+      if (handoffNo) handoffNo.disabled = disabled;
+    }
+
+    async function syncHistory(initial = false) {
+      if (syncInFlight) return;
+      syncInFlight = true;
+
       try {
         const params = new URLSearchParams();
         params.set('session_id', sid);
-        if (!initial && lastMsgAt) {
-          params.set('since', lastMsgAt);
+
+        if (!initial && lastMessageId > 0) {
+          params.set('since_id', String(lastMessageId));
         }
 
         const resp = await fetch('/sac/chat/history?' + params.toString(), {
           method: 'GET',
-          headers: {
-            'X-Session-Id': sid
-          }
+          headers: { 'X-Session-Id': sid },
+          cache: 'no-store'
         });
 
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status);
+        }
+
         const data = await resp.json();
         if (!data.ok) return;
 
-        if (data.conv_id) {
-          convId = data.conv_id;
-        }
+        const status = String(data.status || '').toLowerCase();
+        const handoffState = String(data.handoff_state || '').toUpperCase();
 
-        const statusRaw = data.status || '';
-        const status = String(statusRaw || '').toLowerCase();
-        const abierta = (typeof data.abierta === 'undefined') ? true : !!data.abierta;
-
-        if (abierta && status === 'handoff_offer') {
+        if (handoffState === 'OFFER' || status === 'handoff_offer' || data.show_handoff_offer === true) {
           showHandoffOffer();
         } else {
           hideHandoffOffer();
@@ -249,58 +350,37 @@
 
         const msgs = data.messages || [];
         for (const m of msgs) {
-          const id        = m.id;
-          const role      = m.role || 'bot';   // 'user' | 'bot' | 'agent'
-          const text      = m.text || '';
-          const createdAt = m.created_at || null;
+          appendMessage(
+            m.role || 'bot',
+            m.text || '',
+            m.created_at || '',
+            m.sender_name || '',
+            m.id
+          );
 
-          if (id && seenIds.has(id)) {
-            continue; // ya pintado
-          }
-
-          appendMessage(role, text, createdAt);
-
-          if (id) {
-            seenIds.add(id);
-          }
-          if (createdAt) {
-            if (!lastMsgAt || createdAt > lastMsgAt) {
-              lastMsgAt = createdAt;
-            }
+          const numericId = Number(m.id || 0);
+          if (numericId > lastMessageId) {
+            lastMessageId = numericId;
           }
         }
 
-        if (data.last_msg_at && (!lastMsgAt || data.last_msg_at > lastMsgAt)) {
-          lastMsgAt = data.last_msg_at;
+        const apiLastMessageId = Number(data.last_message_id || 0);
+        if (apiLastMessageId > lastMessageId) {
+          lastMessageId = apiLastMessageId;
         }
       } catch (err) {
-        console.error('[SAC] Error al sincronizar historial', err);
+        console.error('[SAC] Error al sincronizar historial:', err);
+      } finally {
+        syncInFlight = false;
       }
     }
 
-    function startPolling() {
-      if (polling) return;
-      polling = true;
-      pollTimer = setInterval(function () {
-        syncHistoryOnce(false);
-      }, 4000);
-    }
-
-    function stopPolling() {
-      polling = false;
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-    }
-
-    // --- Llamada principal al bot (IA / RAG) ---
     async function ask(question) {
       const q = (question || input.value || '').trim();
-      if (!q) return;
+      if (!q || sendInFlight) return;
 
-      appendMessage('user', q, null);
-      input.value = '';
+      sendInFlight = true;
+      setFormDisabled(true);
 
       try {
         const resp = await fetch('/sac/ask', {
@@ -312,35 +392,48 @@
           body: JSON.stringify({ q: q })
         });
 
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const data = await resp.json();
-
-        if (data.need_handoff) {
-          if (data.handoff_state === 'OFFER') {
-            showHandoffOffer();
-          } else {
-            hideHandoffOffer();
-          }
-        } else {
-          hideHandoffOffer();
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status);
         }
 
-        // Sincronizamos para traer la respuesta real desde la BD
-        await syncHistoryOnce(false);
+        const data = await resp.json();
+        if (!data.ok) {
+          throw new Error(data.error || 'Error al consultar /sac/ask');
+        }
+
+        input.value = '';
+
+        await syncHistory(false);
+
+        const handoffState = String(data.handoff_state || '').toUpperCase();
+        if (handoffState === 'OFFER') {
+          showHandoffOffer();
+        } else if (handoffState === 'PENDING') {
+          hideHandoffOffer();
+        }
       } catch (err) {
-        console.error('[SAC] Error en /sac/ask', err);
+        console.error('[SAC] Error en /sac/ask:', err);
         appendMessage(
           'bot',
-          'Lo siento, no pude contactar al servidor en este momento.',
-          null
+          'Lo siento, no pude comunicarme con el servidor en este momento.',
+          '',
+          'Bot Hotel Villa Grace',
+          'local-error-' + Date.now()
         );
+      } finally {
+        setFormDisabled(false);
+        sendInFlight = false;
+        input.focus();
       }
     }
 
-    // --- Escalar explícitamente a agente humano ---
-    async function escalarHumano() {
+    async function resolveHandoff(decision) {
+      if (!decision) return;
+
+      setHandoffButtonsDisabled(true);
+
       try {
-        const resp = await fetch('/sac/chat/escalar', {
+        const resp = await fetch('/sac/chat/handoff-decision', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -348,46 +441,58 @@
           },
           body: JSON.stringify({
             session_id: sid,
-            texto: 'El cliente ha solicitado ser atendido por un agente humano.'
+            decision: decision
           })
         });
 
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status);
+        }
+
         const data = await resp.json();
+        if (!data.ok) {
+          throw new Error(data.error || 'No se pudo procesar la decisión.');
+        }
 
-        appendMessage(
-          'bot',
-          data.mensaje || 'Tu consulta ha sido enviada a un agente humano de recepción. En breve continuarán la atención por este mismo chat.',
-          null
-        );
+        if (decision === 'accept') {
+          hideHandoffOffer();
+        } else if (decision === 'reject') {
+          hideHandoffOffer();
+        }
 
-        hideHandoffOffer();
-        await syncHistoryOnce(false);
+        await syncHistory(false);
       } catch (err) {
-        console.error('[SAC] Error en /sac/chat/escalar', err);
+        console.error('[SAC] Error al resolver handoff:', err);
         appendMessage(
           'bot',
-          'No pude contactar al sistema de recepción en este momento. Por favor llámanos al +506 2642 0225 para ayudarte.',
-          null
+          'No se pudo procesar tu decisión en este momento. Inténtalo de nuevo.',
+          '',
+          'Bot Hotel Villa Grace',
+          'local-handoff-error-' + Date.now()
         );
+      } finally {
+        setHandoffButtonsDisabled(false);
       }
     }
 
-    // --- Manejo de panel ---
+    function startPolling() {
+      if (polling) return;
+      polling = true;
+
+      pollTimer = setInterval(function () {
+        syncHistory(false);
+      }, 2500);
+    }
+
     function openPanel() {
       panel.classList.remove('d-none');
-      if (!polling) {
-        syncHistoryOnce(true).then(startPolling);
-      }
+      input.focus();
     }
 
     function closePanel() {
       panel.classList.add('d-none');
-      // Si quisieras detener el polling al cerrar, descomenta:
-      // stopPolling();
     }
 
-    // --- Listeners UI ---
     openBtn.addEventListener('click', openPanel);
     closeBtn.addEventListener('click', closePanel);
 
@@ -398,21 +503,28 @@
 
     if (handoffYes) {
       handoffYes.addEventListener('click', function () {
-        escalarHumano();
+        resolveHandoff('accept');
       });
     }
 
     if (handoffNo) {
       handoffNo.addEventListener('click', function () {
-        hideHandoffOffer();
-        // Opcional: podríamos enviar un mensaje corto al bot indicando que no
-        // desea escalar, para que el estado pase de handoff_offer → bot.
-        // ask('No, gracias');
+        resolveHandoff('reject');
       });
     }
 
-    // Cargar historial y empezar polling incluso si el panel está cerrado,
-    // de forma que al abrirlo ya esté la conversación lista.
-    syncHistoryOnce(true).then(startPolling);
+    syncHistory(true).then(function () {
+      if (!messagesBox.children.length && !welcomeInjected) {
+        appendMessage(
+          'bot',
+          'Hola, soy el asistente virtual de Hotel Villa Grace. Cuéntame en qué puedo ayudarte.',
+          '',
+          'Bot Hotel Villa Grace',
+          'virtual-welcome'
+        );
+        welcomeInjected = true;
+      }
+      startPolling();
+    });
   });
 </script>

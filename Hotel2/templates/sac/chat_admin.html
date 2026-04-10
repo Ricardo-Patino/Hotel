@@ -141,15 +141,16 @@
                   <thead>
                     <tr>
                       <th style="width: 5%">ID</th>
-                      <th style="width: 40%">Título</th>
-                      <th style="width: 25%">Nombre archivo</th>
-                      <th style="width: 15%">Tamaño</th>
-                      <th style="width: 15%">Subido</th>
+                      <th style="width: 32%">Título</th>
+                      <th style="width: 23%">Nombre archivo</th>
+                      <th style="width: 12%">Tamaño</th>
+                      <th style="width: 13%">Subido</th>
+                      <th style="width: 15%">Acciones</th>
                     </tr>
                   </thead>
                   <tbody id="kb-docs-tbody">
                     <tr>
-                      <td colspan="5" class="text-center text-muted">
+                      <td colspan="6" class="text-center text-muted">
                         No hay datos cargados todavía.
                       </td>
                     </tr>
@@ -393,40 +394,40 @@ document.addEventListener("DOMContentLoaded", function () {
   async function loadKbDocs() {
     const tbody = document.getElementById("kb-docs-tbody");
     if (!tbody) return;
-
+  
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" class="text-center text-muted">
+        <td colspan="6" class="text-center text-muted">
           Cargando documentos de KB…
         </td>
       </tr>
     `;
-
+  
     try {
       const resp = await fetch("{{ url_for('sac.sac_kb_docs') }}");
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       const data = await resp.json();
       if (!data.ok) throw new Error(data.error || "Error al cargar documentos");
-
+  
       const items = data.items || [];
       if (items.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="5" class="text-center text-muted">
+            <td colspan="6" class="text-center text-muted">
               No hay documentos registrados en la base de conocimiento.
             </td>
           </tr>
         `;
         return;
       }
-
+  
       const fmtSize = function (bytes) {
         const n = Number(bytes || 0);
         if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
         if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
         return n + " B";
       };
-
+  
       const fmtDate = function (iso) {
         if (!iso) return "";
         try {
@@ -437,7 +438,7 @@ document.addEventListener("DOMContentLoaded", function () {
           return iso;
         }
       };
-
+  
       tbody.innerHTML = "";
       items.forEach((doc) => {
         const tr = document.createElement("tr");
@@ -447,14 +448,50 @@ document.addEventListener("DOMContentLoaded", function () {
           <td>${doc.filename || "-"}</td>
           <td>${fmtSize(doc.size_bytes)}</td>
           <td>${fmtDate(doc.created_at)}</td>
+          <td>
+            <button
+              type="button"
+              class="btn btn-outline-danger btn-sm"
+              data-doc-id="${doc.id}"
+              data-doc-name="${doc.filename || doc.title || 'documento'}"
+            >
+              Eliminar
+            </button>
+          </td>
         `;
         tbody.appendChild(tr);
+      });
+  
+      tbody.querySelectorAll("button[data-doc-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const docId = btn.getAttribute("data-doc-id");
+          const docName = btn.getAttribute("data-doc-name") || "documento";
+  
+          if (!confirm(`¿Seguro que deseas eliminar "${docName}" de la base de conocimiento?`)) {
+            return;
+          }
+  
+          btn.disabled = true;
+          try {
+            const resp = await fetch(`/sac/kb/docs/${docId}`, { method: "DELETE" });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+              throw new Error(data.error || ("HTTP " + resp.status));
+            }
+            showAdminAlert("success", "Documento eliminado correctamente.");
+            loadKbDocs();
+          } catch (err) {
+            console.error(err);
+            btn.disabled = false;
+            showAdminAlert("danger", "No se pudo eliminar el documento.");
+          }
+        });
       });
     } catch (err) {
       console.error(err);
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" class="text-center text-danger">
+          <td colspan="6" class="text-center text-danger">
             Error al cargar documentos de KB.
           </td>
         </tr>

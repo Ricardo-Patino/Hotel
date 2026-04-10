@@ -198,47 +198,38 @@ def _load_index() -> Optional[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 def rebuild_index(db, docs: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
-    Reconstruye completamente el índice de la KB en base a las filas de
-    SAC_KB_Doc activas.
-
-    Parámetros:
-      - db: objeto extensions.db (para actualizar Chunks).
-      - docs: lista de diccionarios con al menos {Id, FileName}.
-
-    Retorna:
-      (docs_con_chunks, lista_chunks)
-      donde lista_chunks es una lista de dicts con metadatos de los chunks.
+    Reconstruye completamente el índice TF-IDF de la KB.
+    No actualiza columnas inexistentes en SAC_KB_Doc.
     """
-    from sqlalchemy import text as sql_text  # import local para evitar ciclos
-
     _dbg(f"rebuild_index: KB_DIR={KB_DIR}, num_docs={len(docs)}")
 
     all_texts: List[str] = []
     meta: List[Dict[str, Any]] = []
 
-    # Mapear Id → conteo de chunks
-    chunks_por_doc: Dict[int, int] = {}
-
     for d in docs:
-        doc_id = int(d["Id"])
-        fname = d["FileName"]
-        path = KB_DIR / fname
+        try:
+            doc_id = int(d["Id"])
+        except Exception:
+            continue
 
+        fname = (d.get("FileName") or "").strip()
+        if not fname:
+            _dbg(f"doc_id={doc_id}: sin FileName, se omite.")
+            continue
+
+        path = KB_DIR / fname
         _dbg(f"Procesando doc_id={doc_id}, file={fname}, path={path}")
+
         if not path.exists():
-            _dbg(f"  Archivo no encontrado en KB_DIR, se omite.")
-            chunks_por_doc[doc_id] = 0
+            _dbg("  Archivo no encontrado en KB_DIR, se omite.")
             continue
 
         raw = _load_text_from_file(path)
         if not raw.strip():
-            _dbg(f"  Documento vacío tras extracción de texto, se omite.")
-            chunks_por_doc[doc_id] = 0
+            _dbg("  Documento vacío tras extracción de texto, se omite.")
             continue
 
         chunks = _split_into_chunks(raw)
-        chunks_por_doc[doc_id] = len(chunks)
-
         for idx, ch in enumerate(chunks):
             all_texts.append(ch)
             meta.append(
@@ -251,39 +242,24 @@ def rebuild_index(db, docs: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]],
             )
 
     if not all_texts:
-        # No hay documentos o todos vacíos → limpiar índice
-        _dbg("No hay texto para indexar. Limpiando índice y poniendo Chunks=0.")
+        _dbg("No hay texto para indexar. Limpiando índice.")
         _save_index({"vectorizer": None, "matrix": None, "meta": []})
-        with db.engine.begin() as conn:
-            conn.execute(sql_text("UPDATE SAC_KB_Doc SET Chunks=0"))
         return docs, meta
 
     _dbg(f"Total de chunks a vectorizar: {len(all_texts)}")
 
-    # Vectorizar (corregido: usamos una lista de stopwords en español)
     vectorizer = TfidfVectorizer(stop_words=SPANISH_STOP_WORDS)
     matrix = vectorizer.fit_transform(all_texts)
-    _dbg("Vectorización completada.")
 
-    index = {
-        "vectorizer": vectorizer,
-        "matrix": matrix,
-        "meta": meta,
-    }
-    _save_index(index)
+    _save_index(
+        {
+            "vectorizer": vectorizer,
+            "matrix": matrix,
+            "meta": meta,
+        }
+    )
 
-    # Actualizar conteo de chunks en la tabla
-    from sqlalchemy import text as sql_text  # asegurar import en este bloque también
-    with db.engine.begin() as conn:
-        for d in docs:
-            doc_id = int(d["Id"])
-            cnt = int(chunks_por_doc.get(doc_id, 0))
-            conn.execute(
-                sql_text("UPDATE SAC_KB_Doc SET Chunks=:c WHERE Id=:id"),
-                {"c": cnt, "id": doc_id},
-            )
-            _dbg(f"  SAC_KB_Doc(Id={doc_id}) → Chunks={cnt}")
-
+    _dbg("Índice RAG reconstruido correctamente.")
     return docs, meta
 
 

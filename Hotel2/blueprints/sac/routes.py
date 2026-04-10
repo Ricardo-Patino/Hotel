@@ -11,6 +11,7 @@ import hashlib
 import unicodedata
 import re
 
+
 from flask import (
     Blueprint,
     request,
@@ -37,6 +38,7 @@ from models.sac import (
 
 from werkzeug.utils import secure_filename
 from services.sac.rag import KB_DIR, rebuild_index, search, answer_from_chunks
+from collections import Counter
 
 # ---------------------------------------------------------------------
 # Blueprint SAC
@@ -274,6 +276,25 @@ def _default_suggestions(cid: Optional[int]) -> List[str]:
     return base
 
 
+def _convmsg_fk_attr() -> str:
+    return "Conversation_Id" if hasattr(SACConversationMsg, "Conversation_Id") else "Conv_Id"
+
+def _convmsg_text_attr() -> str:
+    return "Texto" if hasattr(SACConversationMsg, "Texto") else "Msg_Text"
+
+def _convmsg_query(conv_id: int):
+    fk_col = getattr(SACConversationMsg, _convmsg_fk_attr())
+    return SACConversationMsg.query.filter(fk_col == conv_id)
+
+def _convmsg_text_value(m) -> str:
+    return (getattr(m, "Texto", None) or getattr(m, "Msg_Text", None) or "").strip()
+
+def _clean_fact(v: Optional[str]) -> str:
+    s = (v or "").strip()
+    s = re.sub(r"\s+", " ", s)
+    s = re.sub(r"[.]+$", "", s)
+    s = re.sub(r"[,]+$", "", s)
+    return s.strip()
 # ---------------------------------------------------------------------
 # Sesión estandarizada (CLIENTE)
 # ---------------------------------------------------------------------
@@ -372,6 +393,797 @@ def _reservas_del_cliente(limit: Optional[int] = None) -> List[Dict[str, Any]]:
 
 
 # ====================== PREFERENCIAS ======================
+
+def _load_active_kb_docs() -> List[Dict[str, Any]]:
+    with db.engine.begin() as conn:
+        rows = conn.execute(
+            text("""
+                SELECT Id, Title, Content, Metadata_JSON, Created_At
+                  FROM SAC_KB_Doc
+                 WHERE Status = 'ACTIVE'
+                 ORDER BY Created_At DESC, Id DESC
+            """)
+        ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def _extract_label_value(content: str, labels: List[str]) -> Optional[str]:
+    if not content:
+        return None
+
+    for label in labels:
+        # Caso 1: "Etiqueta: valor"
+        m = re.search(
+            rf"(?im)^{re.escape(label)}\s*:\s*(.+)$",
+            content,
+        )
+        if m:
+            val = (m.group(1) or "").strip()
+            if val:
+                return val
+
+        # Caso 2: "Etiqueta:" en una línea y valor en la siguiente
+        m = re.search(
+            rf"(?ims)^{re.escape(label)}\s*:\s*\n\s*([^\n]+)",
+            content,
+        )
+        if m:
+            val = (m.group(1) or "").strip()
+            if val:
+                return val
+
+    return None
+
+
+def _extract_section_bullets(content: str, headings: List[str]) -> List[str]:
+    if not content:
+        return []
+
+    items: List[str] = []
+
+    for heading in headings:
+        m = re.search(
+            rf"(?ims)^{re.escape(heading)}\s*:\s*(.*?)(?=^\S.*?:|\Z)",
+            content,
+        )
+        if not m:
+            continue
+
+        block = (m.group(1) or "").strip()
+        for line in block.splitlines():
+            s = line.strip()
+            if not s:
+                continue
+            if s.startswith("-") or s.startswith("•"):
+                clean = s.lstrip("-• ").strip()
+                clean = clean.rstrip(".").strip()
+                if clean:
+                    items.append(clean)
+
+    # dedupe preservando orden
+    seen = set()
+    out = []
+    for x in items:
+        k = _norm(x)
+        if k not in seen:
+            seen.add(k)
+            out.append(x)
+    return out
+
+
+def _extract_noinfo_message(content: str) -> str:
+    if not content:
+        return _noinfo_answer()
+
+    m = re.search(
+        r'(?is)la respuesta correcta debe ser:\s*["“]?(.+?)["”]?\s*(?:\n|$)',
+        content
+    )
+    if m:
+        txt = (m.group(1) or "").strip()
+        if txt:
+            return txt
+
+    return _noinfo_answer()
+
+
+
+def _tokenize_norm(s: str) -> List[str]:
+    return [t for t in re.findall(r"[a-z0-9áéíóúñ]+", _norm(s)) if len(t) > 1]
+
+
+def _extract_kb_sections(content: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Extrae secciones de documentos con formato:
+      Etiqueta: valor
+      Etiqueta:
+      - item 1
+      - item 2
+
+    Funciona para TXT, texto extraído de PDF y DOCX razonablemente estructurados.
+    """
+    sections: Dict[str, Dict[str, Any]] = {}
+    current_key: Optional[str] = None
+
+    for raw_line in (content or "").splitlines():
+        line = (raw_line or "").strip()
+        if not line:
+            continue
+
+        m = re.match(r"^([^:\n]{2,140})\s*:\s*(.*)$", line)
+        if m:
+            label = (m.group(1) or "").strip()
+            value = (m.group(2) or "").strip()
+
+            key = _norm(label)
+            bucket = sections.setdefault(
+                key,
+                {
+                    "label": label,
+                    "values": [],
+                    "items": [],
+                    "paragraphs": [],
+                },
+            )
+            current_key = key
+
+            if value:
+                clean_value = value.lstrip("-• ").strip()
+                if clean_value:
+                    bucket["values"].append(clean_value)
+            continue
+
+        if current_key is None:
+            continue
+
+        bucket = sections[current_key]
+        if line.startswith("-") or line.startswith("•"):
+            item = line.lstrip("-• ").strip()
+            if item:
+                bucket["items"].append(item)
+        else:
+            bucket["paragraphs"].append(line)
+
+    for bucket in sections.values():
+        merged_parts = []
+        merged_parts.extend(bucket.get("values", []))
+        merged_parts.extend(bucket.get("paragraphs", []))
+        bucket["value"] = " ".join([p.strip() for p in merged_parts if p and p.strip()]).strip()
+
+    return sections
+
+
+def _section_first_value(
+    sections: Dict[str, Dict[str, Any]],
+    aliases: List[str],
+) -> str:
+    alias_norms = [_norm(a) for a in aliases]
+
+    # match exacto por alias
+    for alias in alias_norms:
+        if alias in sections:
+            val = _clean_fact(sections[alias].get("value") or "")
+            if val:
+                return val
+
+    # match parcial por alias
+    for alias in alias_norms:
+        for key, sec in sections.items():
+            if alias == key or alias in key or key in alias:
+                val = _clean_fact(sec.get("value") or "")
+                if val:
+                    return val
+
+    return ""
+
+
+def _collect_section_items(
+    sections: Dict[str, Dict[str, Any]],
+    label_aliases: Optional[List[str]] = None,
+) -> List[str]:
+    out: List[str] = []
+    seen = set()
+
+    label_aliases_norm = [_norm(x) for x in (label_aliases or [])]
+
+    for key, sec in sections.items():
+        if label_aliases_norm:
+            if not any(a == key or a in key or key in a for a in label_aliases_norm):
+                continue
+
+        for item in sec.get("items", []) or []:
+            clean = _clean_fact(item)
+            if clean:
+                nk = _norm(clean)
+                if nk not in seen:
+                    seen.add(nk)
+                    out.append(clean)
+
+    return out
+
+
+def _split_kb_sentences(content: str) -> List[str]:
+    parts = re.split(r"(?<=[\.\!\?])\s+|\n+", content or "")
+    out = []
+    for p in parts:
+        s = p.strip(" \t\r\n-•")
+        if len(s) >= 3:
+            out.append(s)
+    return out
+
+
+def _best_sentence_match(content: str, query: str) -> str:
+    q_tokens = set(_tokenize_norm(query))
+    if not q_tokens:
+        return ""
+
+    best_text = ""
+    best_score = 0.0
+
+    for s in _split_kb_sentences(content):
+        s_tokens = set(_tokenize_norm(s))
+        if not s_tokens:
+            continue
+
+        overlap = len(q_tokens & s_tokens)
+        if overlap <= 0:
+            continue
+
+        score = overlap / max(len(q_tokens), 1)
+
+        if "km" in s.lower() or "metros" in s.lower() or "m " in s.lower():
+            score += 0.10
+
+        if score > best_score:
+            best_score = score
+            best_text = s
+
+    return best_text
+
+
+def _extract_yes_no_target(qn: str) -> str:
+    patterns = [
+        r"\btiene(?:n)?\s+(.+?)(?:\?|$)",
+        r"\bacepta(?:n)?\s+(.+?)(?:\?|$)",
+        r"\bincluye(?:n)?\s+(.+?)(?:\?|$)",
+        r"\bofrece(?:n)?\s+(.+?)(?:\?|$)",
+        r"\bcuenta con\s+(.+?)(?:\?|$)",
+        r"\bhay\s+(.+?)(?:\?|$)",
+        r"\bdispone de\s+(.+?)(?:\?|$)",
+    ]
+
+    for pat in patterns:
+        m = re.search(pat, qn, flags=re.IGNORECASE)
+        if m:
+            target = (m.group(1) or "").strip()
+            target = re.sub(r"^(el|la|los|las|un|una)\s+", "", target, flags=re.IGNORECASE)
+            target = re.sub(r"\bdel hotel\b", "", target, flags=re.IGNORECASE).strip()
+            target = re.sub(r"\bel hotel\b", "", target, flags=re.IGNORECASE).strip()
+            return target.strip("¿?.,;: ")
+    return ""
+
+
+def _match_target_in_items(target: str, items: List[str]) -> str:
+    target_norm = _norm(target)
+    target_tokens = set(_tokenize_norm(target))
+
+    if not target_norm or not target_tokens:
+        return ""
+
+    best_item = ""
+    best_score = 0.0
+
+    for item in items:
+        item_norm = _norm(item)
+        item_tokens = set(_tokenize_norm(item))
+
+        score = 0.0
+        if target_norm in item_norm or item_norm in target_norm:
+            score = 1.0
+        else:
+            overlap = len(target_tokens & item_tokens)
+            if overlap > 0:
+                score = overlap / max(len(target_tokens), 1)
+
+        if score > best_score:
+            best_score = score
+            best_item = item
+
+    return best_item if best_score >= 0.50 else ""
+
+
+def _build_summary_from_sections(
+    hotel_name: str,
+    lema: str,
+    ubicacion: str,
+    direccion: str,
+    habitaciones: str,
+    checkin: str,
+    checkout: str,
+    servicios: List[str],
+    cercanias: List[str],
+) -> str:
+    parts: List[str] = []
+
+    if hotel_name:
+        if lema:
+            parts.append(f"{hotel_name}. {lema}.")
+        else:
+            parts.append(f"{hotel_name}.")
+
+    if ubicacion or direccion:
+        loc = ", ".join([x for x in [ubicacion, direccion] if x])
+        if loc:
+            parts.append(f"Está ubicado en {loc}.")
+
+    if habitaciones:
+        parts.append(f"Cuenta con {habitaciones}.")
+
+    if servicios:
+        parts.append("Ofrece " + ", ".join(servicios[:8]) + ".")
+
+    if checkin or checkout:
+        if checkin and checkout:
+            parts.append(f"El check-in es {checkin} y el check-out es {checkout}.")
+        elif checkin:
+            parts.append(f"El horario de check-in es {checkin}.")
+        elif checkout:
+            parts.append(f"El horario de check-out es {checkout}.")
+
+    if cercanias:
+        parts.append("Cerca del hotel están " + ", ".join(cercanias[:4]) + ".")
+
+    return " ".join(parts).strip()
+
+
+def _ai_backend_available() -> bool:
+    return bool((os.getenv("SAC_N8N_WEBHOOK") or "").strip()) or (
+        os.getenv("SAC_ENABLE_OLLAMA", "0") in ("1", "true", "True")
+    )
+
+
+def _call_ai_answer_from_context(
+    user_q: str,
+    hits: List[Dict[str, Any]],
+) -> Tuple[Optional[str], Optional[str], float]:
+    """
+    Usa el backend LLM configurado (n8n u Ollama) para responder SOLO con base
+    en el contexto documental recuperado del índice RAG.
+    """
+    if not hits or not _ai_backend_available():
+        return None, None, 0.0
+
+    custom_instructions = cfg("chatbot_system_prompt", "").strip()
+    system_prompt = _build_effective_system_prompt(custom_instructions)
+
+    context_blocks = []
+    for idx, h in enumerate(hits[:5], start=1):
+        txt = (h.get("text") or "").strip()
+        if txt:
+            context_blocks.append(f"[Fragmento {idx}]\n{txt}")
+
+    context_text = "\n\n".join(context_blocks).strip()
+    if not context_text:
+        return None, None, 0.0
+
+    noinfo = _noinfo_answer()
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                system_prompt
+                + "\nReglas obligatorias:\n"
+                + "1) Responde ÚNICAMENTE con base en el contexto documental proporcionado.\n"
+                + "2) No inventes datos, no completes huecos y no uses conocimiento externo.\n"
+                + "3) Si la respuesta no está respaldada por el contexto, responde EXACTAMENTE este texto:\n"
+                + noinfo
+                + "\n4) Si el contexto sí responde la pregunta, contesta breve, clara y natural.\n"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Pregunta del huésped:\n{user_q}\n\n"
+                f"Contexto documental recuperado:\n{context_text}"
+            ),
+        },
+    ]
+
+    txt, source, conf = _call_ai_chat(messages, temperature=0.1)
+    if not txt:
+        return None, None, 0.0
+
+    return txt.strip(), source or "AI_CONTEXT", conf or 0.0
+
+
+def _build_compact_rag_answer(
+    raw_q: str,
+    hits: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    Fallback sin IA:
+    intenta devolver la frase más relevante encontrada en los chunks recuperados,
+    pero filtra títulos, encabezados y fragmentos demasiado pobres.
+    """
+    if not hits:
+        return None
+
+    best_sentence = ""
+    best_score = 0.0
+    q_tokens = set(_tokenize_norm(raw_q))
+
+    for h in hits[:5]:
+        for s in _split_kb_sentences(h.get("text") or ""):
+            st = (s or "").strip()
+            s_tokens = set(_tokenize_norm(st))
+            if not s_tokens:
+                continue
+
+            # Filtro: descartar encabezados muy cortos tipo "Hotel Costa Esmeralda"
+            if len(s_tokens) <= 3 and len(st.split()) <= 4 and not any(ch in st for ch in ".:;!?"):
+                continue
+
+            overlap = len(q_tokens & s_tokens)
+            if overlap <= 0:
+                continue
+
+            score = overlap / max(len(q_tokens), 1)
+
+            # Penalizar frases demasiado cortas o vagas
+            if len(st) < 18:
+                score -= 0.20
+
+            if score > best_score:
+                best_score = score
+                best_sentence = st
+
+    if not best_sentence or best_score < 0.45:
+        return None
+
+    return {
+        "answer": best_sentence,
+        "confidence": max(0.35, min(0.85, best_score)),
+        "source": "KB_DOCS_SENTENCE",
+    }
+    
+    
+
+def _answer_from_uploaded_kb(raw_q: str, qn: str) -> Optional[Dict[str, Any]]:
+    """
+    Responde de forma dinámica usando los documentos activos de SAC_KB_Doc.
+    No hardcodea valores del hotel y soporta cambios de contenido entre archivos.
+    """
+    docs = _load_active_kb_docs()
+    if not docs:
+        return None
+
+    contents = [
+        str(d.get("Content") or "")
+        for d in docs
+        if (d.get("Content") or "").strip()
+    ]
+    if not contents:
+        return None
+
+    content = "\n\n".join(contents)
+    sections = _extract_kb_sections(content)
+
+    hotel_name = (
+        _section_first_value(sections, ["Nombre oficial", "Nombre del hotel", "Nombre"])
+        or (docs[0].get("Title") or "").strip()
+        or "El hotel"
+    )
+    lema = _section_first_value(sections, ["Lema", "Slogan", "Claim"])
+    ubicacion = _section_first_value(
+        sections,
+        ["Ubicación", "Ubicacion", "Localización", "Localizacion"]
+    )
+    direccion = _section_first_value(sections, ["Dirección", "Direccion"])
+    telefono = _section_first_value(
+        sections,
+        ["Teléfono", "Telefono", "WhatsApp", "Número de teléfono", "Numero de telefono"]
+    )
+    correo = _section_first_value(
+        sections,
+        ["Correo electrónico", "Correo electronico", "Correo", "Email", "E-mail"]
+    )
+    habitaciones = _section_first_value(
+        sections,
+        ["Cantidad de habitaciones", "Habitaciones", "Número de habitaciones", "Numero de habitaciones"]
+    )
+
+    checkin_doc = _section_first_value(
+        sections,
+        ["Horario de check-in", "Horario de check in", "Check-in", "Check in"]
+    )
+    checkout_doc = _section_first_value(
+        sections,
+        ["Horario de check-out", "Horario de check out", "Check-out", "Check out"]
+    )
+
+    # Valores del documento
+    checkin = checkin_doc
+    checkout = checkout_doc
+
+    # Fallback de configuración SOLO para respuestas directas de horario,
+    # no para contaminar el resumen si el documento ya trae otros datos.
+    checkin_cfg = ""
+    checkout_cfg = ""
+
+    if not checkin_doc:
+        ci = cfg("checkin_inicio", "")
+        cf = cfg("checkin_fin", "")
+        if ci and cf:
+            checkin_cfg = f"De {ci} a {cf}"
+
+    if not checkout_doc:
+        co = cfg("checkout_limite", "")
+        if co:
+            checkout_cfg = f"Hasta las {co}"
+
+    # Variables efectivas para respuestas directas de horario
+    effective_checkin = checkin_doc or checkin_cfg
+    effective_checkout = checkout_doc or checkout_cfg
+
+    servicios = _collect_section_items(
+        sections,
+        [
+            "Servicios y amenidades",
+            "Servicios",
+            "Amenidades",
+            "Amenidades y servicios",
+            "Incluye",
+            "Servicios incluidos",
+            "Facilidades",
+            "Características",
+            "Caracteristicas",
+        ],
+    )
+
+    cercanias = _collect_section_items(
+        sections,
+        [
+            "Puntos de referencia y distancias",
+            "Distancias",
+            "Lugares cercanos",
+            "Ubicación y distancias",
+            "Cercanías",
+            "Cercanias",
+        ],
+    )
+
+    no_confirmado = _collect_section_items(
+        sections,
+        [
+            "Información que NO está confirmada",
+            "Información que no está confirmada",
+            "Informacion que NO esta confirmada",
+            "Informacion que no esta confirmada",
+            "No confirmado",
+            "No confirmada",
+        ],
+    )
+
+    noinfo_msg = _extract_noinfo_message(content)
+
+    q = qn or _norm(raw_q)
+    unknown_blob = " | ".join([_norm(x) for x in no_confirmado])
+
+    # ----------------------------
+    # Nombre / lema
+    # ----------------------------
+    if any(x in q for x in ["nombre oficial", "como se llama", "cómo se llama", "nombre del hotel"]):
+        if hotel_name:
+            return {
+                "answer": hotel_name.rstrip("."),
+                "confidence": 0.98,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if any(x in q for x in ["lema", "slogan", "claim"]):
+        if lema:
+            return {
+                "answer": lema.rstrip("."),
+                "confidence": 0.98,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    # ----------------------------
+    # Ubicación / dirección / contacto
+    # ----------------------------
+    if "direccion" in q or "dirección" in raw_q.lower():
+        if direccion:
+            return {
+                "answer": f"La dirección de {hotel_name} es {direccion.rstrip('.')}.",
+                "confidence": 0.97,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if "donde" in q or "dónde" in raw_q.lower() or "ubic" in q:
+        loc = ", ".join([x.rstrip(".") for x in [ubicacion, direccion] if x])
+        if loc:
+            return {
+                "answer": f"{hotel_name} está ubicado en {loc}.",
+                "confidence": 0.97,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if "telefono" in q or "teléfono" in raw_q.lower():
+        if telefono:
+            return {
+                "answer": f"El teléfono de {hotel_name} es {telefono.rstrip('.')}.",
+                "confidence": 0.98,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if "correo" in q or "email" in q or "e-mail" in q:
+        if correo:
+            return {
+                "answer": f"El correo electrónico de {hotel_name} es {correo.rstrip('.')}.",
+                "confidence": 0.98,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    # ----------------------------
+    # Habitaciones y horarios
+    # ----------------------------
+    if (
+        "cuantas habitaciones" in q
+        or "cuántas habitaciones" in raw_q.lower()
+        or "habitaciones tiene" in q
+        or "numero de habitaciones" in q
+        or "número de habitaciones" in raw_q.lower()
+    ):
+        if habitaciones:
+            return {
+                "answer": f"{hotel_name} cuenta con {habitaciones.rstrip('.')}.",
+                "confidence": 0.98,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if "check-in" in raw_q.lower() or "check in" in q or ("horario" in q and "entrada" in q):
+        if effective_checkin:
+            return {
+                "answer": f"El horario de check-in es {effective_checkin.rstrip('.')}.",
+                "confidence": 0.97,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if "check-out" in raw_q.lower() or "check out" in q or ("horario" in q and "salida" in q):
+        if effective_checkout:
+            return {
+                "answer": f"El horario de check-out es {effective_checkout.rstrip('.')}.",
+                "confidence": 0.97,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if ("horarios" in q or "horario" in q) and ("check" in q or "entrada" in q or "salida" in q):
+        if effective_checkin or effective_checkout:
+            answer = []
+            if effective_checkin:
+                answer.append(f"check-in: {effective_checkin.rstrip('.')}")
+            if effective_checkout:
+                answer.append(f"check-out: {effective_checkout.rstrip('.')}")
+            return {
+                "answer": "Los horarios son " + " y ".join(answer) + ".",
+                "confidence": 0.97,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    # ----------------------------
+    # Preguntas de sí/no sobre servicios o características
+    # IMPORTANTE: van ANTES del listado general de servicios
+    # ----------------------------
+    target = _extract_yes_no_target(q)
+    if target:
+        all_items = []
+        for sec in sections.values():
+            all_items.extend(sec.get("items", []) or [])
+            if sec.get("value"):
+                all_items.append(sec.get("value"))
+
+        matched = _match_target_in_items(target, all_items)
+        if matched:
+            matched_clean = matched.rstrip(".").strip()
+            return {
+                "answer": f"Sí. La documentación indica: {matched_clean}.",
+                "confidence": 0.95,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+        # Si la pregunta es de sí/no y NO encontramos el servicio en la documentación,
+        # no debemos caer a RAG ni devolver títulos o ruido.
+        return {
+            "answer": noinfo_msg,
+            "confidence": 0.90,
+            "source": "NO_INFO",
+        }
+
+    # ----------------------------
+    # Servicios / amenidades (resumen general)
+    # ----------------------------
+    if (
+        "servicio" in q
+        or "amenidad" in q
+        or "amenidades" in q
+        or "que ofrece" in q
+        or "qué ofrece" in raw_q.lower()
+        or "que tiene el hotel" in q
+        or "qué tiene el hotel" in raw_q.lower()
+    ):
+        if servicios:
+            servicios_clean = [s.rstrip(".").strip() for s in servicios[:12] if s.strip()]
+            return {
+                "answer": f"{hotel_name} ofrece " + ", ".join(servicios_clean) + ".",
+                "confidence": 0.96,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    # ----------------------------
+    # Distancias / lugares cercanos
+    # ----------------------------
+    if (
+        "queda cerca" in q
+        or "lugares cerca" in q
+        or "lugares quedan cerca" in q
+        or "que lugares quedan cerca" in q
+        or "qué lugares quedan cerca" in raw_q.lower()
+        or "cerca del hotel" in q
+    ):
+        if cercanias:
+            cercanias_clean = [c.rstrip(".").strip() for c in cercanias[:8] if c.strip()]
+            return {
+                "answer": "Cerca del hotel están " + ", ".join(cercanias_clean) + ".",
+                "confidence": 0.95,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    if "distancia" in q or "a que distancia" in q or "a qué distancia" in raw_q.lower():
+        best_sentence = _best_sentence_match(content, raw_q)
+        if best_sentence:
+            return {
+                "answer": best_sentence.rstrip(".").strip() + ".",
+                "confidence": 0.92,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    # ----------------------------
+    # Resumen
+    # ----------------------------
+    if "resumen" in q or "resum" in q:
+        summary = _build_summary_from_sections(
+            hotel_name=hotel_name,
+            lema=lema,
+            ubicacion=ubicacion,
+            direccion=direccion,
+            habitaciones=habitaciones,
+            checkin=checkin_doc,
+            checkout=checkout_doc,
+            servicios=servicios,
+            cercanias=cercanias,
+        )
+        if summary:
+            return {
+                "answer": summary,
+                "confidence": 0.95,
+                "source": "KB_DOCS_STRUCTURED",
+            }
+
+    # ----------------------------
+    # Información marcada como no confirmada
+    # ----------------------------
+    if no_confirmado and target:
+        if target and _norm(target) in unknown_blob:
+            return {
+                "answer": noinfo_msg,
+                "confidence": 0.90,
+                "source": "NO_INFO",
+            }
+
+    return None
+
+
 @sac_bp.get("/preferencias", endpoint="preferencias_html")
 def preferencias_html():
     cid, _ = _current_cliente_y_email()
@@ -451,7 +1263,6 @@ def chatbot_ask():
         or _is_greeting(qn)
         or _is_smalltalk(qn)
         or _is_help_like(qn)
-        or len(qn.split()) <= 2
     ):
         answer = _hotel_greeting_answer()
         suggestions = _default_suggestions(cid)
@@ -490,63 +1301,103 @@ def chatbot_ask():
 
 @sac_bp.get("/chat/history")
 def chat_history():
-    # Session Id desde querystring o header, por si acaso
     sid = request.args.get("session_id") or request.headers.get("X-Session-Id")
     if not sid:
         return jsonify(ok=False, message="session_id requerido"), 400
 
     conv = _get_active_conversation(sid, create_if_missing=False)
     if not conv:
-        # No hay conversación activa para este cliente (o se venció >24h)
-        return jsonify(ok=True, conv_id=None, messages=[], last_msg_at=None)
-
-    # Si quieres aplicar la regla de 24h también aquí (por seguridad)
-    from datetime import datetime, timedelta
+        return jsonify(
+            ok=True,
+            conv_id=None,
+            messages=[],
+            last_msg_at=None,
+            last_message_id=None,
+            status=None,
+            needs_agent=None,
+            abierta=None,
+            handoff_state=None,
+            show_handoff_offer=False,
+        )
 
     now = datetime.utcnow()
-    if conv.Last_Msg_At and conv.Last_Msg_At < now - timedelta(
-        hours=MAX_CONV_AGE_HOURS
-    ):
-        return jsonify(ok=True, conv_id=None, messages=[], last_msg_at=None)
+    if getattr(conv, "Last_Msg_At", None) and conv.Last_Msg_At < now - timedelta(hours=MAX_CONV_AGE_HOURS):
+        return jsonify(
+            ok=True,
+            conv_id=None,
+            messages=[],
+            last_msg_at=None,
+            last_message_id=None,
+            status=None,
+            needs_agent=None,
+            abierta=None,
+            handoff_state=None,
+            show_handoff_offer=False,
+        )
 
+    since_id_raw = request.args.get("since_id")
     since_raw = request.args.get("since")
-    q = SACConversationMsg.query.filter_by(Conv_Id=conv.Id).order_by(
-        SACConversationMsg.Creada_At.asc()
-    )
 
-    if since_raw:
+    q = _convmsg_query(conv.Id).order_by(SACConversationMsg.Id.asc())
+
+    if since_id_raw:
         try:
-            # Formato ISO simple "YYYY-MM-DD HH:MM:SS"
+            since_id = int(since_id_raw)
+            if since_id > 0:
+                q = q.filter(SACConversationMsg.Id > since_id)
+        except Exception:
+            pass
+    elif since_raw:
+        try:
             since = datetime.fromisoformat(since_raw)
             q = q.filter(SACConversationMsg.Creada_At > since)
         except ValueError:
-            pass  # si viene mal, devolvemos todo
+            pass
 
     msgs = []
-    last_ts = conv.Last_Msg_At
+    last_ts = getattr(conv, "Last_Msg_At", None)
+    last_message_id = 0
+
     for m in q:
-        ts = m.Creada_At
-        if last_ts is None or ts > last_ts:
+        ts = getattr(m, "Creada_At", None)
+        if ts is not None and (last_ts is None or ts > last_ts):
             last_ts = ts
+
+        mid = int(getattr(m, "Id", 0) or 0)
+        if mid > last_message_id:
+            last_message_id = mid
+
         msgs.append(
             {
-                "id": m.Id,
-                "role": m.Rol,  # 'user' | 'bot' | 'agent'
-                "text": m.Texto,
-                "created_at": ts.isoformat(sep=" ", timespec="seconds"),
+                "id": mid,
+                "role": getattr(m, "Rol", None),
+                "text": _convmsg_text_value(m),
+                "sender_name": _get_message_sender_name(m),
+                "created_at": ts.isoformat(sep=" ", timespec="microseconds") if ts else None,
             }
         )
+
+    conv_status = (getattr(conv, "Status", None) or "bot").lower()
+    handoff_state = None
+    show_handoff_offer = False
+
+    if conv_status == "handoff_offer":
+        handoff_state = "OFFER"
+        show_handoff_offer = True
+    elif conv_status in ("agent_pending", "agent_active"):
+        handoff_state = "PENDING"
 
     return jsonify(
         ok=True,
         conv_id=conv.Id,
         messages=msgs,
-        last_msg_at=(
-            last_ts.isoformat(sep=" ", timespec="seconds") if last_ts else None
-        ),
+        last_msg_at=last_ts.isoformat(sep=" ", timespec="microseconds") if last_ts else None,
+        last_message_id=last_message_id or None,
         status=getattr(conv, "Status", None),
         needs_agent=getattr(conv, "Needs_Agent", None),
-        abierta=conv.Abierta,
+        abierta=getattr(conv, "Abierta", None),
+        handoff_state=handoff_state,
+        show_handoff_offer=show_handoff_offer,
     )
 
 
@@ -587,10 +1438,12 @@ def chatbot_escalar():
 
         # Registrar un mensaje de sistema/bot indicando la derivación
         msg = SACConversationMsg(
-            Conv_Id=conv.Id,
-            Rol="bot",
-            Texto="La conversación ha sido derivada a un agente humano de recepción.",
-            Creada_At=datetime.utcnow(),
+            **{
+                _convmsg_fk_attr(): conv.Id,
+                "Rol": "bot",
+                _convmsg_text_attr(): "La conversación ha sido derivada a un agente humano de recepción.",
+                "Creada_At": datetime.utcnow(),
+            }
         )
         if hasattr(msg, "Creada_At"):
             msg.Creada_At = now
@@ -611,6 +1464,97 @@ def chatbot_escalar():
 
     db.session.commit()
     return jsonify({"ok": True})
+
+
+
+@sac_bp.post("/chat/handoff-decision")
+def chat_handoff_decision():
+    payload = request.get_json(silent=True) or {}
+    decision = (payload.get("decision") or "").strip().lower()
+
+    if decision not in ("accept", "reject"):
+        return jsonify({"ok": False, "error": "Decisión inválida."}), 400
+
+    sid = (
+        payload.get("session_id")
+        or request.headers.get("X-Session-Id")
+        or session.get("sid")
+    )
+    if not sid:
+        return jsonify({"ok": False, "error": "session_id requerido"}), 400
+
+    cid, _ = _current_cliente_y_email()
+    conv = _get_or_create_conversation(sid, cid)
+    if not conv:
+        return jsonify({"ok": False, "error": "No se pudo obtener la conversación"}), 500
+
+    current_status = (getattr(conv, "Status", None) or "bot").lower()
+
+    if current_status != "handoff_offer":
+        return jsonify(
+            {
+                "ok": True,
+                "status": current_status,
+                "handoff_state": None,
+                "message": "La conversación ya no tiene una oferta de transferencia pendiente.",
+            }
+        )
+
+    try:
+        if decision == "accept":
+            bot_text = (
+                "Perfecto, voy a transferir tu consulta a un agente humano de recepción. "
+                "En cuanto la revisen, continuarán la conversación por este mismo chat."
+            )
+            _append_conversation_message(
+                conv,
+                "bot",
+                bot_text,
+                sender_name="Bot Hotel Villa Grace",
+            )
+            _touch_conversation(
+                conv,
+                status="agent_pending",
+                needs_agent=True,
+                last_role="bot",
+            )
+            handoff_state = "PENDING"
+        else:
+            bot_text = (
+                "Entendido. Continuaré atendiéndote por este chat sin transferirte a un asesor."
+            )
+            _append_conversation_message(
+                conv,
+                "bot",
+                bot_text,
+                sender_name="Bot Hotel Villa Grace",
+            )
+            _touch_conversation(
+                conv,
+                status="bot",
+                needs_agent=False,
+                last_role="bot",
+            )
+            handoff_state = None
+
+        db.session.commit()
+
+        return jsonify(
+            {
+                "ok": True,
+                "status": getattr(conv, "Status", None),
+                "handoff_state": handoff_state,
+                "message": bot_text,
+            }
+        )
+
+    except Exception as e:
+        current_app.logger.warning(f"[SAC] No se pudo registrar decisión de handoff: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({"ok": False, "error": "No se pudo procesar la decisión."}), 500
 
 
 # ====================== SOLICITUDES ======================
@@ -762,10 +1706,23 @@ def _status_label(status: str) -> str:
         "handoff_offer": "Oferta de transferencia",
         "agent_pending": "Pendiente agente",
         "agent_active": "En atención",
-        "closed": "Cerrada",
+        "closed": "Atendida",
     }
     s = (status or "").lower()
     return mapping.get(s, (status or "Abierta").title())
+
+
+def _status_variant(status: str) -> str:
+    s = (status or "").lower()
+    if s == "closed":
+        return "success"
+    if s in ("agent_pending", "handoff_offer"):
+        return "danger"
+    if s == "agent_active":
+        return "primary"
+    if s == "bot":
+        return "light"
+    return "secondary"
 
 
 # Cache sencillo de columnas reales de SAC_Conversation para evitar errores 1054
@@ -799,14 +1756,7 @@ def _conv_has(col_name: str) -> bool:
 def conversations_list():
     """
     Listado resumido de conversaciones (lado izquierdo del panel).
-
-    IMPORTANTE:
-    La base puede estar en una versión antigua sin columnas:
-      - Status, Needs_Agent, Guest_Name, Guest_Email, Channel,
-        Last_Msg_At, Last_Msg_Role.
-    Para evitar errores 1054 se inspeccionan las columnas y se
-    construye el SELECT dinámicamente, usando constantes NULL
-    o valores por defecto cuando la columna no existe.
+    Compatible con esquemas antiguos/nuevos.
     """
     cols = _get_conv_columns()
 
@@ -817,6 +1767,8 @@ def conversations_list():
     has_channel = "channel" in cols
     has_last_msg_at = "last_msg_at" in cols
     has_last_msg_role = "last_msg_role" in cols
+    has_abierta = "abierta" in cols
+    has_estado = "estado" in cols
 
     status_expr = "COALESCE(c.Status,'bot')" if has_status else "'bot'"
     needs_agent_expr = "COALESCE(c.Needs_Agent,0)" if has_needs_agent else "0"
@@ -825,12 +1777,17 @@ def conversations_list():
     channel_expr = "c.Channel" if has_channel else "'Web'"
     last_msg_at_expr = "c.Last_Msg_At" if has_last_msg_at else "NULL"
     last_msg_role_expr = "c.Last_Msg_Role" if has_last_msg_role else "NULL"
+    abierta_expr = "COALESCE(c.Abierta,1)" if has_abierta else "1"
+    estado_expr = "COALESCE(c.Estado,'')" if has_estado else "''"
 
     order_by_expr = (
-        "Needs_Agent DESC, Actualizada_At DESC"
+        "COALESCE(c.Needs_Agent,0) DESC, c.Actualizada_At DESC"
         if has_needs_agent
-        else "Actualizada_At DESC"
+        else "c.Actualizada_At DESC"
     )
+
+    text_col = _convmsg_text_attr()
+    fk_col = _convmsg_fk_attr()
 
     sql = text(
         f"""
@@ -845,37 +1802,49 @@ def conversations_list():
           c.Actualizada_At,
           {last_msg_at_expr}   AS Last_Msg_At,
           {last_msg_role_expr} AS Last_Msg_Role,
+          {abierta_expr}       AS Abierta,
+          {estado_expr}        AS Estado,
           (
-            SELECT m.Texto
+            SELECT m.{text_col}
             FROM SAC_ConversationMsg m
-            WHERE m.Conversation_Id = c.Id
+            WHERE m.{fk_col} = c.Id
             ORDER BY m.Id DESC
             LIMIT 1
           ) AS Last_Snippet
         FROM SAC_Conversation c
         ORDER BY {order_by_expr}
         LIMIT 100
-    """
+        """
     )
 
     rows = db.session.execute(sql).mappings().all()
 
     items: List[Dict[str, Any]] = []
     for r in rows:
-        status = r.get("Status") or "bot"
+        status = (r.get("Status") or "bot")
+        status_norm = str(status).lower()
         needs_agent = bool(r.get("Needs_Agent"))
-        requires_attention = needs_agent or status.lower() == "agent_pending"
+        abierta = bool(r.get("Abierta"))
+        estado_legacy = str(r.get("Estado") or "").upper()
+
+        is_closed = (not abierta) or status_norm == "closed" or estado_legacy == "CERRADA"
+        requires_attention = (not is_closed) and (
+            needs_agent or status_norm in ("agent_pending", "agent_active")
+        )
 
         guest_label = r.get("Guest_Name") or r.get("Guest_Email") or "Visitante web"
         snippet = (r.get("Last_Snippet") or "").replace("\n", " ")
         if len(snippet) > 160:
             snippet = snippet[:157] + "..."
 
+        effective_status = "closed" if is_closed else status_norm
+
         items.append(
             {
                 "id": int(r["Id"]),
-                "status": status,
-                "status_label": _status_label(status),
+                "status": effective_status,
+                "status_label": _status_label(effective_status),
+                "status_variant": _status_variant(effective_status),
                 "requires_attention": requires_attention,
                 "guest_label": guest_label,
                 "last_snippet": snippet,
@@ -900,7 +1869,7 @@ def conversation_detail(conversation_id: int):
         return jsonify({"ok": False, "error": "Conversación no encontrada"}), 404
 
     msgs = (
-        SACConversationMsg.query.filter_by(Conv_Id=conversation_id)
+        _convmsg_query(conversation_id)
         .order_by(SACConversationMsg.Id.asc())
         .all()
     )
@@ -915,43 +1884,41 @@ def conversation_detail(conversation_id: int):
         except Exception:
             return str(dt)
 
-    # --- NUEVA lógica de estado / atención ---
+    # --- lógica de estado / atención ---
     status_raw = getattr(conv, "Status", None) or "bot"
     status = str(status_raw).lower()
     needs_agent = bool(getattr(conv, "Needs_Agent", False))
     abierta = bool(getattr(conv, "Abierta", True))
+    estado_legacy = str(getattr(conv, "Estado", None) or "").upper()
 
-    # Requiere atención si está abierta y:
-    #  - tiene Needs_Agent=1, o
-    #  - está en estados lógicos orientados a agente.
-    requires_attention = abierta and (
+    is_closed = (not abierta) or status == "closed" or estado_legacy == "CERRADA"
+
+    requires_attention = (not is_closed) and (
         needs_agent or status in ("agent_pending", "agent_active")
     )
 
-    # Un agente puede responder si:
-    #  - la conversación está abierta, y
-    #  - o bien tiene Needs_Agent=1,
-    #  - o bien el Status indica que ya está en flujo de agente.
-    can_agent_reply = abierta and (
+    can_agent_reply = (not is_closed) and (
         needs_agent or status in ("agent_pending", "agent_active")
     )
 
     conversation_out: Dict[str, Any] = {
         "id": conv.Id,
         "status": status_raw,
-        "status_label": _status_label(status_raw),
+        "status_label": _status_label("closed" if is_closed else status_raw),
+        "status_variant": _status_variant("closed" if is_closed else status_raw),
         "requires_attention": requires_attention,
         "guest_label": getattr(conv, "Guest_Name", None)
         or getattr(conv, "Guest_Email", None)
         or "Visitante web",
         "can_agent_reply": can_agent_reply,
+        "is_closed": is_closed,
     }
 
     messages_out: List[Dict[str, Any]] = []
     for m in msgs:
         role_raw = m.Rol or "user"
         role = (role_raw or "").lower()
-        content = m.Texto or ""
+        content = _convmsg_text_value(m)
         created = getattr(m, "Creada_At", None)
 
         # Normalizamos roles a los usados por el front:
@@ -968,11 +1935,23 @@ def conversation_detail(conversation_id: int):
         else:
             out_role = "system"
 
+        sender_name = _extract_sender_name(m)
+        if not sender_name:
+            if out_role == "agent":
+                sender_name = "Asesor Hotel Villa Grace"
+            elif out_role == "bot":
+                sender_name = "Bot Hotel Villa Grace"
+            elif out_role == "user":
+                sender_name = "Cliente"
+            else:
+                sender_name = "Sistema"
+
         messages_out.append(
             {
                 "id": m.Id,
                 "role": out_role,
                 "content": content,
+                "sender_name": sender_name,
                 "created_at": created,
                 "created_at_human": fmt_ts(created),
             }
@@ -991,9 +1970,13 @@ def conversation_detail(conversation_id: int):
 def conversation_agent_reply(conversation_id: int):
     """
     Permite que un agente humano continúe la conversación desde el panel.
-    Inserta un mensaje con Rol='agent' y actualiza Status/Needs_Agent.
     """
     user_id = session.get("user_id")
+    agent_name = (
+        session.get("user_name")
+        or session.get("user_email")
+        or "Asesor Hotel Villa Grace"
+    )
 
     data = request.get_json(silent=True) or {}
     text_msg = (data.get("message") or "").strip()
@@ -1004,33 +1987,24 @@ def conversation_agent_reply(conversation_id: int):
     if not conv:
         return jsonify({"ok": False, "error": "Conversación no encontrada"}), 404
 
-    now = datetime.utcnow()
     try:
-        msg = SACConversationMsg(
-            Conv_Id=conv.Id,
-            Rol="agent",
-            Texto=text_msg,
+        _append_conversation_message(
+            conv,
+            "agent",
+            text_msg,
+            sender_name=agent_name,
+            created_by_user_id=user_id,
         )
-        # Si el modelo tiene columna Creada_At/Created_At, la asignamos
-        if hasattr(msg, "Creada_At"):
-            setattr(msg, "Creada_At", now)
-        if hasattr(msg, "Created_By_User_Id"):
-            setattr(msg, "Created_By_User_Id", user_id)
 
-        db.session.add(msg)
-
-        # Actualizar estado de la conversación
-        if hasattr(conv, "Status"):
-            conv.Status = "agent_active"
-        if hasattr(conv, "Needs_Agent"):
-            conv.Needs_Agent = False
-        conv.Actualizada_At = now
-        if hasattr(conv, "Last_Msg_At"):
-            conv.Last_Msg_At = now
-        if hasattr(conv, "Last_Msg_Role"):
-            conv.Last_Msg_Role = "agent"
+        _touch_conversation(
+            conv,
+            status="agent_active",
+            needs_agent=True,
+            last_role="agent",
+        )
 
         db.session.commit()
+
     except Exception as e:
         current_app.logger.warning(
             f"[SAC-CONV] No se pudo registrar respuesta de agente: {e}"
@@ -1045,6 +2019,68 @@ def conversation_agent_reply(conversation_id: int):
             ),
             500,
         )
+
+    return jsonify({"ok": True})
+
+
+
+
+@sac_bp.post(
+    "/conversations/<int:conversation_id>/close",
+    endpoint="conversation_close",
+)
+@role_required("Recepcionista", "Administrador")
+def conversation_close(conversation_id: int):
+    """
+    Cierra la conversación únicamente cuando el asesor lo marca manualmente.
+    """
+    conv = SACConversation.query.get(conversation_id)
+    if not conv:
+        return jsonify({"ok": False, "error": "Conversación no encontrada"}), 404
+
+    agent_name = (
+        session.get("user_name")
+        or session.get("user_email")
+        or "Asesor Hotel Villa Grace"
+    )
+
+    now = datetime.utcnow()
+    try:
+        close_note = SACConversationMsg(
+            **{
+                _convmsg_fk_attr(): conv.Id,
+                "Rol": "agent",
+                _convmsg_text_attr(): f"Conversación marcada como atendida por {agent_name}.",
+            }
+        )
+        if hasattr(close_note, "Creada_At"):
+            setattr(close_note, "Creada_At", now)
+        _set_msg_meta(close_note, {"sender_name": agent_name})
+        db.session.add(close_note)
+
+        if hasattr(conv, "Status"):
+            conv.Status = "closed"
+        if hasattr(conv, "Needs_Agent"):
+            conv.Needs_Agent = False
+        if hasattr(conv, "Estado") and getattr(conv, "Estado", None) is not None:
+            conv.Estado = "CERRADA"
+        if hasattr(conv, "Abierta"):
+            conv.Abierta = 0
+        if hasattr(conv, "Actualizada_At"):
+            conv.Actualizada_At = now
+        if hasattr(conv, "Last_Msg_At"):
+            conv.Last_Msg_At = now
+        if hasattr(conv, "Last_Msg_Role"):
+            conv.Last_Msg_Role = "agent"
+
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.warning(f"[SAC-CONV] No se pudo cerrar conversación: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return jsonify({"ok": False, "error": "No se pudo cerrar la conversación."}), 500
 
     return jsonify({"ok": True})
 
@@ -1112,7 +2148,7 @@ def conversaciones_messages(conv_id: int):
         return jsonify({"ok": False, "error": "Conversación no encontrada"}), 404
 
     msgs = (
-        SACConversationMsg.query.filter_by(Conv_Id=conv_id)
+        _convmsg_query(conv_id)
         .order_by(SACConversationMsg.Id.asc())
         .all()
     )
@@ -1124,7 +2160,7 @@ def conversaciones_messages(conv_id: int):
             {
                 "id": m.Id,
                 "role": m.Rol,
-                "text": m.Texto or "",
+                "text": _convmsg_text_value(m),
                 "created_at": (
                     created.isoformat() if hasattr(created, "isoformat") else None
                 ),
@@ -1588,11 +2624,11 @@ def sac_kb_list():
             conn.execute(
                 text(
                     """
-          SELECT Id, Pregunta, Origen, Estado, Creada_At
-          FROM SAC_KB_Unanswered
-          WHERE Estado IN ('NUEVA','REVISADA')
-          ORDER BY Creada_At DESC
-        """
+              SELECT Id, Question, Status, Created_At, Reviewed_At, Resolution_Note
+              FROM SAC_KB_Unanswered
+              WHERE Status IN ('Pendiente','Clasificada')
+              ORDER BY Created_At DESC
+            """
                 )
             )
             .mappings()
@@ -1629,7 +2665,7 @@ def _kb_extract_text(file_path: str, ext: str) -> str:
 
     try:
         if ext in {".txt", ".md", ".csv", ".log", ".json", ".xml", ".html", ".htm"}:
-            raw = Path(file_path).read_bytes()
+            raw = pathlib.Path(file_path).read_bytes()
             return raw.decode("utf-8", errors="ignore").strip()
 
         if ext == ".pdf":
@@ -1662,22 +2698,23 @@ def _kb_extract_text(file_path: str, ext: str) -> str:
 
 
 @sac_bp.post("/kb/upload", endpoint="sac_kb_upload")
+@role_required("Administrador")
 def sac_kb_upload():
     try:
         f = request.files.get("file")
         title = (request.form.get("title") or "").strip()
-        if not f:
-            return jsonify(ok=False, error="No file."), 200
-        if not title:
-            return jsonify(ok=False, error="Title is required."), 200
 
-        # Guardar archivo físico (se mantiene para compatibilidad / auditoría)
+        if not f:
+            return jsonify(ok=False, error="No se recibió archivo."), 400
+
+        original_name = (f.filename or "documento").strip()
+        if not title:
+            title = original_name
+
         os.makedirs(KB_DIR, exist_ok=True)
 
-        original_name = f.filename or "documento"
         ext = os.path.splitext(original_name)[1].lower()
 
-        # leer bytes para hash + size
         blob = f.read()
         size_bytes = len(blob)
         sha = hashlib.sha256(blob).hexdigest()
@@ -1686,11 +2723,9 @@ def sac_kb_upload():
         stored_name = f"{sha[:12]}_{safe_orig}"
         dest = os.path.join(KB_DIR, stored_name)
 
-        # escribir a disco
         with open(dest, "wb") as out:
             out.write(blob)
 
-        # extraer texto (para Content NOT NULL)
         content = _kb_extract_text(dest, ext)
         if not content:
             content = f"[Contenido no extraíble automáticamente] Archivo: {original_name} ({ext or 'sin extensión'})"
@@ -1702,203 +2737,307 @@ def sac_kb_upload():
             "size_bytes": size_bytes,
             "sha256": sha,
             "stored_path": dest,
+            "uploaded_by": session.get("user_id"),
         }
 
-        uid = session.get("user_id")  # si aplica; si no, queda en metadata
-        lang = "es"
-
         with db.engine.begin() as conn:
-            # Inserta según esquema real SAC_KB_Doc (Doc_Id, Title, Content, Content_Hash, Metadata_JSON, Status...)
-            # Esquema: Base de Datos VillaGrace.txt
-            try:
-                res = conn.execute(text("""
+            existing = conn.execute(
+                text("""
+                    SELECT Id
+                      FROM SAC_KB_Doc
+                     WHERE Content_Hash = :hash
+                     LIMIT 1
+                """),
+                {"hash": sha},
+            ).scalar()
+
+            if existing:
+                return jsonify(ok=False, error="Este documento ya existe en la base de conocimiento."), 200
+
+            res = conn.execute(
+                text("""
                     INSERT INTO SAC_KB_Doc
-                      (Title, Content, Source_Type, Lang, Content_Hash, Metadata_JSON, Status)
+                        (Source, Title, Content, Lang, Metadata_JSON, Content_Hash, Status)
                     VALUES
-                      (:title, :content, 'FILE', :lang, :hash, :meta, 'READY')
-                """), {
+                        ('FILE', :title, :content, :lang, :meta, :hash, 'ACTIVE')
+                """),
+                {
                     "title": title,
                     "content": content,
-                    "lang": lang,
-                    "hash": sha,
+                    "lang": "es",
                     "meta": json.dumps(meta, ensure_ascii=False),
-                })
-            except IntegrityError as e:
-                # hash duplicado
-                raise
+                    "hash": sha,
+                },
+            )
 
             doc_id = getattr(res, "lastrowid", None)
 
-            # Reindex: mantener compatibilidad construyendo mappings con Id/FileName
-            # (rebuild_index en tu proyecto recibe rows con claves Id y FileName)
-            try:
-                rows = conn.execute(text("""
+            rows = conn.execute(
+                text("""
                     SELECT
-                      Doc_Id AS Id,
+                      Id AS Id,
                       JSON_UNQUOTE(JSON_EXTRACT(Metadata_JSON, '$.stored_name')) AS FileName
                     FROM SAC_KB_Doc
-                    WHERE Status = 'READY'
+                    WHERE Status = 'ACTIVE'
                     ORDER BY Created_At DESC
-                """)).mappings().all()
+                """)
+            ).mappings().all()
 
-                # si rebuild_index existe en tu proyecto, esto mantiene el contrato Id/FileName
-                rebuild_index(db, rows)
-            except Exception:
-                current_app.logger.exception("KB: fallo en rebuild_index (se guarda el doc igualmente)")
+        try:
+            rebuild_index(db, rows)
+        except Exception:
+            current_app.logger.exception("KB: fallo en rebuild_index")
 
-        return jsonify(ok=True, id=doc_id, message="Documento subido a la base de conocimiento."), 200
-
-    except IntegrityError as e:
-        # duplicado (Content_Hash UNIQUE)
-        msg = str(getattr(e, "orig", e))
-        if "UQ_SAC_KB_Doc_Hash" in msg or "duplicate" in msg.lower():
-            return jsonify(ok=False, error="Este documento ya existe en la KB (hash duplicado)."), 200
-        current_app.logger.exception("KB upload IntegrityError")
-        return jsonify(ok=False, error="No se pudo registrar el documento por una restricción de BD."), 200
+        return jsonify(
+            ok=True,
+            id=doc_id,
+            message="Documento subido e indexado correctamente."
+        ), 200
 
     except Exception:
         current_app.logger.exception("KB upload error")
-        return jsonify(ok=False, error="Error al subir el documento a la base de conocimiento."), 200
+        return jsonify(ok=False, error="Error al subir el documento a la base de conocimiento."), 500
 
 
 @sac_bp.get("/kb/docs", endpoint="sac_kb_docs")
+@role_required("Administrador")
 def sac_kb_docs():
     """
     Devuelve docs para /sac/chat/admin.
-    El frontend espera: {id,title,filename,size_bytes,created_at}
+    El frontend espera `items`, así que devolvemos `items` y también `docs`
+    para mantener compatibilidad.
     """
     try:
         with db.engine.begin() as conn:
-            rows = conn.execute(text("""
-                SELECT
-                  Doc_Id AS id,
-                  Title AS title,
-                  JSON_UNQUOTE(JSON_EXTRACT(Metadata_JSON, '$.original_name')) AS filename,
-                  CAST(JSON_UNQUOTE(JSON_EXTRACT(Metadata_JSON, '$.size_bytes')) AS UNSIGNED) AS size_bytes,
-                  Created_At AS created_at
-                FROM SAC_KB_Doc
-                ORDER BY Created_At DESC
-                LIMIT 200
-            """)).mappings().all()
+            rows = conn.execute(
+                text("""
+                    SELECT
+                      Id AS id,
+                      Title AS title,
+                      JSON_UNQUOTE(JSON_EXTRACT(Metadata_JSON, '$.original_name')) AS filename,
+                      CAST(JSON_UNQUOTE(JSON_EXTRACT(Metadata_JSON, '$.size_bytes')) AS UNSIGNED) AS size_bytes,
+                      Created_At AS created_at
+                    FROM SAC_KB_Doc
+                    WHERE Status = 'ACTIVE'
+                    ORDER BY Created_At DESC
+                    LIMIT 200
+                """)
+            ).mappings().all()
 
-        docs = []
+        items = []
         for r in rows:
             created = r.get("created_at")
-            if hasattr(created, "isoformat"):
-                created = created.isoformat()
-            else:
-                created = str(created) if created is not None else None
+            items.append(
+                {
+                    "id": int(r.get("id")) if r.get("id") is not None else None,
+                    "title": r.get("title") or "",
+                    "filename": r.get("filename") or "",
+                    "size_bytes": int(r.get("size_bytes") or 0),
+                    "created_at": created.isoformat() if hasattr(created, "isoformat") else (str(created) if created else None),
+                }
+            )
 
-            docs.append({
-                "id": r.get("id"),
-                "title": r.get("title"),
-                "filename": r.get("filename") or "",
-                "size_bytes": int(r.get("size_bytes") or 0),
-                "created_at": created,
-            })
-
-        return jsonify(ok=True, docs=docs), 200
+        return jsonify(ok=True, items=items, docs=items), 200
 
     except Exception:
         current_app.logger.exception("KB docs error")
-        return jsonify(ok=False, docs=[], error="No se pudo cargar la lista de documentos."), 200
+        return jsonify(ok=False, items=[], docs=[], error="No se pudo cargar la lista de documentos."), 500
 
+
+@sac_bp.delete("/kb/docs/<int:doc_id>", endpoint="sac_kb_delete")
+@role_required("Administrador")
+def sac_kb_delete(doc_id: int):
+    try:
+        meta = {}
+        stored_name = None
+
+        with db.engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT Id, Metadata_JSON
+                      FROM SAC_KB_Doc
+                     WHERE Id = :id
+                     LIMIT 1
+                """),
+                {"id": doc_id},
+            ).mappings().first()
+
+            if not row:
+                return jsonify(ok=False, error="Documento no encontrado."), 404
+
+            try:
+                meta = json.loads(row.get("Metadata_JSON") or "{}")
+            except Exception:
+                meta = {}
+
+            stored_name = (meta.get("stored_name") or "").strip() or None
+
+            conn.execute(
+                text("DELETE FROM SAC_KB_Doc WHERE Id = :id"),
+                {"id": doc_id},
+            )
+
+            remaining = conn.execute(
+                text("""
+                    SELECT
+                      Id AS Id,
+                      JSON_UNQUOTE(JSON_EXTRACT(Metadata_JSON, '$.stored_name')) AS FileName
+                    FROM SAC_KB_Doc
+                    WHERE Status = 'ACTIVE'
+                    ORDER BY Created_At DESC
+                """)
+            ).mappings().all()
+
+        if stored_name:
+            try:
+                path = pathlib.Path(KB_DIR) / stored_name
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                current_app.logger.warning("No se pudo eliminar el archivo físico de KB.", exc_info=True)
+
+        try:
+            rebuild_index(db, remaining)
+        except Exception:
+            current_app.logger.exception("KB: fallo al reconstruir índice tras eliminar documento")
+
+        return jsonify(ok=True), 200
+
+    except Exception:
+        current_app.logger.exception("KB delete error")
+        return jsonify(ok=False, error="No se pudo eliminar el documento."), 500
 
 @sac_bp.post("/kb/teach")
 @role_required("Administrador")
 def sac_kb_teach():
     """
-    Alta/actualización de pares Pregunta-Respuesta manuales (FAQ estructurado).
-    No se usa para subir archivos, solo Q/A.
-
-    Espera JSON:
-      - pregunta: str
-      - respuesta: str
+    Alta/actualización manual de preguntas y respuestas en la KB.
+    Sigue disponible, pero ya no es obligatoria para que el bot funcione.
     """
-    data = request.get_json(silent=True) or {}
-    q = (data.get("pregunta") or "").strip()
-    a = (data.get("respuesta") or "").strip()
-    if not q or not a:
-        return jsonify(ok=False, error="Pregunta/Respuesta requeridas"), 400
+    data = request.get_json(silent=True) or request.form or {}
+    q = (data.get("pregunta") or data.get("question") or "").strip()
+    a = (data.get("respuesta") or data.get("answer") or "").strip()
 
-    with db.engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-          INSERT INTO SAC_KB_QA (Pregunta, Respuesta, Activo, CreadoPor)
-          VALUES (:q,:a,1,:u)
-          ON DUPLICATE KEY UPDATE Respuesta=VALUES(Respuesta), Activo=1
-        """
-            ),
-            dict(q=q, a=a, u=session.get("user_id")),
-        )
-        # marcar preguntas abiertas similares como respondidas
-        conn.execute(
-            text(
-                """
-          UPDATE SAC_KB_Unanswered
-             SET Estado='RESPONDIDA', Respondida_At=NOW()
-           WHERE Estado!='RESPONDIDA'
-             AND Pregunta LIKE :likeq
-        """
-            ),
-            dict(likeq=f"%{q[:80]}%"),
-        )
-    return jsonify(ok=True)
+    if not q or not a:
+        return jsonify(ok=False, error="Pregunta y respuesta son requeridas."), 400
+
+    try:
+        with db.engine.begin() as conn:
+            existing = conn.execute(
+                text("""
+                    SELECT Id
+                      FROM SAC_KB_QA
+                     WHERE LOWER(Question) = LOWER(:q)
+                     LIMIT 1
+                """),
+                {"q": q},
+            ).mappings().first()
+
+            if existing:
+                qa_id = int(existing["Id"])
+                conn.execute(
+                    text("""
+                        UPDATE SAC_KB_QA
+                           SET Answer = :a,
+                               Status = 'ACTIVE',
+                               Updated_At = NOW()
+                         WHERE Id = :id
+                    """),
+                    {"a": a, "id": qa_id},
+                )
+            else:
+                res = conn.execute(
+                    text("""
+                        INSERT INTO SAC_KB_QA (Question, Answer, Status)
+                        VALUES (:q, :a, 'ACTIVE')
+                    """),
+                    {"q": q, "a": a},
+                )
+                qa_id = int(getattr(res, "lastrowid", 0) or 0)
+
+            try:
+                conn.execute(
+                    text("""
+                        UPDATE SAC_KB_Unanswered
+                           SET Status = 'Resuelta',
+                               Reviewed_At = NOW(),
+                               Resolution_Note = 'Respondida desde /sac/kb/teach'
+                         WHERE Status <> 'Resuelta'
+                           AND Question LIKE :likeq
+                    """),
+                    {
+                        "likeq": f"%{q[:80]}%",
+                    },
+                )
+            except Exception:
+                pass
+
+        return jsonify(ok=True, id=qa_id), 200
+
+    except Exception:
+        current_app.logger.exception("KB teach error")
+        return jsonify(ok=False, error="No se pudo guardar la pregunta/respuesta."), 500
 
 
 # ====================== Panel Administración Chatbot ======================
 @sac_bp.get("/chat/admin", endpoint="sac_chat_admin")
 @role_required("Administrador")
 def sac_chat_admin():
-    """
-    Panel de administración del chatbot:
-      - Edición de prompt (instrucciones del bot).
-      - Upload de documentos (PDF, etc.) para la KB.
-      - Vista rápida de preguntas frecuentes/tendencias.
-    """
     prompt_current = cfg("chatbot_system_prompt", "")
 
-    # Preguntas frecuentes (simple: agrupación por texto de usuario)
     popular_questions: List[Dict[str, Any]] = []
-    with db.engine.begin() as conn:
+
+    try:
+        text_col = getattr(SACConversationMsg, _convmsg_text_attr())
+
         rows = (
-            conn.execute(
-                text(
-                    """
-            SELECT
-              TRIM(LOWER(Texto)) AS pregunta,
-              COUNT(*) AS veces
-            FROM SAC_ConversationMsg
-            WHERE Rol='user'
-              AND Texto IS NOT NULL
-              AND Texto <> ''
-            GROUP BY TRIM(LOWER(Texto))
-            ORDER BY veces DESC
-            LIMIT 30
-        """
-                )
-            )
-            .mappings()
+            db.session.query(text_col.label("pregunta"))
+            .filter(SACConversationMsg.Rol == "user")
+            .filter(text_col.isnot(None))
+            .filter(text_col != "")
+            .order_by(SACConversationMsg.Id.desc())
+            .limit(2000)
             .all()
         )
-    for r in rows:
-        popular_questions.append({"text": r["pregunta"], "count": int(r["veces"] or 0)})
+
+        counter = Counter()
+        for row in rows:
+            txt = (getattr(row, "pregunta", None) or "").strip()
+            qn = _norm(txt)
+            if not qn:
+                continue
+            if _is_greeting(qn) or _is_smalltalk(qn) or _is_help_like(qn):
+                continue
+            if len(qn) < 4:
+                continue
+            counter[qn] += 1
+
+        for question, count in counter.most_common(30):
+            popular_questions.append({"text": question, "count": int(count)})
+
+    except Exception as e:
+        current_app.logger.warning(f"[SAC] No se pudieron calcular preguntas populares: {e}")
 
     kb_stats = {"docs": 0, "unanswered": 0}
     with db.engine.begin() as conn:
         kb_stats["docs"] = int(
-            conn.execute(text("SELECT COUNT(*) FROM SAC_KB_Doc")).scalar() or 0
-        )
-        kb_stats["unanswered"] = int(
             conn.execute(
-                text(
-                    "SELECT COUNT(*) FROM SAC_KB_Unanswered "
-                    "WHERE Estado IN ('NUEVA','REVISADA')"
-                )
-            ).scalar()
-            or 0
+                text("SELECT COUNT(*) FROM SAC_KB_Doc WHERE Status='ACTIVE'")
+            ).scalar() or 0
         )
+
+        try:
+            kb_stats["unanswered"] = int(
+                conn.execute(
+                    text("""
+                        SELECT COUNT(*)
+                          FROM SAC_KB_Unanswered
+                         WHERE Status IN ('Pendiente','Clasificada')
+                    """)
+                ).scalar() or 0
+            )
+        except Exception:
+            kb_stats["unanswered"] = 0
 
     return render_template(
         "sac/chat_admin.html",
@@ -1906,30 +3045,6 @@ def sac_chat_admin():
         popular_questions=popular_questions,
         kb_stats=kb_stats,
     )
-
-
-# ---- Configuración JSON del chatbot para chat_admin.html ----
-BASE_SYSTEM_PROMPT = (
-    "Eres el asistente virtual del Hotel Villa Grace en Cóbano, Puntarenas, Costa Rica.\n"
-    "Debes responder en español latino, tono cordial y profesional.\n"
-    "Se te entrega una 'respuesta base' generada por los sistemas del hotel; "
-    "tu tarea es reformularla o resumirla para que suene natural, no repetitiva, "
-    "y coherente con la conversación reciente.\n\n"
-    "Reglas IMPORTANTES:\n"
-    "1. NO agregues datos nuevos (números, horarios, políticas, precios, direcciones, "
-    "   nombres de contacto, características específicas) que no aparezcan explícitamente "
-    "   en la 'respuesta base' o en el propio mensaje del huésped.\n"
-    "2. Si la respuesta base indica que no hay información suficiente o que el bot no sabe, "
-    "   respeta ese mensaje y NO intentes completar con suposiciones.\n"
-    "3. Si el huésped solo saluda o dice algo como 'hola', 'buenas' o 'gracias', "
-    "   responde en 1–2 frases muy cortas, sin listas de viñetas.\n"
-    "4. Si el huésped se queja de que repites o dice 'no contestes lo mismo', "
-    "   cambia el enfoque: reconoce brevemente que ya le explicaste y pide "
-    "   más detalle o da un ejemplo distinto, sin inventar datos.\n"
-    "5. Evita repetir literalmente grandes fragmentos de texto; puedes condensarlos.\n"
-    "6. Solo usa listas con viñetas si el huésped explícitamente pide 'lista', 'puntos', etc.\n"
-    "7. Mantén la información factual de la respuesta base, pero adapta el estilo.\n"
-)
 
 
 def _build_effective_system_prompt(custom_instructions: str) -> str:
@@ -2036,15 +3151,14 @@ def sac_chat_admin_save_prompt():
 @role_required("Administrador")
 def sac_chat_stats():
     """
-    Devuelve las preguntas más frecuentes del chatbot.
-    Parámetros:
-      - max_rows: máximo de mensajes a analizar (no estrictamente usado como sample).
-      - limit: máximo de filas en el resultado.
+    Devuelve tendencias reales del chatbot, excluyendo saludos y small-talk.
+    Compatible con Texto / Msg_Text.
     """
     try:
         max_rows = int(request.args.get("max_rows") or 2000)
     except Exception:
         max_rows = 2000
+
     try:
         limit = int(request.args.get("limit") or 30)
     except Exception:
@@ -2053,56 +3167,47 @@ def sac_chat_stats():
     max_rows = max(100, min(max_rows, 10000))
     limit = max(5, min(limit, 100))
 
-    # Total de mensajes de usuario
-    total = (
-        db.session.execute(
-            text(
-                """
-        SELECT COUNT(*) AS n
-        FROM SAC_ConversationMsg
-        WHERE Rol='user'
-          AND Texto IS NOT NULL
-          AND Texto <> ''
-    """
-            )
-        )
-        .mappings()
-        .first()
-        or {}
-    )
-    total_counted = int(total.get("n") or 0)
+    try:
+        text_col = getattr(SACConversationMsg, _convmsg_text_attr())
 
-    # Preguntas normalizadas
-    rows = (
-        db.session.execute(
-            text(
-                """
-        SELECT
-          TRIM(LOWER(Texto)) AS pregunta,
-          COUNT(*) AS veces
-        FROM (
-          SELECT Texto
-          FROM SAC_ConversationMsg
-          WHERE Rol='user'
-            AND Texto IS NOT NULL
-            AND Texto <> ''
-          ORDER BY Id DESC
-          LIMIT :max_rows
-        ) t
-        GROUP BY TRIM(LOWER(Texto))
-        HAVING LENGTH(pregunta) >= 4
-        ORDER BY veces DESC
-        LIMIT :limit
-    """
-            ),
-            {"max_rows": max_rows, "limit": limit},
+        rows = (
+            db.session.query(text_col.label("texto"))
+            .filter(SACConversationMsg.Rol == "user")
+            .filter(text_col.isnot(None))
+            .filter(text_col != "")
+            .order_by(SACConversationMsg.Id.desc())
+            .limit(max_rows)
+            .all()
         )
-        .mappings()
-        .all()
-    )
 
-    items = [{"question": r["pregunta"], "count": int(r["veces"] or 0)} for r in rows]
-    return jsonify({"ok": True, "items": items, "total_counted": total_counted})
+        counter = Counter()
+        total_counted = 0
+
+        for row in rows:
+            txt = (getattr(row, "texto", None) or "").strip()
+            qn = _norm(txt)
+            if not qn:
+                continue
+            if _is_greeting(qn) or _is_smalltalk(qn) or _is_help_like(qn):
+                continue
+            if len(qn) < 4:
+                continue
+
+            total_counted += 1
+            counter[qn] += 1
+
+        items = [
+            {"question": question, "count": count}
+            for question, count in counter.most_common(limit)
+        ]
+
+        return jsonify({"ok": True, "items": items, "total_counted": total_counted})
+
+    except Exception as e:
+        current_app.logger.warning(f"[SAC] Error calculando estadísticas del chat: {e}")
+        return jsonify(
+            {"ok": False, "items": [], "total_counted": 0, "error": "No se pudieron calcular las estadísticas."}
+        ), 500
 
 
 # ====================== Conversación + IA (n8n / Ollama) ======================
@@ -2120,7 +3225,7 @@ def _get_conversation_history(session_id: str, limit: int = 6) -> List[Dict[str,
         return []
 
     msgs = (
-        SACConversationMsg.query.filter_by(Conv_Id=conv.Id)
+        _convmsg_query(conv.Id)
         .order_by(SACConversationMsg.Id.asc())
         .all()
     )
@@ -2133,7 +3238,7 @@ def _get_conversation_history(session_id: str, limit: int = 6) -> List[Dict[str,
         else:
             # 'bot', 'agent', etc. → assistant
             role = "assistant"
-        history.append({"role": role, "content": m.Texto or ""})
+        history.append({"role": role, "content": _convmsg_text_value(m)})
     return history
 
 
@@ -2163,6 +3268,193 @@ def _get_or_create_conversation(
     return conv
 
 
+def _msg_meta_to_dict(raw: Any) -> Dict[str, Any]:
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _message_default_sender_name(role: str) -> str:
+    r = (role or "").lower()
+    if r == "agent":
+        return "Asesor Hotel Villa Grace"
+    if r == "bot":
+        return "Bot Hotel Villa Grace"
+    if r == "user":
+        return "Cliente"
+    return "Sistema"
+
+
+def _set_message_sender_name(
+    msg: SACConversationMsg,
+    sender_name: Optional[str] = None,
+    extra_meta: Optional[Dict[str, Any]] = None,
+) -> None:
+    if not hasattr(msg, "Meta_JSON"):
+        return
+
+    meta = _msg_meta_to_dict(getattr(msg, "Meta_JSON", None))
+    meta["sender_name"] = (sender_name or _message_default_sender_name(getattr(msg, "Rol", ""))).strip()
+
+    if extra_meta:
+        for k, v in extra_meta.items():
+            meta[k] = v
+
+    setattr(msg, "Meta_JSON", json.dumps(meta, ensure_ascii=False))
+
+
+def _get_message_sender_name(msg: SACConversationMsg) -> str:
+    meta = _msg_meta_to_dict(getattr(msg, "Meta_JSON", None))
+    sender = (meta.get("sender_name") or "").strip()
+    if sender:
+        return sender
+
+    return _message_default_sender_name(getattr(msg, "Rol", ""))
+
+
+def _append_conversation_message(
+    conv: SACConversation,
+    role: str,
+    text_msg: str,
+    *,
+    sender_name: Optional[str] = None,
+    created_by_user_id: Optional[int] = None,
+) -> SACConversationMsg:
+    now = datetime.utcnow()
+
+    msg = SACConversationMsg(
+        **{
+            _convmsg_fk_attr(): conv.Id,
+            "Rol": role,
+            _convmsg_text_attr(): (text_msg or "").strip(),
+        }
+    )
+
+    if hasattr(msg, "Creada_At"):
+        setattr(msg, "Creada_At", now)
+
+    if created_by_user_id is not None and hasattr(msg, "Created_By_User_Id"):
+        setattr(msg, "Created_By_User_Id", created_by_user_id)
+
+    _set_message_sender_name(msg, sender_name=sender_name)
+
+    db.session.add(msg)
+    return msg
+
+
+def _touch_conversation(
+    conv: SACConversation,
+    *,
+    status: Optional[str] = None,
+    needs_agent: Optional[bool] = None,
+    last_role: Optional[str] = None,
+) -> None:
+    now = datetime.utcnow()
+
+    if hasattr(conv, "Actualizada_At"):
+        conv.Actualizada_At = now
+    if hasattr(conv, "Last_Msg_At"):
+        conv.Last_Msg_At = now
+    if last_role is not None and hasattr(conv, "Last_Msg_Role"):
+        conv.Last_Msg_Role = last_role
+    if status is not None and hasattr(conv, "Status"):
+        conv.Status = status
+    if needs_agent is not None and hasattr(conv, "Needs_Agent"):
+        conv.Needs_Agent = bool(needs_agent)
+
+def _safe_meta_json(value: Any) -> Dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _sender_name_for_role(role: str) -> str:
+    role = (role or "").lower()
+    if role == "agent":
+        return (
+            session.get("user_name")
+            or session.get("user_email")
+            or "Asesor Hotel Villa Grace"
+        )
+    if role == "bot":
+        return "Bot Hotel Villa Grace"
+    if role == "user":
+        return "Cliente"
+    return "Sistema"
+
+
+def _set_msg_meta(msg: SACConversationMsg, meta: Dict[str, Any]) -> None:
+    if hasattr(msg, "Meta_JSON"):
+        try:
+            setattr(msg, "Meta_JSON", json.dumps(meta, ensure_ascii=False))
+        except Exception:
+            setattr(msg, "Meta_JSON", "{}")
+
+
+def _extract_sender_name(msg: SACConversationMsg) -> Optional[str]:
+    meta = _safe_meta_json(getattr(msg, "Meta_JSON", None))
+    sender_name = (meta.get("sender_name") or "").strip()
+    return sender_name or None
+
+
+def _log_single_conversation_message(
+    conv: SACConversation,
+    role: str,
+    text_msg: str,
+    *,
+    status: Optional[str] = None,
+    needs_agent: Optional[bool] = None,
+    sender_name: Optional[str] = None,
+) -> None:
+    now = datetime.utcnow()
+
+    msg = SACConversationMsg(
+        **{
+            _convmsg_fk_attr(): conv.Id,
+            "Rol": role,
+            _convmsg_text_attr(): (text_msg or "").strip(),
+        }
+    )
+    if hasattr(msg, "Creada_At"):
+        setattr(msg, "Creada_At", now)
+
+    _set_msg_meta(
+        msg,
+        {
+            "sender_name": sender_name or _sender_name_for_role(role),
+        },
+    )
+
+    db.session.add(msg)
+
+    if hasattr(conv, "Actualizada_At"):
+        conv.Actualizada_At = now
+    if hasattr(conv, "Last_Msg_At"):
+        conv.Last_Msg_At = now
+    if hasattr(conv, "Last_Msg_Role"):
+        conv.Last_Msg_Role = role
+    if status is not None and hasattr(conv, "Status"):
+        conv.Status = status
+    if needs_agent is not None and hasattr(conv, "Needs_Agent"):
+        conv.Needs_Agent = bool(needs_agent)
+
+
 def _log_conversation_turn(
     session_id: str,
     cid: Optional[int],
@@ -2174,12 +3466,6 @@ def _log_conversation_turn(
 ) -> None:
     """
     Registra el turno (usuario/bot) en SAC_Conversation y SAC_ConversationMsg.
-    Si no existe conversación abierta para la sesión, la crea.
-
-    Parámetros adicionales:
-      - status: nuevo estado lógico de la conversación (bot, handoff_offer, agent_pending, agent_active, closed).
-      - needs_agent: flag para marcar si requiere atención humana en el panel.
-      - last_role: rol del último mensaje ('bot', 'agent', etc.) para meta.
     """
     if not session_id:
         return
@@ -2189,40 +3475,36 @@ def _log_conversation_turn(
         if not conv:
             return
 
-        now = datetime.utcnow()
+        assistant_role = last_role if last_role in ("bot", "agent") else "bot"
+        assistant_sender = (
+            session.get("user_name")
+            or session.get("user_email")
+            or _message_default_sender_name(assistant_role)
+        ) if assistant_role == "agent" else _message_default_sender_name("bot")
 
-        # Mensaje de usuario
-        msg_user = SACConversationMsg(
-            Conv_Id=conv.Id,
-            Rol="user",
-            Texto=user_text or "(vacío)",
+        _append_conversation_message(
+            conv,
+            "user",
+            user_text or "(vacío)",
+            sender_name="Cliente",
         )
-        if hasattr(msg_user, "Creada_At"):
-            setattr(msg_user, "Creada_At", now)
-        db.session.add(msg_user)
 
-        # Mensaje del bot/assistant
-        msg_bot = SACConversationMsg(
-            Conv_Id=conv.Id,
-            Rol=last_role if last_role != "user" else "bot",
-            Texto=bot_text or "",
+        _append_conversation_message(
+            conv,
+            assistant_role,
+            bot_text or "",
+            sender_name=assistant_sender,
         )
-        if hasattr(msg_bot, "Creada_At"):
-            setattr(msg_bot, "Creada_At", now)
-        db.session.add(msg_bot)
 
-        # Actualizar metadatos de conversación
-        conv.Actualizada_At = now
-        if hasattr(conv, "Last_Msg_At"):
-            setattr(conv, "Last_Msg_At", now)
-        if hasattr(conv, "Last_Msg_Role"):
-            setattr(conv, "Last_Msg_Role", last_role)
-        if status is not None and hasattr(conv, "Status"):
-            setattr(conv, "Status", status)
-        if needs_agent is not None and hasattr(conv, "Needs_Agent"):
-            setattr(conv, "Needs_Agent", bool(needs_agent))
+        _touch_conversation(
+            conv,
+            status=status,
+            needs_agent=needs_agent,
+            last_role=assistant_role,
+        )
 
         db.session.commit()
+
     except Exception as e:
         current_app.logger.warning(f"[SAC-CONV] No se pudo registrar conversación: {e}")
         try:
@@ -2293,6 +3575,8 @@ def _call_ai_chat(
     # 3) Sin IA configurada
     return None, None, 0.0
 
+def _ai_rephrase_enabled() -> bool:
+    return os.getenv("SAC_ENABLE_AI_REPHRASE", "0") in ("1", "true", "True")
 
 def _call_ai_rephrase(
     history: List[Dict[str, str]],
@@ -2373,24 +3657,29 @@ def user_accepts_handoff(text: str) -> bool:
     return any(p in t for p in opciones_si)
 
 
+def user_rejects_handoff(text: str) -> bool:
+    """
+    Heurística sencilla para detectar que el huésped rechaza
+    ser atendido por un agente humano.
+    """
+    if not text:
+        return False
+
+    t = text.lower().strip()
+    opciones_no = [
+        "no",
+        "no gracias",
+        "mejor no",
+        "prefiero no",
+        "continuar con el bot",
+        "seguir con el bot",
+        "no deseo",
+    ]
+    return any(t == p or t.startswith(p + " ") for p in opciones_no)
+
 # ====================== Endpoint público de QA/RAG ======================
 @sac_bp.post("/ask")
 def sac_ask():
-    """
-    Endpoint principal de QA:
-      1) Small-talk / saludos → respuesta hotel-céntrica.
-      2) Búsqueda en Q/A manual (FULLTEXT, luego LIKE).
-      3) Búsqueda semántica en documentos (RAG).
-      4) Opcionalmente, restaurantes cercanos (OSM o configuración).
-      5) Si NO hay información confiable, NO inventar nada:
-         - Responder que no hay datos.
-         - Sugerir transferencia a un agente humano.
-      6) Registrar pregunta no contestada en SAC_KB_Unanswered.
-      7) Pasar la respuesta base por una capa de IA conversacional (n8n/Ollama)
-         SOLO para reformular, sin agregar datos.
-      8) Integrar con SAC_Conversation para poder escalar a agentes humanos,
-         manteniendo estados: bot, handoff_offer, agent_pending, agent_active.
-    """
     data = request.get_json(silent=True) or {}
     raw_q = (data.get("q") or "").strip()
     qn = _norm(raw_q)
@@ -2401,7 +3690,6 @@ def sac_ask():
     )
     cid, _ = _current_cliente_y_email()
 
-    # Cargar/crear conversación actual para conocer estado
     conv = _get_or_create_conversation(sess, cid)
     current_status = (getattr(conv, "Status", None) or "bot").lower() if conv else "bot"
     current_needs_agent = bool(getattr(conv, "Needs_Agent", False)) if conv else False
@@ -2414,50 +3702,58 @@ def sac_ask():
         "source": None,
         "suggestions": suggestions,
         "need_handoff": False,
-        "handoff_state": None,  # 'OFFER' | 'PENDING'
+        "handoff_state": None,
     }
 
     conv_status = current_status or "bot"
     conv_needs_agent = current_needs_agent
 
-    # ---------- Estado ya escalado a agente ----------
+    # Conversación ya escalada:
+    # registrar SIEMPRE el nuevo mensaje del usuario para que el asesor lo vea.
     if conv_status in ("agent_pending", "agent_active"):
-        # Si el agente aún no ha respondido, seguimos mostrando el estado pendiente.
-        msgs = (
-            SACConversationMsg.query.filter_by(Conv_Id=conv.Id)
-            .order_by(SACConversationMsg.Id.asc())
-            .all()
-        )
-        # Si ya existe un mensaje de Rol='agent' → mostrar ese texto y reactivar el bot.
-        last_agent_msg = next((m for m in reversed(msgs) if m.Rol == "agent"), None)
-        if last_agent_msg:
-            result["answer"] = last_agent_msg.Texto
-            result["source"] = "AGENT_REPLY"
-            result["confidence"] = 1.0
-            conv_status = "bot"
-            conv_needs_agent = False
-        else:
+        try:
+            _append_conversation_message(
+                conv,
+                "user",
+                raw_q,
+                sender_name="Cliente",
+            )
+            _touch_conversation(
+                conv,
+                status=conv_status,
+                needs_agent=True,
+                last_role="user",
+            )
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.warning(
+                f"[SAC] No se pudo registrar mensaje del cliente en conversación escalada: {e}"
+            )
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+
+        if conv_status == "agent_pending":
             result["answer"] = (
-                "Tu consulta ha sido transferida a un agente humano. "
-                "En cuanto revise el mensaje, continuará la conversación aquí mismo."
+                "Tu consulta fue transferida a un agente humano de recepción. "
+                "Tu mensaje ya quedó registrado y el asesor lo verá en este mismo chat."
             )
             result["source"] = "HANDOFF_PENDING"
-            result["need_handoff"] = True
-            result["handoff_state"] = "PENDING"
+        else:
+            result["answer"] = (
+                "Tu conversación está siendo atendida por recepción. "
+                "Tu mensaje ya quedó registrado y el asesor continuará por este mismo chat."
+            )
+            result["source"] = "AGENT_ACTIVE"
 
-        _log_conversation_turn(
-            session_id=sess,
-            cid=cid,
-            user_text=raw_q,
-            bot_text=result["answer"],
-            status=conv_status,
-            needs_agent=conv_needs_agent,
-            last_role="bot",
-        )
-        db.session.commit()
+        result["confidence"] = 1.0
+        result["need_handoff"] = True
+        result["handoff_state"] = "PENDING"
         return jsonify(result)
 
-    # ---------- Usuario responde a una oferta de transferencia ----------
+    # Oferta de transferencia pendiente:
+    # NO se debe perder ni desaparecer hasta que el usuario decida sí o no.
     if conv_status == "handoff_offer":
         if user_accepts_handoff(qn):
             transfer_msg = (
@@ -2468,7 +3764,7 @@ def sac_ask():
                 {
                     "answer": transfer_msg,
                     "source": "HANDOFF_ACCEPTED",
-                    "confidence": 0.0,
+                    "confidence": 1.0,
                     "need_handoff": True,
                     "handoff_state": "PENDING",
                 }
@@ -2485,221 +3781,246 @@ def sac_ask():
                 last_role="bot",
             )
             return jsonify(result)
-        else:
-            # El usuario no aceptó explícitamente; seguimos con flujo normal de bot.
+
+        if user_rejects_handoff(qn):
+            decline_msg = (
+                "Entendido. Continuaré atendiéndote por este chat sin transferirte a un asesor."
+            )
+            result.update(
+                {
+                    "answer": decline_msg,
+                    "source": "HANDOFF_REJECTED",
+                    "confidence": 1.0,
+                    "need_handoff": False,
+                    "handoff_state": None,
+                }
+            )
             conv_status = "bot"
             conv_needs_agent = False
+            _log_conversation_turn(
+                session_id=sess,
+                cid=cid,
+                user_text=raw_q,
+                bot_text=decline_msg,
+                status=conv_status,
+                needs_agent=conv_needs_agent,
+                last_role="bot",
+            )
+            return jsonify(result)
 
-    # ---------- 1) Small-talk / saludos / muy corto ----------
+        result["answer"] = (
+            "Tienes una solicitud de transferencia pendiente. "
+            "Por favor selecciona Sí o No en el recuadro para decidir si deseas ser atendido por un asesor."
+        )
+        result["source"] = "HANDOFF_DECISION_PENDING"
+        result["confidence"] = 1.0
+        result["need_handoff"] = True
+        result["handoff_state"] = "OFFER"
+        return jsonify(result)
+
+    # 1) Small-talk / saludos
+    # IMPORTANTE:
+    # ya NO tratamos automáticamente cualquier consulta corta como small-talk,
+    # porque "wifi", "parqueo", "karaoke", etc. son consultas válidas.
     if (
         (not qn)
         or _is_greeting(qn)
         or _is_smalltalk(qn)
         or _is_help_like(qn)
-        or len(qn.split()) <= 2
     ):
         result["answer"] = _hotel_greeting_answer()
         result["confidence"] = 0.45
         result["source"] = "SMALL_TALK"
     else:
-        # ---------- 2) Q/A manual FULLTEXT ----------
-        ft_best = None
-        try:
-            with db.engine.begin() as conn:
-                ft_best = (
-                    conn.execute(
-                        text(
-                            """
-                    SELECT Id, Pregunta, Respuesta,
-                           MATCH(Pregunta, Respuesta)
-                           AGAINST(:q IN NATURAL LANGUAGE MODE) AS score
-                      FROM SAC_KB_QA
-                     WHERE Activo=1
-                     ORDER BY score DESC
-                     LIMIT 1
-                """
-                        ),
-                        {"q": raw_q},
-                    )
-                    .mappings()
-                    .first()
-                )
-        except Exception:
-            ft_best = None
+        # 2) Respuesta determinística desde documentos subidos/config
+        structured = _answer_from_uploaded_kb(raw_q, qn)
+        if structured:
+            result.update(structured)
+            if result.get("source") == "NO_INFO":
+                result["need_handoff"] = True
+                result["handoff_state"] = "OFFER"
+                conv_status = "handoff_offer"
+                conv_needs_agent = False
 
-        if ft_best and ft_best.get("score") and float(ft_best["score"]) >= 1.0:
-            result["answer"] = ft_best["Respuesta"]
-            result["confidence"] = min(0.99, 0.5 + float(ft_best["score"]) / 10.0)
-            result["source"] = "KB_QA_FT"
-            result["qa_id"] = int(ft_best["Id"])
-        else:
-            # ---------- 3) Q/A manual LIKE ----------
-            with db.engine.begin() as conn:
-                like_row = (
-                    conn.execute(
-                        text(
-                            """
-                    SELECT Id, Pregunta, Respuesta
-                      FROM SAC_KB_QA
-                     WHERE Activo=1
-                       AND (
-                           LOWER(Pregunta)  LIKE LOWER(:likeq)
-                        OR LOWER(Respuesta) LIKE LOWER(:likeq)
-                       )
-                     ORDER BY CHAR_LENGTH(Pregunta) ASC
-                     LIMIT 1
-                """
-                        ),
-                        {"likeq": f"%{raw_q}%"},
-                    )
-                    .mappings()
-                    .first()
-                )
+        # 3) Q/A manual solo si todavía no hay respuesta
+        # FIX:
+        # - ya no tomamos la primera fila de SAC_KB_QA como fallback ciego
+        # - solo usamos KB_QA si la similitud con la pregunta es razonable
+        if not result["answer"]:
+            try:
+                with db.engine.begin() as conn:
+                    ft_candidates = conn.execute(
+                        text("""
+                            SELECT Id, Question, Answer
+                              FROM SAC_KB_QA
+                             WHERE Status='ACTIVE'
+                             ORDER BY Updated_At DESC, Created_At DESC
+                             LIMIT 100
+                        """)
+                    ).mappings().all()
+            except Exception:
+                ft_candidates = []
 
-            if like_row:
-                result["answer"] = like_row["Respuesta"]
-                result["confidence"] = 0.60
-                result["source"] = "KB_QA_LIKE"
-                result["qa_id"] = int(like_row["Id"])
-            else:
-                # ---------- 4) RAG sobre documentos (KB_DOCS) ----------
+            if ft_candidates:
+                q_tokens = set(_tokenize_norm(raw_q))
+                best_like = None
+                best_score = 0.0
+                raw_q_norm = _norm(raw_q)
+
+                for row in ft_candidates:
+                    qq = _norm(row.get("Question") or "")
+                    aa = _norm(row.get("Answer") or "")
+                    qq_tokens = set(_tokenize_norm(qq))
+
+                    overlap = len(q_tokens & qq_tokens)
+                    score = overlap / max(len(q_tokens), 1) if q_tokens else 0.0
+
+                    if raw_q_norm and (raw_q_norm in qq or qq in raw_q_norm):
+                        score = max(score, 0.95)
+                    elif raw_q_norm and raw_q_norm in aa:
+                        score = max(score, 0.65)
+
+                    if score > best_score:
+                        best_score = score
+                        best_like = row
+
+                if best_like and best_score >= 0.55:
+                    result["answer"] = best_like["Answer"]
+                    result["confidence"] = round(best_score, 2)
+                    result["source"] = "KB_QA"
+                    result["qa_id"] = int(best_like["Id"])
+
+        # 4) RAG solo si todavía no hay respuesta
+        # Primero intentamos recuperación real del índice.
+        hits: List[Dict[str, Any]] = []
+        if not result["answer"]:
+            try:
+                hits = search(raw_q, topk=6)
+            except Exception as e:
+                current_app.logger.warning(f"[SAC] RAG search error: {e}")
+                hits = []
+
+        # 4.a) Si hay backend de IA configurado, responder con el prompt efectivo
+        # usando SOLO contexto documental.
+        if not result["answer"] and hits:
+            try:
+                ai_answer, ai_source, ai_conf = _call_ai_answer_from_context(raw_q, hits)
+                if ai_answer:
+                    result["answer"] = ai_answer
+                    result["confidence"] = max(0.60, float(ai_conf or 0.60))
+                    result["source"] = ai_source or "AI_CONTEXT"
+            except Exception as e:
+                current_app.logger.warning(f"[SAC] AI context answer error: {e}")
+
+        # 4.b) Fallback sin IA: devolver la frase documental más relevante
+        if not result["answer"] and hits:
+            try:
+                compact = _build_compact_rag_answer(raw_q, hits)
+                if compact:
+                    result.update(compact)
+            except Exception as e:
+                current_app.logger.warning(f"[SAC] Compact RAG answer error: {e}")
+
+        # 5) Restaurantes cercanos solo para preguntas explícitas de cercanía,
+        # NO para preguntas tipo '¿el hotel tiene restaurante?'
+        if not result["answer"]:
+            nearby_restaurant_query = any(
+                x in qn
+                for x in [
+                    "restaurantes cerca",
+                    "restaurant cerca",
+                    "donde comer cerca",
+                    "dónde comer cerca",
+                    "lugares para comer cerca",
+                    "opciones para comer cerca",
+                ]
+            )
+
+            if nearby_restaurant_query:
                 try:
-                    hits = search(raw_q, topk=5)
-                    ans = answer_from_chunks(raw_q, hits)
-                    # Se asume que answer_from_chunks ya está instruido
-                    # para NO inventar más allá del contexto.
+                    if os.getenv("OSM_ENABLE", "0") == "1":
+                        import requests  # type: ignore
 
-                    # Umbral más permisivo acorde con la heurística de RAG.
-                    #  - <0.02 → conf=0.15 (ruido)
-                    #  - 0.02–0.05 → conf=0.35
-                    #  - 0.05–0.10 → conf=0.55
-                    #  - 0.10–0.20 → conf=0.75
-                    #  - >0.20 → conf=0.90
-                    KB_DOCS_CONF_THRESHOLD = 0.15
-
-                    conf = float(ans.get("confidence", 0.0) or 0.0)
-                    if (
-                        ans.get("ok")
-                        and conf >= KB_DOCS_CONF_THRESHOLD
-                        and ans.get("answer")
-                    ):
-                        # ans ya incluye 'answer', 'confidence', etc.
-                        result.update(ans)
-                        result["source"] = "KB_DOCS"
-                        result["suggestions"] = suggestions
-                    else:
-                        current_app.logger.info(
-                            "[SAC] RAG sin confianza suficiente o sin respuesta: "
-                            f"conf={conf}, q='{raw_q}'"
-                        )
-                except Exception as e:
-                    current_app.logger.warning(f"[SAC] RAG error: {e}")
-
-                # ---------- 5) Restaurantes cercanos ----------
-                if not result["answer"]:
-                    if any(
-                        x in qn
-                        for x in [
-                            "restaurante",
-                            "comer",
-                            "cenar",
-                            "restaurant",
-                            "almorzar",
-                            "food",
-                        ]
-                    ):
-                        # 5.1 OSM
-                        try:
-                            if os.getenv("OSM_ENABLE", "0") == "1":
-                                import requests  # type: ignore
-
-                                lat = float(os.getenv("HOTEL_LAT", "9.585"))
-                                lon = float(os.getenv("HOTEL_LON", "-85.103"))
-                                r = requests.get(
-                                    "https://nominatim.openstreetmap.org/search",
-                                    params={
-                                        "q": "restaurant",
-                                        "format": "json",
-                                        "limit": "5",
-                                        "viewbox": f"{lon-0.05},{lat+0.05},{lon+0.05},{lat-0.05}",
-                                    },
-                                    headers={"User-Agent": "VillaGraceBot/1.0"},
-                                    timeout=20,
-                                )
-                                js = r.json()
-                                if js:
-                                    lines = [
-                                        f"- {it.get('display_name','').split(',')[0]}"
-                                        for it in js[:5]
-                                    ]
-                                    result["answer"] = (
-                                        "Algunas opciones cercanas que aparecen en mapas públicos:\n"
-                                        + "\n".join(lines)
-                                    )
-                                    result["confidence"] = 0.40
-                                    result["source"] = "OSM"
-                        except Exception as e:
-                            current_app.logger.warning(
-                                f"[SAC] Error consultando OSM: {e}"
-                            )
-
-                        # 5.2 Fallback: lista en SAC_Config
-                        if not result["answer"]:
-                            with db.engine.begin() as conn:
-                                cfg_val = conn.execute(
-                                    text(
-                                        "SELECT Valor FROM SAC_Config "
-                                        "WHERE Clave='nearby_restaurants'"
-                                    )
-                                ).scalar()
-                            if cfg_val:
-                                try:
-                                    items = json.loads(cfg_val)
-                                    result["answer"] = (
-                                        "Opciones cercanas registradas por el hotel:\n"
-                                        + "\n".join(f"- {x}" for x in items[:5])
-                                    )
-                                    result["confidence"] = 0.35
-                                    result["source"] = "CONFIG"
-                                except Exception:
-                                    pass
-
-                # ---------- 6) Registrar no contestadas + política NO-HALU ----------
-                if not result["answer"]:
-                    # No hay respuesta confiable → registrar gap y ofrecer agente
-                    with db.engine.begin() as conn:
-                        conn.execute(
-                            text(
-                                """
-                        INSERT INTO SAC_KB_Unanswered (Pregunta, Detalle, Origen, Session_Id, Cliente_Id)
-                        VALUES (:p, :d, 'WEB', :s, :c)
-                    """
-                            ),
-                            {
-                                "p": raw_q,
-                                "d": json.dumps({"ua": "web"}),
-                                "s": sess,
-                                "c": cid,
+                        lat = float(os.getenv("HOTEL_LAT", "9.585"))
+                        lon = float(os.getenv("HOTEL_LON", "-85.103"))
+                        r = requests.get(
+                            "https://nominatim.openstreetmap.org/search",
+                            params={
+                                "q": "restaurant",
+                                "format": "json",
+                                "limit": "5",
+                                "viewbox": f"{lon-0.05},{lat+0.05},{lon+0.05},{lat-0.05}",
                             },
+                            headers={"User-Agent": "VillaGraceBot/1.0"},
+                            timeout=20,
                         )
-                    result["answer"] = _noinfo_answer()
-                    result["confidence"] = 0.0
-                    result["source"] = "NO_INFO"
-                    result["need_handoff"] = True
-                    result["handoff_state"] = "OFFER"
-                    conv_status = "handoff_offer"
-                    conv_needs_agent = False
+                        js = r.json()
+                        if js:
+                            lines = [
+                                f"- {it.get('display_name','').split(',')[0]}"
+                                for it in js[:5]
+                            ]
+                            result["answer"] = (
+                                "Algunas opciones cercanas que aparecen en mapas públicos:\n"
+                                + "\n".join(lines)
+                            )
+                            result["confidence"] = 0.40
+                            result["source"] = "OSM"
+                except Exception as e:
+                    current_app.logger.warning(f"[SAC] Error consultando OSM: {e}")
 
-    # ---------- 7) Capa de IA conversacional (n8n / Ollama) ----------
+                if not result["answer"]:
+                    with db.engine.begin() as conn:
+                        cfg_val = conn.execute(
+                            text("SELECT Valor FROM SAC_Config WHERE Clave='nearby_restaurants'")
+                        ).scalar()
+                    if cfg_val:
+                        try:
+                            items = json.loads(cfg_val)
+                            result["answer"] = (
+                                "Opciones cercanas registradas por el hotel:\n"
+                                + "\n".join(f"- {x}" for x in items[:5])
+                            )
+                            result["confidence"] = 0.35
+                            result["source"] = "CONFIG"
+                        except Exception:
+                            pass
+
+        # 6) No info si todavía no hay respuesta
+        if not result["answer"]:
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(
+                        text("""
+                            INSERT INTO SAC_KB_Unanswered (Question, Asked_By, Context_JSON, Status)
+                            VALUES (:p, :asked_by, :ctx, 'Pendiente')
+                        """),
+                        {
+                            "p": raw_q,
+                            "asked_by": str(cid) if cid else sess,
+                            "ctx": json.dumps(
+                                {"channel": "web", "session_id": sess, "cliente_id": cid},
+                                ensure_ascii=False,
+                            ),
+                        },
+                    )
+            except Exception:
+                current_app.logger.warning("[SAC] No se pudo registrar pregunta no contestada.", exc_info=True)
+
+            result["answer"] = _noinfo_answer()
+            result["confidence"] = 0.0
+            result["source"] = "NO_INFO"
+            result["need_handoff"] = True
+            result["handoff_state"] = "OFFER"
+            conv_status = "handoff_offer"
+            conv_needs_agent = False
+
+    # 7) Capa IA solo si está habilitada y no hay handoff
     base_answer = (result.get("answer") or "").strip()
     base_source = (result.get("source") or "") or None
-
-    # Nunca usar IA para reescribir cuando:
-    #   - No hay información (NO_INFO) y se está ofreciendo agente.
-    #   - Podría inducir a inventar datos en un caso 'sin respuesta'.
     skip_ai = result.get("source") in ("NO_INFO",) or bool(result.get("need_handoff"))
 
-    if base_answer and not skip_ai:
+    if base_answer and not skip_ai and _ai_rephrase_enabled():
         try:
             history = _get_conversation_history(sess, limit=6)
             ai_answer, ai_source, ai_conf = _call_ai_rephrase(
@@ -2709,7 +4030,6 @@ def sac_ask():
                 base_source=base_source,
             )
             if ai_answer:
-                # Sustituimos solo el texto y ajustamos confianza / fuente
                 result["answer"] = ai_answer
                 if ai_source:
                     result["source"] = ai_source
@@ -2722,15 +4042,13 @@ def sac_ask():
         except Exception as e:
             current_app.logger.warning(f"[SAC-AI] Error al reescribir respuesta: {e}")
 
-        # ---------- 7-bis) Normalización final de respuestas "no tengo información" ----------
+    # 8) Normalización final de no-info
     final_answer = (result.get("answer") or "").strip()
-
     if (
         final_answer
         and _looks_like_noinfo(final_answer)
         and result.get("source") != "NO_INFO"
     ):
-        # Forzamos el flujo estándar de "no sé" + oferta de agente humano
         result["answer"] = _noinfo_answer()
         result["confidence"] = 0.0
         result["source"] = "NO_INFO"
@@ -2739,7 +4057,6 @@ def sac_ask():
         conv_status = "handoff_offer"
         conv_needs_agent = False
 
-    # ---------- 8) Registrar conversación (último paso) ----------
     try:
         _log_conversation_turn(
             session_id=sess,
@@ -2751,7 +4068,6 @@ def sac_ask():
             last_role="bot",
         )
     except Exception:
-        # ya se registró en el log interno dentro de _log_conversation_turn
         pass
 
     return jsonify(result)
