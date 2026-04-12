@@ -2387,7 +2387,7 @@ def create_app() -> Flask:
                 {"Content-Type": "text/plain; charset=utf-8"},
             )
 
-    @app.route('/portal/admin-users')
+    @app.route('/admin-users.html')
     def portal_admin_users_html():
         return render_template('admin-users.html')
 
