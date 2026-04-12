@@ -41,7 +41,7 @@
 
 <body class="{% block body_class %}{% endblock %}">
 
-  <!-- HEADER (tal cual tu index) -->
+  <!-- HEADER -->
   <header id="header" class="header d-flex align-items-center fixed-top">
     <div class="container position-relative d-flex align-items-center justify-content-between">
 
@@ -74,21 +74,19 @@
             <a href="#"><span>Atención</span><i class="bi bi-chevron-down toggle-dropdown" aria-hidden="true"></i></a>
             <ul>
               <li><a href="{{ url_for('sac.faq_html') }}">FAQ y horarios</a></li>
+
               {% if session.get('user_role') == 'Cliente' %}
               <li><a href="{{ url_for('sac.preferencias_html') }}">Preferencias de notificación</a></li>
-              <!--<li><a href="{{ url_for('sac.solicitud_nueva_html') }}">Solicitudes especiales</a></li> -->
-              {% if session.get('user_role') == 'Cliente' %}
               <li><a href="{{ url_for('sac.solicitud_nueva_html') }}">Solicitudes especiales</a></li>
               {% endif %}
-              {% endif %}
+
               {% if session.get('user_role') in ['Recepcionista','Administrador'] %}
-              <li>
-                <hr class="dropdown-divider">
-              </li>
+              <li><hr class="dropdown-divider"></li>
               <li><a href="{{ url_for('sac.panel_solicitudes') }}">Panel de solicitudes</a></li>
               <li><a href="{{ url_for('sac.incidentes_html') }}">Incidentes / comentarios</a></li>
               <li><a href="{{ url_for('sac.conversaciones_html') }}">Historial de conversaciones</a></li>
               {% endif %}
+
               {% if session.get('user_role') == 'Administrador' %}
               <li><a href="{{ url_for('sac.indicadores_html') }}">Indicadores</a></li>
               {% endif %}
@@ -116,15 +114,14 @@
                 </ul>
               </li>
 
-            {# ✅ NUEVO: Finanzas #}
-            <li class="dropdown">
-              <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
-              <ul>
-                <li><a href="/fin/caja/ui">Caja</a></li>
-                <li><a href="/fin/periods/ui">Períodos</a></li>
-                <li><a href="/fin-invoices.html">Facturas</a></li>
-              </ul>
-            </li>
+              <li class="dropdown">
+                <a href="#"><span>Finanzas</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+                <ul>
+                  <li><a href="/fin/caja/ui">Caja</a></li>
+                  <li><a href="/fin/periods/ui">Períodos</a></li>
+                  <li><a href="/fin-invoices.html">Facturas</a></li>
+                </ul>
+              </li>
 
               <li class="dropdown">
                 <a href="#"><span>Inventario</span><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
@@ -156,6 +153,7 @@
               <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
               <li><a href="{{ url_for('portal_reservas_html') }}">Mis reservas</a></li>
               <li><a href="{{ url_for('portal_perfil_html') }}">Perfil</a></li>
+              <li><a href="{{ url_for('portal_admin_users_html') }}">Roles</a></li>
               <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
             </ul>
           </li>
@@ -186,7 +184,6 @@
 
   {% block header_offset %}{% endblock %}
 
-  <!-- CSS que tenías inline en index (lo dejamos aquí porque afecta al header) -->
   <style>
     .header .navmenu>ul>li {
       margin: 0 8px;
@@ -242,12 +239,11 @@
     }
   </style>
 
-
   <main class="main">
     {% block content %}{% endblock %}
   </main>
 
-  <!-- FOOTER (tal cual tu index) -->
+  <!-- FOOTER -->
   <footer id="footer" class="footer position-relative dark-background">
     <div class="footer-top">
       <div class="container">
@@ -308,7 +304,6 @@
                 <a href="https://www.facebook.com/HotelVillaGrace" target="_blank" rel="noopener">Facebook</a>
               </li>
               <li><a href="{{ url_for('contact_html') }}">Contacto rápido</a></li>
-              <!--<li><a href="#">Mapa</a></li>-->
             </ul>
           </div>
         </div>
@@ -341,7 +336,6 @@
   <!-- Main JS File -->
   <script src="{{ url_for('static', filename='assets/js/main.js') }}"></script>
 
-
   <script>
     window.ROOM_IMAGE_FALLBACK = "{{ url_for('static', filename='assets/img/hotel/default-room.webp') }}";
   </script>
@@ -352,9 +346,6 @@
     });
   </script>
 
-
-
-  <!-- Script alertas inventario (tu mismo script) -->
   <script>
     (function () {
       const badge = document.getElementById("inv-alert-badge");
@@ -406,7 +397,6 @@
   {% include "partials/sac-widget.html" %}
   <script src="{{ url_for('static', filename='assets/js/sac-widget.js') }}"></script>
 
-  <!-- Script API tipo de cambio (tu mismo script) -->
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
       const widget = document.querySelector(".fx-widget");
