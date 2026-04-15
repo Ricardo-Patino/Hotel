@@ -5809,140 +5809,75 @@ def create_app() -> Flask:
                 except Exception:
                     pass
         return 0.0
+    
 
     @app.get("/api/ops/checkin/search")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkin_search():
         """
-        Busca reservas (solo Confirmadas) por:
-        - Cédula / pasaporte (normalizado)
-        - Correo
-        - Número de comprobante
-        y opcionalmente por fecha (when) para el día operativo.
+        Busca reservas activas para el día operativo por:
+        - cédula / pasaporte
+        - correo
+        - número de comprobante
+    
+        IMPORTANTE:
+        Nunca debe devolver reservas cuyo check-in ya fue realizado.
         """
         doc = (request.args.get("doc") or "").strip()
         when = (request.args.get("when") or "").strip()
-
+    
         if not doc:
             return jsonify({"ok": False, "error": "doc_required"}), 400
-
-        # Fecha operativa (por defecto hoy)
-        d = date.today()
-        if when:
-            try:
-                d = datetime.strptime(when, "%Y-%m-%d").date()
-            except Exception:
-                return jsonify({"ok": False, "error": "invalid_when"}), 400
-
-        # Normalización simple en SQL: quitar espacios y guiones
+    
+        try:
+            d = datetime.strptime(when, "%Y-%m-%d").date() if when else date.today()
+        except Exception:
+            return jsonify({"ok": False, "error": "invalid_when"}), 400
+    
         def _norm_sql(expr: str) -> str:
             return f"REPLACE(REPLACE({expr},'-',''),' ','')"
-
+    
+        join_gc = ""
+        where_gc = ""
+        if _tabla_existe("guest_checkin"):
+            join_gc = "LEFT JOIN guest_checkin gc ON gc.reserva_id = R.Codigo_Reserva"
+            where_gc = " AND gc.id IS NULL "
+    
         sql = f"""
             SELECT
-                R.Codigo_Reserva       AS id,
-                R.Numero_Comprobante   AS numero,
-                R.Estado               AS estado,
-                DATE_FORMAT(R.Fecha_Entrada, '%%Y-%%m-%%d') AS checkin,
-                DATE_FORMAT(R.Fecha_Salida,  '%%Y-%%m-%%d') AS checkout,
-                R.Monto_Total          AS total,
-                C.Codigo_Cliente       AS cliente_id,
-                CONCAT(C.Nombre,' ',C.Apellido) AS huesped,
-                C.Cedula               AS cedula,
-                C.Correo               AS correo,
-                H.Codigo_Habitacion    AS habitacion_id,
-                H.Numero_Habitacion    AS habitacion_num,
-                H.Tipo                 AS habitacion_tipo
+                R.Codigo_Reserva AS id,
+                COALESCE(NULLIF(R.Numero_Comprobante, ''), CONCAT('VG-', R.Codigo_Reserva)) AS numero,
+                R.Estado AS estado,
+                R.Fecha_Entrada AS checkin,
+                R.Fecha_Salida AS checkout,
+                R.Monto_Total AS total,
+                C.Codigo_Cliente AS cliente_id,
+                CONCAT(C.Nombre, ' ', COALESCE(C.Apellido, '')) AS huesped,
+                C.Cedula AS cedula,
+                C.Correo AS correo,
+                H.Codigo_Habitacion AS Codigo_Habitacion,
+                H.Numero_Habitacion AS Numero_Habitacion
             FROM Reserva R
             JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
             LEFT JOIN Usuario U ON U.Codigo_Cliente = C.Codigo_Cliente
             LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+            {join_gc}
             WHERE
                 R.Estado = 'Confirmada'
                 AND DATE(R.Fecha_Entrada) <= :d
                 AND DATE(R.Fecha_Salida)  > :d
+                {where_gc}
                 AND (
                     {_norm_sql("C.Cedula")} = {_norm_sql(":doc")}
                     OR {_norm_sql("COALESCE(U.Cedula_Pasaporte,'')")} = {_norm_sql(":doc")}
                     OR LOWER(C.Correo) = LOWER(:doc)
                     OR R.Numero_Comprobante = :doc
                 )
-            ORDER BY R.Fecha_Entrada ASC, COALESCE(H.Numero_Habitacion,'') ASC
+            ORDER BY R.Fecha_Entrada ASC, COALESCE(H.Numero_Habitacion, '') ASC
             LIMIT 200
         """
-
+    
         rows = db.session.execute(_text(sql), {"d": d, "doc": doc}).mappings().all()
-        items = []
-        for r in rows:
-            items.append({
-                "id": int(r["id"]),
-                "numero": r.get("numero"),
-                "estado": r.get("estado"),
-                "checkin": r.get("checkin"),
-                "checkout": r.get("checkout"),
-                "total": float(r["total"]) if r.get("total") is not None else None,
-                "huesped": r.get("huesped"),
-                "cedula": r.get("cedula"),
-                "correo": r.get("correo"),
-                "habitacion": {
-                    "id": r.get("habitacion_id"),
-                    "numero": r.get("habitacion_num"),
-                    "tipo": r.get("habitacion_tipo"),
-                }
-            })
-
-        return jsonify({"ok": True, "items": items})
-
-    
-
-    
-
-  
-    
-    
-    @app.get("/api/ops/checkin/confirmed")
-    @role_required("Administrador", "Recepcionista")
-    def api_ops_checkin_confirmed():
-        """
-        Lista reservas CONFIRMADAS activas para una fecha (por defecto hoy).
-        Si existe la tabla guest_checkin, excluye las reservas que ya tengan check-in registrado.
-        Esto permite que en ops-checkin.html, ANTES de ingresar documento, se muestren confirmadas.
-        """
-        when = (request.args.get("when") or "").strip()
-        try:
-            d = date.fromisoformat(when[:10]) if when else date.today()
-        except Exception:
-            return jsonify({"ok": False, "items": [], "msg": "when inválido (YYYY-MM-DD)"}), 400
-    
-        join_gc = ""
-        where_gc = ""
-        if _tabla_existe("guest_checkin"):
-            join_gc = "LEFT JOIN guest_checkin gc ON gc.reserva_id = R.Codigo_Reserva"
-            where_gc = " AND gc.id IS NULL"
-    
-        sql = f"""
-            SELECT
-                R.Codigo_Reserva        AS id,
-                R.Fecha_Entrada         AS checkin,
-                R.Fecha_Salida          AS checkout,
-                R.Estado                AS estado,
-                R.Codigo_Habitacion     AS Codigo_Habitacion,
-                C.Nombre                AS c_nombre,
-                COALESCE(C.Apellido,'') AS c_apellido,
-                H.Numero_Habitacion     AS Numero_Habitacion
-            FROM Reserva R
-            JOIN Cliente C         ON C.Codigo_Cliente = R.Codigo_Cliente
-            LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
-            {join_gc}
-            WHERE R.Estado = 'Confirmada'
-              AND DATE(R.Fecha_Entrada) <= :d
-              AND DATE(R.Fecha_Salida)  > :d
-              {where_gc}
-            ORDER BY R.Fecha_Entrada ASC, R.Codigo_Reserva ASC
-            LIMIT 200
-        """
-    
-        rows = db.session.execute(_text(sql), {"d": d}).mappings().all()
     
         items = []
         for r in rows:
@@ -5967,7 +5902,95 @@ def create_app() -> Flask:
     
             items.append({
                 "id": int(r["id"]),
-                "numero": f"VG-{int(r['id'])}",
+                "numero": r.get("numero") or f"VG-{int(r['id'])}",
+                "estado": r.get("estado"),
+                "checkin": r["checkin"].isoformat() if r.get("checkin") else None,
+                "checkout": r["checkout"].isoformat() if r.get("checkout") else None,
+                "total": float(r["total"]) if r.get("total") is not None else None,
+                "huesped": (r.get("huesped") or "").strip() or "—",
+                "cedula": r.get("cedula"),
+                "correo": r.get("correo"),
+                "habitacion": r.get("Numero_Habitacion"),
+                "room": room_block,
+            })
+    
+        return jsonify({"ok": True, "items": items, "count": len(items)}), 200
+
+    
+
+    
+
+  
+    
+    
+    @app.get("/api/ops/checkin/confirmed")
+    @role_required("Administrador", "Recepcionista")
+    def api_ops_checkin_confirmed():
+        """
+        Lista reservas CONFIRMADAS activas para una fecha (por defecto hoy).
+        Si existe la tabla guest_checkin, excluye las reservas ya registradas.
+        """
+        when = (request.args.get("when") or "").strip()
+        try:
+            d = date.fromisoformat(when[:10]) if when else date.today()
+        except Exception:
+            return jsonify({"ok": False, "items": [], "msg": "when inválido (YYYY-MM-DD)"}), 400
+
+        join_gc = ""
+        where_gc = ""
+        if _tabla_existe("guest_checkin"):
+            join_gc = "LEFT JOIN guest_checkin gc ON gc.reserva_id = R.Codigo_Reserva"
+            where_gc = " AND gc.id IS NULL"
+
+        sql = f"""
+            SELECT
+                R.Codigo_Reserva AS id,
+                COALESCE(NULLIF(R.Numero_Comprobante, ''), CONCAT('VG-', R.Codigo_Reserva)) AS numero,
+                R.Fecha_Entrada AS checkin,
+                R.Fecha_Salida AS checkout,
+                R.Estado AS estado,
+                R.Codigo_Habitacion AS Codigo_Habitacion,
+                C.Nombre AS c_nombre,
+                COALESCE(C.Apellido, '') AS c_apellido,
+                H.Numero_Habitacion AS Numero_Habitacion
+            FROM Reserva R
+            JOIN Cliente C ON C.Codigo_Cliente = R.Codigo_Cliente
+            LEFT JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+            {join_gc}
+            WHERE R.Estado = 'Confirmada'
+              AND DATE(R.Fecha_Entrada) <= :d
+              AND DATE(R.Fecha_Salida)  > :d
+              {where_gc}
+            ORDER BY R.Fecha_Entrada ASC, R.Codigo_Reserva ASC
+            LIMIT 200
+        """
+
+        rows = db.session.execute(_text(sql), {"d": d}).mappings().all()
+
+        items = []
+        for r in rows:
+            room_block = None
+            h = None
+            try:
+                if r["Codigo_Habitacion"]:
+                    h = Habitacion.query.get(int(r["Codigo_Habitacion"]))
+            except Exception:
+                h = None
+
+            if h:
+                room_block = {
+                    "code": int(getattr(h, "Codigo_Habitacion")),
+                    "number": getattr(h, "Numero_Habitacion", None),
+                    "type": getattr(h, "Tipo", None) or "",
+                    "capacity": int(getattr(h, "Capacidad", None) or 0),
+                    "price": _precio_noche_py(h),
+                    "desc": getattr(h, "Descripcion", None) or "",
+                    "img": getattr(h, "Imagen_URL", None) or "",
+                }
+
+            items.append({
+                "id": int(r["id"]),
+                "numero": r.get("numero") or f"VG-{int(r['id'])}",
                 "huesped": (f"{r['c_nombre']} {r['c_apellido']}".strip() or "—"),
                 "checkin": r["checkin"].isoformat() if r["checkin"] else None,
                 "checkout": r["checkout"].isoformat() if r["checkout"] else None,
@@ -5975,9 +5998,9 @@ def create_app() -> Flask:
                 "habitacion": r["Numero_Habitacion"],
                 "room": room_block,
             })
-    
+
         return jsonify({"ok": True, "items": items, "count": len(items)}), 200
-    
+
     
     @app.get("/api/ops/checkin/week")
     @role_required("Administrador", "Recepcionista")
