@@ -50,15 +50,31 @@
   .text-nowrap{ white-space: nowrap !important; }
   .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
-  /* Semana: layout estable */
+  /* Semana: layout estable sin traslapes */
   .wk-table{
-    table-layout: fixed;
+    table-layout: auto;
     width: 100%;
+    min-width: 920px;
   }
-  .wk-col-dt{ width: 170px; }
-  .wk-col-res{ width: 140px; }
-  .wk-col-hab{ width: 90px; }
-  .wk-col-doc{ width: 170px; }
+  .wk-col-dt{ min-width: 220px; width: 220px; }
+  .wk-col-res{ min-width: 160px; width: 160px; }
+  .wk-col-hab{ min-width: 90px; width: 90px; }
+  .wk-col-doc{ min-width: 170px; width: 170px; }
+
+  .wk-table td,
+  .wk-table th{
+    vertical-align: middle;
+  }
+
+  .wk-cell-datetime,
+  .wk-cell-reserva,
+  .wk-cell-doc{
+    white-space: nowrap;
+  }
+
+  .wk-cell-huesped{
+    min-width: 220px;
+  }
 
   /* Resultados: reservar espacio para botón */
   .res-col-actions{ width: 150px; }
@@ -286,15 +302,81 @@
     if(!message) el.classList.add('d-none'); else el.classList.remove('d-none');
   }
 
-  function fmtDateOnly(s){
-    if(!s) return '—';
-    const d = new Date(s);
-    return d.toLocaleDateString('es-CR');
+  function parseDateSafe(value){
+    if(!value) return null;
+
+    if(value instanceof Date){
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+
+    if(typeof value === 'string'){
+      const s = value.trim();
+      if(!s) return null;
+
+      // YYYY-MM-DD -> parse local para evitar corrimiento de zona horaria
+      let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if(m){
+        const [, y, mo, d] = m;
+        return new Date(Number(y), Number(mo) - 1, Number(d), 12, 0, 0, 0);
+      }
+
+      // YYYY-MM-DD HH:mm:ss o YYYY-MM-DDTHH:mm:ss
+      m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+      if(m){
+        const [, y, mo, d, hh, mm, ss = '0'] = m;
+        return new Date(
+          Number(y),
+          Number(mo) - 1,
+          Number(d),
+          Number(hh),
+          Number(mm),
+          Number(ss),
+          0
+        );
+      }
+
+      const parsed = new Date(s);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    if(typeof value === 'object'){
+      if(value.$date) return parseDateSafe(value.$date);
+      if(value.iso) return parseDateSafe(value.iso);
+      if(value.isoformat) return parseDateSafe(value.isoformat);
+
+      if(
+        Object.prototype.hasOwnProperty.call(value, 'year') &&
+        Object.prototype.hasOwnProperty.call(value, 'month') &&
+        Object.prototype.hasOwnProperty.call(value, 'day')
+      ){
+        return new Date(
+          Number(value.year),
+          Number(value.month) - 1,
+          Number(value.day),
+          12, 0, 0, 0
+        );
+      }
+    }
+
+    return null;
   }
-  function fmtDateTime(s){
-    if(!s) return '—';
-    const d = new Date(s);
-    return d.toLocaleString('es-CR', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+
+  function fmtDateOnly(value){
+    const d = parseDateSafe(value);
+    return d ? d.toLocaleDateString('es-CR') : '—';
+  }
+
+  function fmtDateTime(value){
+    const d = parseDateSafe(value);
+    return d
+      ? d.toLocaleString('es-CR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : '—';
   }
 
   async function fetchJsonStrict(url, opts={}){
@@ -359,6 +441,33 @@
   function enableCheckin(enable){
     $('#btn-checkin').disabled = !enable;
   }
+  
+  function normalizeRoomInfo(item){
+    if(item?.room && typeof item.room === 'object'){
+      return {
+        number: item.room.number ?? item.room.numero ?? item.habitacion ?? '—',
+        type: item.room.type ?? item.room.tipo ?? null,
+        capacity: item.room.capacity ?? item.room.capacidad ?? null,
+        price: item.room.price ?? item.room.precio ?? null
+      };
+    }
+
+    if(item?.habitacion && typeof item.habitacion === 'object'){
+      return {
+        number: item.habitacion.number ?? item.habitacion.numero ?? '—',
+        type: item.habitacion.type ?? item.habitacion.tipo ?? null,
+        capacity: item.habitacion.capacity ?? item.habitacion.capacidad ?? null,
+        price: item.habitacion.price ?? item.habitacion.precio ?? null
+      };
+    }
+
+    return {
+      number: item?.habitacion ?? '—',
+      type: null,
+      capacity: null,
+      price: null
+    };
+  }
 
   function renderResults(items){
     const tbody = $('#tbody-results');
@@ -371,47 +480,62 @@
       return;
     }
 
-    items.forEach(it=>{
-      const tr = document.createElement('tr'); tr.className = 'result-row';
+    items.forEach(it => {
+      const tr = document.createElement('tr');
+      tr.className = 'result-row';
+
       const estado = (it.estado || '').toLowerCase();
+      const room = normalizeRoomInfo(it);
+
+      const details = [
+        room.type || null,
+        (room.capacity ? `${room.capacity} pax` : null),
+        (Number.isFinite(Number(room.price)) ? `₡${Number(room.price).toFixed(2)}/noche` : null)
+      ].filter(Boolean).join(' · ');
+
       tr.innerHTML = `
         <td><strong>${it.numero || ('VG-' + it.id)}</strong></td>
         <td>${it.huesped || '—'}</td>
         <td>${fmtDateOnly(it.checkin)} → ${fmtDateOnly(it.checkout)}</td>
         <td>
-          <div><strong>${it.room?.number ?? it.habitacion ?? '—'}</strong></div>
-          ${it.room ? `
-            <div class="small text-muted">
-              ${[
-                it.room.type || null,
-                (it.room.capacity ? (it.room.capacity + ' pax') : null),
-                (Number.isFinite(+it.room.price) ? ('₡' + Number(it.room.price).toFixed(2) + '/noche') : null)
-              ].filter(Boolean).join(' · ')}
-            </div>
-          ` : ``}
+          <div><strong>${room.number ?? '—'}</strong></div>
+          ${details ? `<div class="small text-muted">${details}</div>` : ``}
         </td>
-        <td><span class="badge ${estado==='confirmada'?'text-bg-success':'text-bg-secondary'}">${it.estado || '—'}</span></td>
+        <td>
+          <span class="badge ${estado === 'confirmada' ? 'text-bg-success' : 'text-bg-secondary'}">
+            ${it.estado || '—'}
+          </span>
+        </td>
         <td class="text-end">
           <button class="btn btn-sm btn-outline-primary btn-select" data-id="${it.id}">
             <i class="bi bi-check2-circle me-1"></i> Seleccionar
           </button>
         </td>
       `;
+
       tbody.appendChild(tr);
     });
 
-    $$('.btn-select').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    $$('.btn-select').forEach(btn => {
+      btn.addEventListener('click', () => {
         const id = Number(btn.dataset.id);
         selectedReserva = resultsCache.find(x => Number(x.id) === id) || null;
 
         enableCheckin(!!selectedReserva);
 
-        $$('.result-row').forEach(r=> r.classList.remove('table-success'));
+        $$('.result-row').forEach(r => r.classList.remove('table-success'));
         btn.closest('tr').classList.add('table-success');
 
-        showUiAlert(selectedReserva ? `Reserva seleccionada: ${selectedReserva.numero || ('VG-' + selectedReserva.id)}` : '', 'info');
-        if(!selectedReserva) showUiAlert('No se pudo seleccionar la reserva.', 'warning');
+        showUiAlert(
+          selectedReserva
+            ? `Reserva seleccionada: ${selectedReserva.numero || ('VG-' + selectedReserva.id)}`
+            : '',
+          'info'
+        );
+
+        if(!selectedReserva){
+          showUiAlert('No se pudo seleccionar la reserva.', 'warning');
+        }
       });
     });
   }
@@ -469,6 +593,7 @@
     try{
       const j = await fetchJsonStrict('/api/ops/checkin/week');
       const items = Array.isArray(j.items) ? j.items : [];
+
       $('#wk-count').textContent = String(items.length);
       if(j.week_start && j.week_end){
         $('#wk-range').textContent = `Semana: ${j.week_start} → ${j.week_end}`;
@@ -482,14 +607,14 @@
       if(!items.length){
         body.innerHTML = `<tr><td colspan="5" class="text-center soft py-4">Aún no hay check-ins registrados esta semana.</td></tr>`;
       }else{
-        items.forEach(it=>{
+        items.forEach(it => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td class="mono text-nowrap">${fmtDateTime(it.created_at)}</td>
-            <td class="text-nowrap"><strong>${it.numero || (it.reserva_id ? ('VG-' + it.reserva_id) : '—')}</strong></td>
-            <td class="text-truncate" style="max-width: 380px;">${it.huesped || '—'}</td>
+            <td class="mono wk-cell-datetime">${fmtDateTime(it.created_at)}</td>
+            <td class="wk-cell-reserva"><strong>${it.numero || (it.reserva_id ? ('VG-' + it.reserva_id) : '—')}</strong></td>
+            <td class="wk-cell-huesped">${it.huesped || '—'}</td>
             <td class="text-center text-nowrap">${it.habitacion ?? '—'}</td>
-            <td class="mono text-nowrap">${(it.doc_number || '—')}</td>
+            <td class="mono wk-cell-doc">${it.doc_number || '—'}</td>
           `;
           body.appendChild(tr);
         });

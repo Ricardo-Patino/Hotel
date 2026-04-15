@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_mail import Mail
 
-db = SQLAlchemy(engine_options={"connect_args": {"ssl": {"ca": "ca-certificate.crt"}}})
+#db = SQLAlchemy(engine_options={"connect_args": {"ssl": {"ca": "ca-certificate.crt"}}})
+db = SQLAlchemy()
 migrate = Migrate()
 mail = Mail()
