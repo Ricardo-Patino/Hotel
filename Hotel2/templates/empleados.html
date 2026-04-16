@@ -8,20 +8,91 @@
 {% block head_extra %}
 <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
 <style>
-  .btn-theme{background:#1c4b3c;color:#fff;border-color:#1c4b3c}
-  .btn-theme:hover{filter:brightness(1.05);color:#fff}
-  .btn-outline-theme{color:#1c4b3c;border-color:#1c4b3c}
-  .btn-outline-theme:hover{background:#1c4b3c;color:#fff}
-  .chip{border:1px solid #cfd8dc;border-radius:10rem;padding:.25rem .6rem;font-size:.85rem;text-decoration:none}
-  .chip.active{background:#1c4b3c;color:#fff;border-color:#1c4b3c}
-  .badge-activo{background:#d7f0e7;color:#1c4b3c;font-weight:600;border-radius:.4rem;padding:.25rem .5rem}
-  .badge-inactivo{background:#f7d9d9;color:#7a1111;font-weight:600;border-radius:.4rem;padding:.25rem .5rem}
-  .table td, .table th{vertical-align:middle}
+  .btn-theme{
+    background:#1c4b3c;
+    color:#fff;
+    border-color:#1c4b3c;
+  }
+  .btn-theme:hover{
+    filter:brightness(1.05);
+    color:#fff;
+  }
+  .btn-outline-theme{
+    color:#1c4b3c;
+    border-color:#1c4b3c;
+  }
+  .btn-outline-theme:hover{
+    background:#1c4b3c;
+    color:#fff;
+  }
+  .chip{
+    border:1px solid #cfd8dc;
+    border-radius:10rem;
+    padding:.25rem .6rem;
+    font-size:.85rem;
+    text-decoration:none;
+    color:inherit;
+  }
+  .chip.active{
+    background:#1c4b3c;
+    color:#fff;
+    border-color:#1c4b3c;
+  }
+  .badge-activo{
+    background:#d7f0e7;
+    color:#1c4b3c;
+    font-weight:600;
+    border-radius:.4rem;
+    padding:.25rem .5rem;
+  }
+  .badge-inactivo{
+    background:#f7d9d9;
+    color:#7a1111;
+    font-weight:600;
+    border-radius:.4rem;
+    padding:.25rem .5rem;
+  }
+  .table td,
+  .table th{
+    vertical-align:middle;
+  }
+  .confirm-icon-circle{
+    width:72px;
+    height:72px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    margin:0 auto 1rem;
+    background:#fdeeee;
+    color:#a11a1a;
+    font-size:1.7rem;
+  }
+  .confirm-copy{
+    color:#52606d;
+    line-height:1.6;
+  }
+  .confirm-copy strong{
+    color:#1c4b3c;
+  }
+  .modal-confirm-vg .modal-content{
+    border:0;
+    border-radius:1rem;
+    overflow:hidden;
+  }
+  .modal-confirm-vg .modal-header{
+    border-bottom:0;
+    padding-bottom:.25rem;
+  }
+  .modal-confirm-vg .modal-footer{
+    border-top:0;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-title dark-background" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+{% set showcase_bg = url_for('static', filename='assets/img/hotel/showcase-7.webp') %}
+
+<div class="page-title dark-background" style="background-image: url('{{ showcase_bg }}');">
   <div class="container position-relative">
     <h1>Colaboradores {{ estado|lower }}</h1>
     <p>Gestione el equipo del hotel: nombre, puesto, salario base y estado laboral.</p>
@@ -45,13 +116,13 @@
       </div>
 
       <div class="d-flex gap-2 flex-wrap">
-        <button class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#modalNuevo">
+        <button type="button" class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#modalNuevo">
           <i class="bi bi-plus-lg"></i> Nuevo colaborador
         </button>
 
-        <a href="{{ url_for('hrm.empleados_ui') }}?estado=Activo" class="chip {% if estado=='Activo' %}active{% endif %}">Activos</a>
-        <a href="{{ url_for('hrm.empleados_ui') }}?estado=Inactivo" class="chip {% if estado=='Inactivo' %}active{% endif %}">Inactivos</a>
-        <a href="{{ url_for('hrm.empleados_ui') }}?estado=todos" class="chip {% if estado=='todos' %}active{% endif %}">Todos</a>
+        <a href="{{ url_for('hrm.empleados_ui') }}?estado=Activo" class="chip {% if estado == 'Activo' %}active{% endif %}">Activos</a>
+        <a href="{{ url_for('hrm.empleados_ui') }}?estado=Inactivo" class="chip {% if estado == 'Inactivo' %}active{% endif %}">Inactivos</a>
+        <a href="{{ url_for('hrm.empleados_ui') }}?estado=todos" class="chip {% if estado == 'todos' %}active{% endif %}">Todos</a>
       </div>
     </div>
 
@@ -71,40 +142,57 @@
           </thead>
           <tbody>
             {% if empleados|length == 0 %}
-            <tr><td colspan="7" class="text-center text-muted py-4">No hay colaboradores para este filtro.</td></tr>
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">
+                  No hay colaboradores para este filtro.
+                </td>
+              </tr>
             {% else %}
-            {% for e in empleados %}
-            <tr>
-              <td>{{ e.Codigo_Funcionario }}</td>
-              <td>
-                <div class="fw-semibold">{{ e.Nombre }} {{ e.Apellido }}</div>
-                <div class="small text-muted">Céd: {{ e.Cedula }}</div>
-              </td>
-              <td>{{ e.Puesto or '—' }}</td>
-              <td>{{ e.Departamento or '—' }}</td>
-              <td class="text-end">₡{{ e.Salario_Base_Mensual }}</td>
-              <td>
-                {% if e.Estado_Empleado == 'Activo' %}
-                  <span class="badge-activo">Activo</span>
-                {% else %}
-                  <span class="badge-inactivo">Inactivo</span>
-                {% endif %}
-              </td>
-              <td class="text-center">
-                <button
-                  class="btn btn-sm btn-outline-theme"
-                  onclick="openEdit('{{ e.Codigo_Funcionario }}','{{ e.Puesto|default('') }}','{{ e.Departamento|default('') }}','{{ e.Salario_Base_Mensual }}','{{ e.Nombre }} {{ e.Apellido }}')">
-                  Editar
-                </button>
+              {% for e in empleados %}
+              <tr>
+                <td>{{ e.Codigo_Funcionario }}</td>
+                <td>
+                  <div class="fw-semibold">{{ e.Nombre }} {{ e.Apellido }}</div>
+                  <div class="small text-muted">Céd: {{ e.Cedula }}</div>
+                </td>
+                <td>{{ e.Puesto or '—' }}</td>
+                <td>{{ e.Departamento or '—' }}</td>
+                <td class="text-end">₡{{ e.Salario_Base_Mensual }}</td>
+                <td>
+                  {% if e.Estado_Empleado == 'Activo' %}
+                    <span class="badge-activo">Activo</span>
+                  {% else %}
+                    <span class="badge-inactivo">Inactivo</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-theme"
+                    data-id="{{ e.Codigo_Funcionario }}"
+                    data-puesto="{{ e.Puesto or '' }}"
+                    data-depto="{{ e.Departamento or '' }}"
+                    data-salario="{{ e.Salario_Base_Mensual or '' }}"
+                    data-nombre="{{ (e.Nombre or '') ~ ' ' ~ (e.Apellido or '') }}"
+                    onclick="openEditFromButton(this)">
+                    Editar
+                  </button>
 
-                <a class="btn btn-sm btn-theme" href="/hrm/mis-horas?func={{ e.Codigo_Funcionario }}">Horas</a>
+                  <a class="btn btn-sm btn-theme" href="/hrm/mis-horas?func={{ e.Codigo_Funcionario }}">Horas</a>
 
-                {% if e.Estado_Empleado == 'Activo' %}
-                <button class="btn btn-sm btn-outline-danger" onclick="desactivarEmpleado({{ e.Codigo_Funcionario }})">Baja</button>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
+                  {% if e.Estado_Empleado == 'Activo' %}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    data-id="{{ e.Codigo_Funcionario }}"
+                    data-nombre="{{ (e.Nombre or '') ~ ' ' ~ (e.Apellido or '') }}"
+                    onclick="desactivarEmpleadoDesdeBoton(this)">
+                    Baja
+                  </button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
             {% endif %}
           </tbody>
         </table>
@@ -181,8 +269,8 @@
         <div class="small text-muted mt-2">Los campos marcados con * son obligatorios.</div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-theme" onclick="guardarNuevo()">Guardar</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-theme" onclick="guardarNuevo()">Guardar</button>
       </div>
     </div>
   </div>
@@ -216,8 +304,35 @@
         </form>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-theme" onclick="guardarEdit()">Guardar cambios</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-theme" onclick="guardarEdit()">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade modal-confirm-vg" id="modalConfirmInactivate" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow">
+      <div class="modal-header">
+        <h5 class="modal-title">Cambiar estado del colaborador</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body text-center px-4 pt-2 pb-1">
+        <div class="confirm-icon-circle">
+          <i class="bi bi-person-dash"></i>
+        </div>
+        <h5 class="mb-2">¿Deseas marcar este colaborador como inactivo?</h5>
+        <p class="confirm-copy mb-0">
+          El colaborador <strong id="confirmInactivateName">—</strong> dejará de aparecer como activo en el módulo de RR. HH.
+          Esta acción quedará registrada en el historial del sistema.
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center gap-2 px-4 pb-4">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-theme" id="btnConfirmInactivate" onclick="confirmarDesactivarEmpleado()">
+          Sí, marcar como inactivo
+        </button>
       </div>
     </div>
   </div>
@@ -226,6 +341,23 @@
 
 {% block scripts %}
 <script>
+  function openEditFromButton(btn){
+    openEdit(
+      btn.dataset.id || '',
+      btn.dataset.puesto || '',
+      btn.dataset.depto || '',
+      btn.dataset.salario || '',
+      btn.dataset.nombre || ''
+    );
+  }
+
+  function desactivarEmpleadoDesdeBoton(btn){
+    desactivarEmpleado(
+      btn.dataset.id || '',
+      btn.dataset.nombre || 'este colaborador'
+    );
+  }
+
   async function guardarNuevo(){
     const form = document.getElementById('formNuevo');
     if(!form.reportValidity()) return;
@@ -235,11 +367,12 @@
 
     try{
       const r = await fetch('/hrm/empleados', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify(data)
       });
       const json = await r.json();
+
       if(r.ok && json.ok){
         bootstrap.Modal.getInstance(document.getElementById('modalNuevo')).hide();
         location.reload();
@@ -252,27 +385,64 @@
     }
   }
 
-  async function desactivarEmpleado(id){
-    if(!confirm('¿Marcar este colaborador como Inactivo?')) return;
+  let empleadoPendienteInactivar = null;
+  let modalConfirmInactivate = null;
+
+  function desactivarEmpleado(id, nombre){
+    empleadoPendienteInactivar = id;
+    document.getElementById('confirmInactivateName').textContent = nombre || 'este colaborador';
+
+    if(!modalConfirmInactivate){
+      modalConfirmInactivate = new bootstrap.Modal(document.getElementById('modalConfirmInactivate'));
+    }
+    modalConfirmInactivate.show();
+  }
+
+  async function confirmarDesactivarEmpleado(){
+    if(!empleadoPendienteInactivar) return;
+
+    const btn = document.getElementById('btnConfirmInactivate');
+    const htmlOriginal = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+
     try{
-      const r = await fetch(`/hrm/empleados/${id}`,{
-        method:'DELETE',
-        headers:{'Content-Type':'application/json'},
+      const r = await fetch(`/hrm/empleados/${empleadoPendienteInactivar}`, {
+        method: 'DELETE',
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify({Registrado_Por:1})
       });
+
       const json = await r.json();
-      if(r.ok && json.ok){ location.reload(); }
-      else{ alert('No se pudo actualizar: ' + (json.error || 'Error')); }
-    }catch(e){ console.error(e); alert('Error de red'); }
+
+      if(r.ok && json.ok){
+        location.reload();
+        return;
+      }
+
+      alert('No se pudo actualizar: ' + (json.error || 'Error'));
+    }catch(e){
+      console.error(e);
+      alert('Error de red');
+    }finally{
+      btn.disabled = false;
+      btn.innerHTML = htmlOriginal;
+      if(modalConfirmInactivate){
+        modalConfirmInactivate.hide();
+      }
+      empleadoPendienteInactivar = null;
+    }
   }
 
   let editId = null;
+
   function openEdit(id, puesto, depto, salario, nombre){
     editId = id;
     document.getElementById('editNombre').value = nombre || '';
-    document.getElementById('editPuesto').value = (puesto || '');
-    document.getElementById('editDepto').value  = (depto || '');
-    document.getElementById('editSalario').value= (salario || '');
+    document.getElementById('editPuesto').value = puesto || '';
+    document.getElementById('editDepto').value = depto || '';
+    document.getElementById('editSalario').value = salario || '';
     new bootstrap.Modal(document.getElementById('modalEdit')).show();
   }
 
@@ -282,23 +452,23 @@
     data.Registrado_Por = 1;
 
     try{
-      const r = await fetch(`/hrm/empleados/${editId}`,{
-        method:'PUT',
-        headers:{'Content-Type':'application/json'},
+      const r = await fetch(`/hrm/empleados/${editId}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify(data)
       });
       const json = await r.json();
+
       if(r.ok && json.ok){
         bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
         location.reload();
       }else{
         alert('No se pudo actualizar: ' + (json.error || 'Error'));
       }
-    }catch(e){ console.error(e); alert('Error de red'); }
+    }catch(e){
+      console.error(e);
+      alert('Error de red');
+    }
   }
 </script>
 {% endblock %}
-
-
-
-

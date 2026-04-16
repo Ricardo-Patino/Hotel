@@ -2177,6 +2177,26 @@ def create_app() -> Flask:
             return redirect(url_for("login_html", next=next_url))
 
     # ---------------------- RUTAS ESTÁTICAS / PÚBLICAS ----------------------
+    @app.errorhandler(403)
+    def forbidden(e):
+        mensaje = getattr(e, "description", None) or "No tienes permisos para acceder a esta sección."
+    
+        if _is_api_request():
+            return jsonify({
+                "ok": False,
+                "error": "forbidden",
+                "message": mensaje,
+                "path": request.path
+            }), 403
+    
+        return render_template(
+            "403.html",
+            titulo="Acceso restringido",
+            mensaje=mensaje,
+            ruta=request.path
+        ), 403
+        
+    
     @app.errorhandler(404)
     def not_found(e):
         # Para API devolvemos JSON (evita "Unexpected token '<'")

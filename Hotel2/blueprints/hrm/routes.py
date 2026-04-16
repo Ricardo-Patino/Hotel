@@ -42,13 +42,36 @@ from models import Marcacion
 from functools import wraps
 from flask import abort
 
+def _current_role_name() -> str:
+    return str(
+        session.get("user_role")
+        or session.get("rol")
+        or session.get("Rol")
+        or session.get("role")
+        or ""
+    ).strip()
+
+
 def require_roles(*roles):
+    roles_norm = {str(r).strip().lower() for r in roles if r}
+
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
-            rol = session.get("user_role")
-            if rol not in roles:
-                return abort(403)
+            if not session.get("user_id"):
+                next_url = request.full_path if request.query_string else request.path
+                return redirect(url_for("login_html", next=next_url))
+
+            rol_actual = _current_role_name().lower()
+            if rol_actual not in roles_norm:
+                abort(
+                    403,
+                    description=(
+                        "No tienes permisos para acceder a esta sección. "
+                        f"Rol actual: {(_current_role_name() or 'No definido')}. "
+                        f"Roles permitidos: {', '.join(roles)}."
+                    )
+                )
             return f(*args, **kwargs)
         return wrapper
     return decorator
@@ -76,6 +99,25 @@ def _funcionario_to_dict(f: Funcionario):
         "Fecha_mod_alta": f.Fecha_mod_alta.isoformat() if f.Fecha_mod_alta else None,
     }
 
+def _current_role_name() -> str:
+    return str(
+        session.get("user_role")
+        or session.get("Rol")
+        or session.get("rol")
+        or session.get("role")
+        or ""
+    ).strip()
+
+
+def _funcionario_por_usuario(uid: int | None):
+    if not uid:
+        return None
+    try:
+        return Funcionario.query.filter_by(Codigo_Usuario=uid).first()
+    except Exception:
+        db.session.rollback()
+        return None
+
 
 def _registrado_por():
     # Ajusta a como guardes el usuario en sesión
@@ -84,10 +126,11 @@ def _registrado_por():
 
 def _current_funcionario_id() -> int | None:
     """
-    Obtiene el funcionario 'logueado'.
-    - 1) session["Codigo_Funcionario"]
-    - 2) si viene ?func=ID (testing)
-    - 3) si hay session["user_id"], busca Funcionario por Codigo_Usuario y lo guarda en sesión
+    Obtiene el funcionario logueado.
+    Prioridad:
+    1) session["Codigo_Funcionario"]
+    2) ?func=ID (testing)
+    3) session["user_id"] -> Funcionario.Codigo_Usuario
     """
     fid = session.get("Codigo_Funcionario")
     if fid:
@@ -103,10 +146,11 @@ def _current_funcionario_id() -> int | None:
 
     uid = session.get("user_id")
     if uid:
-        funci = Funcionario.query.filter_by(Codigo_Usuario=uid).first()
+        funci = _funcionario_por_usuario(uid)
         if funci:
             session["Codigo_Funcionario"] = int(funci.Codigo_Funcionario)
-            session["Departamento"] = funci.Departamento
+            if getattr(funci, "Departamento", None):
+                session["Departamento"] = funci.Departamento
             return int(funci.Codigo_Funcionario)
 
     return None
@@ -475,7 +519,7 @@ def ver_empleado_detalle_alias(codigo_func):
 # HU-08-002 — Registro de horas por el colaborador
 # =============================================================================
 @hrm_bp.route("/mis-horas", methods=["GET"])
-@require_roles("Limpieza", "Recepcionista")
+@require_roles("Limpieza", "Recepcionista", "Administrador")
 def mis_horas_ui():
     """
     Panel del colaborador para ver/registrar sus horas.
@@ -486,7 +530,13 @@ def mis_horas_ui():
     """
     fid = _current_funcionario_id()
     if not fid:
-        return redirect(url_for("hrm.empleados_ui"))
+        abort(
+            403,
+            description=(
+                "Tu usuario no está vinculado a un colaborador del sistema. "
+                "Solicita al administrador que asocie tu Usuario con un Funcionario."
+            )
+        )
 
     start, end, _label = _get_periodo()
     hoy_local = date.today()
@@ -680,10 +730,22 @@ def _calc_and_set_hours(m):
     return horas
 
 def _es_jefe_y_departamento():
-    """Lee sesión y devuelve (es_jefe:bool, depto:str|None). Ajusta a tu manejo real de roles."""
-    rol = session.get("Rol") or session.get("rol")
+    """
+    Lee sesión y devuelve (es_jefe: bool, depto: str | None).
+    Si el departamento no está en sesión, intenta resolverlo
+    desde el Funcionario asociado al user_id actual.
+    """
+    rol = _current_role_name().lower()
     dpt = session.get("Departamento") or session.get("departamento")
-    return (str(rol).lower() == "jefe", dpt)
+
+    if not dpt:
+        uid = session.get("user_id")
+        funci = _funcionario_por_usuario(uid)
+        if funci and getattr(funci, "Departamento", None):
+            dpt = funci.Departamento
+            session["Departamento"] = dpt
+
+    return (rol == "jefe", dpt)
 
 def _filtro_equipo_query():
     """
@@ -712,7 +774,7 @@ def _filtro_equipo_query():
     return q
 
 @hrm_bp.route("/val-horas", methods=["GET"])
-@require_user_id(1)
+@require_roles("Administrador", "Recepcionista", "Jefe")
 def validar_horas_ui():
     """
     UI del jefe para validar/corregir horas.
