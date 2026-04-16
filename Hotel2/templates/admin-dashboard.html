@@ -298,16 +298,13 @@ endblock %}
 
           <!-- Finanzas (sin link aún) -->
           <div class="col-md-6 col-lg-4">
-            <a href="#" class="text-decoration-none" aria-disabled="true" tabindex="-1"
-              onclick="event.preventDefault();">
-              <div class="hub-card p-3 h-100" style="opacity:.65; cursor:not-allowed;">
+            <a href="{{ url_for('fin_invoices_html') }}" class="text-decoration-none">
+              <div class="hub-card p-3 h-100">
                 <div class="d-flex gap-3">
                   <div class="hub-icon"><i class="bi bi-cash-coin"></i></div>
                   <div class="flex-grow-1">
-                    <div class="fw-semibold text-dark d-flex align-items-center gap-2">
-                      Finanzas <span class="badge bg-secondary">Próximamente</span>
-                    </div>
-                    <p class="hub-sub">Módulo en construcción</p>
+                    <div class="fw-semibold text-dark">Finanzas</div>
+                    <p class="hub-sub">Facturas y gestión financiera</p>
                   </div>
                 </div>
               </div>
