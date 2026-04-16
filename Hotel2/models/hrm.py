@@ -13,6 +13,7 @@ class Funcionario(db.Model):
     Apellido             = db.Column(String(50), nullable=False)
     Puesto               = db.Column(String(50), nullable=False)
     Fecha_Nacimiento     = db.Column(Date, nullable=False)
+    Codigo_Usuario       = db.Column(Integer, nullable=True, index=True)
 
     # Extensiones HRM-08-001
     Departamento         = db.Column(String(80))

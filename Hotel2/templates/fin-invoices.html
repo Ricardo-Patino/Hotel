@@ -181,7 +181,7 @@
                             {# PDF adjunto manualmente (si existe) - puede ser “diseño viejo” porque es un archivo viejo #}
                             {% if f.archivo_path %}
                               <a class="btn btn-outline-dark btn-sm"
-                                 href="{{ url_for('static', filename='uploads/invoices/' ~ f.archivo_path) }}"
+                                 href="{{ url_any('fin_invoice_attachment', id=f.id_factura) }}"
                                  target="_blank" title="Ver PDF adjunto">
                                 Adjunto
                               </a>

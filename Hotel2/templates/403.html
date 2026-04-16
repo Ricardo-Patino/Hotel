@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Acceso restringido | Hotel Villa Grace</title>
+
+  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon" />
+  <link href="{{ url_for('static', filename='assets/img/apple-touch-icon.png') }}" rel="apple-touch-icon" />
+
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap"
+    rel="stylesheet" />
+
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet" />
+
+  <style>
+    .access-hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        linear-gradient(rgba(12, 30, 24, 0.70), rgba(12, 30, 24, 0.78)),
+        url("{{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }}") center/cover no-repeat;
+      padding: 2rem;
+    }
+
+    .access-card {
+      width: 100%;
+      max-width: 760px;
+      background: rgba(255,255,255,0.96);
+      border-radius: 24px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+      padding: 2.2rem;
+      text-align: center;
+    }
+
+    .access-icon {
+      width: 88px;
+      height: 88px;
+      margin: 0 auto 1.2rem;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #eaf5ef;
+      color: #1c4b3c;
+      font-size: 2rem;
+    }
+
+    .access-code {
+      font-size: 4rem;
+      font-weight: 800;
+      line-height: 1;
+      color: #1c4b3c;
+      margin-bottom: .5rem;
+      font-family: "Playfair Display", serif;
+    }
+
+    .access-title {
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: #18392f;
+      margin-bottom: .8rem;
+    }
+
+    .access-text {
+      font-size: 1rem;
+      color: #52606d;
+      max-width: 620px;
+      margin: 0 auto 1.2rem;
+    }
+
+    .access-detail {
+      background: #f6f8f7;
+      border: 1px solid #dfe7e2;
+      border-radius: 16px;
+      padding: 1rem 1.1rem;
+      text-align: left;
+      margin: 1.25rem 0 1.5rem;
+    }
+
+    .access-detail .label {
+      font-size: .82rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #6a7b74;
+      margin-bottom: .35rem;
+      font-weight: 700;
+    }
+
+    .access-detail .value {
+      color: #244338;
+      font-weight: 500;
+      word-break: break-word;
+    }
+
+    .btn-vg {
+      background: #1c4b3c;
+      border-color: #1c4b3c;
+      color: #fff;
+      border-radius: 999px;
+      padding: .8rem 1.4rem;
+      font-weight: 600;
+    }
+
+    .btn-vg:hover {
+      background: #163a2f;
+      border-color: #163a2f;
+      color: #fff;
+    }
+
+    .btn-soft {
+      border-radius: 999px;
+      padding: .8rem 1.4rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <section class="access-hero">
+    <div class="access-card">
+      <div class="access-icon">
+        <i class="bi bi-shield-lock"></i>
+      </div>
+
+      <div class="access-code">403</div>
+      <h1 class="access-title">{{ titulo or 'Acceso restringido' }}</h1>
+
+      <p class="access-text">
+        Esta sección requiere permisos específicos dentro del sistema. 
+        Verifica que tu usuario tenga el rol correcto o inicia sesión con una cuenta autorizada.
+      </p>
+
+      <div class="access-detail">
+        <div class="label">Motivo</div>
+        <div class="value">{{ mensaje or 'No cuentas con permisos suficientes para ingresar a esta sección.' }}</div>
+      </div>
+
+      {% if ruta %}
+      <div class="access-detail">
+        <div class="label">Ruta solicitada</div>
+        <div class="value">{{ ruta }}</div>
+      </div>
+      {% endif %}
+
+      <div class="d-flex flex-wrap gap-2 justify-content-center">
+        <a href="{{ url_for('index_html') }}" class="btn btn-vg">Volver al inicio</a>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary btn-soft">Regresar</a>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

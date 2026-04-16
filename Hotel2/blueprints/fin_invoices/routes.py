@@ -1029,6 +1029,59 @@ def fin_invoice_pdf(id: int):
 
     return send_file(BytesIO(pdf_bytes), mimetype="application/pdf", as_attachment=False, download_name=filename)
 
+
+
+@fin_invoices_bp.get("/fin/invoices/<int:id>/archivo", endpoint="fin_invoice_attachment")
+def fin_invoice_attachment(id: int):
+    inv = _db().session.execute(
+        text("""
+            SELECT id_factura, numero, archivo_path
+            FROM fin_invoices
+            WHERE id_factura = :id
+            LIMIT 1
+        """),
+        {"id": id}
+    ).mappings().fetchone()
+
+    if not inv:
+        abort(404, description="La factura solicitada no existe.")
+
+    archivo = (inv.get("archivo_path") or "").strip()
+
+    # Si no hay adjunto registrado, mostramos el PDF generado por el sistema
+    if not archivo:
+        return redirect(_url("fin_invoice_pdf", id=id))
+
+    safe_name = os.path.basename(archivo)
+    full_path = os.path.join(
+        current_app.root_path,
+        "static",
+        "uploads",
+        "invoices",
+        safe_name
+    )
+
+    # Si existe el adjunto, se sirve normalmente
+    if os.path.isfile(full_path):
+        return send_file(
+            full_path,
+            mimetype="application/pdf",
+            as_attachment=False,
+            download_name=safe_name
+        )
+
+    # Si ya no existe físicamente, hacemos fallback elegante
+    current_app.logger.warning(
+        "[fin_invoices] Adjunto no encontrado para factura %s: %s",
+        id,
+        full_path
+    )
+    flash(
+        "El adjunto original ya no está disponible. Se mostró la factura generada por el sistema.",
+        "warning"
+    )
+    return redirect(_url("fin_invoice_pdf", id=id))
+
 # =========================================================
 # PDF: RECIBO (GET)
 # =========================================================
