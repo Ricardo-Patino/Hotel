@@ -1,143 +1,119 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Colaboradores | Hotel Villa Grace</title>
+{% extends "base.html" %}
 
-  <link href="{{ url_for('static', filename='assets/img/favicon.png') }}" rel="icon">
-  <link href="https://fonts.googleapis.com" rel="preconnect"><link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/main.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
-  <style>
-    .btn-theme{background:#1c4b3c;color:#fff;border-color:#1c4b3c}
-    .btn-theme:hover{filter:brightness(1.05)}
-    .btn-outline-theme{color:#1c4b3c;border-color:#1c4b3c}
-    .btn-outline-theme:hover{background:#1c4b3c;color:#fff}
-    .chip{border:1px solid #cfd8dc;border-radius:10rem;padding:.25rem .6rem;font-size:.85rem}
-    .chip.active{background:#1c4b3c;color:#fff;border-color:#1c4b3c}
-    .badge-activo{background:#d7f0e7;color:#1c4b3c;font-weight:600;border-radius:.4rem;padding:.25rem .5rem}
-    .badge-inactivo{background:#f7d9d9;color:#7a1111;font-weight:600;border-radius:.4rem;padding:.25rem .5rem}
-    .table td, .table th{vertical-align:middle}
-  </style>
-</head>
-<body>
+{% block title %}Colaboradores | Hotel Villa Grace{% endblock %}
+{% block meta_description %}Gestión de colaboradores del hotel: altas, edición, bajas y acceso a registro de horas.{% endblock %}
+{% block meta_keywords %}RRHH, colaboradores, empleados, horas, Hotel Villa Grace{% endblock %}
+{% block body_class %}inner-page{% endblock %}
 
-<header id="header" class="header d-flex align-items-center fixed-top">
-  <div class="container position-relative d-flex align-items-center justify-content-between">
-    <a href="/" class="logo d-flex align-items-center me-auto me-xl-0"><h1 class="sitename">Hotel Villa Grace</h1></a>
-    <nav id="navmenu" class="navmenu">
-      <ul>
-        <li><a href="/">Inicio</a></li>      
-        <li><a href="/hrm/empleados-ui" class="active">Colaboradores</a></li>
-      </ul>
-      <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+{% block head_extra %}
+<link href="{{ url_for('static', filename='assets/css/style.css') }}" rel="stylesheet">
+<style>
+  .btn-theme{background:#1c4b3c;color:#fff;border-color:#1c4b3c}
+  .btn-theme:hover{filter:brightness(1.05);color:#fff}
+  .btn-outline-theme{color:#1c4b3c;border-color:#1c4b3c}
+  .btn-outline-theme:hover{background:#1c4b3c;color:#fff}
+  .chip{border:1px solid #cfd8dc;border-radius:10rem;padding:.25rem .6rem;font-size:.85rem;text-decoration:none}
+  .chip.active{background:#1c4b3c;color:#fff;border-color:#1c4b3c}
+  .badge-activo{background:#d7f0e7;color:#1c4b3c;font-weight:600;border-radius:.4rem;padding:.25rem .5rem}
+  .badge-inactivo{background:#f7d9d9;color:#7a1111;font-weight:600;border-radius:.4rem;padding:.25rem .5rem}
+  .table td, .table th{vertical-align:middle}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-title dark-background" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
+  <div class="container position-relative">
+    <h1>Colaboradores {{ estado|lower }}</h1>
+    <p>Gestione el equipo del hotel: nombre, puesto, salario base y estado laboral.</p>
+    <nav class="breadcrumbs">
+      <ol>
+        <li><a href="{{ url_for('index_html') }}">Inicio</a></li>
+      </ol>
     </nav>
-    <a class="btn-getstarted d-none d-sm-block" href="/grr">Reservar</a>
   </div>
-</header>
+</div>
 
-<main class="main">
-  <div class="page-title dark-background" style="background-image:url({{ url_for('static', filename='assets/img/hotel/showcase-7.webp') }});">
-    <div class="container position-relative">
-      <h1>Colaboradores {{ estado|lower }}</h1>
-      <p>Gestione el equipo del hotel: nombre, puesto, salario base y estado laboral.</p>
-      <nav class="breadcrumbs"><ol>
-        <li><a href="/">Inicio</a></li>
-        
-      </ol></nav>
-    </div>
-  </div>
+<section class="section">
+  <div class="container" data-aos="fade-up">
 
-  <section class="section">
-    <div class="container" data-aos="fade-up">
-
-      <!-- Toolbar -->
-      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-        <div class="text-muted small">
-          <i class="bi bi-people"></i>
-          Total: <strong>{{ total }}</strong> ·
-          Activos: <strong>{{ conteos.get('Activo', 0) }}</strong> ·
-          Inactivos: <strong>{{ conteos.get('Inactivo', 0) }}</strong>
-        </div>
-
-        <div class="d-flex gap-2">
-          <button class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#modalNuevo">
-            <i class="bi bi-plus-lg"></i> Nuevo colaborador
-          </button>
-
-          <a href="/hrm/empleados-ui?estado=Activo"   class="chip {% if estado=='Activo' %}active{% endif %}">Activos</a>
-          <a href="/hrm/empleados-ui?estado=Inactivo" class="chip {% if estado=='Inactivo' %}active{% endif %}">Inactivos</a>
-          <a href="/hrm/empleados-ui?estado=todos"    class="chip {% if estado=='todos' %}active{% endif %}">Todos</a>
-        </div>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+      <div class="text-muted small">
+        <i class="bi bi-people"></i>
+        Total: <strong>{{ total }}</strong> ·
+        Activos: <strong>{{ conteos.get('Activo', 0) }}</strong> ·
+        Inactivos: <strong>{{ conteos.get('Inactivo', 0) }}</strong>
       </div>
 
-      <!-- Tabla -->
-      <div class="card shadow-sm border-0">
-        <div class="table-responsive">
-          <table class="table align-middle mb-0">
-            <thead class="table-light">
-              <tr>
-                <th style="width:80px">Código</th>
-                <th>Nombre</th>
-                <th>Puesto</th>
-                <th>Departamento</th>
-                <th class="text-end">Salario base</th>
-                <th>Estado</th>
-                <th style="width:230px" class="text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% if empleados|length == 0 %}
-              <tr><td colspan="7" class="text-center text-muted py-4">No hay colaboradores para este filtro.</td></tr>
-              {% else %}
-              {% for e in empleados %}
-              <tr>
-                <td>{{ e.Codigo_Funcionario }}</td>
-                <td>
-                  <div class="fw-semibold">{{ e.Nombre }} {{ e.Apellido }}</div>
-                  <div class="small text-muted">Céd: {{ e.Cedula }}</div>
-                </td>
-                <td>{{ e.Puesto or '—' }}</td>
-                <td>{{ e.Departamento or '—' }}</td>
-                <td class="text-end">₡{{ e.Salario_Base_Mensual }}</td>
-                <td>
-                  {% if e.Estado_Empleado == 'Activo' %}
-                    <span class="badge-activo">Activo</span>
-                  {% else %}
-                    <span class="badge-inactivo">Inactivo</span>
-                  {% endif %}
-                </td>
-                <td class="text-center">
-                  <!-- Editar (modal) -->
-                  <button
-                    class="btn btn-sm btn-outline-theme"
-                    onclick="openEdit('{{ e.Codigo_Funcionario }}','{{ e.Puesto|default('') }}','{{ e.Departamento|default('') }}','{{ e.Salario_Base_Mensual }}','{{ e.Nombre }} {{ e.Apellido }}')">
-                    Editar
-                  </button>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#modalNuevo">
+          <i class="bi bi-plus-lg"></i> Nuevo colaborador
+        </button>
 
-                  <!-- Ir a HU-08-002 (simula login con ?func=ID) -->
-                  <a class="btn btn-sm btn-theme" href="/hrm/mis-horas?func={{ e.Codigo_Funcionario }}">Horas</a>
-
-                  {% if e.Estado_Empleado == 'Activo' %}
-                  <button class="btn btn-sm btn-outline-danger" onclick="desactivarEmpleado({{ e.Codigo_Funcionario }})">Baja</button>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
+        <a href="{{ url_for('hrm.empleados_ui') }}?estado=Activo" class="chip {% if estado=='Activo' %}active{% endif %}">Activos</a>
+        <a href="{{ url_for('hrm.empleados_ui') }}?estado=Inactivo" class="chip {% if estado=='Inactivo' %}active{% endif %}">Inactivos</a>
+        <a href="{{ url_for('hrm.empleados_ui') }}?estado=todos" class="chip {% if estado=='todos' %}active{% endif %}">Todos</a>
       </div>
-
     </div>
-  </section>
-</main>
 
-<!-- ========== MODAL: NUEVO COLABORADOR ========== -->
+    <div class="card shadow-sm border-0">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:80px">Código</th>
+              <th>Nombre</th>
+              <th>Puesto</th>
+              <th>Departamento</th>
+              <th class="text-end">Salario base</th>
+              <th>Estado</th>
+              <th style="width:230px" class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if empleados|length == 0 %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No hay colaboradores para este filtro.</td></tr>
+            {% else %}
+            {% for e in empleados %}
+            <tr>
+              <td>{{ e.Codigo_Funcionario }}</td>
+              <td>
+                <div class="fw-semibold">{{ e.Nombre }} {{ e.Apellido }}</div>
+                <div class="small text-muted">Céd: {{ e.Cedula }}</div>
+              </td>
+              <td>{{ e.Puesto or '—' }}</td>
+              <td>{{ e.Departamento or '—' }}</td>
+              <td class="text-end">₡{{ e.Salario_Base_Mensual }}</td>
+              <td>
+                {% if e.Estado_Empleado == 'Activo' %}
+                  <span class="badge-activo">Activo</span>
+                {% else %}
+                  <span class="badge-inactivo">Inactivo</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <button
+                  class="btn btn-sm btn-outline-theme"
+                  onclick="openEdit('{{ e.Codigo_Funcionario }}','{{ e.Puesto|default('') }}','{{ e.Departamento|default('') }}','{{ e.Salario_Base_Mensual }}','{{ e.Nombre }} {{ e.Apellido }}')">
+                  Editar
+                </button>
+
+                <a class="btn btn-sm btn-theme" href="/hrm/mis-horas?func={{ e.Codigo_Funcionario }}">Horas</a>
+
+                {% if e.Estado_Empleado == 'Activo' %}
+                <button class="btn btn-sm btn-outline-danger" onclick="desactivarEmpleado({{ e.Codigo_Funcionario }})">Baja</button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
 <div class="modal fade" id="modalNuevo" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -212,7 +188,6 @@
   </div>
 </div>
 
-<!-- ========== MODAL: EDITAR DATOS (Puesto/Depto/Salario) ========== -->
 <div class="modal fade" id="modalEdit" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -247,20 +222,16 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
-<footer id="footer" class="footer position-relative dark-background">
-  <div class="copyright text-center"><div class="container">© <strong><span>Hotel Villa Grace</span></strong></div></div>
-</footer>
-
-<script src="{{ url_for('static', filename='assets/vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+{% block scripts %}
 <script>
-  // POST: crear empleado
   async function guardarNuevo(){
     const form = document.getElementById('formNuevo');
     if(!form.reportValidity()) return;
 
     const data = Object.fromEntries(new FormData(form).entries());
-    data.Registrado_Por = 1; // luego podés tomarlo de sesión
+    data.Registrado_Por = 1;
 
     try{
       const r = await fetch('/hrm/empleados', {
@@ -281,7 +252,6 @@
     }
   }
 
-  // DELETE: desactivar
   async function desactivarEmpleado(id){
     if(!confirm('¿Marcar este colaborador como Inactivo?')) return;
     try{
@@ -296,7 +266,6 @@
     }catch(e){ console.error(e); alert('Error de red'); }
   }
 
-  // EDIT modal open
   let editId = null;
   function openEdit(id, puesto, depto, salario, nombre){
     editId = id;
@@ -307,7 +276,6 @@
     new bootstrap.Modal(document.getElementById('modalEdit')).show();
   }
 
-  // PUT: guardar edición
   async function guardarEdit(){
     const form = document.getElementById('formEdit');
     const data = Object.fromEntries(new FormData(form).entries());
@@ -324,13 +292,12 @@
         bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
         location.reload();
       }else{
-        alert('No se pudo actualizar: ' + (json.error || 'Error')); 
+        alert('No se pudo actualizar: ' + (json.error || 'Error'));
       }
     }catch(e){ console.error(e); alert('Error de red'); }
   }
 </script>
-</body>
-</html>
+{% endblock %}
 
 
 
