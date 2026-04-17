@@ -89,9 +89,9 @@ try:
     from models_sql import Reserva as ReservaModel  # si existiera
 except Exception:
     ReservaModel = None
-    
-    
-    
+
+
+
 
 
 # =========================
@@ -165,7 +165,7 @@ def _get_role_name(user: Usuario) -> str:
         rol = Rol.query.filter_by(Codigo_Rol=user.Rol_Id).first()
         if rol and rol.Nombre:
             return rol.Nombre
-    
+
     return "Cliente"
 
 
@@ -1792,7 +1792,7 @@ def create_app() -> Flask:
 
     # Blueprint de registro de KPIs contables:
     app.register_blueprint(fin_kpi_bp)
-    
+
     # Blueprint de cierres mensuales
     from blueprints.fin_periods import fin_periods_bp
     app.register_blueprint(fin_periods_bp)
@@ -1814,7 +1814,7 @@ def create_app() -> Flask:
     app.register_blueprint(inv_bp)
 
     # Blueprint de Operaciones
-    from blueprints.admin import admin_bp 
+    from blueprints.admin import admin_bp
     app.register_blueprint(admin_bp)
 
     from blueprints.mnt import mnt_bp  # <-- IMPORTA
@@ -1831,7 +1831,7 @@ def create_app() -> Flask:
     from blueprints.fin_invoices import fin_invoices_bp
     app.register_blueprint(fin_invoices_bp)
 
-    
+
     @app.get("/dashboard")
     @role_required("Administrador", "Recepcionista")
     def dashboard():
@@ -1845,7 +1845,7 @@ def create_app() -> Flask:
     # === AREP (Analítica y Reportes) ===
     from blueprints.arep import arep_bp
     app.register_blueprint(arep_bp)
-    
+
     # === SAC (Atención al Cliente y Comunicación) ===
     from blueprints.sac.routes import sac_bp
     app.register_blueprint(sac_bp)
@@ -1861,7 +1861,7 @@ def create_app() -> Flask:
 
     from blueprints.rooms import rooms_bp
     app.register_blueprint(rooms_bp)
-    
+
 
     # ------------------------- Helpers para GRR-01-003 -------------------------
     def _extraer_reserva_id_de_response(resp) -> Optional[int]:
@@ -1919,7 +1919,7 @@ def create_app() -> Flask:
                 {"t": nombre}
             ).scalar()
             return bool(exists)
-        
+
     def _col_exists(table_name: str, column_name: str) -> bool:
         try:
             row = db.session.execute(
@@ -1936,9 +1936,9 @@ def create_app() -> Flask:
             return bool(row)
         except Exception:
             return False
-    
-        
-        
+
+
+
     def _col_nullable(table: str, column: str) -> bool:
         try:
             row = db.session.execute(
@@ -2009,21 +2009,21 @@ def create_app() -> Flask:
             status = response.status_code
             method = request.method.upper()
             path = (request.path or "").lower()
-    
+
             # Solo en respuestas exitosas de escritura
             if status >= 400 or method not in ("POST", "PUT", "PATCH", "DELETE"):
                 return response
-    
+
             # Solo si el endpoint es de reservas
             es_endpoint_reserva = any(
                 s in path for s in ("/api/reservas", "/grr/reservas", "/reservas")
             )
             if not es_endpoint_reserva:
                 return response
-    
+
             # Intentar extraer el id de la reserva de la respuesta
             rid = _extraer_reserva_id_de_response(response)
-    
+
             # Auditoría de DELETE y salir
             if method == "DELETE" and rid:
                 _audit_log(
@@ -2034,15 +2034,15 @@ def create_app() -> Flask:
                 )
                 db.session.commit()
                 return response
-    
+
             if not rid:
                 return response
-    
+
             # Cargar datos mínimos de la reserva
             r = _reserva_min(rid)
             if not r:
                 return response
-    
+
             # Auditoría de creación / actualización
             if method == "POST":
                 _audit_log(
@@ -2058,7 +2058,7 @@ def create_app() -> Flask:
                     },
                     entidad_id=str(r["Codigo_Reserva"]),
                 )
-    
+
                 # === GRR-01-009: Confirmación automática (email/SMS) ===
                 # Evitar doble envío en el flujo público sin sesión (/api/reservas/anon),
                 # ya que ese endpoint realiza su propio correo de confirmación.
@@ -2068,18 +2068,18 @@ def create_app() -> Flask:
                         try:
                             r = _get_reserva_by_id(int(rid)) or {}
                             est = (r.get("Estado") or "").strip()
-                    
+
                             if est == "Confirmada":
                                 _notify_reserva_success(int(rid))
                             elif est == "Pendiente":
                                 _notify_reserva_pending(int(rid))
                         except Exception:
                             pass
-                    
-                    
+
+
                 except Exception as e:
                     current_app.logger.warning(f"[GRR-01-009] Notificación omitida: {e}")
-    
+
             elif method in ("PUT", "PATCH"):
                 _audit_log(
                     _current_user_email(),
@@ -2087,27 +2087,27 @@ def create_app() -> Flask:
                     {"Codigo_Reserva": r["Codigo_Reserva"], "Estado": r["Estado"]},
                     entidad_id=str(r["Codigo_Reserva"]),
                 )
-    
+
             # KPI solo cuando queda confirmada
             if r["Estado"] == "Confirmada":
                 _kpi_touch(str(r["Fecha_Entrada"]), float(r["Monto_Total"]))
-    
+
             # Auto-asignación para Confirmada/Pendiente
             if r["Estado"] in ("Confirmada", "Pendiente"):
                 try:
                     _asegurar_auto_asignacion(int(rid))
                 except Exception as e:
                     current_app.logger.warning(f"[ASSIGN] error auto R={rid}: {e}")
-    
+
             db.session.commit()
-    
+
         except Exception as e:
             try:
                 db.session.rollback()
             except Exception:
                 pass
             current_app.logger.warning(f"[AFTER] error en grr_after_request: {e}")
-    
+
         return response
 
 
@@ -2137,7 +2137,7 @@ def create_app() -> Flask:
                 return v if v else default
             except Exception:
                 return default
-        
+
         sinpe_mobile = _sac_cfg(
             "sinpe_mobile",
             os.getenv("SINPE_MOBILE") or os.getenv("SINPE_NUMERO") or os.getenv("SINPE_PHONE") or "",
@@ -2146,7 +2146,7 @@ def create_app() -> Flask:
             "sinpe_beneficiary",
             os.getenv("SINPE_BENEFICIARIO") or os.getenv("SINPE_NOMBRE") or "Hotel Villa Grace",
         )
-        
+
 
         return {
             "is_logged_in": is_logged_in,
@@ -2180,7 +2180,7 @@ def create_app() -> Flask:
     @app.errorhandler(403)
     def forbidden(e):
         mensaje = getattr(e, "description", None) or "No tienes permisos para acceder a esta sección."
-    
+
         if _is_api_request():
             return jsonify({
                 "ok": False,
@@ -2188,30 +2188,30 @@ def create_app() -> Flask:
                 "message": mensaje,
                 "path": request.path
             }), 403
-    
+
         return render_template(
             "403.html",
             titulo="Acceso restringido",
             mensaje=mensaje,
             ruta=request.path
         ), 403
-        
-    
+
+
     @app.errorhandler(404)
     def not_found(e):
         # Para API devolvemos JSON (evita "Unexpected token '<'")
         if _is_api_request():
             return jsonify({"ok": False, "error": "not_found", "path": request.path}), 404
         return render_template("404.html"), 404
-    
-    
+
+
     @app.errorhandler(405)
     def method_not_allowed(e):
         if _is_api_request():
             return jsonify({"ok": False, "error": "method_not_allowed", "path": request.path}), 405
         return render_template("404.html"), 405
-    
-    
+
+
     @app.errorhandler(500)
     def internal_server_error(e):
         if _is_api_request():
@@ -2222,8 +2222,8 @@ def create_app() -> Flask:
             500,
             {"Content-Type": "text/html; charset=utf-8"},
         )
-    
-    
+
+
 
     @app.route("/")
     @app.route("/index.html")
@@ -2252,11 +2252,15 @@ def create_app() -> Flask:
             fx_date=fx_date,
         )
 
+    @app.route("/in-progress.html")
+    def in_progress_html():
+        return render_template("in-progress.html")
+
 
     @app.route("/contact.html")
     def contact_html():
         return render_template("contact.html")
-    
+
         # -----------------------------------------------------------------------
     # Contact Form (contact.html -> /forms/contact.php)
     # Mantiene compatibilidad con assets/vendor/php-email-form/validate.js
@@ -2275,22 +2279,22 @@ def create_app() -> Flask:
         user_agent: str = "",
     ) -> None:
         to_email = "hotelvillagrace@gmail.com"
-    
+
         host = current_app.config.get("MAIL_SERVER") or os.getenv("MAIL_SERVER")
         port = int(current_app.config.get("MAIL_PORT") or os.getenv("MAIL_PORT") or 0)
         user = current_app.config.get("MAIL_USERNAME") or os.getenv("MAIL_USERNAME")
         pwd  = current_app.config.get("MAIL_PASSWORD") or os.getenv("MAIL_PASSWORD")
-    
+
         sender = (
             current_app.config.get("MAIL_DEFAULT_SENDER")
             or os.getenv("MAIL_DEFAULT_SENDER")
             or user
             or "no-reply@hotel.local"
         )
-    
+
         subject_clean = re.sub(r"[\r\n]+", " ", (subject_raw or "")).strip()
         subject = f"[Web Contacto] {subject_clean}" if subject_clean else "[Web Contacto] Nuevo mensaje"
-    
+
         text_body = (
             "Nuevo mensaje desde el formulario 'Escríbenos' (contact.html)\n\n"
             f"Nombre: {name}\n"
@@ -2304,10 +2308,10 @@ def create_app() -> Flask:
             f"User-Agent: {user_agent}\n"
             f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         )
-    
+
         if not (host and port and user and pwd):
             raise RuntimeError("Configuración SMTP incompleta (MAIL_SERVER/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD).")
-    
+
         html_body = _email_brand_shell(
             badge="Contacto web",
             title="Nuevo mensaje desde el sitio web",
@@ -2318,28 +2322,28 @@ def create_app() -> Flask:
                   <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Nombre</div>
                   <div style="font-size:15px; color:#0f172a; font-weight:700;">{escape(name)}</div>
                 </div>
-    
+
                 <div style="margin-bottom:12px; padding:14px 16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
                   <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Correo</div>
                   <div style="font-size:15px; color:#0f172a;">{escape(email)}</div>
                 </div>
-    
+
                 <div style="margin-bottom:12px; padding:14px 16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
                   <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Teléfono / WhatsApp</div>
                   <div style="font-size:15px; color:#0f172a;">{escape(phone or '(no indicado)')}</div>
                 </div>
-    
+
                 <div style="margin-bottom:12px; padding:14px 16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
                   <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Asunto</div>
                   <div style="font-size:15px; color:#0f172a;">{escape(subject_clean or '(sin asunto)')}</div>
                 </div>
               </div>
-    
+
               <div style="margin-bottom:18px; padding:18px; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px;">
                 <div style="font-size:13px; color:#64748b; margin-bottom:10px;">Mensaje</div>
                 <div style="font-size:15px; line-height:1.75; color:#334155; white-space:pre-wrap;">{escape(message)}</div>
               </div>
-    
+
               <div style="padding:14px 16px; background:#ffffff; border:1px dashed #cbd5e1; border-radius:14px;">
                 <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Metadatos</div>
                 <div style="font-size:13px; line-height:1.7; color:#475569;">
@@ -2350,7 +2354,7 @@ def create_app() -> Flask:
               </div>
             """,
         )
-    
+
         _send_email_branded(
             current_app,
             to_email=to_email,
@@ -2414,7 +2418,7 @@ def create_app() -> Flask:
     @app.route("/booking.html")
     def booking_html():
         return redirect(url_for("booking_search"))
-    
+
     # =========================
     # GRR-01-007: Reserva sin iniciar sesión (UI públicas)
     # =========================
@@ -2426,13 +2430,13 @@ def create_app() -> Flask:
     @app.route("/reserva-sin-sesion/exito")
     def anon_reserva_exito_html():
         return render_template("anon-reserva-exito.html")
-    
+
     @app.get("/reserva-sin-sesion")
     def anon_reserva_page():
         uid = session.get("user_id")
         u = Usuario.query.filter_by(Codigo_Usuario=uid).first() if uid else None
         return render_template("anon-reserva.html", is_recepcionista=es_recepcionista(u))
-    
+
 
 
     # ---------------------- Portal / Ops / Admin (protegidas por rol) ------------
@@ -2476,19 +2480,19 @@ def create_app() -> Flask:
             "is_authenticated": bool(uid)
         }
         return render_template("portal-reservas.html", user_id=session.get("user_id", 1))
-    
+
         current_user = {
             "id": int(uid),
             "is_authenticated": True
         }
-    
+
         # Pasá explícitamente lo que el template use (idealmente current_user)
         return render_template(
             "portal-reservas.html",
             user_id=int(uid),
             current_user=current_user
         )
-    
+
 
     @app.route("/portal-reserva-detalle.html")
     @app.route("/portal-reserva-detalle")
@@ -2517,65 +2521,65 @@ def create_app() -> Flask:
             "ops-dashboard.html",
             pending_approvals_count=pending_approvals_count
         )
-        
-        
+
+
     @app.route("/ops-reservas.html")
     @role_required("Administrador", "Recepcionista")
     def ops_reservas_html():
         return render_template("ops-reservas.html")
-    
-    
+
+
     @app.route("/ops-reservas-dashboard.html")
     @role_required("Administrador", "Recepcionista")
     def ops_reservas_dashboard_html():
         result = db.session.execute(text("SELECT * FROM Reserva, Cliente WHERE Reserva.Codigo_Cliente = Cliente.Codigo_Cliente"))
         return render_template("ops-reservas-dashboard.html", reservas=result)
-    
-    
-        
 
-        
-        
-        
-        
-        
-        
+
+
+
+
+
+
+
+
+
     # =========================================================
-    # OPS - HABITACIONES 
+    # OPS - HABITACIONES
     # =========================================================
-    
+
     @app.route("/ops-rooms.html", methods=["GET"])
     @role_required("Administrador", "Recepcionista")
     def ops_rooms_menu_html():
         return render_template("ops-rooms.html")
-    
-    
+
+
     @app.route("/ops-rooms-manage.html", methods=["GET"])
     @role_required("Administrador")
     def ops_rooms_manage_html():
         return render_template("ops-rooms-manage.html")
-    
-    
+
+
     @app.route("/ops-rooms-dashboard.html")
     @role_required("Administrador", "Recepcionista")
     def ops_rooms_dashboard_html():
         return render_template("ops-rooms-dashboard.html")
-    
-    
-        
-    
+
+
+
+
     @app.route("/ops-approvals.html")
     @role_required("Administrador", "Recepcionista")
     def ops_approvals_html():
         return render_template("ops-approvals.html")
-    
-    
-    
+
+
+
     @app.get("/ops-approvals-cambios.html")
     @role_required("Recepcionista", "Administrador", "Admin")
     def ops_approvals_cambios_html():
         return render_template("ops-approvals-cambios.html")
-    
+
 
 
 
@@ -2593,7 +2597,7 @@ def create_app() -> Flask:
     @role_required("Administrador")
     def admin_rooms_html():
         return render_template("admin-rooms.html")
-    
+
     @app.route("/admin-taxes.html")
     @role_required("Administrador")
     def admin_taxes_html():
@@ -2603,7 +2607,7 @@ def create_app() -> Flask:
     @role_required("Administrador")
     def admin_rates_html():
         return render_template("admin-rates.html")
-    
+
     @app.route("/admin-channels.html")
     @role_required("Administrador")
     def admin_channels_html():
@@ -2614,14 +2618,14 @@ def create_app() -> Flask:
     @role_required("Administrador", "Recepcionista")
     def ops_rooms_status_html():
         return render_template("ops-rooms-status.html")
-    
+
 
     # === ADMIN/OPS: vista de calendario por habitación ===
     @app.route("/admin-calendario.html")
     @role_required("Administrador", "Recepcionista")
     def admin_calendario_html():
         return render_template("admin-calendario.html")
-    
+
         # ---------------------- OPS/ADMIN: Gestión de Cupones ----------------------
     @app.get("/api/coupons")
     @role_required("Administrador", "Recepcionista")
@@ -2664,7 +2668,7 @@ def create_app() -> Flask:
         """), {"c": codigo})
         db.session.commit()
         return jsonify({"ok": True})
-    
+
     # app.py — debajo de api_coupons_toggle
     @app.delete("/api/coupons/<string:codigo>")
     @role_required("Administrador", "Recepcionista")
@@ -2674,12 +2678,12 @@ def create_app() -> Flask:
         return jsonify({"ok": True})
 
 
-    
+
     @app.route("/ops-walkin.html")
     @role_required("Administrador", "Recepcionista")
     def ops_walkin_html():
         return render_template("ops-walkin.html")
-    
+
     # app.py — sección de vistas HTML de OPS/ADMIN
     @app.route("/ops/coupons")
     @role_required("Administrador", "Recepcionista")
@@ -2695,17 +2699,17 @@ def create_app() -> Flask:
             subtotal = float(request.args.get("subtotal") or 0)
         except Exception:
             subtotal = 0.0
-    
+
         row = db.session.execute(text("""
             SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
               FROM Coupon
              WHERE Codigo = :c
              LIMIT 1
         """), {"c": code}).mappings().first()
-    
+
         if not row or not row["Activo"]:
             return jsonify({"ok": False, "msg": "Cupón inválido o inactivo."}), 200
-    
+
         # vigencia y usos
         today = date.today()
         vd, vh = row["Valido_Desde"], row["Valido_Hasta"]
@@ -2713,21 +2717,21 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "msg": "Fuera de vigencia."}), 200
         if row["Max_Usos"] and row["Usos"] is not None and row["Usos"] >= row["Max_Usos"]:
             return jsonify({"ok": False, "msg": "Cupón agotado."}), 200
-    
+
         amount = 0.0
         if row["Tipo"] == "porcentaje":
             amount = round(subtotal * (float(row["Valor"] or 0) / 100.0), 2)
         elif row["Tipo"] in ("monto", "monto_fijo"):
             amount = float(row["Valor"] or 0)
-    
+
         return jsonify({
             "ok": True,
             "type": row["Tipo"],
             "amount": amount,
             "msg": f"Descuento: ₡ {amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         })
-    
-    
+
+
     # === GRR — Aplicar cupón a una reserva (persiste) ===
     @app.post("/grr/reservas/<int:reserva_id>/apply-coupon")
     @role_required("Cliente","Administrador","Recepcionista")
@@ -2736,17 +2740,17 @@ def create_app() -> Flask:
         code = (p.get("codigo") or p.get("code") or "").strip().upper()
         if not code:
             return jsonify({"ok": False, "msg": "Código requerido."}), 400
-    
+
         # Cargar reserva
         r = _get_reserva_by_id(reserva_id)
         if not r:
             return jsonify({"ok": False, "msg": "Reserva no encontrada."}), 404
-    
+
         # Si es cliente, verificar pertenencia
         if _user_role().lower() == "cliente":
             if not _reserva_belongs_to_email(reserva_id, _current_user_email() or ""):
                 return jsonify({"ok": False, "msg": "No autorizado."}), 403
-    
+
         # Cargar cupón
         row = db.session.execute(text("""
             SELECT Codigo, Tipo, Valor, Valido_Desde, Valido_Hasta, Max_Usos, Usos, Activo
@@ -2754,22 +2758,22 @@ def create_app() -> Flask:
         """), {"c": code}).mappings().first()
         if not row or not row["Activo"]:
             return jsonify({"ok": False, "msg": "Cupón inválido o inactivo."}), 200
-    
+
         today = date.today()
         vd, vh = row["Valido_Desde"], row["Valido_Hasta"]
         if (vd and str(vd)[:10] > str(today)) or (vh and str(vh)[:10] < str(today)):
             return jsonify({"ok": False, "msg": "Fuera de vigencia."}), 200
         if row["Max_Usos"] and row["Usos"] is not None and row["Usos"] >= row["Max_Usos"]:
             return jsonify({"ok": False, "msg": "Cupón agotado."}), 200
-    
+
         total_actual = float(r.get("Monto_Total") or 0.0)
         if row["Tipo"] == "porcentaje":
             descuento = round(total_actual * (float(row["Valor"] or 0)/100.0), 2)
         else:
             descuento = float(row["Valor"] or 0)
-    
+
         nuevo_total = max(0.0, round(total_actual - descuento, 2))
-    
+
         # Persistir cambios
         db.session.execute(
             text("UPDATE Reserva SET Monto_Total=:t, Observaciones = CONCAT(COALESCE(Observaciones,''),' | CUPON ', :c) WHERE Codigo_Reserva=:r"),
@@ -2777,36 +2781,36 @@ def create_app() -> Flask:
         )
         db.session.execute(text("UPDATE Coupon SET Usos = COALESCE(Usos,0)+1 WHERE Codigo=:c"), {"c": code})
         db.session.commit()
-    
+
         return jsonify({"ok": True, "monto": nuevo_total, "descuento": descuento, "codigo": code})
-    
+
     # ---------------------- API Disponibilidad --------------------------
     @app.get("/api/availability")
     def api_availability():
         from datetime import datetime as dt
         from math import ceil
-    
+
         checkin = (request.args.get("checkin") or "").strip()
         checkout = (request.args.get("checkout") or "").strip()
         guests = int((request.args.get("guests") or 1) or 1)
         rooms_req = int((request.args.get("rooms") or 1) or 1)
         tipo = (request.args.get("tipo") or request.args.get("type") or "").strip()
-    
+
         # Validar fechas
         try:
             ci = dt.strptime(checkin, "%Y-%m-%d").date()
             co = dt.strptime(checkout, "%Y-%m-%d").date()
         except Exception:
             return jsonify({"ok": False, "available": False, "message": "Fechas inválidas"}), 400
-    
+
         today = date.today()
         if ci < today or co <= ci:
             return jsonify({"ok": True, "available": False, "message": "Rango de fechas no válido"}), 200
-    
+
         # Columnas disponibles
         has_cap = _col_exists("Habitacion", "Capacidad")
         has_tipo = _col_exists("Habitacion", "Tipo")
-    
+
         # Si pidieron un tipo pero no existe en catálogo, devuélvelo claro
         if tipo and has_tipo:
             exists_type = db.session.execute(
@@ -2825,10 +2829,10 @@ def create_app() -> Flask:
                     "checkout": checkout,
                     "message": f"No hay habitaciones de tipo '{tipo}' configuradas."
                 }), 200
-    
+
         # Requisitos de capacidad (por habitación)
         need_per_room = ceil(guests / max(rooms_req, 1))
-    
+
         # Habitaciones libres (sin solape con reservas Confirmadas/Pendientes)
         conditions = []
         params = {"ci": checkin, "co": checkout}
@@ -2838,9 +2842,9 @@ def create_app() -> Flask:
         if has_cap:
             conditions.append("h.Capacidad >= :cap")
             params["cap"] = need_per_room
-    
+
         where_extra = (" AND " + " AND ".join(conditions)) if conditions else ""
-    
+
         rows = db.session.execute(
             text(f"""
                 SELECT
@@ -2861,11 +2865,11 @@ def create_app() -> Flask:
             """),
             params
         ).mappings().all()
-    
+
         available_rooms = len(rows)
         nights = (co - ci).days
         is_available = available_rooms >= rooms_req
-    
+
         return jsonify({
             "ok": True,
             "available": bool(is_available),
@@ -2879,7 +2883,7 @@ def create_app() -> Flask:
             "tipo": tipo or None,
             "message": ("Disponibilidad confirmada" if is_available else "Sin cupo para ese rango"),
         }), 200
-        
+
     @app.get("/api/availability/rooms")
     def api_availability_rooms():
         """
@@ -2889,12 +2893,12 @@ def create_app() -> Flask:
         """
         from datetime import datetime as dt
         from sqlalchemy import or_
-    
+
         checkin = (request.args.get("checkin") or "").strip()
         checkout = (request.args.get("checkout") or "").strip()
         guests = int((request.args.get("guests") or request.args.get("adults") or 1) or 1)
         tipo = (request.args.get("tipo") or request.args.get("type") or "").strip()
-    
+
         # Validar fechas
         try:
             ci = dt.strptime(checkin, "%Y-%m-%d").date()
@@ -2903,11 +2907,11 @@ def create_app() -> Flask:
                 return jsonify({"ok": False, "msg": "checkout debe ser posterior a checkin"}), 400
         except Exception:
             return jsonify({"ok": False, "msg": "Fechas inválidas (YYYY-MM-DD)"}), 400
-    
+
         # ¿Existen estas columnas en la BD?
         has_cap  = _col_exists("Habitacion", "Capacidad")
         has_tipo = _col_exists("Habitacion", "Tipo")
-    
+
         # 1) Traer habitaciones con ORM (evita referenciar columnas inexistentes)
         q = Habitacion.query
         if tipo and has_tipo:
@@ -2915,16 +2919,16 @@ def create_app() -> Flask:
         if has_cap:
             # si hay columna capacidad, aceptar null o suficiente para 'guests'
             q = q.filter(or_(Habitacion.Capacidad == None, Habitacion.Capacidad >= guests))  # noqa: E711
-    
+
         # Orden: por número si existe, si no por código
         if hasattr(Habitacion, "Numero_Habitacion"):
             q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
         else:
             q = q.order_by(Habitacion.Codigo_Habitacion.asc())
-    
+
         habs = q.all()
         ids = [int(getattr(h, "Codigo_Habitacion")) for h in habs] or []
-    
+
         # 2) ¿Cuáles están bloqueadas por reservas en [ci, co)?
         blocked = set()
         if ids:
@@ -2943,29 +2947,29 @@ def create_app() -> Flask:
             except Exception as e:
                 current_app.logger.exception(f"[availability/rooms] error obteniendo bloqueadas: {e}")
                 # No abortamos; seguimos y marcamos todas como disponibles para no romper la UI
-    
+
         # 3) Armar salida (con flags available/disabled y URL de waitlist para bloqueadas)
         rooms = []
         for h in habs:
             hid   = int(getattr(h, "Codigo_Habitacion"))
             num   = getattr(h, "Numero_Habitacion", None)
             tipoh = getattr(h, "Tipo", None) or ""
-    
+
             # precio noche robusto
             price = getattr(h, "Precio_Noche", None) or getattr(h, "Precio_Base", None) or getattr(h, "Precio", None) or 0
             try:
                 price = float(price or 0)
             except Exception:
                 price = 0.0
-    
+
             capacidad = getattr(h, "Capacidad", None)
             try:
                 capacidad = int(capacidad or 2)
             except Exception:
                 capacidad = 2
-    
+
             img = getattr(h, "Imagen_URL", None) or ""
-    
+
             is_blocked = hid in blocked
             rooms.append({
                 "id": hid,
@@ -2992,7 +2996,7 @@ def create_app() -> Flask:
 
 
             })
-    
+
         return jsonify({
             "ok": True,
             "checkin": checkin,
@@ -3001,7 +3005,7 @@ def create_app() -> Flask:
             "tipo": (tipo or None),
             "rooms": rooms
         }), 200
-    
+
 
 
 
@@ -3009,8 +3013,8 @@ def create_app() -> Flask:
     @app.get("/booking/search")
     def booking_search_alias():
         return redirect(url_for("api_availability", **request.args))
-    
-    
+
+
     # =========================
     # API pública: Tipos de habitación (para anon-reserva.html)
     # =========================
@@ -3020,23 +3024,23 @@ def create_app() -> Flask:
         try:
             if not _col_exists("Habitacion", "Tipo"):
                 return jsonify({"ok": True, "items": []}), 200
-    
+
             rows = db.session.execute(text("""
                 SELECT DISTINCT Tipo
                   FROM Habitacion
                  WHERE Tipo IS NOT NULL AND TRIM(Tipo) <> ''
                  ORDER BY Tipo
             """)).scalars().all()
-    
+
             items = [str(r).strip() for r in rows if r and str(r).strip()]
             return jsonify({"ok": True, "items": items}), 200
-    
+
         except Exception as e:
             current_app.logger.exception(f"[api/public/room-types] error: {e}")
             return jsonify({"ok": False, "items": []}), 200
-    
-    
-    
+
+
+
     # =========================
     # GRR-01-007: Reserva sin iniciar sesión (API + helpers locales)
     # =========================
@@ -3097,7 +3101,7 @@ def create_app() -> Flask:
         Si no hay columna de contraseña, se crea usuario sin contraseña y se forzará reset por email.
         """
         correo = (correo or "").strip().lower()
-    
+
         # ¿Ya existe por correo?
         urow = db.session.execute(
             text("SELECT Codigo_Usuario, COALESCE(Codigo_Cliente,0) FROM Usuario WHERE LOWER(Correo)=:e LIMIT 1"),
@@ -3111,12 +3115,12 @@ def create_app() -> Flask:
                                    {"c": cliente_id, "u": uid})
                 db.session.commit()
             return uid, temp_pwd
-    
+
         # Resolver columnas disponibles en la tabla Usuario
         tel_col  = _col_exists("Usuario", "Telefono")
         pwd_col  = _col_exists("Usuario", "Contrasena")
         doc_col  = _col_exists("Usuario", "Cedula_Pasaporte")
-    
+
         # Telefono a usar
         tel_val = (telefono or "").strip()
         if not tel_val:
@@ -3127,10 +3131,10 @@ def create_app() -> Flask:
         if not tel_val:
             tel_val = "00000000"
         tel_val = tel_val[:20]
-    
+
         # Doc a usar (si la columna existe)
         doc_val = (doc_numero or "").strip()[:64] if doc_col else None
-    
+
         # Preparar password temporal si existe columna de contraseña
         import secrets
         try:
@@ -3146,11 +3150,11 @@ def create_app() -> Flask:
                 pwd_hash = temp_pwd
             else:
                 pwd_hash = None
-    
+
         # Rol cliente
         rol = _get_role_by_name("Cliente")
         rol_id = getattr(rol, "Codigo_Rol", None) or getattr(rol, "id", None)
-    
+
         # Construir INSERT dinámico según columnas existentes
         cols = ["Codigo_Cliente", "Correo", "Rol_Id", "Estado", "Nombre"]
         params = {"c": cliente_id, "e": correo, "r": rol_id, "n": nombre_completo[:80]}
@@ -3160,7 +3164,7 @@ def create_app() -> Flask:
             cols.append("Telefono"); params["t"] = tel_val
         if doc_col and doc_val:
             cols.append("Cedula_Pasaporte"); params["d"] = doc_val
-    
+
         placeholders = []
         for col in cols:
             if col == "Contrasena":
@@ -3181,7 +3185,7 @@ def create_app() -> Flask:
                 placeholders.append(":n")
             else:
                 placeholders.append("NULL")
-    
+
         try:
             sql = text(f"INSERT INTO Usuario ({', '.join(cols)}) VALUES ({', '.join(placeholders)})")
             res = db.session.execute(sql, params)
@@ -3263,8 +3267,8 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.warning(f"[MAIL] Fallback console: {e}")
             current_app.logger.info(f"[MAIL MOCK] To: {to_email}\nSubj: {subject}\n\n" + "\n".join(body))
-            
-            
+
+
     def _get_reserva_contacto(reserva_id: int) -> dict:
         """
         Devuelve los datos de contacto asociados a la reserva:
@@ -3273,10 +3277,10 @@ def create_app() -> Flask:
           - nombre completo
         """
         row = db.session.execute(text("""
-            SELECT 
+            SELECT
               C.Nombre, C.Apellido, C.Correo AS c_email, C.Telefono AS c_tel,
               U.Correo AS u_email,
-              CASE WHEN EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+              CASE WHEN EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
                                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME='Usuario' AND COLUMN_NAME='Telefono')
                    THEN U.Telefono ELSE NULL END AS u_tel
             FROM Reserva R
@@ -3285,16 +3289,16 @@ def create_app() -> Flask:
             WHERE R.Codigo_Reserva = :rid
             LIMIT 1
         """), {"rid": reserva_id}).mappings().first()
-    
+
         if not row:
             return {"email": None, "phone": None, "nombre": None}
-    
+
         nombre = f"{(row['Nombre'] or '').strip()} {(row['Apellido'] or '').strip()}".strip() or None
         email  = (row.get("u_email") or row.get("c_email") or "").strip().lower() or None
         phone  = (row.get("u_tel") or row.get("c_tel") or "").strip() or None
         return {"email": email, "phone": phone, "nombre": nombre}
-    
-    
+
+
     def _send_sms(to_phone: str, message: str) -> None:
         """
         Envía SMS usando Twilio si está configurado; si no, hace log consola.
@@ -3308,7 +3312,7 @@ def create_app() -> Flask:
         if not (sid and token and from_n):
             current_app.logger.info(f"[SMS MOCK] To: {to_phone}\n{message}")
             return
-    
+
         try:
             from twilio.rest import Client  # type: ignore
             cli = Client(sid, token)
@@ -3317,8 +3321,8 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.warning(f"[SMS ERROR] {e}. Haciendo LOG como fallback.")
             current_app.logger.info(f"[SMS MOCK] To: {to_phone}\n{message}")
-    
-    
+
+
     def _send_reserva_confirmation_email(to_email: str, reserva: dict, pdf_path: Optional[Path] = None) -> None:
         """
         Envía correo de confirmación con detalles de la reserva.
@@ -3326,7 +3330,7 @@ def create_app() -> Flask:
         """
         if not to_email:
             return
-    
+
         numero  = reserva.get("Numero") or reserva.get("numero")
         ci      = str(reserva.get("Fecha_Entrada") or reserva.get("checkin") or "")[:10]
         co      = str(reserva.get("Fecha_Salida")  or reserva.get("checkout") or "")[:10]
@@ -3335,12 +3339,12 @@ def create_app() -> Flask:
         monto   = float(reserva.get("Monto_Total") or reserva.get("monto") or 0.0)
         canal   = reserva.get("Canal") or reserva.get("canal") or "Web"
         estado  = reserva.get("Estado") or reserva.get("estado") or "Confirmada"
-    
+
         portal_link = url_for("portal_reservas_html", _external=True)
         subject = f"Confirmación de Reserva {numero} — Hotel Villa Grace"
-    
+
         monto_fmt = f"₡ {monto:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    
+
         text_body = (
             "¡Gracias por tu reserva en Hotel Villa Grace!\n\n"
             f"Número de reserva: {numero}\n"
@@ -3355,7 +3359,7 @@ def create_app() -> Flask:
             "Si no fuiste tú quien realizó esta reserva, por favor contáctanos de inmediato.\n\n"
             "— Hotel Villa Grace"
         )
-    
+
         attachment_payload = []
         if pdf_path and pdf_path.exists():
             with open(pdf_path, "rb") as f:
@@ -3365,7 +3369,7 @@ def create_app() -> Flask:
                     "maintype": "application",
                     "subtype": "pdf",
                 })
-    
+
         html_body = _email_brand_shell(
             badge="Reserva confirmada",
             title="Tu reserva está confirmada",
@@ -3376,7 +3380,7 @@ def create_app() -> Flask:
                   <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Número de reserva</div>
                   <div style="font-size:20px; font-weight:800; color:#0f172a;">{escape(str(numero))}</div>
                 </div>
-    
+
                 <div style="margin-bottom:12px; padding:16px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px;">
                   <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Detalles</div>
                   <div style="font-size:15px; line-height:1.8; color:#334155;">
@@ -3388,12 +3392,12 @@ def create_app() -> Flask:
                     <strong>Canal:</strong> {escape(str(canal))}
                   </div>
                 </div>
-    
+
                 <div style="padding:16px; background:#ecfdf5; border:1px solid #bbf7d0; border-radius:14px;">
                   <div style="font-size:12px; color:#166534; margin-bottom:6px;">Total</div>
                   <div style="font-size:24px; font-weight:800; color:#166534;">{escape(monto_fmt)}</div>
                 </div>
-    
+
                 <p style="margin:18px 0 0; font-size:14px; line-height:1.75; color:#64748b;">
                   {"Adjuntamos tu comprobante en PDF en este correo." if attachment_payload else "Puedes descargar tu comprobante desde el portal del huésped."}
                 </p>
@@ -3402,7 +3406,7 @@ def create_app() -> Flask:
             cta_label="Ver mis reservas",
             cta_url=portal_link,
         )
-    
+
         _send_email_branded(
             current_app,
             to_email=to_email,
@@ -3411,8 +3415,8 @@ def create_app() -> Flask:
             html_body=html_body,
             attachments=attachment_payload,
         )
-            
-            
+
+
     def send_reserva_pending(self, reserva_id: int) -> Dict[str, object]:
         """
         Notificación: Reserva creada pero pendiente de confirmación (SINPE).
@@ -3421,26 +3425,26 @@ def create_app() -> Flask:
         payload = _fetch_reserva_payload(int(reserva_id))
         if not payload:
             return {"ok": False, "error": "not_found"}
-    
+
         rid   = payload.get("rid")
         cid   = payload.get("cid")
         f_in  = str(payload.get("f_entrada") or "")
         f_out = str(payload.get("f_salida") or "")
         total = payload.get("total")
-    
+
         hotel_nom  = _cfg("hotel_nombre", "Hotel Villa Grace")
         hotel_tel  = _cfg("hotel_tel", "+506 2642 0225")
         base_url   = _cfg("site_base_url", "https://hotelvillagrace.com")
         moneda_sym = _cfg("moneda_simbolo", "₡")
-    
+
         # Config SINPE (si no existen, el email igual sale sin ese detalle)
         sinpe_num = _cfg("sinpe_mobile", "")
         sinpe_ben = _cfg("sinpe_beneficiary", hotel_nom)
-    
+
         total_txt = _fmt_currency(total, symbol=moneda_sym) if total is not None else ""
-    
+
         subject = f"Reserva pendiente de confirmación #{rid} – {hotel_nom}"
-    
+
         lines = [
             (payload.get("cliente_nombre") or "Estimado/a") + ",",
             "",
@@ -3462,20 +3466,20 @@ def create_app() -> Flask:
                 "Recomendación: en el detalle del SINPE indica tu correo y fechas para facilitar la verificación.",
                 "",
             ])
-    
+
         lines.extend([
             f"Teléfono: {hotel_tel}",
             f"Portal del huésped: {base_url}/portal/reservas",
             "",
             f"{hotel_nom} — \"Tu hogar fuera de casa\".",
         ])
-    
+
         body = "\n".join([x for x in lines if x is not None])
-    
+
         # SMS compacto (GSM-7)
         sms_raw = f"VG Reserva #{rid} PENDIENTE. {f_in}->{f_out}. Total {total_txt}. Se confirma al validar SINPE. Tel {hotel_tel}"
         sms = _truncate_for_trial(_to_gsm7_approx(sms_raw))
-    
+
         return self.route_and_queue(
             cliente_id=cid,
             email=payload.get("cliente_email"),
@@ -3487,8 +3491,8 @@ def create_app() -> Flask:
             ref_id=str(rid),
         )
 
-    
-    
+
+
     def _ensure_reserva_numero(reserva_id: int, fecha_entrada: Optional[str]) -> str:
         """Garantiza que la reserva tenga Numero_Comprobante; lo asigna si está vacío."""
         numero = db.session.execute(
@@ -3507,8 +3511,8 @@ def create_app() -> Flask:
         except Exception:
             db.session.rollback()
         return numero
-    
-    
+
+
     # --- Notificación de confirmación de reserva (respeta preferencias SAC) ---
     def _notify_reserva_success(rid: int) -> None:
         """
@@ -3527,7 +3531,7 @@ def create_app() -> Flask:
             pass
         except Exception as e:
             current_app.logger.warning(f"[GRR-01-009] Camino principal falló R={rid}: {e}")
-    
+
         # ---------- Fallback seguro (sin h.Nombre) ----------
         cid = None
         email_fb = None
@@ -3535,12 +3539,12 @@ def create_app() -> Flask:
         hab = None
         f_in = None
         f_out = None
-    
+
         # Cliente (correo/teléfono)
         try:
             row = db.session.execute(
                 text("""
-                    SELECT 
+                    SELECT
                         r.Codigo_Cliente   AS cid,
                         c.Correo           AS email_fb,
                         c.Telefono         AS tel_fb
@@ -3557,12 +3561,12 @@ def create_app() -> Flask:
                 tel_fb   = (row.get("tel_fb") or None)
         except Exception as e:
             current_app.logger.warning(f"[GRR-01-009] Fallback: no se pudo leer Cliente para R={rid}: {e}")
-    
+
         # Detalles mínimos de reserva (NUNCA h.Nombre)
         try:
             rdet = db.session.execute(
                 text("""
-                    SELECT 
+                    SELECT
                         h.Numero_Habitacion AS habitacion,
                         r.Fecha_Entrada     AS f_in,
                         r.Fecha_Salida      AS f_out
@@ -3579,7 +3583,7 @@ def create_app() -> Flask:
                 f_out= rdet.get("f_out")
         except Exception as e:
             current_app.logger.warning(f"[GRR-01-009] Fallback: no se pudo leer detalles R={rid}: {e}")
-    
+
         # Horarios desde SAC_Config (si existen)
         checkin_ini  = "12:00"; checkin_fin = "00:00"; checkout = "12:00"
         try:
@@ -3592,7 +3596,7 @@ def create_app() -> Flask:
             checkout    = kv.get("checkout_limite", checkout)
         except Exception:
             pass
-    
+
         subject = f"Confirmación de reserva #{rid} – Hotel Villa Grace"
         body = "\n".join([x for x in [
             "¡Gracias por reservar en Hotel Villa Grace!",
@@ -3602,7 +3606,7 @@ def create_app() -> Flask:
             (f"Salida:  {f_out} (check-out hasta {checkout})" if f_out else None),
             "Si necesitas ayuda, responde a este mensaje."
         ] if x])
-    
+
         try:
             from services.grr.notification_service import NotificationService
             ns = NotificationService()
@@ -3619,8 +3623,8 @@ def create_app() -> Flask:
         except Exception as e2:
             current_app.logger.warning(f"[GRR-01-009] Notificación omitida R={rid}: {e2}")
 
-    
-    
+
+
     def _notify_reserva_pending(reserva_id: int):
         """
         Envía notificación de 'pendiente de confirmación' respetando preferencias (/sac/preferencias).
@@ -3633,11 +3637,11 @@ def create_app() -> Flask:
                 current_app.logger.warning(f"[NOTIFY] Pendiente fallo reserva_id={reserva_id}: {e}")
             except Exception:
                 pass
-    
-    
 
 
-    
+
+
+
     @app.post("/api/reservas/anon")
     def api_reservas_anon_create():
         """
@@ -3647,7 +3651,7 @@ def create_app() -> Flask:
           - Inserción en Reserva incluyendo Codigo_Funcionario si la columna existe (y mensaje claro si no hay ninguno)
           - Número de comprobante único
           - Auditoría, KPI y correo de confirmación
-    
+
         Importante:
           - 'tipo' es OPCIONAL (coincide con templates/anon-reserva.html)
           - Se respeta la habitación seleccionada si viene en el payload (Codigo_Habitacion / room_id / habitacion_id)
@@ -3655,10 +3659,10 @@ def create_app() -> Flask:
             solo excluye 'Mantenimiento' y solapes; no exige estado 'Disponible'.
         """
         p = request.get_json(silent=True) or {}
-    
+
         def req(k: str) -> str:
             return (p.get(k) or "").strip()
-    
+
         # ---- Datos del formulario ----
         checkin    = req("checkin")
         checkout   = req("checkout")
@@ -3670,7 +3674,7 @@ def create_app() -> Flask:
         doc_tipo   = req("doc_tipo")
         doc_numero = req("doc_numero")
         acepta     = str(p.get("acepta") or "0") in ("1", "true", "True", "on", "sí", "si")
-    
+
         # Habitación seleccionada (opcional, pero si viene se debe respetar)
         hab_sel = (
             p.get("Codigo_Habitacion")
@@ -3682,17 +3686,17 @@ def create_app() -> Flask:
             hab_sel = int(hab_sel) if hab_sel not in (None, "", False) else None
         except Exception:
             hab_sel = None
-    
+
         try:
             huespedes = int(p.get("huespedes") or 1)
         except Exception:
             huespedes = 1
         huespedes = max(1, huespedes)
-    
+
         # ---- Validaciones mínimas (tipo NO es obligatorio) ----
         if not (checkin and checkout and nombre and apellido and correo and telefono and doc_tipo and doc_numero and acepta):
             return jsonify({"ok": False, "message": "Faltan campos obligatorios."}), 400
-    
+
         # ---- Parseo de fechas ----
         try:
             ci_dt = datetime.strptime(checkin, "%Y-%m-%d").date()
@@ -3701,7 +3705,7 @@ def create_app() -> Flask:
                 return jsonify({"ok": False, "message": "La fecha de salida debe ser posterior a la de llegada."}), 400
         except Exception:
             return jsonify({"ok": False, "message": "Fechas inválidas (YYYY-MM-DD)."}), 400
-    
+
         # ---- Cliente (upsert por correo + documento) ----
         try:
             cliente_id = _upsert_cliente_con_doc(
@@ -3710,10 +3714,10 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.exception("[ANON] Error creando/enlazando Cliente: %s", e)
             return jsonify({"ok": False, "message": "No se pudo crear/enlazar al cliente."}), 500
-    
+
         if not cliente_id:
             return jsonify({"ok": False, "message": "No se pudo crear/enlazar al cliente."}), 500
-    
+
         # ---- Usuario (cuenta de portal, rol 'Cliente') ----
         try:
             uid, temp_pwd = _create_or_link_usuario(
@@ -3722,14 +3726,14 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.exception("[ANON] Error creando/enlazando Usuario: %s", e)
             return jsonify({"ok": False, "message": "No se pudo crear la cuenta del huésped."}), 500
-    
+
         if not uid:
             return jsonify({"ok": False, "message": "No se pudo crear la cuenta del huésped."}), 500
-    
+
         # ---- Comprobaciones de columnas (capacidad / tipo / funcionario) ----
         has_cap  = _col_exists("Habitacion", "Capacidad")
         has_tipo = _col_exists("Habitacion", "Tipo")
-    
+
         # Si viene tipo pero no existe en catálogo, mensaje claro
         if tipo and has_tipo:
             _type_exists = db.session.execute(
@@ -3738,11 +3742,11 @@ def create_app() -> Flask:
             ).first()
             if not _type_exists:
                 return jsonify({"ok": False, "message": f"No hay habitaciones de tipo '{tipo}' configuradas."}), 400
-    
+
         # ---- Selección de habitación ----
         hab_id = None
         price_n = 0.0
-    
+
         # Caso A: el usuario seleccionó una habitación -> se respeta y se valida disponibilidad
         if hab_sel:
             hab_row = db.session.execute(
@@ -3761,21 +3765,21 @@ def create_app() -> Flask:
                 )),
                 {"id": hab_sel}
             ).mappings().first()
-    
+
             if not hab_row:
                 return jsonify({"ok": False, "message": "La habitación seleccionada no existe."}), 404
-    
+
             # Excluir mantenimiento
             estado_h = (hab_row.get("Estado") or "").strip()
             if estado_h.lower() == "mantenimiento":
                 return jsonify({"ok": False, "message": "La habitación seleccionada está en mantenimiento."}), 409
-    
+
             # Validar tipo/capacidad contra la habitación elegida (si aplica)
             if tipo and has_tipo:
                 tipo_h = (hab_row.get("Tipo") or "").strip()
                 if tipo_h and tipo_h != tipo:
                     return jsonify({"ok": False, "message": "La habitación seleccionada no coincide con el tipo elegido."}), 400
-    
+
             if has_cap:
                 cap_h = hab_row.get("Capacidad")
                 try:
@@ -3784,7 +3788,7 @@ def create_app() -> Flask:
                     cap_h = None
                 if cap_h is not None and huespedes > cap_h:
                     return jsonify({"ok": False, "message": "La habitación seleccionada no tiene capacidad suficiente."}), 400
-    
+
             # Validar solape con reservas no canceladas
             solape = db.session.execute(
                 text("""
@@ -3798,28 +3802,28 @@ def create_app() -> Flask:
                 """),
                 {"h": hab_sel, "ci": checkin, "co": checkout}
             ).first()
-    
+
             if solape:
                 return jsonify({"ok": False, "message": "La habitación seleccionada ya no está disponible para ese rango."}), 409
-    
+
             hab_id = int(hab_row["Codigo_Habitacion"])
             price_n = float(hab_row["Precio_Noche"] or 0.0)
-    
+
         # Caso B: no seleccionó habitación -> buscamos una libre que cumpla criterios
         if hab_id is None:
             conds  = []
             params = {"ci": checkin, "co": checkout}
-    
+
             if tipo and has_tipo:
                 conds.append("h.Tipo = :t")
                 params["t"] = tipo
-    
+
             if has_cap:
                 conds.append("COALESCE(h.Capacidad, 2) >= :cap")
                 params["cap"] = int(huespedes)
-    
+
             where_extra = (" AND " + " AND ".join(conds)) if conds else ""
-    
+
             hab = db.session.execute(
                 text(f"""
                     SELECT h.Codigo_Habitacion, h.Precio_Noche
@@ -3839,19 +3843,19 @@ def create_app() -> Flask:
                 """),
                 params
             ).mappings().first()
-    
+
             if not hab:
                 return jsonify({
                     "ok": False,
                     "message": "No hay habitaciones disponibles que cumplan los criterios para ese rango."
                 }), 409
-    
+
             hab_id  = int(hab["Codigo_Habitacion"])
             price_n = float(hab["Precio_Noche"] or 0.0)
-    
+
         # ---- Calcular noches y monto total (server-side autoritativo) ----
         nights = max((co_dt - ci_dt).days, 1)
-    
+
         tax = None
         for k in ("VAT_RATE", "TAX_RATE", "IVA", "IVA_RATE"):
             if k in current_app.config:
@@ -3862,13 +3866,13 @@ def create_app() -> Flask:
                     pass
         if tax is None:
             tax = 0.13
-    
+
         subtotal    = round(price_n * nights * huespedes, 2)
         monto_total = round(subtotal * (1.0 + tax), 2)
-    
+
         # ---- Observaciones (guardar doc y tel para check-in) ----
         obs = f"GRR-01-007 | Doc: {doc_tipo} {doc_numero} | Tel: {telefono}"
-    
+
         # ---- Resolver Codigo_Funcionario si la columna existe ----
         has_func_col = _col_exists("Reserva", "Codigo_Funcionario")
         func_id = None
@@ -3878,7 +3882,7 @@ def create_app() -> Flask:
                 uid_sess = int(uid_sess) if uid_sess is not None else None
             except Exception:
                 uid_sess = None
-    
+
             if uid_sess:
                 try:
                     func_id = db.session.execute(
@@ -3891,7 +3895,7 @@ def create_app() -> Flask:
                         func_id = None
                 except Exception:
                     func_id = None
-    
+
             if func_id is None and not _col_nullable("Reserva", "Codigo_Funcionario"):
                 try:
                     any_f = db.session.execute(
@@ -3900,13 +3904,13 @@ def create_app() -> Flask:
                     func_id = int(any_f) if any_f is not None else None
                 except Exception:
                     func_id = None
-    
+
             if func_id is None and not _col_nullable("Reserva", "Codigo_Funcionario"):
                 return jsonify({
                     "ok": False,
                     "message": "No hay funcionarios creados y la columna Reserva.Codigo_Funcionario no admite NULL."
                 }), 409
-    
+
         # ---- Insert dinámico en Reserva ----
         try:
             cols = [
@@ -3932,12 +3936,12 @@ def create_app() -> Flask:
                 "m": float(monto_total),
                 "obs": obs
             }
-    
+
             if has_func_col and func_id is not None:
                 cols.append("Codigo_Funcionario")
                 vals.append(":f")
                 iparams["f"] = int(func_id)
-    
+
             sql_insert = text(f"INSERT INTO Reserva ({', '.join(cols)}) VALUES ({', '.join(vals)})")
             res = db.session.execute(sql_insert, iparams)
             db.session.commit()
@@ -3945,7 +3949,7 @@ def create_app() -> Flask:
             db.session.rollback()
             current_app.logger.exception("[ANON] Error insertando Reserva: %s", e)
             return jsonify({"ok": False, "message": "No se pudo registrar la reserva."}), 500
-    
+
         # ---- Obtener ID de la reserva recién creada ----
         try:
             reserva_id = int(
@@ -3964,7 +3968,7 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.exception("[ANON] No se pudo recuperar Codigo_Reserva: %s", e)
             return jsonify({"ok": False, "message": "Reserva creada, pero no se pudo obtener el ID."}), 500
-    
+
         # ---- Asignar número único de comprobante ----
         try:
             numero = _make_unique_number(reserva_id, checkin)
@@ -3977,7 +3981,7 @@ def create_app() -> Flask:
             db.session.rollback()
             current_app.logger.warning("[ANON] No se pudo asignar Numero_Comprobante: %s", e)
             numero = _make_unique_number(reserva_id, checkin)
-    
+
         # ---- Auditoría + KPI ----
         try:
             _audit_log(correo, "reserva.creada.publica",
@@ -3989,13 +3993,13 @@ def create_app() -> Flask:
             _update_kpis(float(monto_total or 0.0), checkin)
         except Exception:
             pass
-    
+
         # ---- Enviar correo de confirmación / credenciales ----
         try:
             _send_new_account_and_reserva_email(correo, numero, checkin, checkout, temp_pwd)
         except Exception as e:
             current_app.logger.warning("[ANON] Error enviando correo de confirmación: %s", e)
-    
+
         return jsonify({
             "ok": True,
             "reserva_id": reserva_id,
@@ -4004,12 +4008,12 @@ def create_app() -> Flask:
         }), 201
 
 
-    
-    
-    
-   
 
-    
+
+
+
+
+
 
     # === API: estado actual de todas las habitaciones (para el tablero) ===
     @app.get("/api/rooms/status")
@@ -4218,7 +4222,7 @@ def create_app() -> Flask:
             children = int((request.form.get("children") or 0) or 0)
             rooms = int((request.form.get("rooms") or 1) or 1)
             guests = max(1, adults + children)
-    
+
             return redirect(
                 url_for(
                     "booking_results",
@@ -4237,7 +4241,7 @@ def create_app() -> Flask:
     @app.route("/booking-results.html", methods=["GET"])
     def booking_results():
         args = request.args.to_dict(flat=True)
-    
+
         # Derivar guests si no viene: adults + children
         try:
             a = int(args.get("adults") or 0)
@@ -4248,7 +4252,7 @@ def create_app() -> Flask:
             args["guests"] = str(max(1, a + c) or 1)
         if not args.get("rooms"):
             args["rooms"] = "1"
-    
+
         with app.test_client() as c:
             resp_av = c.get(url_for("api_availability", **args))
             data_av = resp_av.get_json() if resp_av.is_json else {"ok": False}
@@ -4260,7 +4264,7 @@ def create_app() -> Flask:
                                availability=data_av,
                                availability_rooms=data_rooms)
 
-    
+
 
     # ---------------------- Detalle / Checkout / Confirmación ------------------
     @app.route("/booking-details", methods=["GET", "POST"])
@@ -4289,7 +4293,7 @@ def create_app() -> Flask:
                 return val if val not in (None, "") else default
             except Exception:
                 return default
-    
+
         ctx = {
             "checkin": request.values.get("checkin"),
             "checkout": request.values.get("checkout"),
@@ -4306,7 +4310,7 @@ def create_app() -> Flask:
             "coupon": request.values.get("coupon", ""),
         }
         return render_template("booking-checkout.html", **ctx)
-    
+
 
     @app.route("/booking-confirmation", methods=["GET"])
     @app.route("/booking-confirmation.html", methods=["GET"])
@@ -4321,7 +4325,7 @@ def create_app() -> Flask:
             "reservation_code": request.args.get("code", "VG-" + datetime.now().strftime("%Y%m%d-%H%M%S")),
             "reservation_id": request.args.get("id") or request.args.get("reserva_id"),
         }
-    
+
         # --- NUEVO (GRR-01-004): recordatorio del documento con el que se creó el perfil
         identity_notice = None
         try:
@@ -4341,7 +4345,7 @@ def create_app() -> Flask:
                     if row and row[0]:
                         doc_value = row[0]
                         doc_label = "cédula"
-    
+
             if data.get("checkin") and doc_value:
                 identity_notice = (
                     f"El día {data['checkin']} debe presentar el {doc_label} "
@@ -4349,9 +4353,9 @@ def create_app() -> Flask:
                 )
         except Exception:
             pass
-    
+
         return render_template("booking-confirmation.html", identity_notice=identity_notice, **data)
-    
+
 
     # ---------------------- API Portal Reservas (solo Cliente) ----------------------
     @app.route("/api/portal/reservas", methods=["GET"])
@@ -4385,8 +4389,8 @@ def create_app() -> Flask:
                 "[PORTAL] Error listando reservas para %s: %s", email, e
             )
             return jsonify({"ok": True, "items": [], "warning": "no_data"}), 200
-        
-        
+
+
     @app.route("/api/portal/reservas/export", methods=["GET"])
     @role_required("Cliente")
     def api_portal_reservas_export():
@@ -4439,8 +4443,8 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "message": "No autorizado."}), 403
 
         return jsonify({"ok": True, "item": _reserva_to_dict(row)}), 200
-    
-    
+
+
     @app.get("/api/portal/reservas/<int:reserva_id>/summary")
     @role_required("Cliente")
     def api_portal_reserva_summary(reserva_id: int):
@@ -4538,8 +4542,8 @@ def create_app() -> Flask:
         )
         db.session.commit()
         return jsonify({"ok": True})
-    
-    
+
+
 
     @app.route("/api/portal/reservas/<int:reserva_id>/export", methods=["GET"])
     @role_required("Cliente")
@@ -4583,10 +4587,10 @@ def create_app() -> Flask:
 
         # Fallback: JSON (solo si alguien lo invoca explícitamente)
         return jsonify({"ok": True, "item": _reserva_to_dict(r)})
-    
-    
-    
-    
+
+
+
+
     @app.post("/api/portal/reservas/<int:reserva_id>/quote-changes")
     @role_required("Cliente")
     def api_portal_reserva_quote(reserva_id: int):
@@ -4640,12 +4644,12 @@ def create_app() -> Flask:
             "delta": delta,
             "message": "Disponible. Puedes aplicar los cambios."
         }), 200
-    
-    
-    
-    
-        
-        
+
+
+
+
+
+
         # === Cotización de cambios de reserva (Portal) — sin ORM, robusto ===
     @app.post("/api/portal/reservas/<int:reserva_id>/quote-changes", endpoint="portal_reserva_quote_changes")
     def portal_reserva_quote_changes(reserva_id: int):
@@ -4664,12 +4668,12 @@ def create_app() -> Flask:
                 return jsonify(ok=False, message="No autenticado."), 401
             if not _reserva_belongs_to_email(reserva_id, email):
                 return jsonify(ok=False, message="No autorizado."), 403
-    
+
             # Carga robusta de la reserva (sin ORM)
             r = _get_reserva_by_id(reserva_id)
             if not r:
                 return jsonify(ok=False, message="Reserva no encontrada."), 404
-    
+
             # Fechas/pax propuestos (o valores actuales)
             body = request.get_json(silent=True) or {}
             ci_new = _normalize_date_like(body.get("checkin")  or _get_first_attr(r, ["Fecha_Entrada","checkin","entrada"]))
@@ -4678,17 +4682,17 @@ def create_app() -> Flask:
                 return jsonify(ok=False, message="Fechas inválidas."), 400
             if co_new <= ci_new:
                 return jsonify(ok=False, message="El checkout debe ser posterior al check-in."), 400
-    
+
             pax_old = int(_get_first_attr(r, ["Huespedes","huespedes"]) or 1)
             pax_new = int(body.get("huespedes") or pax_old)
-    
+
             # Identificación de habitación
             room_id = _get_first_attr(r, [
                 "Codigo_Habitacion","codigo_habitacion","Habitacion","habitacion_id","habitacion"
             ])
             if not room_id:
                 return jsonify(ok=False, message="La reserva no tiene habitación asociada."), 400
-    
+
             # Info de habitación (precio, capacidad…)
             info = _habitacion_info(room_id) or {}
             # Asegura Decimal
@@ -4698,17 +4702,17 @@ def create_app() -> Flask:
             except Exception:
                 price = Decimal("0")
             capacity = info.get("capacity")  # puede ser None
-    
+
             # Noches actual/nuevo
             ci_old = _normalize_date_like(_get_first_attr(r, ["Fecha_Entrada","checkin","entrada"]))
             co_old = _normalize_date_like(_get_first_attr(r, ["Fecha_Salida","checkout","salida"]))
             nights_old = _nights(ci_old, co_old) or 0
             nights_new = _nights(ci_new, co_new) or 0
-    
+
             # Totales
             current_total = _calc_total(price, nights_old, pax_old)
             new_total     = _calc_total(price, nights_new, pax_new)
-    
+
             # Disponibilidad de la misma habitación (excluye esta reserva)
             overlap = db.session.execute(text("""
                 SELECT COUNT(1) AS c
@@ -4719,17 +4723,17 @@ def create_app() -> Flask:
                   AND NOT ( :co <= Fecha_Entrada OR :ci >= Fecha_Salida )
             """), {"room": room_id, "rid": reserva_id, "ci": ci_new, "co": co_new}).scalar() or 0
             room_available = (overlap == 0)
-    
+
             # Capacidad (si la tabla no tiene columna, capacity será None => se omite la validación)
             capacity_ok = True if capacity is None else (int(pax_new) <= int(capacity))
-    
+
             allowed = room_available and capacity_ok
-    
+
             # Diferencial: solo positivo requiere pago
             delta = new_total - current_total
             delta_payable = delta if delta > 0 else Decimal("0")
             needs_payment = (delta_payable > 0)
-    
+
             # Mensaje amigable
             if not capacity_ok:
                 msg = "Capacidad insuficiente para la cantidad de huéspedes."
@@ -4737,7 +4741,7 @@ def create_app() -> Flask:
                 msg = "La habitación asignada no está disponible para el nuevo rango."
             else:
                 msg = "Disponible. Puedes aplicar los cambios."
-    
+
             return jsonify({
                 "ok": True,
                 "available": room_available,
@@ -4761,18 +4765,18 @@ def create_app() -> Flask:
                     "delta": float(delta_payable),
                 }
             }), 200
-    
+
         except Exception as e:
             app.logger.error(f"[QUOTE] Error cotizando reserva {reserva_id}: {e}", exc_info=True)
             # Respondemos 200 con ok=false para que la UI muestre el mensaje sin romper
             return jsonify(ok=False, message="No se pudo validar la cotización."), 200
-    
-    
+
+
 
 
     from sqlalchemy import text
     from flask import request, session, jsonify
-    
+
     @app.put("/api/portal/reservas/<int:reserva_id>/apply-changes")
     @role_required("Cliente", "Recepcionista", "Admin")
     def api_portal_reserva_apply(reserva_id):
@@ -4784,33 +4788,33 @@ def create_app() -> Flask:
         """
         try:
             data = request.get_json(silent=True) or {}
-    
+
             # Esperado desde el frontend (portal-reserva-detalle)
             old_data = data.get("old") or {}
             new_data = data.get("new") or {}
             quote = data.get("quote") or {}
-    
+
             new_checkin = (new_data.get("checkin") or "").strip()
             new_checkout = (new_data.get("checkout") or "").strip()
             new_guests = new_data.get("guests")
-    
+
             if not new_checkin or not new_checkout or new_guests is None:
                 return jsonify({"error": "Datos incompletos para solicitar cambios."}), 400
-    
+
             # Monto adicional (si el frontend ya cotizó, lo usamos; si no, asumimos 0)
             try:
                 delta = float(quote.get("delta", 0) or 0)
             except Exception:
                 delta = 0.0
-    
+
             monto_adicional = delta if delta > 0 else 0.0
-    
+
             # Validación mínima (no dejamos checkout <= checkin)
             # Mantengo validación ligera para no depender de formatos internos;
             # el cotizador del frontend ya lo controla.
             if new_checkout <= new_checkin:
                 return jsonify({"error": "Rango de fechas inválido."}), 400
-    
+
             # Evitar múltiples solicitudes pendientes por la misma reserva
             db.session.execute(text("""
                 CREATE TABLE IF NOT EXISTS ReservaCambioSolicitud (
@@ -4830,19 +4834,19 @@ def create_app() -> Flask:
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """))
             db.session.commit()
-    
+
             pending = db.session.execute(text("""
                 SELECT COUNT(1) AS c
                 FROM ReservaCambioSolicitud
                 WHERE Codigo_Reserva = :rid AND Estado = 'Pendiente'
             """), {"rid": reserva_id}).scalar() or 0
-    
+
             if int(pending) > 0:
                 return jsonify({"error": "Ya existe una solicitud de cambio pendiente para esta reserva."}), 409
-    
+
             # Identidad del actor (para auditoría, útil en Paso 3)
             decided_by = session.get("user_id")
-    
+
             payload = {
                 "old": {
                     "checkin": old_data.get("checkin"),
@@ -4864,7 +4868,7 @@ def create_app() -> Flask:
                     "requested_by_user_id": decided_by
                 }
             }
-    
+
             db.session.execute(text("""
                 INSERT INTO ReservaCambioSolicitud (Codigo_Reserva, Estado, Monto_Adicional, Solicitud_JSON, Creado_En, Decidido_Por)
                 VALUES (:rid, 'Pendiente', :monto, CAST(:json_payload AS JSON), NOW(), :user_id)
@@ -4875,22 +4879,22 @@ def create_app() -> Flask:
                 "user_id": decided_by
             })
             db.session.commit()
-    
+
             # NO aplicamos cambios aquí. Eso queda para Paso 3 (Aprobar/Rechazar).
             return jsonify({
                 "ok": True,
                 "message": "Solicitud de cambio creada y enviada a aprobación.",
                 "monto_adicional": monto_adicional
             })
-    
+
         except Exception as e:
             db.session.rollback()
             return jsonify({"error": f"Error procesando solicitud de cambio: {str(e)}"}), 500
-    
-    
-    
-    
-    
+
+
+
+
+
     @app.post("/api/portal/reservas/<int:reserva_id>/send-confirmation")
     @role_required("Cliente")
     def api_portal_reserva_send_confirmation(reserva_id: int):
@@ -4898,14 +4902,14 @@ def create_app() -> Flask:
             r = _get_reserva_by_id(reserva_id)
             if not r:
                 return jsonify({"ok": False, "error": "not_found"}), 404
-    
+
             # Cliente solo puede accionar sobre su propia reserva
             email = _current_user_email()
             if not email or not _reserva_belongs_to_email(reserva_id, email):
                 return jsonify({"ok": False, "error": "forbidden"}), 403
-    
+
             estado = (r.get("Estado") or "").strip()
-    
+
             # Paso 1: si no está confirmada, NO se puede enviar confirmación
             if estado != "Confirmada":
                 # opcional: re-enviar aviso de pendiente si aplica
@@ -4915,18 +4919,18 @@ def create_app() -> Flask:
                     except Exception:
                         pass
                 return jsonify({"ok": False, "error": "not_confirmed", "estado": estado}), 409
-    
+
             _notify_reserva_success(reserva_id)
             return jsonify({"ok": True})
-    
+
         except Exception as e:
             current_app.logger.exception(f"[SEND_CONFIRMATION] error reserva={reserva_id}: {e}")
             return jsonify({"ok": False, "error": "server_error"}), 500
-        
-        
+
+
     from flask import jsonify
     import os
-    
+
     @app.get("/api/public/sinpe-config")
     def api_public_sinpe_config():
         """
@@ -4935,7 +4939,7 @@ def create_app() -> Flask:
         """
         try:
             from sqlalchemy import text
-    
+
             def _cfg_value(clave: str, default=None):
                 try:
                     row = db.session.execute(
@@ -4951,11 +4955,11 @@ def create_app() -> Flask:
                     return val if val else default
                 except Exception:
                     return default
-    
+
             # 1) BD
             sinpe_mobile = (_cfg_value("sinpe_mobile", None) or "").strip()
             sinpe_beneficiary = (_cfg_value("sinpe_beneficiary", None) or "").strip()
-    
+
             # 2) Fallback env (compatibilidad)
             if not sinpe_mobile:
                 sinpe_mobile = (
@@ -4964,7 +4968,7 @@ def create_app() -> Flask:
                     or os.getenv("SINPE_PHONE")
                     or ""
                 ).strip()
-    
+
             if not sinpe_beneficiary:
                 sinpe_beneficiary = (
                     os.getenv("SINPE_BENEFICIARIO")
@@ -4972,27 +4976,27 @@ def create_app() -> Flask:
                     or os.getenv("SINPE_BENEFICIARY")
                     or "Hotel Villa Grace"
                 ).strip()
-    
+
             # 3) Defaults finales
             if not sinpe_mobile:
                 sinpe_mobile = "SINPE no configurado"
             if not sinpe_beneficiary:
                 sinpe_beneficiary = "Hotel Villa Grace"
-    
+
             return jsonify({
                 "sinpe_mobile": sinpe_mobile,
                 "sinpe_beneficiary": sinpe_beneficiary
             })
-    
+
         except Exception:
             # fallback ultra seguro
             return jsonify({
                 "sinpe_mobile": "SINPE no configurado",
                 "sinpe_beneficiary": "Hotel Villa Grace"
             })
-    
-    
-        
+
+
+
 
 
 
@@ -5037,10 +5041,10 @@ def create_app() -> Flask:
             mimetype="application/pdf",
         )
 
-    
 
-    
-    
+
+
+
     @app.post("/api/portal/reservas/abono")
     def api_portal_reserva_abono():
         # TODO: validar sesión/rol + ownership de la reserva
@@ -5049,10 +5053,10 @@ def create_app() -> Flask:
         metodo = request.form.get("metodo", type=str)
         referencia = request.form.get("referencia", type=str)
         created_by = session.get("user_id", 1)
-    
+
         if not reserva_id or not monto or monto <= 0:
             return jsonify({"ok": False, "error": "Datos inválidos"}), 400
-    
+
         # TODO: aquí conectás con tu lógica real de finanzas (fin_receipts / fin_ledger_tx)
         # Por ahora devolvemos estructura compatible con tu JS:
         return jsonify({
@@ -5064,40 +5068,40 @@ def create_app() -> Flask:
             "created_by": created_by
         })
 
-    
+
     # ---------------------- RUTA de HABITACIONES DINÁMICAS (opcional) ----------------------
-    
-    
-    
-    
+
+
+
+
     @app.route("/rooms.html")
     def rooms_html():
         try:
             q = Habitacion.query
-    
+
             # Orden consistente (si existe Numero_Habitacion)
             if hasattr(Habitacion, "Numero_Habitacion"):
                 q = q.order_by(Habitacion.Numero_Habitacion.asc(), Habitacion.Codigo_Habitacion.asc())
             else:
                 q = q.order_by(Habitacion.Codigo_Habitacion.asc())
-    
+
             habitaciones = q.all()
-    
-            
+
+
             for h in habitaciones:
                 try:
                     setattr(h, "Precio_Noche", float(_precio_noche(h) or 0))
                 except Exception:
                     # No rompemos la vista por un caso aislado
                     pass
-    
+
             print(f"[DEBUG] Se cargaron {len(habitaciones)} habitaciones desde la BD.")
         except Exception as e:
             print(f"[ERROR] Al cargar habitaciones: {e}")
             habitaciones = []
-    
+
         return render_template("rooms.html", habitaciones=habitaciones)
-    
+
 
     @app.route("/test-db")
     def test_db():
@@ -5139,14 +5143,14 @@ def create_app() -> Flask:
             noches   = int(row[3] or 0)
             adr = (rev / noches) if noches > 0 else 0.0
             return {"reservas": reservas, "monto": monto, "adr": round(adr, 2)}
-    
+
         return jsonify({
             "ok": True,
             "day":   _fetch("day",   "DATE_FORMAT(CURDATE(), '%Y-%m-%d')"),
             "week":  _fetch("week",  "DATE_FORMAT(CURDATE(), '%x-W%v')"),
             "month": _fetch("month", "DATE_FORMAT(CURDATE(), '%Y-%m')"),
         })
-    
+
 
     # ---------------------- Auditoría reciente ----------------------
     @app.get("/api/audit/recent")
@@ -5223,31 +5227,31 @@ def create_app() -> Flask:
         except BadSignature:
             flash("Enlace inválido. Solicita uno nuevo.", "danger")
             return redirect(url_for("forgot_password"))
-    
+
         user = Usuario.query.filter(func.lower(Usuario.Correo) == email).first()
         if not user:
             flash("El enlace no es válido o expiró.", "danger")
             return redirect(url_for("forgot_password"))
-    
+
         if request.method == "POST":
             pwd1 = (request.form.get("password") or "").strip()
             pwd2 = (request.form.get("confirm_password") or "").strip()
-    
+
             if len(pwd1) < 8:
                 flash("La contraseña debe tener al menos 8 caracteres.", "warning")
                 return render_template("reset-password.html", token=token, email=email)
             if pwd1 != pwd2:
                 flash("Las contraseñas no coinciden.", "warning")
                 return render_template("reset-password.html", token=token, email=email)
-    
+
             user.set_password(pwd1)
             db.session.commit()
             if session.get("user_id") == getattr(user, "Codigo_Usuario", None):
                 session.clear()
-    
+
             flash("Tu contraseña fue actualizada. Ya puedes iniciar sesión.", "success")
             return redirect(url_for("login_html"))
-    
+
         return render_template("reset-password.html", token=token, email=email)
 
 
@@ -5351,28 +5355,28 @@ def create_app() -> Flask:
             password   = (request.form.get("password") or "").strip()
             confirm    = (request.form.get("confirm_password") or "").strip()
             terms_ok   = (request.form.get("terms") is not None)
-    
+
             # --- Validaciones servidor (seguridad/consistencia) ---
             # Nombres
             if not (_validate_name(nombre) and _validate_name(apellidos)):
                 flash("Nombre y apellidos inválidos (solo letras y espacios, mínimo 2).", "warning")
                 return render_template("register.html")
-    
+
             # Full name (construir si viene vacío)
             if not full_name:
                 full_name = f"{nombre} {apellidos}".strip()
-    
+
             # Email
             if not _is_valid_email(email):
                 flash("Correo electrónico inválido.", "warning")
                 return render_template("register.html")
-    
+
             # Teléfono CR normalizado a E.164
             phone_norm = _normalize_cr_phone(phone_raw)
             if not phone_norm:
                 flash("Teléfono inválido. Debe ser de Costa Rica (8 dígitos; opcional +506).", "warning")
                 return render_template("register.html")
-    
+
             # Documento (opcional)
             national_id = None
             if national_id_raw:
@@ -5380,7 +5384,7 @@ def create_app() -> Flask:
                 if not national_id:
                     flash("Cédula/DIMEX/Pasaporte inválido.", "warning")
                     return render_template("register.html")
-    
+
             # Password
             if password != confirm:
                 flash("Las contraseñas no coinciden.", "warning")
@@ -5388,29 +5392,29 @@ def create_app() -> Flask:
             if not _is_strong_password(password, email):
                 flash("La contraseña es débil. Usa mínimo 8 caracteres con mayúsculas, minúsculas y números; evita secuencias o repetidos.", "warning")
                 return render_template("register.html")
-    
+
             # Términos
             if not terms_ok:
                 flash("Debes aceptar los Términos y la Política de Privacidad.", "warning")
                 return render_template("register.html")
-    
+
             # --- Unicidad ---
             if Usuario.query.filter(func.lower(Usuario.Correo) == email).first():
                 flash("El correo ya está registrado.", "danger")
                 return render_template("register.html")
-    
+
             if national_id:
                 # normalizamos comparación: Cedula_Pasaporte puede almacenar dígitos o alfanum.
                 if Usuario.query.filter_by(Cedula_Pasaporte=national_id).first():
                     flash("La cédula/pasaporte ya está registrada.", "danger")
                     return render_template("register.html")
-    
+
             # --- Rol cliente ---
             role = _get_role_by_name("Cliente")
             if not role:
                 _ensure_seed_roles()
                 role = _get_role_by_name("Cliente")
-    
+
             # --- Crear usuario ---
             u = Usuario(
                 Nombre=full_name[:80],
@@ -5422,17 +5426,17 @@ def create_app() -> Flask:
             )
             u.set_password(password)
             db.session.add(u)
-    
+
             try:
-                
+
                 # 1) Asegurar Cliente con documento
                 cliente_id = ensure_cliente_for_email(full_name, email, phone_norm, doc_num=national_id)
                 if cliente_id:
                     u.Codigo_Cliente = cliente_id
-                
+
                 # 2) Commit único (Usuario + Cliente) = consistencia total
                 db.session.commit()
-                
+
             except IntegrityError:
                 db.session.rollback()
                 flash("Ya existe un usuario con ese correo o cédula/pasaporte.", "danger")
@@ -5442,18 +5446,18 @@ def create_app() -> Flask:
                 current_app.logger.exception(f"[REGISTER] Error creando usuario: {e}")
                 flash("No se pudo completar el registro. Inténtalo de nuevo.", "danger")
                 return render_template("register.html")
-    
+
             flash("Registro exitoso. Ya puedes iniciar sesión.", "success")
             return redirect(url_for("login_html"))
-    
+
         return render_template("register.html")
-    
+
 
     @app.route("/register.html", methods=["GET", "POST"])
     def register_html():
         return register()
-    
-    
+
+
         # ---------------------- Perfil del usuario (API) ----------------------
     @app.get("/api/me")
     @login_required
@@ -5471,7 +5475,7 @@ def create_app() -> Flask:
             "Rol":      _get_role_name(u) or "Cliente",
             "Cedula":   ""  # relleno abajo
         }
-        
+
         # Resolver documento preferentemente desde Usuario.Cedula_Pasaporte, si existe.
         try:
             doc_val = None
@@ -5488,7 +5492,7 @@ def create_app() -> Flask:
                 data["Cedula"] = str(doc_val)
         except Exception:
             pass
-        
+
         return jsonify({"ok": True, "data": data})
 
 
@@ -5500,15 +5504,15 @@ def create_app() -> Flask:
         correo   = (p.get("Correo") or "").strip().lower()
         telefono = (p.get("Telefono") or "").strip()
         cedula   = (p.get("Cedula") or "").strip()
-    
+
         if not nombre or not correo:
             return jsonify({"ok": False, "msg": "Nombre y correo son obligatorios."}), 400
-    
+
         uid = session.get("user_id")
         u = Usuario.query.filter_by(Codigo_Usuario=uid).first()
         if not u:
             return jsonify({"ok": False, "msg": "not_found"}), 404
-    
+
         # Correo único (case-insensitive) excluyendo mi propio id
         dupe = (
             Usuario.query
@@ -5517,14 +5521,14 @@ def create_app() -> Flask:
         )
         if dupe:
             return jsonify({"ok": False, "msg": "Ese correo ya está en uso."}), 409
-    
+
         # === Validación de documento (opcional pero con formato sensato) ===
         # Acepta: 1-2345-6789 | 9–12 dígitos | pasaporte alfanumérico 6–20
         if cedula:
             re_doc = re.compile(r"^(?:(?:[1-9]-\d{4}-\d{4})|\d{9,12}|[A-Za-z0-9]{6,20})$")
             if not re_doc.match(cedula):
                 return jsonify({"ok": False, "msg": "Documento inválido. Usa 1-2345-6789, 9–12 dígitos o pasaporte (6–20)."}), 400
-    
+
             # Unicidad en Usuario.Cedula_Pasaporte (si existe la columna)
             try:
                 if _col_exists("Usuario", "Cedula_Pasaporte"):
@@ -5538,7 +5542,7 @@ def create_app() -> Flask:
                         return jsonify({"ok": False, "msg": "Ese número de documento ya está en uso."}), 409
             except Exception:
                 pass
-    
+
         try:
             # === Actualizar Usuario ===
             u.Nombre = nombre
@@ -5548,14 +5552,14 @@ def create_app() -> Flask:
                     u.Telefono = telefono or getattr(u, "Telefono", None)
             except Exception:
                 pass
-    
+
             # Guardar cédula/pasaporte si la columna existe
             try:
                 if _col_exists("Usuario", "Cedula_Pasaporte"):
                     u.Cedula_Pasaporte = cedula or getattr(u, "Cedula_Pasaporte", None)
             except Exception:
                 pass
-    
+
             # === Sincronizar datos básicos en Cliente (si está vinculado) ===
             try:
                 if getattr(u, "Codigo_Cliente", None):
@@ -5563,16 +5567,16 @@ def create_app() -> Flask:
                     partes = nombre.split(" ", 1)
                     nom = partes[0][:50]
                     ape = (partes[1] if len(partes) > 1 else "").strip()[:50]
-    
+
                     # Para Cliente.Cedula solo almacenamos dígitos (0 si no hay)
                     ced_digits = _try_int_digits(cedula) if cedula else None
-    
+
                     params = {"n": nom, "a": ape, "t": (telefono or None), "e": correo, "cid": u.Codigo_Cliente}
                     set_ced = ""
                     if ced_digits is not None:
                         set_ced = ", Cedula = :ced"
                         params["ced"] = ced_digits
-    
+
                     db.session.execute(
                         text(f"""
                             UPDATE Cliente
@@ -5588,17 +5592,17 @@ def create_app() -> Flask:
             except Exception:
                 # no impedir guardado del perfil por esta sincronización
                 pass
-    
+
             db.session.commit()
             # refrescar nombre en sesión
             session["user_name"] = u.Nombre
             return jsonify({"ok": True})
-    
+
         except Exception as e:
             db.session.rollback()
             current_app.logger.exception(f"[api/me] update failed: {e}")
             return jsonify({"ok": False, "msg": "No se pudo actualizar el perfil."}), 500
-    
+
 
     # === Perfil: cambio de contraseña ===
     @app.route("/api/me/password", methods=["PUT", "POST"])
@@ -5608,18 +5612,18 @@ def create_app() -> Flask:
             uid = session.get("user_id")
             if not uid:
                 return jsonify({"ok": False, "msg": "No autenticado."}), 401
-    
+
             u = Usuario.query.filter_by(Codigo_Usuario=uid).first()
             if not u:
                 return jsonify({"ok": False, "msg": "Usuario no encontrado."}), 404
-    
+
             p = request.get_json(silent=True) or {}
-    
+
             # Acepta los nombres que manda portal-perfil.html
             current = (p.get("current") or p.get("old") or p.get("password") or "").strip()
             new_pw  = (p.get("new")     or p.get("new_password") or p.get("password_new") or "").strip()
             confirm = (p.get("confirm") or p.get("password_confirm") or "").strip()
-    
+
             # Validaciones
             if not current or not new_pw or not confirm:
                 return jsonify({"ok": False, "msg": "Completa todos los campos."}), 400
@@ -5629,7 +5633,7 @@ def create_app() -> Flask:
                 return jsonify({"ok": False, "msg": "La confirmación no coincide."}), 400
             if new_pw == current:
                 return jsonify({"ok": False, "msg": "La nueva contraseña no puede ser igual a la actual."}), 400
-    
+
             # Verificación de la contraseña actual (compatibilidad con hash o texto plano legado)
             stored = getattr(u, "Contrasena", None)
             is_ok = False
@@ -5642,21 +5646,21 @@ def create_app() -> Flask:
             else:
                 # Si por diseño existían usuarios sin contraseña previa, permite setear la primera
                 is_ok = True
-    
+
             if not is_ok:
                 return jsonify({"ok": False, "msg": "La contraseña actual no es válida."}), 400
-    
+
             # Hash de la nueva contraseña y persistencia
             try:
                 new_hash = generate_password_hash(new_pw)
             except Exception:
                 # Fallback improbable: guarda en claro (no recomendado), pero evita NULL
                 new_hash = new_pw
-    
+
             u.Contrasena = new_hash
             if hasattr(u, "Fecha_Modificacion"):
                 u.Fecha_Modificacion = datetime.utcnow()
-    
+
             db.session.commit()
             return jsonify({"ok": True, "msg": "Contraseña actualizada."})
         except IntegrityError:
@@ -5666,9 +5670,9 @@ def create_app() -> Flask:
             db.session.rollback()
             current_app.logger.exception("[api/me/password] error: %s", e)
             return jsonify({"ok": False, "msg": "No se pudo cambiar la contraseña."}), 500
-    
 
-    
+
+
 
     # ========= GRR-01-004 — MODELOS / HELPERS / RUTAS =============
     class GuestCheckin(db.Model):
@@ -5684,9 +5688,9 @@ def create_app() -> Flask:
         key_activated = db.Column(db.Boolean, nullable=False, server_default=text("0"))
         created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
         meta = db.Column(db.JSON)
-        
-        
-        
+
+
+
     class GuestCheckout(db.Model):
         __tablename__ = "guest_checkout"
         id            = db.Column(db.Integer, primary_key=True)
@@ -5696,14 +5700,14 @@ def create_app() -> Flask:
         documento     = db.Column(db.String(60), nullable=True)
         checked_out_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now(), index=True)
         staff_user_id = db.Column(db.Integer, nullable=True, index=True)
-    
+
         __table_args__ = (
             db.ForeignKeyConstraint(["reserva_id"], ["Reserva.Codigo_Reserva"], name="FK_guest_checkout_reserva"),
             db.ForeignKeyConstraint(["estancia_id"], ["ReservaEstancia.Id_Estancia"], name="FK_guest_checkout_estancia"),
             db.ForeignKeyConstraint(["habitacion_id"], ["Habitacion.Codigo_Habitacion"], name="FK_guest_checkout_hab"),
             db.ForeignKeyConstraint(["staff_user_id"], ["Usuario.Codigo_Usuario"], name="FK_guest_checkout_staff"),
         )
-    
+
 
     class KeyActivation(db.Model):
         __tablename__ = "key_activation"
@@ -5760,7 +5764,7 @@ def create_app() -> Flask:
         """
         doc = _normalize_docnum(doc_number)
         when = (when_iso or date.today().isoformat())
-    
+
         rows = db.session.execute(text("""
             SELECT
                 R.Codigo_Reserva           AS reserva_id,
@@ -5785,9 +5789,9 @@ def create_app() -> Flask:
               AND ( C.Cedula = :doc OR U.Cedula_Pasaporte = :doc )
             ORDER BY R.Fecha_Entrada ASC, R.Codigo_Reserva ASC
         """), {"doc": doc, "w": when}).mappings().all()
-    
+
         return [dict(r) for r in rows]
-    
+
 
     # UI de recepción (simple)
     @app.route("/ops-checkin.html", methods=["GET"])
@@ -5818,7 +5822,7 @@ def create_app() -> Flask:
             return bool(row)
         except Exception:
             return False
-    
+
     def _precio_noche_py(h) -> float:
         for c in ("Precio_Noche", "Precio_Base", "Precio", "Tarifa_Base"):
             if hasattr(h, c):
@@ -5829,7 +5833,7 @@ def create_app() -> Flask:
                 except Exception:
                     pass
         return 0.0
-    
+
 
     @app.get("/api/ops/checkin/search")
     @role_required("Administrador", "Recepcionista")
@@ -5839,30 +5843,30 @@ def create_app() -> Flask:
         - cédula / pasaporte
         - correo
         - número de comprobante
-    
+
         IMPORTANTE:
         Nunca debe devolver reservas cuyo check-in ya fue realizado.
         """
         doc = (request.args.get("doc") or "").strip()
         when = (request.args.get("when") or "").strip()
-    
+
         if not doc:
             return jsonify({"ok": False, "error": "doc_required"}), 400
-    
+
         try:
             d = datetime.strptime(when, "%Y-%m-%d").date() if when else date.today()
         except Exception:
             return jsonify({"ok": False, "error": "invalid_when"}), 400
-    
+
         def _norm_sql(expr: str) -> str:
             return f"REPLACE(REPLACE({expr},'-',''),' ','')"
-    
+
         join_gc = ""
         where_gc = ""
         if _tabla_existe("guest_checkin"):
             join_gc = "LEFT JOIN guest_checkin gc ON gc.reserva_id = R.Codigo_Reserva"
             where_gc = " AND gc.id IS NULL "
-    
+
         sql = f"""
             SELECT
                 R.Codigo_Reserva AS id,
@@ -5896,9 +5900,9 @@ def create_app() -> Flask:
             ORDER BY R.Fecha_Entrada ASC, COALESCE(H.Numero_Habitacion, '') ASC
             LIMIT 200
         """
-    
+
         rows = db.session.execute(_text(sql), {"d": d, "doc": doc}).mappings().all()
-    
+
         items = []
         for r in rows:
             room_block = None
@@ -5908,7 +5912,7 @@ def create_app() -> Flask:
                     h = Habitacion.query.get(int(r["Codigo_Habitacion"]))
             except Exception:
                 h = None
-    
+
             if h:
                 room_block = {
                     "code": int(getattr(h, "Codigo_Habitacion")),
@@ -5919,7 +5923,7 @@ def create_app() -> Flask:
                     "desc": getattr(h, "Descripcion", None) or "",
                     "img": getattr(h, "Imagen_URL", None) or "",
                 }
-    
+
             items.append({
                 "id": int(r["id"]),
                 "numero": r.get("numero") or f"VG-{int(r['id'])}",
@@ -5933,16 +5937,16 @@ def create_app() -> Flask:
                 "habitacion": r.get("Numero_Habitacion"),
                 "room": room_block,
             })
-    
+
         return jsonify({"ok": True, "items": items, "count": len(items)}), 200
 
-    
 
-    
 
-  
-    
-    
+
+
+
+
+
     @app.get("/api/ops/checkin/confirmed")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkin_confirmed():
@@ -6021,7 +6025,7 @@ def create_app() -> Flask:
 
         return jsonify({"ok": True, "items": items, "count": len(items)}), 200
 
-    
+
     @app.get("/api/ops/checkin/week")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkin_week():
@@ -6032,16 +6036,16 @@ def create_app() -> Flask:
         Fallback: Audit_Log (Accion='checkin.completed') si guest_checkin no existe.
         """
         from datetime import timedelta, datetime, time
-    
+
         today = date.today()
         week_start = today - timedelta(days=today.weekday())  # Lunes
         week_end = week_start + timedelta(days=7)             # Lunes siguiente
-    
+
         start_dt = datetime.combine(week_start, time.min)
         end_dt = datetime.combine(week_end, time.min)
-    
+
         items = []
-    
+
         # Preferido: guest_checkin si existe y tiene created_at
         if _tabla_existe("guest_checkin") and _col_exists("guest_checkin", "created_at"):
             rows = db.session.execute(_text("""
@@ -6061,7 +6065,7 @@ def create_app() -> Flask:
                 ORDER BY gc.created_at DESC
                 LIMIT 500
             """), {"s": start_dt, "e": end_dt}).mappings().all()
-    
+
             for r in rows:
                 items.append({
                     "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
@@ -6071,7 +6075,7 @@ def create_app() -> Flask:
                     "habitacion": r.get("habitacion"),
                     "doc_number": r.get("doc_number") or "",
                 })
-    
+
             return jsonify({
                 "ok": True,
                 "week_start": week_start.isoformat(),
@@ -6079,7 +6083,7 @@ def create_app() -> Flask:
                 "count": len(items),
                 "items": items
             }), 200
-    
+
         # Fallback: Audit_Log
         if _tabla_existe("Audit_Log") and _col_exists("Audit_Log", "Fecha"):
             rows = db.session.execute(_text("""
@@ -6102,14 +6106,14 @@ def create_app() -> Flask:
                 ORDER BY a.Fecha DESC
                 LIMIT 500
             """), {"s": start_dt, "e": end_dt}).mappings().all()
-    
+
             for r in rows:
                 rid = None
                 try:
                     rid = int(r["reserva_id"]) if r.get("reserva_id") is not None else None
                 except Exception:
                     rid = None
-    
+
                 items.append({
                     "created_at": r["created_at"].isoformat() if r.get("created_at") else None,
                     "reserva_id": rid,
@@ -6118,7 +6122,7 @@ def create_app() -> Flask:
                     "habitacion": r.get("habitacion"),
                     "doc_number": (r.get("doc_number") or ""),
                 })
-    
+
             return jsonify({
                 "ok": True,
                 "week_start": week_start.isoformat(),
@@ -6126,7 +6130,7 @@ def create_app() -> Flask:
                 "count": len(items),
                 "items": items
             }), 200
-    
+
         return jsonify({
             "ok": True,
             "week_start": week_start.isoformat(),
@@ -6134,10 +6138,10 @@ def create_app() -> Flask:
             "count": 0,
             "items": []
         }), 200
-    
-    
 
-    
+
+
+
 
     @app.post("/api/ops/checkin/complete")
     @role_required("Administrador", "Recepcionista")
@@ -6404,17 +6408,17 @@ def create_app() -> Flask:
             current_app.logger.exception(f"[api/ops/checkin/complete] error: {e}")
             return jsonify({"ok": False, "error": "internal_error"}), 500
 
-    
-    
-    
-    
+
+
+
+
         # Alias de compatibilidad (si alguna vista vieja llama /api/ops/checkin)
     @app.post("/api/ops/checkin")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkin_complete_alias():
         return api_ops_checkin_complete()
 
-    
+
     @app.get("/api/ops/walkin/rooms")
     @role_required("Administrador", "Recepcionista")
     def api_ops_walkin_rooms():
@@ -6850,20 +6854,20 @@ def create_app() -> Flask:
             "reserva_id": int(r["reserva_id"]),
             "habitacion_id": int(r["habitacion_id"]),
             "habitacion": r["hab_num"],
-        
+
             # Compatibilidad UI (ops-checkout.html usa checkin/checkout):
             "checkin": str(r["desde"]),
             "checkout": str(r["hasta"]),
-        
+
             # Se conservan también por si luego los usás:
             "desde": str(r["desde"]),
             "hasta": str(r["hasta"]),
-        
+
             "numero": r["numero"],
             "monto_total_reserva": float(r["monto_total"] or 0.0),
             "cliente": r["cliente_email"],
         } for r in rows]
-        
+
 
     def _estancias_salen_hoy():
         rows = db.session.execute(_text("""
@@ -6885,7 +6889,7 @@ def create_app() -> Flask:
             ORDER BY R.Codigo_Reserva DESC
             LIMIT 200
         """)).mappings().all()
-    
+
         items = []
         for r in rows:
             items.append({
@@ -6899,9 +6903,9 @@ def create_app() -> Flask:
                 "checkout": r["checkout"].isoformat() if r["checkout"] else None,
             })
         return items
-    
-    
-    
+
+
+
 
 
 
@@ -7008,28 +7012,28 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "doc_required"}), 400
         items = _estancias_salen_hoy_por_documento(doc)
         return jsonify({"ok": True, "items": items})
-    
-    
-    
+
+
+
 
     @app.get("/api/ops/checkout/today")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkout_today():
         items = _estancias_salen_hoy()
         return jsonify({"ok": True, "items": items, "count": len(items)}), 200
-    
-    
-    
+
+
+
     @app.get("/api/ops/checkout/week")
     @role_required("Administrador", "Recepcionista")
     def api_ops_checkout_week():
         from datetime import datetime, timedelta
-    
+
         today = date.today()
         monday = today - timedelta(days=today.weekday())
         start = datetime.combine(monday, datetime.min.time())
         end = start + timedelta(days=7)
-    
+
         rows = db.session.execute(_text("""
             SELECT
                 x.Fecha AS fecha,
@@ -7056,7 +7060,7 @@ def create_app() -> Flask:
             ORDER BY x.Fecha DESC
             LIMIT 500
         """), {"start": start, "end": end}).mappings().all()
-    
+
         items = []
         for r in rows:
             items.append({
@@ -7068,15 +7072,15 @@ def create_app() -> Flask:
                 "pago_final": float(r["pago_final"] or 0.0),
                 "metodo": r["metodo"] or "—",
             })
-    
+
         return jsonify({"ok": True, "items": items, "count": len(items)}), 200
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
 
     @app.get("/api/ops/checkout/preview")
     @role_required("Administrador", "Recepcionista")
@@ -7123,7 +7127,7 @@ def create_app() -> Flask:
         credit = db.Column(db.Numeric(14, 2), default=0, nullable=False)
         description = db.Column(db.String(255))
 
-    
+
 
     @app.post("/api/pos/ledger")
     def api_pos_ledger():
@@ -7523,11 +7527,11 @@ def create_app() -> Flask:
         if not path.exists():
             _create_note_pdf(note)
         return send_file(str(path), as_attachment=True, download_name=f"{note.numero}.pdf")
-    
+
     @app.get("/ops/coupons")
     def view_ops_coupons():
         return render_template("ops-coupons.html")
-    
+
     @app.get("/ops/no-show")
     def view_ops_noshow():
         return render_template("ops-no-show.html")
@@ -7644,11 +7648,11 @@ def create_app() -> Flask:
                              WHERE r.Codigo_Reserva = :rid
                              LIMIT 1
                         """), {"rid": int(reserva_id)}).first()
-                
+
                         doc_val = None
                         if doc_row:
                             doc_val = (doc_row[0] or doc_row[1] or None)
-                
+
                         db.session.execute(text("""
                             INSERT INTO guest_checkout (reserva_id, estancia_id, habitacion_id, documento, checked_out_at, staff_user_id)
                             VALUES (:r, :e, :h, :doc, NOW(), :u)
@@ -7663,7 +7667,7 @@ def create_app() -> Flask:
                 except Exception as log_ex:
                     db.session.rollback()
                     current_app.logger.warning(f"[CHECKOUT] No se pudo registrar guest_checkout: {log_ex}")
-                
+
                 db.session.rollback()
                 current_app.logger.warning(f"[CHECKOUT] No se pudo cerrar estancia {e['Id_Estancia']}: {ex}")
 
@@ -7685,10 +7689,10 @@ def create_app() -> Flask:
 
         bd_after = _checkout_breakdown(int(reserva_id), estancia_id=estancia_id) or bd_before
         return jsonify({"ok": True, "reserva_id": int(reserva_id), "receipt": receipt, "breakdown": bd_after})
-    
-    
-    
-    
+
+
+
+
     # Configuración de carpetas de uploads ACE
     os.makedirs(app.config.get('UPLOAD_FOLDER_CLIENTES'), exist_ok=True)
 
@@ -7728,14 +7732,14 @@ def create_app() -> Flask:
         FinInvoice  # type: ignore[name-defined]
     except NameError:
         from sqlalchemy import func
-    
+
         # ========= FIN-INV-01 — Gestión de Facturas ===========
         class FinInvoice(db.Model):
             __tablename__ = "fin_invoices"
             __table_args__ = (
                 db.UniqueConstraint("numero", name="UQ_fin_invoices_numero"),  # nombre explícito de la unique
             )
-    
+
             id_factura      = db.Column(db.Integer, primary_key=True)
             numero          = db.Column(db.String(20), unique=True, nullable=False)
             cliente_nombre  = db.Column(db.String(120))
@@ -7748,9 +7752,9 @@ def create_app() -> Flask:
             id_usuario      = db.Column(db.Integer, index=True)
             fecha_emision   = db.Column(db.Date, server_default=func.current_date())
             estado          = db.Column(db.Enum("Emitida", "Anulada", name="fin_invoice_estado"), server_default="Emitida")
-    
-    
-    
+
+
+
         # =========================
     # OPS — Aprobaciones SINPE
     # =========================
@@ -7763,7 +7767,7 @@ def create_app() -> Flask:
         """
         import re
         from decimal import Decimal
-    
+
         rows = (
             db.session.execute(
                 text(
@@ -7796,11 +7800,11 @@ def create_app() -> Flask:
             .mappings()
             .all()
         )
-    
+
         out = []
         for x in rows:
             d = dict(x)
-    
+
             # 1) Normaliza fechas para que el frontend reciba YYYY-MM-DD
             for k in ("checkin", "checkout"):
                 v = d.get(k)
@@ -7825,7 +7829,7 @@ def create_app() -> Flask:
                         d[k] = s[:10] if len(s) >= 10 else s
                     except Exception:
                         pass
-    
+
             # 2) Normaliza total para evitar TypeError: Decimal is not JSON serializable
             tv = d.get("total")
             if tv is None:
@@ -7839,12 +7843,12 @@ def create_app() -> Flask:
                 except Exception:
                     # último recurso: dejarlo como string (serializable)
                     d["total"] = str(tv)
-    
+
             out.append(d)
-    
+
         return out
-    
-    
+
+
     def _ops_list_reservas_all(limit: int = 500, estado: str | None = None, q: str | None = None):
         """
         Listado general para OPS con valores 100% JSON-serializables.
@@ -7852,10 +7856,10 @@ def create_app() -> Flask:
         """
         import re
         from decimal import Decimal
-    
+
         q_clean = (q or "").strip()
         q_like = f"%{q_clean}%" if q_clean else None
-    
+
         rows = (
             db.session.execute(
                 text(
@@ -7902,11 +7906,11 @@ def create_app() -> Flask:
             .mappings()
             .all()
         )
-    
+
         out = []
         for x in rows:
             d = dict(x)
-    
+
             # Fechas a YYYY-MM-DD
             for k in ("checkin", "checkout"):
                 v = d.get(k)
@@ -7925,7 +7929,7 @@ def create_app() -> Flask:
                         d[k] = s[:10] if len(s) >= 10 else s
                     except Exception:
                         pass
-    
+
             # Montos a float
             for money_key in ("total", "pagado", "saldo"):
                 tv = d.get(money_key)
@@ -7938,12 +7942,12 @@ def create_app() -> Flask:
                         d[money_key] = float(tv)
                     except Exception:
                         d[money_key] = 0.0
-    
+
             out.append(d)
-    
+
         return out
-    
-    
+
+
     @app.get("/api/ops/reservas")
     @role_required("Administrador", "Recepcionista")
     def api_ops_reservas_list():
@@ -7957,10 +7961,10 @@ def create_app() -> Flask:
             except Exception:
                 limit_i = 500
             limit_i = max(1, min(2000, limit_i))
-    
+
             estado = (request.args.get("estado") or "").strip() or None
             q = request.args.get("q") or None
-    
+
             items = _ops_list_reservas_all(limit=limit_i, estado=estado, q=q)
             return jsonify({"ok": True, "items": items})
         except Exception as e:
@@ -7969,9 +7973,9 @@ def create_app() -> Flask:
             except Exception:
                 pass
             return jsonify({"ok": False, "error": "reservas_list_failed"}), 500
-        
-        
-        
+
+
+
     from datetime import timedelta
 
     @app.get("/api/ops/reservas/calendar")
@@ -7981,7 +7985,7 @@ def create_app() -> Flask:
         Construcción de calendario:
           - Devuelve reservas que se solapan con el rango [from..to]
           - Devuelve habitaciones "usables" (por defecto excluye Mantenimiento)
-    
+
         Query:
           from=YYYY-MM-DD   (requerido)
           to=YYYY-MM-DD     (requerido)
@@ -7993,22 +7997,22 @@ def create_app() -> Flask:
             to_s = (request.args.get("to") or "").strip()
             if not from_s or not to_s:
                 return jsonify({"ok": False, "error": "missing_range"}), 400
-    
+
             try:
                 d_from = datetime.strptime(from_s, "%Y-%m-%d").date()
                 d_to = datetime.strptime(to_s, "%Y-%m-%d").date()
             except ValueError:
                 return jsonify({"ok": False, "error": "invalid_range"}), 400
-    
+
             if d_to < d_from:
                 return jsonify({"ok": False, "error": "range_order"}), 400
-    
+
             estados_csv = (request.args.get("estados") or "Confirmada,Pendiente").strip()
             exclude_room_csv = (request.args.get("exclude_room_estados") or "Mantenimiento").strip()
-    
+
             # Para solape usando checkout exclusivo: checkin < (to+1) AND checkout > from
             to_plus1 = d_to + timedelta(days=1)
-    
+
             reservas_rows = (
                 db.session.execute(
                     text(
@@ -8022,11 +8026,11 @@ def create_app() -> Flask:
                             r.Fecha_Salida AS checkout,
                             r.Monto_Total AS total,
                             r.Monto_Pagado AS pagado,
-    
+
                             CONCAT(c.Nombre,' ',c.Apellido) AS cliente_nombre,
                             c.Correo AS cliente_correo,
                             c.Cedula AS cliente_cedula,
-    
+
                             h.Codigo_Habitacion AS room_id,
                             h.Numero_Habitacion AS habitacion_numero,
                             h.Tipo AS habitacion_tipo
@@ -8048,7 +8052,7 @@ def create_app() -> Flask:
                 .mappings()
                 .all()
             )
-    
+
             rooms_rows = (
                 db.session.execute(
                     text(
@@ -8071,12 +8075,12 @@ def create_app() -> Flask:
                 .mappings()
                 .all()
             )
-    
+
             def _iso_date(v):
                 if v is None:
                     return None
                 return v.isoformat()[:10] if hasattr(v, "isoformat") else str(v)[:10]
-    
+
             reservas = []
             for r in reservas_rows:
                 d = dict(r)
@@ -8088,7 +8092,7 @@ def create_app() -> Flask:
                     except Exception:
                         d[k] = 0.0
                 reservas.append(d)
-    
+
             rooms = []
             for rm in rooms_rows:
                 d = dict(rm)
@@ -8097,7 +8101,7 @@ def create_app() -> Flask:
                 except Exception:
                     d["precio_noche"] = 0.0
                 rooms.append(d)
-    
+
             return jsonify(
                 {
                     "ok": True,
@@ -8108,17 +8112,17 @@ def create_app() -> Flask:
                     "reservas": reservas,
                 }
             )
-    
+
         except Exception as e:
             try:
                 current_app.logger.exception(f"[OPS] reservas calendar error: {e}")
             except Exception:
                 pass
             return jsonify({"ok": False, "error": "calendar_failed"}), 500
-        
-        
+
+
     from datetime import timedelta
-    
+
     @app.get("/api/ops/reservas/dashboard")
     @role_required("Administrador", "Recepcionista")
     def api_ops_reservas_dashboard():
@@ -8130,7 +8134,7 @@ def create_app() -> Flask:
           - Llegadas/Salidas
           - Distribución por estado/canal
           - Próximas llegadas (7 días) + alertas saldo pendiente
-    
+
         Query:
           from=YYYY-MM-DD (requerido)
           to=YYYY-MM-DD   (requerido)
@@ -8141,24 +8145,24 @@ def create_app() -> Flask:
             to_s = (request.args.get("to") or "").strip()
             if not from_s or not to_s:
                 return jsonify({"ok": False, "error": "missing_range"}), 400
-    
+
             try:
                 d_from = datetime.strptime(from_s, "%Y-%m-%d").date()
                 d_to = datetime.strptime(to_s, "%Y-%m-%d").date()
             except ValueError:
                 return jsonify({"ok": False, "error": "invalid_range"}), 400
-    
+
             if d_to < d_from:
                 return jsonify({"ok": False, "error": "range_order"}), 400
-    
+
             max_days = 400
             days = (d_to - d_from).days + 1
             if days > max_days:
                 return jsonify({"ok": False, "error": "range_too_large", "max_days": max_days}), 400
-    
+
             exclude_room_csv = (request.args.get("exclude_room_estados") or "Mantenimiento").strip()
             to_plus1 = d_to + timedelta(days=1)
-    
+
             # Rooms usables
             rooms_rows = (
                 db.session.execute(
@@ -8183,7 +8187,7 @@ def create_app() -> Flask:
                 .all()
             )
             total_rooms = len(rooms_rows)
-    
+
             # Reservas que solapan el rango (para ocupación/ingresos/estado/canal)
             reservas_rows = (
                 db.session.execute(
@@ -8199,10 +8203,10 @@ def create_app() -> Flask:
                             r.Monto_Total AS total,
                             r.Monto_Pagado AS pagado,
                             r.Fecha_Registro AS created_at,
-    
+
                             CONCAT(c.Nombre,' ',c.Apellido) AS cliente_nombre,
                             c.Correo AS cliente_correo,
-    
+
                             h.Codigo_Habitacion AS room_id,
                             h.Numero_Habitacion AS habitacion_numero,
                             h.Tipo AS habitacion_tipo
@@ -8220,7 +8224,7 @@ def create_app() -> Flask:
                 .mappings()
                 .all()
             )
-    
+
             # Serie de reservas creadas por día (por Fecha_Registro, no por estancia)
             created_map = { (d_from + timedelta(days=i)).isoformat(): 0 for i in range(days) }
             created_rows = (
@@ -8241,7 +8245,7 @@ def create_app() -> Flask:
             for r in created_rows:
                 if r["d"]:
                     created_map[str(r["d"])[:10]] = int(r["cnt"] or 0)
-    
+
             # Próximas llegadas (7 días)
             today = date.today()
             next7 = today + timedelta(days=7)
@@ -8274,61 +8278,61 @@ def create_app() -> Flask:
                 .mappings()
                 .all()
             )
-    
+
             # Helpers
             def _iso_date(v):
                 return v.isoformat()[:10] if v is not None and hasattr(v, "isoformat") else None
-    
+
             # Preparar series base
             dates = [(d_from + timedelta(days=i)) for i in range(days)]
             idx = { d.isoformat(): i for i, d in enumerate(dates) }
-    
+
             arrivals = [0] * days
             departures = [0] * days
             occ_rooms_sets = [set() for _ in range(days)]
             revenue_by_day = [0.0] * days
             paid_by_day = [0.0] * days
-    
+
             confirmed_set = {"Confirmada"}  # coherente para ocupación/ingresos
             status_counts = {}
             channel_counts = {}
-    
+
             overlapping_reservations = 0
             confirmed_overlap = 0
             cancelled_overlap = 0
             noshow_overlap = 0
-    
+
             room_nights_sold = 0.0  # noches vendidas (confirmadas)
             revenue_total = 0.0
             paid_total = 0.0
-    
+
             # Métricas LOS/Lead (para llegadas confirmadas en rango)
             los_sum = 0.0
             los_n = 0
             lead_sum = 0.0
             lead_n = 0
-    
+
             for r in reservas_rows:
                 overlapping_reservations += 1
-    
+
                 estado = (r.get("estado") or "")
                 canal = (r.get("canal") or "—").strip() or "—"
-    
+
                 status_counts[estado] = status_counts.get(estado, 0) + 1
                 channel_counts[canal] = channel_counts.get(canal, 0) + 1
-    
+
                 if estado == "Confirmada":
                     confirmed_overlap += 1
                 elif estado == "Cancelada":
                     cancelled_overlap += 1
                 elif estado == "NoShow":
                     noshow_overlap += 1
-    
+
                 ci = r.get("checkin")
                 co = r.get("checkout")
                 if not ci or not co:
                     continue
-    
+
                 # llegadas/salidas (solo confirmadas para KPIs operativos)
                 if estado in confirmed_set:
                     if d_from <= ci <= d_to:
@@ -8346,23 +8350,23 @@ def create_app() -> Flask:
                                 lead_n += 1
                             except Exception:
                                 pass
-    
+
                     if d_from <= co <= d_to:
                         departures[idx[co.isoformat()]] += 1
-    
+
                 # Ocupación e ingresos prorrateados por noche: checkin <= día < checkout
                 nights_total = (co - ci).days
                 if nights_total <= 0:
                     continue
-    
+
                 total = float(r.get("total") or 0)
                 pagado = float(r.get("pagado") or 0)
                 per_night_total = total / nights_total
                 per_night_paid = pagado / nights_total
-    
+
                 start = max(ci, d_from)
                 end_excl = min(co, to_plus1)  # checkout exclusivo
-    
+
                 if estado in confirmed_set:
                     d = start
                     while d < end_excl:
@@ -8374,26 +8378,26 @@ def create_app() -> Flask:
                             paid_by_day[j] += per_night_paid
                             room_nights_sold += 1.0
                         d = d + timedelta(days=1)
-    
+
             # Consolidar ocupación diaria y totales
             sold_rooms_by_day = [len(s) for s in occ_rooms_sets]
             occ_pct_by_day = [
                 ( (sold_rooms_by_day[i] / total_rooms) * 100.0 ) if total_rooms > 0 else 0.0
                 for i in range(days)
             ]
-    
+
             revenue_total = float(sum(revenue_by_day))
             paid_total = float(sum(paid_by_day))
             balance_total = float(max(0.0, revenue_total - paid_total))
-    
+
             room_nights_available = float(total_rooms * days)
             occupancy_pct = (room_nights_sold / room_nights_available * 100.0) if room_nights_available > 0 else 0.0
             adr = (revenue_total / room_nights_sold) if room_nights_sold > 0 else 0.0
             revpar = (revenue_total / room_nights_available) if room_nights_available > 0 else 0.0
-    
+
             avg_los = (los_sum / los_n) if los_n > 0 else 0.0
             avg_lead = (lead_sum / lead_n) if lead_n > 0 else 0.0
-    
+
             # Alertas de cobro: próximas llegadas con saldo pendiente
             risk_items = []
             for r in upcoming_rows:
@@ -8412,7 +8416,7 @@ def create_app() -> Flask:
                         "habitacion_tipo": r.get("habitacion_tipo"),
                         "balance": balance
                     })
-    
+
             upcoming_items = []
             for r in upcoming_rows:
                 total = float(r.get("total") or 0)
@@ -8429,17 +8433,17 @@ def create_app() -> Flask:
                     "habitacion_tipo": r.get("habitacion_tipo"),
                     "balance": balance
                 })
-    
+
             # Preparar breakdowns ordenados
             status_breakdown = [{"name": k, "count": int(v)} for k, v in status_counts.items()]
             status_breakdown.sort(key=lambda x: x["count"], reverse=True)
-    
+
             channel_breakdown = [{"name": k, "count": int(v)} for k, v in channel_counts.items()]
             channel_breakdown.sort(key=lambda x: x["count"], reverse=True)
-    
+
             # Serie de balance por día (estimado)
             balance_by_day = [max(0.0, revenue_by_day[i] - paid_by_day[i]) for i in range(days)]
-    
+
             return jsonify({
                 "ok": True,
                 "range": {"from": from_s, "to": to_s, "days": int(days)},
@@ -8449,18 +8453,18 @@ def create_app() -> Flask:
                     "confirmed_overlap": int(confirmed_overlap),
                     "cancelled_overlap": int(cancelled_overlap),
                     "noshow_overlap": int(noshow_overlap),
-    
+
                     "revenue": float(round(revenue_total, 2)),
                     "paid": float(round(paid_total, 2)),
                     "balance": float(round(balance_total, 2)),
-    
+
                     "room_nights_sold": float(round(room_nights_sold, 2)),
                     "room_nights_available": float(round(room_nights_available, 2)),
                     "occupancy_pct": float(round(occupancy_pct, 2)),
-    
+
                     "adr": float(round(adr, 2)),
                     "revpar": float(round(revpar, 2)),
-    
+
                     "arrivals": int(sum(arrivals)),
                     "departures": int(sum(departures)),
                     "avg_los_nights": float(round(avg_los, 2)),
@@ -8484,17 +8488,17 @@ def create_app() -> Flask:
                 "upcoming": {"arrivals": upcoming_items},
                 "risk": {"items": risk_items}
             })
-    
+
         except Exception as e:
             try:
                 current_app.logger.exception(f"[OPS] reservas dashboard error: {e}")
             except Exception:
                 pass
             return jsonify({"ok": False, "error": "dashboard_failed"}), 500
-    
-    
-    
-    
+
+
+
+
 
     @app.get("/api/ops/approvals/count")
     @role_required("Administrador", "Recepcionista")
@@ -8687,25 +8691,25 @@ def create_app() -> Flask:
             except Exception:
                 pass
             return jsonify({"ok": False, "error": "retract_failed"}), 500
-        
-        
-        
-        
+
+
+
+
     # =========================================================
     # OPS: APROBACIÓN/RECHAZO DE CAMBIOS SOLICITADOS (Paso 3)
     # =========================================================
     import json
     from datetime import datetime
-    
+
     def _safe_int(v, default=None):
         try:
             return int(v)
         except Exception:
             return default
-    
+
     def _parse_date_ymd(s: str):
         return datetime.strptime(s, "%Y-%m-%d").date()
-    
+
     def _extract_change_payload(solicitud_json_raw) -> dict:
         """
         Lee Solicitud_JSON (str/dict) y devuelve un dict con estructura:
@@ -8763,7 +8767,7 @@ def create_app() -> Flask:
         except Exception:
             return {}
 
-    
+
     def _calc_total_like_web(price_per_night: float, checkin: str, checkout: str, huespedes: int) -> float:
         """
         Cálculo autoritativo server-side (alineado al flujo web):
@@ -8773,7 +8777,7 @@ def create_app() -> Flask:
         ci = _parse_date_ymd(checkin)
         co = _parse_date_ymd(checkout)
         nights = max((co - ci).days, 1)
-    
+
         tax = None
         for k in ("VAT_RATE", "TAX_RATE", "IVA", "IVA_RATE"):
             if k in current_app.config:
@@ -8784,10 +8788,10 @@ def create_app() -> Flask:
                     pass
         if tax is None:
             tax = 0.13
-    
+
         subtotal = round(float(price_per_night or 0.0) * nights * int(huespedes or 1), 2)
         return round(subtotal * (1.0 + tax), 2)
-    
+
     def _room_overlap_exists(hab_id: int, reserva_id: int, checkin: str, checkout: str) -> bool:
         """
         Verifica solape para la misma habitación excluyendo la reserva actual.
@@ -8807,7 +8811,7 @@ def create_app() -> Flask:
             {"h": int(hab_id), "rid": int(reserva_id), "ci": checkin, "co": checkout}
         ).first()
         return bool(q)
-    
+
     def _send_email_safe(to_email: str, subject: str, body: str):
         """
         Reutiliza lo que ya exista en tu proyecto (sin inventar SMTP nuevo).
@@ -8819,7 +8823,7 @@ def create_app() -> Flask:
             except Exception:
                 return None
         return None
-    
+
     def _notify_change_status(correo: str, telefono: str, subject: str, body: str):
         """
         Intento 1: reusar NotificationService si existe.
@@ -8842,10 +8846,10 @@ def create_app() -> Flask:
                     return
         except Exception:
             pass
-    
+
         # 2) fallback: email
         _send_email_safe(correo, subject, body)
-    
+
     @app.get("/api/ops/cambios")
     @role_required("Recepcionista", "Administrador", "Admin")
     def api_ops_cambios_list():
@@ -8871,14 +8875,14 @@ def create_app() -> Flask:
                  LIMIT 500
             """)
         ).mappings().all()
-    
+
         pending, confirmed = [], []
         for row in rows:
             payload = _extract_change_payload(row.get("Solicitud_JSON"))
             old = payload.get("old") or {}
             new = payload.get("new") or {}
             quote = payload.get("quote") or {}
-    
+
             item = {
                 "id": int(row["Id_Cambio"]),
                 "reserva_id": int(row["Codigo_Reserva"]),
@@ -8916,19 +8920,19 @@ def create_app() -> Flask:
                 "decidido_por": row.get("Decidido_Por"),
                 "rechazo_motivo": row.get("Rechazo_Motivo"),
             }
-    
+
             if row.get("Estado") == "Pendiente":
                 pending.append(item)
             else:
                 confirmed.append(item)
-    
+
         return jsonify({
             "ok": True,
             "pending_count": len(pending),
             "pending": pending,
             "confirmed": confirmed
         })
-    
+
     @app.get("/api/ops/cambios/count")
     @role_required("Recepcionista", "Administrador", "Admin")
     def api_ops_cambios_count():
@@ -8936,7 +8940,7 @@ def create_app() -> Flask:
             text("SELECT COUNT(*) FROM ReservaCambioSolicitud WHERE Estado='Pendiente'")
         ).scalar() or 0
         return jsonify({"ok": True, "count": int(n)})
-    
+
     # =========================================================
     # Helpers Cambios (normalización del payload)
     # =========================================================
@@ -8944,7 +8948,7 @@ def create_app() -> Flask:
     from datetime import datetime
     from flask import request, jsonify, session, current_app
     from sqlalchemy import text
-    
+
     def _normalize_cambio_payload(p: dict) -> dict:
         """
         Normaliza estructura del payload de cambios para tolerar llaves distintas:
@@ -8954,11 +8958,11 @@ def create_app() -> Flask:
         """
         if not isinstance(p, dict):
             p = {}
-    
+
         old = p.get("old") if isinstance(p.get("old"), dict) else {}
         new = p.get("new") if isinstance(p.get("new"), dict) else {}
         quote = p.get("quote") if isinstance(p.get("quote"), dict) else {}
-    
+
         def norm_pax(d: dict) -> dict:
             if not isinstance(d, dict):
                 return {}
@@ -8973,10 +8977,10 @@ def create_app() -> Flask:
             if d.get("guests") in (None, "", 0) and d.get("huespedes") not in (None, "", 0):
                 d["guests"] = d.get("huespedes")
             return d
-    
+
         old = norm_pax(old)
         new = norm_pax(new)
-    
+
         return {"old": old, "new": new, "quote": quote}
 
 
@@ -9004,34 +9008,34 @@ def create_app() -> Flask:
                 """),
                 {"id": cambio_id}
             ).mappings().first()
-    
+
             if not row:
                 return jsonify({"ok": False, "message": "Cambio no encontrado."}), 404
-    
+
             if row["Estado"] != "Pendiente":
                 return jsonify({"ok": False, "message": f"El cambio no está Pendiente (estado actual: {row['Estado']})."}), 409
-    
+
             reserva_id = int(row["Codigo_Reserva"])
-    
+
             # 1) Payload: primero request, luego DB
                     # Payload: si el request viene completo lo usamos, si viene incompleto caemos al payload DB
             req_payload = request.get_json(silent=True) or {}
             payload_req = None
-    
+
             if isinstance(req_payload, dict) and ("old" in req_payload or "new" in req_payload or "quote" in req_payload):
                 payload_req = _normalize_cambio_payload(req_payload)
-    
+
             payload_db = _normalize_cambio_payload(_extract_change_payload(row.get("Solicitud_JSON")))
             payload = payload_req or payload_db
-    
+
             old = payload.get("old") or {}
             new = payload.get("new") or {}
             quote = payload.get("quote") or {}
-    
+
             new_ci = (new.get("checkin") or "").strip()
             new_co = (new.get("checkout") or "").strip()
             new_pax = _safe_int(new.get("huespedes"), None)
-    
+
             # Si vino payload del request pero está incompleto, usar DB
             if payload_req and not (new_ci and new_co and new_pax):
                 payload = payload_db
@@ -9041,17 +9045,17 @@ def create_app() -> Flask:
                 new_ci = (new.get("checkin") or "").strip()
                 new_co = (new.get("checkout") or "").strip()
                 new_pax = _safe_int(new.get("huespedes"), None)
-    
-    
+
+
             # normaliza pax a int si vino como texto
             try:
                 new_pax = int(new_pax) if new_pax not in (None, "") else None
             except Exception:
                 new_pax = None
-    
+
             if not (new_ci and new_co and new_pax):
                 return jsonify({"ok": False, "message": "Solicitud incompleta: faltan datos de cambio."}), 400
-    
+
             # 3) Snapshot BEFORE (estado actual real en Reserva)
             before_row = db.session.execute(
                 text("""
@@ -9062,21 +9066,21 @@ def create_app() -> Flask:
                 """),
                 {"r": reserva_id}
             ).mappings().first()
-    
+
             if not before_row:
                 return jsonify({"ok": False, "message": "La reserva asociada no existe."}), 404
-    
+
             before = {
                 "checkin": str(before_row["Fecha_Entrada"])[:10] if before_row["Fecha_Entrada"] else None,
                 "checkout": str(before_row["Fecha_Salida"])[:10] if before_row["Fecha_Salida"] else None,
                 "huespedes": int(before_row["Huespedes"] or 1),
                 "total": float(before_row["Monto_Total"] or 0.0),
             }
-    
+
             # 4) Aplicar cambios a Reserva
             set_parts = ["Fecha_Entrada=:ci", "Fecha_Salida=:co", "Huespedes=:pax"]
             params = {"ci": new_ci, "co": new_co, "pax": int(new_pax), "r": reserva_id}
-    
+
             # si viene new_total, úsalo (sino, deja Monto_Total igual)
             new_total = quote.get("new_total")
             if new_total not in (None, ""):
@@ -9086,12 +9090,12 @@ def create_app() -> Flask:
                     params["mt"] = new_total
                 except Exception:
                     pass
-    
+
             db.session.execute(
                 text(f"UPDATE Reserva SET {', '.join(set_parts)} WHERE Codigo_Reserva=:r"),
                 params
             )
-    
+
             # 5) Snapshot AFTER (ya aplicado)
             after_row = db.session.execute(
                 text("""
@@ -9102,14 +9106,14 @@ def create_app() -> Flask:
                 """),
                 {"r": reserva_id}
             ).mappings().first()
-    
+
             after = {
                 "checkin": str(after_row["Fecha_Entrada"])[:10] if after_row and after_row["Fecha_Entrada"] else None,
                 "checkout": str(after_row["Fecha_Salida"])[:10] if after_row and after_row["Fecha_Salida"] else None,
                 "huespedes": int((after_row["Huespedes"] if after_row else new_pax) or 1),
                 "total": float((after_row["Monto_Total"] if after_row else before["total"]) or 0.0),
             }
-    
+
             # 6) Guardar snapshots en Solicitud_JSON + marcar Aprobado
             try:
                 stored = row["Solicitud_JSON"]
@@ -9118,23 +9122,23 @@ def create_app() -> Flask:
                     stored_obj = {}
             except Exception:
                 stored_obj = {}
-    
+
             stored_obj["Snapshot_Before"] = before
             stored_obj["Snapshot_After"] = after
-    
+
             # monto adicional: preferimos quote.delta si viene, sino el de la fila
             delta = quote.get("delta")
             try:
                 delta = float(delta) if delta not in (None, "") else float(row["Monto_Adicional"] or 0.0)
             except Exception:
                 delta = float(row["Monto_Adicional"] or 0.0)
-    
+
             uid = session.get("user_id")
             try:
                 uid = int(uid) if uid is not None else None
             except Exception:
                 uid = None
-    
+
             db.session.execute(
                 text("""
                     UPDATE ReservaCambioSolicitud
@@ -9152,9 +9156,9 @@ def create_app() -> Flask:
                     "id": cambio_id
                 }
             )
-    
+
             db.session.commit()
-    
+
             # 7) Notificación (si ya tienes NotificationService/SAC, aquí puedes integrarlo)
             try:
                 # Ejemplo: deja esto si ya lo usas en tu proyecto.
@@ -9169,19 +9173,19 @@ def create_app() -> Flask:
                 )
             except Exception:
                 pass
-    
+
             return jsonify({"ok": True, "id_cambio": cambio_id, "reserva_id": reserva_id}), 200
-    
+
         except Exception as e:
             db.session.rollback()
             current_app.logger.exception("[OPS-CAMBIOS] Error aprobando cambio: %s", e)
             return jsonify({"ok": False, "message": "Error interno aprobando el cambio."}), 500
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
     @app.post("/api/ops/cambios/<int:cambio_id>/reject")
     @role_required("Recepcionista", "Administrador", "Admin")
     def api_ops_cambios_reject(cambio_id: int):
@@ -9195,8 +9199,8 @@ def create_app() -> Flask:
         motivo = (p.get("motivo") or p.get("reason") or "").strip()
         if not motivo:
             return jsonify({"ok": False, "message": "Debe indicar el motivo del rechazo."}), 400
-        
-    
+
+
         row = db.session.execute(
             text("""
                 SELECT c.Id_Cambio, c.Estado, c.Codigo_Reserva,
@@ -9210,12 +9214,12 @@ def create_app() -> Flask:
             """),
             {"id": int(cambio_id)}
         ).mappings().first()
-    
+
         if not row:
             return jsonify({"ok": False, "message": "Cambio no encontrado."}), 404
         if row.get("Estado") != "Pendiente":
             return jsonify({"ok": False, "message": "Este cambio ya no está pendiente."}), 409
-    
+
         try:
             db.session.execute(
                 text("""
@@ -9234,7 +9238,7 @@ def create_app() -> Flask:
             db.session.rollback()
             current_app.logger.exception("[OPS-CAMBIOS] Error rechazando cambio: %s", e)
             return jsonify({"ok": False, "message": "Error interno rechazando el cambio."}), 500
-    
+
         # Notificación
         try:
             correo = (row.get("Correo") or "").strip().lower()
@@ -9251,11 +9255,11 @@ def create_app() -> Flask:
             _notify_change_status(correo, tel, subject, body)
         except Exception:
             pass
-    
+
         return jsonify({"ok": True})
-    
+
     from sqlalchemy.exc import SQLAlchemyError
-    
+
     @app.post("/api/ops/cambios/<int:cambio_id>/retract")
     @role_required("Recepcionista", "Administrador", "Admin")
     def api_ops_cambios_retract(cambio_id):
@@ -9263,7 +9267,7 @@ def create_app() -> Flask:
         Retracta un cambio aprobado:
           - Revierte la Reserva a su snapshot anterior (Snapshot_Before dentro de Solicitud_JSON)
           - Devuelve el cambio a estado 'Pendiente' para que vuelva a aparecer en Cambios pendientes
-    
+
         Nota:
           - NO dependemos de columnas Snapshot_Before/Snapshot_After en tabla (porque pueden no existir).
         """
@@ -9282,33 +9286,33 @@ def create_app() -> Flask:
                 """),
                 {"id": cambio_id}
             ).mappings().first()
-    
+
             if not row:
                 return jsonify({"ok": False, "error": "Cambio no encontrado."}), 404
-    
+
             if (row.get("Estado") or "").strip() != "Aprobado":
                 return jsonify({"ok": False, "error": "Solo se pueden retractar cambios en estado Aprobado."}), 409
-    
+
             # 2) Extraer Snapshot_Before desde Solicitud_JSON
             solicitud_raw = row.get("Solicitud_JSON") or "{}"
             try:
                 stored = json.loads(solicitud_raw) if isinstance(solicitud_raw, str) else (solicitud_raw or {})
             except Exception:
                 stored = {}
-    
+
             before = (
                 stored.get("Snapshot_Before")
                 or stored.get("snapshot_before")
                 or stored.get("SnapshotBefore")
             )
-    
+
             # Si viniera como string JSON embebido
             if isinstance(before, str):
                 try:
                     before = json.loads(before)
                 except Exception:
                     before = None
-    
+
             # Fallback: si tu helper ya lo arma de otra forma
             if not isinstance(before, dict) or not before:
                 try:
@@ -9317,13 +9321,13 @@ def create_app() -> Flask:
                         before = payload.get("old") if isinstance(payload.get("old"), dict) else None
                 except Exception:
                     before = None
-    
+
             if not isinstance(before, dict) or not before:
                 return jsonify({
                     "ok": False,
                     "error": "No se pudo retractar: falta Snapshot_Before/old para revertir."
                 }), 409
-    
+
             # 3) Normalizar llaves esperadas (acepta varias formas)
             def pick(d: dict, *keys):
                 for k in keys:
@@ -9331,23 +9335,23 @@ def create_app() -> Flask:
                     if v not in (None, ""):
                         return v
                 return None
-    
+
             old_checkin  = pick(before, "Fecha_Entrada", "checkin", "Checkin", "fecha_entrada")
             old_checkout = pick(before, "Fecha_Salida",  "checkout", "Checkout", "fecha_salida")
             old_pax      = pick(before, "Huespedes", "huespedes", "Pax", "pax")
             old_total    = pick(before, "Monto_Total", "total", "monto_total", "Monto")
-    
+
             if not (old_checkin and old_checkout and old_pax):
                 return jsonify({
                     "ok": False,
                     "error": "Solicitud incompleta: faltan datos del estado anterior para revertir."
                 }), 409
-    
+
             # 4) Guardas mínimas de consistencia (no rompe el retract si hay formatos raros)
             reserva_id = int(row.get("Codigo_Reserva") or 0)
             if reserva_id <= 0:
                 return jsonify({"ok": False, "error": "Cambio inválido: no hay Codigo_Reserva."}), 409
-    
+
             # 5) Revertir Reserva al snapshot anterior
             #    - Monto_Total: si no viene en snapshot, no lo tocamos.
             params = {
@@ -9356,7 +9360,7 @@ def create_app() -> Flask:
                 "co": str(old_checkout)[:10],
                 "pax": int(old_pax),
             }
-    
+
             if old_total not in (None, ""):
                 try:
                     params["m"] = float(old_total)
@@ -9364,7 +9368,7 @@ def create_app() -> Flask:
                     params["m"] = None
             else:
                 params["m"] = None
-    
+
             db.session.execute(
                 text("""
                     UPDATE Reserva
@@ -9380,7 +9384,7 @@ def create_app() -> Flask:
                 """),
                 params
             )
-    
+
             # 6) Devolver el cambio a Pendiente (para que reaparezca en Cambios pendientes)
             db.session.execute(
                 text("""
@@ -9394,9 +9398,9 @@ def create_app() -> Flask:
                 """),
                 {"id": cambio_id}
             )
-    
+
             db.session.commit()
-    
+
             # Auditoría (si existe helper)
             try:
                 _audit_log(
@@ -9407,23 +9411,23 @@ def create_app() -> Flask:
                 )
             except Exception:
                 pass
-    
+
             return jsonify({
                 "ok": True,
                 "id": int(cambio_id),
                 "reserva_id": int(reserva_id),
                 "estado": "Pendiente"
             }), 200
-    
+
         except Exception as e:
             db.session.rollback()
             current_app.logger.exception("[OPS][CAMBIOS] Error retractando %s: %s", cambio_id, e)
             return jsonify({"ok": False, "error": "Error interno retractando cambio."}), 500
-    
-    
-        
 
-    
+
+
+
+
 
     # ------------------------------------------------------------
     # UI — Lista de facturas
@@ -9450,9 +9454,9 @@ def create_app() -> Flask:
     #   moneda (CRC|USD,...), monto_total, fecha_emision (YYYY-MM-DD),
     #   comprobante (file input)
     # ------------------------------------------------------------
-    
-    
-    
+
+
+
     # Listado JSON para la tabla del front
     @app.get("/api/fin/invoices")
     @role_required("Administrador", "Recepcionista")
@@ -9474,11 +9478,11 @@ def create_app() -> Flask:
         return jsonify({"ok": True, "items": items})
 
     # Alta de factura (lo que estás intentando con POST /fin/invoices/nuevo)
-    
+
 
     from sqlalchemy.exc import IntegrityError
     from werkzeug.utils import secure_filename
-    
+
     @app.post("/fin/invoices/nuevo")
     @role_required("Administrador", "Recepcionista")
     def fin_invoice_nuevo():
@@ -9492,7 +9496,7 @@ def create_app() -> Flask:
         if not _tabla_existe("fin_invoices"):
             flash("No existe la tabla de facturas 'fin_invoices' en la BD.", "danger")
             return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
-    
+
         # Campos del form
         f = request.form
         numero        = (f.get("numero") or "").strip()
@@ -9501,33 +9505,33 @@ def create_app() -> Flask:
         moneda        = (f.get("moneda") or "CRC").strip()
         descripcion   = (f.get("descripcion") or "").strip()
         estado        = "Emitida"
-    
+
         try:
             monto_total = float(f.get("monto_total") or 0)
         except Exception:
             monto_total = 0.0
-    
+
         # Opcional: id_reserva
         try:
             id_reserva = int(f.get("id_reserva")) if f.get("id_reserva") else None
         except Exception:
             id_reserva = None
-    
+
         # Obligatorio por esquema: id_usuario
         uid = session.get("user_id")
         if not uid:
             flash("Sesión requerida para emitir facturas.", "warning")
             return redirect(url_for("login_html"))
-    
+
         # Validaciones mínimas
         if not numero or monto_total <= 0:
             flash("Número/folio y monto total son obligatorios.", "warning")
             return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
-    
+
         # ===== Guardar/generar archivo =====
         STATIC_INVOICES_DIR = BASE_DIR / "static" / "uploads" / "invoices"
         STATIC_INVOICES_DIR.mkdir(parents=True, exist_ok=True)
-    
+
         archivo_file = request.files.get("archivo")
         archivo_filename = None
         try:
@@ -9556,7 +9560,7 @@ def create_app() -> Flask:
         except Exception as e:
             current_app.logger.warning(f"[fin_invoices] No se pudo guardar/generar archivo: {e}")
             archivo_filename = None  # insertaremos NULL en archivo_path
-    
+
         # ===== Insert en fin_invoices =====
         try:
             params = {
@@ -9582,13 +9586,13 @@ def create_app() -> Flask:
             res = db.session.execute(sql, params)
             db.session.commit()
             new_id = int(res.lastrowid or 0)
-    
+
             _audit_log(_current_user_email(), "fin.invoice.emitida",
                        {"id": new_id, "numero": numero, "total": monto_total}, entidad_id=str(new_id))
-    
+
             flash("Factura emitida correctamente.", "success")
             return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
-    
+
         except IntegrityError as ie:
             db.session.rollback()
             # Unicidad de numero
@@ -9597,14 +9601,14 @@ def create_app() -> Flask:
             else:
                 flash(f"No se pudo crear la factura (integridad): {ie.orig}", "danger")
             return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
-    
+
         except Exception as e:
             db.session.rollback()
             flash(f"No se pudo crear la factura: {e}", "danger")
             return redirect(url_for("fin_invoices_html") if "fin_invoices_html" in current_app.view_functions else url_for("admin_dashboard_html"))
-    
-    
-    
+
+
+
 
     # =========================
     # FIN-UI: Caja y Cierres Períodos
