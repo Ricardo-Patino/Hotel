@@ -268,8 +268,15 @@
 
       $in.value  = saved.checkin  || $in.value  || today;
       $out.value = saved.checkout || $out.value || tomorrow;
-      $ad.value  = saved.adults   || $ad.value  || '2';
-      $ch.value  = saved.children || $ch.value  || '0';
+
+      // No usar "saved.adults || ..." : un "0" guardado es truthy como string
+      // y se aceptaría tal cual. Forzamos mínimo 1 explícitamente.
+      const savedAdults = parseInt(saved.adults, 10);
+      $ad.value = String(Number.isFinite(savedAdults) && savedAdults >= 1 ? savedAdults : (parseInt($ad.value,10) || 2));
+
+      const savedChildren = parseInt(saved.children, 10);
+      $ch.value = String(Number.isFinite(savedChildren) && savedChildren >= 0 ? savedChildren : (parseInt($ch.value,10) || 0));
+
       updatePills();
     }
 
@@ -297,14 +304,16 @@
       if (inc) {
         const id = inc.getAttribute('data-inc');
         const el = document.getElementById(id);
+        const min = (id === 'adults') ? 1 : 0;
         el.value = String((parseInt(el.value||'0',10)||0) + 1);
-        clampInt(el, 0, 10);
+        clampInt(el, min, 10);
       }
       if (dec) {
         const id = dec.getAttribute('data-dec');
         const el = document.getElementById(id);
+        const min = (id === 'adults') ? 1 : 0;
         el.value = String((parseInt(el.value||'0',10)||0) - 1);
-        clampInt(el, 0, 10);
+        clampInt(el, min, 10);
       }
     });
 
@@ -318,7 +327,7 @@
       updatePills();
     });
     $out.addEventListener('change', updatePills);
-    $ad.addEventListener('input', ()=>clampInt($ad,0,10));
+    $ad.addEventListener('input', ()=>clampInt($ad,1,10));
     $ch.addEventListener('input', ()=>clampInt($ch,0,10));
 
     function showError(msg) {
@@ -334,12 +343,21 @@
       if (!($in.value && $out.value)) return false;
       return co > ci;
     }
+    function validGuests() {
+      const ad = parseInt($ad.value || '0', 10) || 0;
+      return ad >= 1;
+    }
 
     form.addEventListener('submit', (e) => {
       hideError();
       if (!validDates()) {
         e.preventDefault();
         showError('La fecha de salida debe ser posterior a la de llegada.');
+        return;
+      }
+      if (!validGuests()) {
+        e.preventDefault();
+        showError('Debe haber al menos 1 adulto en la reserva.');
         return;
       }
 
