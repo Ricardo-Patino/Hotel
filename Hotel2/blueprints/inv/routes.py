@@ -24,7 +24,7 @@ def _actor():
 
 # Listado de categorías
 @inv_bp.route("/categorias", methods=["GET"])
-@role_required("Administrador")  # o amplía a otros roles si corresponde
+@role_required("Administrador", "Recepcionista")  # o amplía a otros roles si corresponde
 def categorias_list():
     q = request.args.get("q", "").strip()
     solo_activas = request.args.get("solo_activas", "1") == "1"
@@ -53,7 +53,7 @@ def categorias_list():
 
 # Crear categoría
 @inv_bp.route("/categorias/nueva", methods=["GET", "POST"])
-@role_required("Administrador")
+@role_required("Administrador", "Recepcionista")
 def categorias_new():
     if request.method == "POST":
         nombre = (request.form.get("Nombre") or "").strip()
@@ -81,7 +81,7 @@ def categorias_new():
 
 # Editar categoría
 @inv_bp.route("/categorias/<int:cat_id>/editar", methods=["GET", "POST"])
-@role_required("Administrador")
+@role_required("Administrador", "Recepcionista")
 def categorias_edit(cat_id: int):
     cat = InvCategoria.query.get_or_404(cat_id)
 
@@ -112,7 +112,7 @@ def categorias_edit(cat_id: int):
 
 # Activar/Inactivar categoría
 @inv_bp.route("/categorias/<int:cat_id>/toggle", methods=["POST"])
-@role_required("Administrador")
+@role_required("Administrador", "Recepcionista")
 def categorias_toggle(cat_id: int):
     cat = InvCategoria.query.get_or_404(cat_id)
     cat.Activa = not cat.Activa
@@ -212,7 +212,7 @@ def insumo_new():
 
 # EDITAR / INACTIVAR (INV-07-003)
 @inv_bp.route("/insumos/<int:insumo_id>/editar", methods=["GET", "POST"])
-@role_required("Administrador")
+@role_required("Administrador", "Recepcionista")
 def insumo_edit(insumo_id: int):
     i = InvInsumo.query.filter_by(Id=insumo_id).first()
     if not i:
@@ -311,7 +311,7 @@ def insumo_edit(insumo_id: int):
 
 # AJUSTE DE STOCK (INV-07-003)
 @inv_bp.route("/insumos/<int:insumo_id>/ajuste", methods=["GET", "POST"])
-@role_required("Administrador")
+@role_required("Administrador", "Recepcionista")
 def insumo_adjust(insumo_id: int):
     i = InvInsumo.query.filter_by(Id=insumo_id).first()
     if not i:
