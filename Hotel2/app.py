@@ -2555,7 +2555,7 @@ def create_app() -> Flask:
 
 
     @app.route("/ops-rooms-manage.html", methods=["GET"])
-    @role_required("Administrador")
+    @role_required("Administrador", "Recepcionista")
     def ops_rooms_manage_html():
         return render_template("ops-rooms-manage.html")
 

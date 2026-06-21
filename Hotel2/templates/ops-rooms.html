@@ -85,7 +85,7 @@
       <div class="card-body">
         <div class="ops-grid">
 
-          {% if session.get('user_role') == 'Administrador' %}
+          {% if session.get('user_role') in ['Administrador', 'Recepcionista'] %}
           <a class="ops-item text-decoration-none" href="ops-rooms-manage.html">
             <i class="bi bi-sliders text-success"></i>
             <div>
