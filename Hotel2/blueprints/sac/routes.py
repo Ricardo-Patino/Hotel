@@ -2280,93 +2280,98 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 @sac_bp.post("/incidentes", endpoint="incidentes_new")
+@role_required("Recepcionista", "Administrador")
 def incidentes_new():
     """
-    Crea un incidente SAC.
-    Fix: valida Codigo_Reserva contra la tabla reserva/Reserva para evitar FK 1452.
-    Devuelve SIEMPRE JSON manejable por el front.
+    Crea un incidente/comentario SAC.
+    Alineado con el formulario actual:
+      Tipo: INCIDENTE | COMENTARIO
+      Severidad: BAJA | MEDIA | ALTA | CRITICA
+      Estado: ABIERTA | EN_PROCESO | CERRADA
     """
     try:
         data = request.get_json(force=True) or {}
     except Exception:
         return jsonify(ok=False, error="Payload inválido."), 200
 
-    # --------- Lectura de campos ----------
-    rid_raw = (data.get("Codigo_Reserva") or "").strip()
-    cid_raw = (data.get("Codigo_Cliente") or "").strip()
+    rid_raw = str(data.get("Codigo_Reserva") or "").strip()
+    cid_raw = str(data.get("Codigo_Cliente") or "").strip()
 
-    reportado = (data.get("Reportado_Por") or "").strip()
-    asignado = (data.get("Asignado_A") or "").strip()
-    tipo = (data.get("Tipo") or "INCIDENTE").strip().upper()
-    sev = (data.get("Severidad") or "MEDIA").strip().upper()
-    titulo = (data.get("Titulo") or "").strip()
-    detalle = (data.get("Detalle") or "").strip()
-    estado = (data.get("Estado") or "ABIERTA").strip().upper()
+    reportado = str(data.get("Reportado_Por") or "").strip()
+    if not reportado:
+        reportado = (
+            session.get("user_name")
+            or session.get("user_email")
+            or "Sistema"
+        )
 
-    # --------- Normalización numérica ----------
+    asignado = str(data.get("Asignado_A") or "").strip()
+
+    tipo = str(data.get("Tipo") or "INCIDENTE").strip().upper()
+    sev = str(data.get("Severidad") or "MEDIA").strip().upper()
+    titulo = str(data.get("Titulo") or "").strip()
+    detalle = str(data.get("Detalle") or "").strip()
+    estado = str(data.get("Estado") or "ABIERTA").strip().upper()
+
     rid = None
     if rid_raw:
         try:
             rid = int(rid_raw)
         except ValueError:
-            return jsonify(ok=False, error="Código de reserva inválido (debe ser numérico)."), 200
+            return jsonify(ok=False, error="Código de reserva inválido. Debe ser numérico."), 200
 
     cid = None
     if cid_raw:
         try:
             cid = int(cid_raw)
         except ValueError:
-            return jsonify(ok=False, error="Código de cliente inválido (debe ser numérico)."), 200
+            return jsonify(ok=False, error="Código de cliente inválido. Debe ser numérico."), 200
 
-    # --------- Validaciones de catálogo ----------
-    valid_tipo = {"INCIDENTE", "QUEJA", "CONSULTA"}
-    valid_sev = {"BAJA", "MEDIA", "ALTA"}
-    valid_estado = {"ABIERTA", "EN_PROCESO", "RESUELTA", "CERRADA"}
+    valid_tipo = {"INCIDENTE", "COMENTARIO"}
+    valid_sev = {"BAJA", "MEDIA", "ALTA", "CRITICA"}
+    valid_estado = {"ABIERTA", "EN_PROCESO", "CERRADA"}
 
     if tipo not in valid_tipo:
         return jsonify(ok=False, error=f"Tipo inválido. Use: {', '.join(sorted(valid_tipo))}."), 200
+
     if sev not in valid_sev:
         return jsonify(ok=False, error=f"Severidad inválida. Use: {', '.join(sorted(valid_sev))}."), 200
+
     if estado not in valid_estado:
         return jsonify(ok=False, error=f"Estado inválido. Use: {', '.join(sorted(valid_estado))}."), 200
 
     if not titulo:
         return jsonify(ok=False, error="El título es requerido."), 200
+
     if not detalle:
         return jsonify(ok=False, error="El detalle es requerido."), 200
 
-    # --------- Validación FK: reserva debe existir si se provee ----------
+    # Validar reserva e inferir cliente si se indicó reserva.
     if rid is not None:
         try:
-            with db.engine.begin() as conn:
-                # detectar nombre real por portabilidad
-                res_tbl = conn.execute(text("""
-                    SELECT table_name
-                    FROM information_schema.tables
-                    WHERE table_schema = DATABASE()
-                      AND LOWER(table_name) = 'reserva'
-                    LIMIT 1
-                """)).scalar()
+            row_reserva = db.session.execute(
+                text("""
+                    SELECT Codigo_Reserva, Codigo_Cliente
+                      FROM Reserva
+                     WHERE Codigo_Reserva = :rid
+                     LIMIT 1
+                """),
+                {"rid": rid}
+            ).mappings().first()
 
-                if not res_tbl:
-                    # si no existe tabla reserva, no asociar (evita 500)
-                    return jsonify(ok=False, error="No existe tabla 'reserva' en este schema. No se puede asociar el incidente a una reserva."), 200
+            if not row_reserva:
+                return jsonify(
+                    ok=False,
+                    error=f"El código de reserva {rid} no existe. Dejá el campo vacío si el incidente no está asociado a una reserva."
+                ), 200
 
-                exists = conn.execute(
-                    text(f"SELECT 1 FROM `{res_tbl}` WHERE Codigo_Reserva = :rid LIMIT 1"),
-                    {"rid": rid}
-                ).scalar()
+            if cid is None and row_reserva.get("Codigo_Cliente"):
+                cid = int(row_reserva["Codigo_Cliente"])
 
-                if not exists:
-                    return jsonify(
-                        ok=False,
-                        error=f"El código de reserva {rid} no existe. Dejá el campo vacío si el incidente no está asociado a una reserva."
-                    ), 200
         except Exception:
-            current_app.logger.exception("Error validando Codigo_Reserva contra reserva")
+            current_app.logger.exception("[SAC] Error validando Codigo_Reserva")
             return jsonify(ok=False, error="No se pudo validar el código de reserva. Intenta nuevamente."), 200
 
-    # --------- Insert ----------
     try:
         inc = SACIncident(
             Codigo_Reserva=rid,
@@ -2379,21 +2384,25 @@ def incidentes_new():
             Detalle=detalle,
             Estado=estado,
         )
+
         db.session.add(inc)
         db.session.commit()
+
         return jsonify(ok=True, id=getattr(inc, "Id", None)), 200
 
     except IntegrityError as e:
         db.session.rollback()
-        # Mensaje específico si vuelve a caer por FK
+
         msg = str(getattr(e, "orig", e))
-        if "FK_SAC_Incident_Reserva" in msg or "foreign key constraint fails" in msg.lower():
-            return jsonify(ok=False, error="La reserva indicada no existe o no es válida. Dejá el código vacío o usa uno existente."), 200
+        if "foreign key constraint fails" in msg.lower():
+            return jsonify(ok=False, error="La reserva o cliente indicado no existe o no es válido."), 200
+
+        current_app.logger.exception("[SAC] Restricción guardando incidente")
         return jsonify(ok=False, error="No se pudo guardar el incidente por una restricción de base de datos."), 200
 
     except Exception:
         db.session.rollback()
-        current_app.logger.exception("Error guardando incidente SAC")
+        current_app.logger.exception("[SAC] Error guardando incidente")
         return jsonify(ok=False, error="No se pudo guardar. Intenta nuevamente."), 200
 
 

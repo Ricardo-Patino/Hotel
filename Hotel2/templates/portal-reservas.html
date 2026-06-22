@@ -487,6 +487,34 @@ reserva esté confirmada.{% endblock %}
       return ["confirmada", "check-in", "check-out"].includes(e);
     }
 
+    function boolish(v) {
+      return v === true || v === 1 || v === "1" || String(v).toLowerCase() === "true";
+    }
+    
+    function hasPendingChanges(r) {
+      return boolish(r.has_pending_changes) || String(r.pending_change_status || "").toLowerCase() === "pendiente";
+    }
+    
+    function canRequestChanges(r, estadoTxt) {
+      if (typeof r.can_request_changes !== "undefined") {
+        return boolish(r.can_request_changes);
+      }
+    
+      const e = String(estadoTxt || "").trim().toLowerCase();
+      if (["cancelada", "noshow"].includes(e)) return false;
+    
+      const ci = normalizeISODate(r.checkin || r.Fecha_Entrada);
+      if (!ci) return false;
+    
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+    
+      const checkinDate = new Date(ci + "T00:00:00");
+      if (Number.isNaN(checkinDate.getTime())) return false;
+    
+      return checkinDate >= today;
+    }
+
     function buildPaymentModel(reserva) {
       const est = String(reserva.estado || "").trim().toLowerCase();
       const total = Number(reserva.monto ?? reserva.total ?? reserva.Monto_Total ?? 0);
@@ -515,6 +543,18 @@ reserva esté confirmada.{% endblock %}
         const pay = buildPaymentModel({ estado: estadoTxt, monto });
 
         const downloadOk = canDownloadReceipt(estadoTxt);
+        const pendingChanges = hasPendingChanges(r);
+        const canChange = canRequestChanges(r, estadoTxt);
+        const showChangeButton = canChange && !pendingChanges;
+        
+        const changeNotice = pendingChanges
+          ? `
+            <div class="alert alert-warning mb-0 mt-3">
+              <i class="bi bi-hourglass-split me-1"></i>
+              Esta reserva tiene <strong>cambios pendientes de aprobación</strong>. El hotel debe aprobarlos o rechazarlos antes de solicitar otro cambio.
+            </div>
+          `
+          : "";
         const receiptBtn = downloadOk
           ? `<a class="btn btn-vg" href="/api/reservas/${encodeURIComponent(id)}/comprobante">
                <i class="bi bi-receipt me-1"></i>Descargar comprobante
@@ -635,12 +675,15 @@ reserva esté confirmada.{% endblock %}
               </div>
             </div>
 
+            ${changeNotice}
             ${infoBanner}
 
             <div class="d-flex flex-wrap gap-2 mt-3">
-              <a class="btn btn-outline-secondary" href="/portal-reserva-detalle.html?id=${encodeURIComponent(id)}">
-                <i class="bi bi-pencil-square me-1"></i>Solicitar cambios
-              </a>
+              ${showChangeButton ? `
+                <a class="btn btn-outline-secondary" href="/portal-reserva-detalle.html?id=${encodeURIComponent(id)}">
+                  <i class="bi bi-pencil-square me-1"></i>Solicitar cambios
+                </a>
+              ` : ""}
 
               ${receiptBtn}
 
