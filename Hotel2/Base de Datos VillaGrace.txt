@@ -2229,31 +2229,101 @@ SELECT
   s.id_session,
   s.fecha,
   s.opening_cash,
-  IFNULL(r.ingresos_efectivo, 0.00) AS ingresos_efectivo,
+
+  (
+    IFNULL(r.ingresos_recibos_efectivo, 0.00)
+    + IFNULL(m.ingresos_manual_efectivo, 0.00)
+  ) AS ingresos_efectivo,
+
   IFNULL(m.egresos_efectivo, 0.00)  AS egresos_efectivo,
   IFNULL(m.ajustes_mas, 0.00)       AS ajustes_mas,
   IFNULL(m.ajustes_menos, 0.00)     AS ajustes_menos,
-  (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
-    + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0)) AS efectivo_esperado,
+
+  (
+    s.opening_cash
+    + IFNULL(r.ingresos_recibos_efectivo, 0.00)
+    + IFNULL(m.ingresos_manual_efectivo, 0.00)
+    - IFNULL(m.egresos_efectivo, 0.00)
+    + IFNULL(m.ajustes_mas, 0.00)
+    - IFNULL(m.ajustes_menos, 0.00)
+  ) AS efectivo_esperado,
+
   s.closing_cash_counted AS efectivo_contado,
-  (IFNULL(s.closing_cash_counted,0) -
-   (s.opening_cash + IFNULL(r.ingresos_efectivo,0) - IFNULL(m.egresos_efectivo,0)
-     + IFNULL(m.ajustes_mas,0) - IFNULL(m.ajustes_menos,0))) AS descuadre
+
+  (
+    IFNULL(s.closing_cash_counted, 0.00)
+    -
+    (
+      s.opening_cash
+      + IFNULL(r.ingresos_recibos_efectivo, 0.00)
+      + IFNULL(m.ingresos_manual_efectivo, 0.00)
+      - IFNULL(m.egresos_efectivo, 0.00)
+      + IFNULL(m.ajustes_mas, 0.00)
+      - IFNULL(m.ajustes_menos, 0.00)
+    )
+  ) AS descuadre
+
 FROM fin_cash_session s
+
 LEFT JOIN (
-  SELECT DATE(creado_en) AS fecha, SUM(monto) AS ingresos_efectivo
+  SELECT
+    DATE(creado_en) AS fecha,
+    SUM(ABS(monto)) AS ingresos_recibos_efectivo
   FROM fin_receipts
-  WHERE estado='Emitido' AND metodo='Efectivo'
+  WHERE estado = 'Emitido'
+    AND metodo = 'Efectivo'
   GROUP BY DATE(creado_en)
 ) r ON r.fecha = s.fecha
+
 LEFT JOIN (
-  SELECT DATE(created_at) AS fecha,
-         SUM(CASE WHEN tipo='Egreso' AND metodo='Efectivo' AND estado='Aplicado' THEN monto ELSE 0 END) AS egresos_efectivo,
-         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto >= 0 AND tipo IN ('Ingreso','Ajuste') THEN monto ELSE 0 END) AS ajustes_mas,
-         SUM(CASE WHEN metodo='Efectivo' AND estado='Aplicado' AND monto < 0  AND tipo='Ajuste' THEN -monto ELSE 0 END) AS ajustes_menos
+  SELECT
+    session_id,
+
+    SUM(
+      CASE
+        WHEN estado = 'Aplicado'
+         AND tipo = 'Ingreso'
+         AND metodo = 'Efectivo'
+        THEN ABS(monto)
+        ELSE 0
+      END
+    ) AS ingresos_manual_efectivo,
+
+    SUM(
+      CASE
+        WHEN estado = 'Aplicado'
+         AND tipo = 'Egreso'
+         AND metodo = 'Efectivo'
+        THEN ABS(monto)
+        ELSE 0
+      END
+    ) AS egresos_efectivo,
+
+    SUM(
+      CASE
+        WHEN estado = 'Aplicado'
+         AND tipo = 'Ajuste'
+         AND metodo = 'Efectivo'
+         AND monto >= 0
+        THEN ABS(monto)
+        ELSE 0
+      END
+    ) AS ajustes_mas,
+
+    SUM(
+      CASE
+        WHEN estado = 'Aplicado'
+         AND tipo = 'Ajuste'
+         AND metodo = 'Efectivo'
+         AND monto < 0
+        THEN ABS(monto)
+        ELSE 0
+      END
+    ) AS ajustes_menos
+
   FROM fin_cash_movement
-  GROUP BY DATE(created_at)
-) m ON m.fecha = s.fecha;
+  GROUP BY session_id
+) m ON m.session_id = s.id_session;
 
 CREATE OR REPLACE VIEW v_hist_reservas AS
 SELECT
@@ -3180,6 +3250,121 @@ ON DUPLICATE KEY UPDATE Valor = VALUES(Valor);
 UPDATE SAC_Config
 SET Valor = 83439451
 WHERE Id = 5;
+
+
+/* ------------------------------------------------------------------------- */
+/* Parche para incidentes             */
+/* ------------------------------------------------------------------------- */
+
+
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS fix_sac_incident_villagrace $$
+
+CREATE PROCEDURE fix_sac_incident_villagrace()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'sac_incident'
+       AND COLUMN_NAME = 'Reportado_Por'
+  ) THEN
+    ALTER TABLE sac_incident
+      ADD COLUMN Reportado_Por VARCHAR(80) NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'sac_incident'
+       AND COLUMN_NAME = 'Asignado_A'
+  ) THEN
+    ALTER TABLE sac_incident
+      ADD COLUMN Asignado_A VARCHAR(30) NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'sac_incident'
+       AND COLUMN_NAME = 'Titulo'
+  ) THEN
+    ALTER TABLE sac_incident
+      ADD COLUMN Titulo VARCHAR(200) NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'sac_incident'
+       AND COLUMN_NAME = 'Detalle'
+  ) THEN
+    ALTER TABLE sac_incident
+      ADD COLUMN Detalle TEXT NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+      FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'sac_incident'
+       AND COLUMN_NAME = 'Creado_At'
+  ) THEN
+    ALTER TABLE sac_incident
+      ADD COLUMN Creado_At DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'sac_incident'
+       AND COLUMN_NAME = 'Descripcion'
+  ) THEN
+    ALTER TABLE sac_incident
+      MODIFY COLUMN Descripcion TEXT NULL;
+  END IF;
+
+  UPDATE sac_incident
+     SET Tipo = 'INCIDENTE'
+   WHERE Tipo IS NULL
+      OR Tipo NOT IN ('INCIDENTE','COMENTARIO');
+
+  UPDATE sac_incident
+     SET Severidad = 'MEDIA'
+   WHERE Severidad IS NULL
+      OR Severidad NOT IN ('BAJA','MEDIA','ALTA','CRITICA');
+
+  UPDATE sac_incident
+     SET Estado =
+       CASE
+         WHEN Estado = 'ABIERTO' THEN 'ABIERTA'
+         WHEN Estado IN ('RESUELTO','RESUELTA') THEN 'CERRADA'
+         WHEN Estado IS NULL THEN 'ABIERTA'
+         WHEN Estado NOT IN ('ABIERTA','EN_PROCESO','CERRADA') THEN 'ABIERTA'
+         ELSE Estado
+       END;
+
+  ALTER TABLE sac_incident
+    MODIFY COLUMN Tipo ENUM('INCIDENTE','COMENTARIO') NOT NULL DEFAULT 'INCIDENTE',
+    MODIFY COLUMN Severidad ENUM('BAJA','MEDIA','ALTA','CRITICA') NOT NULL DEFAULT 'MEDIA',
+    MODIFY COLUMN Estado ENUM('ABIERTA','EN_PROCESO','CERRADA') NOT NULL DEFAULT 'ABIERTA';
+
+END $$
+
+CALL fix_sac_incident_villagrace() $$
+
+DROP PROCEDURE IF EXISTS fix_sac_incident_villagrace $$
+
+DELIMITER ;
+
+
+
+
 /* ------------------------------------------------------------------------- */
 /* Verificaciones rápidas (opcional; descomentar si se requiere)             */
 /* ------------------------------------------------------------------------- */

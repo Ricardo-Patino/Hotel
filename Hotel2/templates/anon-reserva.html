@@ -132,7 +132,17 @@
 
               <div class="col-md-6">
                 <label class="form-label">Teléfono</label>
-                <input type="text" class="form-control" id="telefono" required>
+                <input
+                  type="tel"
+                  class="form-control"
+                  id="telefono"
+                  required
+                  inputmode="tel"
+                  autocomplete="tel"
+                  maxlength="20"
+                  pattern="^\+?[0-9\s().-]{8,20}$"
+                  placeholder="+506 8888-8888">
+                <div class="form-text">Solo números, +, espacios, guiones o paréntesis.</div>
               </div>
 
               <div class="col-md-6">
@@ -292,6 +302,24 @@
   const apellido = $("#apellido");
   const correo = $("#correo");
   const telefono = $("#telefono");
+  function sanitizePhoneValue(raw) {
+    let v = String(raw || "").replace(/[^0-9+\-\s().]/g, "");
+  
+    
+    v = v.replace(/\+/g, (match, offset) => offset === 0 ? "+" : "");
+  
+    
+    v = v.replace(/\s{2,}/g, " ");
+  
+    return v;
+  }
+  
+  telefono.addEventListener("input", () => {
+    const clean = sanitizePhoneValue(telefono.value);
+    if (telefono.value !== clean) {
+      telefono.value = clean;
+    }
+  });
   const doc_tipo = $("#doc_tipo");
   const doc_numero = $("#doc_numero");
   const acepta = $("#acepta");
@@ -631,6 +659,14 @@ function initDateLimits() {
     }
     if(!acepta.checked){
       showAlert("warning", "Debes aceptar los términos y condiciones.");
+      return;
+    }
+
+    telefono.value = sanitizePhoneValue(telefono.value);
+    
+    const telDigits = telefono.value.replace(/\D/g, "");
+    if (!/^\+?[0-9\s().-]{8,20}$/.test(telefono.value) || telDigits.length < 8) {
+      showAlert("warning", "Ingresa un número telefónico válido. No se permiten letras.");
       return;
     }
 

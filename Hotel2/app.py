@@ -913,7 +913,9 @@ def _query_user_reservas(
 ):
     if not email:
         return []
+
     params = {"email": (email or "").strip().lower()}
+
     conds = [
         """
         (
@@ -924,18 +926,53 @@ def _query_user_reservas(
                  WHERE LOWER(U.Correo) = :email
              )
         )
-    """
+        """
     ]
+
     if estado:
         conds.append("R.Estado = :estado")
         params["estado"] = estado
+
     if f_ini:
         conds.append("R.Fecha_Entrada >= :fini")
         params["fini"] = f_ini
+
     if f_fin:
         conds.append("R.Fecha_Salida <= :ffin")
         params["ffin"] = f_fin
+
     where = " AND ".join(conds)
+
+    # La tabla existe en el script base, pero lo hacemos tolerante por si una BD vieja aún no la tiene.
+    try:
+        has_change_table = bool(
+            db.session.execute(
+                text("""
+                    SELECT 1
+                      FROM information_schema.TABLES
+                     WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME = 'ReservaCambioSolicitud'
+                     LIMIT 1
+                """)
+            ).scalar()
+        )
+    except Exception:
+        has_change_table = False
+
+    change_select = "0 AS Cambios_Pendientes"
+    change_join = ""
+
+    if has_change_table:
+        change_select = "COALESCE(RCS.Cambios_Pendientes, 0) AS Cambios_Pendientes"
+        change_join = """
+            LEFT JOIN (
+                SELECT Codigo_Reserva, COUNT(*) AS Cambios_Pendientes
+                  FROM ReservaCambioSolicitud
+                 WHERE Estado = 'Pendiente'
+                 GROUP BY Codigo_Reserva
+            ) RCS ON RCS.Codigo_Reserva = R.Codigo_Reserva
+        """
+
     stmt = text(
         f"""
         SELECT
@@ -952,16 +989,38 @@ def _query_user_reservas(
           H.Tipo,
           R.Fecha_Registro      AS Fecha_Creacion,
           R.Fecha_Registro      AS Fecha_Modificacion,
-          C.Correo              AS Usuario
+          C.Correo              AS Usuario,
+          CASE
+            WHEN R.Estado IN ('Confirmada','Pendiente')
+             AND DATE(R.Fecha_Entrada) >= CURDATE()
+            THEN 1 ELSE 0
+          END AS Puede_Solicitar_Cambios,
+          {change_select}
         FROM Reserva R
         JOIN Cliente    C ON C.Codigo_Cliente    = R.Codigo_Cliente
         JOIN Habitacion H ON H.Codigo_Habitacion = R.Codigo_Habitacion
+        {change_join}
         WHERE {where}
         ORDER BY R.Fecha_Entrada DESC
-    """
+        """
     )
+
     rows = db.session.execute(stmt, params).mappings().all()
-    return [_reserva_to_dict(r) for r in rows]
+
+    items = []
+    for row in rows:
+        d = _reserva_to_dict(row)
+
+        pending_count = int(row.get("Cambios_Pendientes") or 0)
+        can_request = bool(int(row.get("Puede_Solicitar_Cambios") or 0))
+
+        d["can_request_changes"] = can_request
+        d["has_pending_changes"] = pending_count > 0
+        d["pending_change_status"] = "Pendiente" if pending_count > 0 else None
+
+        items.append(d)
+
+    return items
 
 
 def _get_reserva_by_id(reserva_id: int):
@@ -3696,6 +3755,15 @@ def create_app() -> Flask:
         # ---- Validaciones mínimas (tipo NO es obligatorio) ----
         if not (checkin and checkout and nombre and apellido and correo and telefono and doc_tipo and doc_numero and acepta):
             return jsonify({"ok": False, "message": "Faltan campos obligatorios."}), 400
+        
+        telefono_norm = _normalize_cr_phone(telefono)
+        if not telefono_norm:
+            return jsonify({
+                "ok": False,
+                "message": "Número telefónico inválido. Usa un número costarricense válido, por ejemplo +50688888888."
+            }), 400
+        
+        telefono = telefono_norm
 
         # ---- Parseo de fechas ----
         try:
@@ -4591,308 +4659,428 @@ def create_app() -> Flask:
 
 
 
-    @app.post("/api/portal/reservas/<int:reserva_id>/quote-changes")
-    @role_required("Cliente")
-    def api_portal_reserva_quote(reserva_id: int):
-        email = _current_user_email()
-        if not email:
-            return jsonify({"ok": False, "message": "No autenticado."}), 401
+    def _ensure_reserva_cambio_table() -> None:
+        """
+        Garantiza la tabla de solicitudes de cambio.
+        No aplica cambios directamente sobre Reserva; solo deja la solicitud pendiente.
+        """
+        db.session.execute(text("""
+            CREATE TABLE IF NOT EXISTS ReservaCambioSolicitud (
+              Id_Cambio INT NOT NULL AUTO_INCREMENT,
+              Codigo_Reserva INT NOT NULL,
+              Estado ENUM('Pendiente','Aprobado','Rechazado','Retractado') NOT NULL DEFAULT 'Pendiente',
+              Monto_Adicional DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+              Solicitud_JSON JSON NOT NULL,
+              Creado_En DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              Decidido_En DATETIME DEFAULT NULL,
+              Decidido_Por INT DEFAULT NULL,
+              Rechazo_Motivo TEXT DEFAULT NULL,
+              PRIMARY KEY (Id_Cambio),
+              KEY IX_RCC_Reserva (Codigo_Reserva),
+              KEY IX_RCC_Estado (Estado),
+              KEY IX_RCC_Creado (Creado_En)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """))
 
-        r = _get_reserva_by_id(reserva_id)
+
+    def _reserva_allows_change_request(r) -> tuple[bool, str]:
+        """
+        Regla del portal:
+        - Solo se pueden solicitar cambios si el primer día de la reserva no ha pasado.
+        - Aplica para reservas Confirmadas y Pendientes.
+        - No aplica para Cancelada / NoShow.
+        """
         if not r:
-            return jsonify({"ok": False, "message": "Reserva no encontrada."}), 404
+            return False, "Reserva no encontrada."
 
-        if not _reserva_belongs_to_email(reserva_id, email):
-            return jsonify({"ok": False, "message": "No autorizado."}), 403
+        estado = (r.get("Estado") or "").strip()
+        if estado in ("Cancelada", "NoShow"):
+            return False, "Esta reserva ya no permite solicitudes de cambio."
 
-        p = request.get_json(silent=True) or {}
-        new_ci = (p.get("checkin") or _normalize_date_like(r.get("Fecha_Entrada")) or "")[:10]
-        new_co = (p.get("checkout") or _normalize_date_like(r.get("Fecha_Salida")) or "")[:10]
+        ci = _parse_date(r.get("Fecha_Entrada"))
+        if not ci:
+            return False, "La reserva no tiene fecha de ingreso válida."
+
+        if ci < date.today():
+            return False, "Ya no se pueden solicitar cambios porque la fecha de ingreso ya pasó."
+
+        return True, ""
+
+
+    def _server_quote_reserva_change(
+        reserva_id: int,
+        r,
+        new_ci: str,
+        new_co: str,
+        new_pax: int,
+    ) -> dict:
+        """
+        Cotización autoritativa del servidor.
+        No confía en totales enviados por el frontend.
+        """
+        if not new_ci or not new_co:
+            return {
+                "ok": False,
+                "available": False,
+                "message": "Fechas inválidas.",
+            }
+
+        if new_co <= new_ci:
+            return {
+                "ok": False,
+                "available": False,
+                "message": "La fecha de salida debe ser posterior a la fecha de entrada.",
+            }
+
+        nights = _nights(new_ci, new_co)
+        if nights <= 0:
+            return {
+                "ok": False,
+                "available": False,
+                "nights": 0,
+                "message": "Rango de fechas no válido.",
+            }
+
         try:
-            new_pax = int(p.get("huespedes") or r.get("Huespedes") or 1)
+            new_pax = int(new_pax or 1)
         except Exception:
             new_pax = 1
 
-        if not new_ci or not new_co:
-            return jsonify({"ok": False, "message": "Fechas inválidas."}), 400
+        new_pax = max(1, new_pax)
 
-        rid_room = int(r["Codigo_Habitacion"])
-        nights = _nights(new_ci, new_co)
-        if nights <= 0:
-            return jsonify({"ok": True, "available": False, "message": "Rango de fechas no válido.", "nights": 0}), 200
+        room_id = int(r.get("Codigo_Habitacion") or 0)
+        if not room_id:
+            return {
+                "ok": False,
+                "available": False,
+                "message": "La reserva no tiene habitación asociada.",
+            }
 
-        # Misma habitación sin solapes
-        is_free, msg = _room_is_available_for(rid_room, new_ci, new_co, exclude_reserva_id=reserva_id)
-        if not is_free:
-            return jsonify({"ok": True, "available": False, "message": msg or "Sin disponibilidad."}), 200
+        room_free, msg = _room_is_available_for(
+            room_id,
+            new_ci,
+            new_co,
+            exclude_reserva_id=reserva_id,
+        )
 
-        # Precio/capacidad del cuarto
-        info = _get_room_info(rid_room)
-        price_n = float(info.get("price") or 0.0)
+        if not room_free:
+            return {
+                "ok": True,
+                "available": False,
+                "allowed": False,
+                "room_available": False,
+                "capacity_ok": True,
+                "message": msg or "La habitación asignada no está disponible para el nuevo rango.",
+            }
 
-        total_new = _calc_total(price_n, nights, new_pax, iva_rate=DEFAULT_IVA, include_tax=ROOM_TOTAL_INCLUDES_TAX)
-        total_old = float(r.get("Monto_Total") or 0.0)
-        delta = round(max(0.0, total_new - total_old), 2)
+        info = _get_room_info(room_id)
+        capacity = info.get("capacity")
 
-        return jsonify({
+        if capacity is not None:
+            try:
+                if int(new_pax) > int(capacity):
+                    return {
+                        "ok": True,
+                        "available": False,
+                        "allowed": False,
+                        "room_available": True,
+                        "capacity_ok": False,
+                        "message": "Capacidad insuficiente para la cantidad de huéspedes.",
+                    }
+            except Exception:
+                pass
+
+        price_night = float(info.get("price") or r.get("Precio_Noche") or 0.0)
+
+        current_total = float(r.get("Monto_Total") or 0.0)
+        new_total = _calc_total(
+            price_night,
+            nights,
+            new_pax,
+            iva_rate=DEFAULT_IVA,
+            include_tax=ROOM_TOTAL_INCLUDES_TAX,
+        )
+
+        delta = round(max(0.0, float(new_total) - float(current_total)), 2)
+
+        return {
             "ok": True,
             "available": True,
+            "allowed": True,
+            "room_available": True,
+            "capacity_ok": True,
+            "message": "Disponible. Puedes continuar con la solicitud de cambios.",
             "nights": nights,
-            "price_night": price_n,
-            "current_total": total_old,
-            "new_total": total_new,
+            "price_night": price_night,
+            "current_total": current_total,
+            "new_total": float(new_total),
             "delta": delta,
-            "message": "Disponible. Puedes aplicar los cambios."
-        }), 200
+            "needs_payment": delta > 0,
+            "pricing": {
+                "nights_new": nights,
+                "price_night": price_night,
+                "total_old": current_total,
+                "total_new": float(new_total),
+                "delta": delta,
+            },
+        }
 
 
-
-
-
-
-        # === Cotización de cambios de reserva (Portal) — sin ORM, robusto ===
-    @app.post("/api/portal/reservas/<int:reserva_id>/quote-changes", endpoint="portal_reserva_quote_changes")
+    @app.post("/api/portal/reservas/<int:reserva_id>/quote-changes")
+    @role_required("Cliente")
     def portal_reserva_quote_changes(reserva_id: int):
         """
-        Calcula la cotización de cambios para una reserva existente y devuelve:
-          - available / allowed
-          - nights, price_night
-          - current_total, new_total, delta (solo positivo para cobro)
-          - needs_payment
-          - pricing {...} (para UIs que esperan este bloque)
+        Cotiza cambios de reserva para el cliente.
+        No crea solicitud; solo valida disponibilidad y monto adicional.
         """
-        from decimal import Decimal
         try:
             email = _current_user_email()
             if not email:
-                return jsonify(ok=False, message="No autenticado."), 401
-            if not _reserva_belongs_to_email(reserva_id, email):
-                return jsonify(ok=False, message="No autorizado."), 403
+                return jsonify({"ok": False, "message": "No autenticado."}), 401
 
-            # Carga robusta de la reserva (sin ORM)
+            if not _reserva_belongs_to_email(reserva_id, email):
+                return jsonify({"ok": False, "message": "No autorizado."}), 403
+
             r = _get_reserva_by_id(reserva_id)
             if not r:
-                return jsonify(ok=False, message="Reserva no encontrada."), 404
+                return jsonify({"ok": False, "message": "Reserva no encontrada."}), 404
 
-            # Fechas/pax propuestos (o valores actuales)
-            body = request.get_json(silent=True) or {}
-            ci_new = _normalize_date_like(body.get("checkin")  or _get_first_attr(r, ["Fecha_Entrada","checkin","entrada"]))
-            co_new = _normalize_date_like(body.get("checkout") or _get_first_attr(r, ["Fecha_Salida","checkout","salida"]))
-            if not ci_new or not co_new:
-                return jsonify(ok=False, message="Fechas inválidas."), 400
-            if co_new <= ci_new:
-                return jsonify(ok=False, message="El checkout debe ser posterior al check-in."), 400
+            allowed, reason = _reserva_allows_change_request(r)
+            if not allowed:
+                return jsonify({
+                    "ok": False,
+                    "available": False,
+                    "message": reason,
+                }), 409
 
-            pax_old = int(_get_first_attr(r, ["Huespedes","huespedes"]) or 1)
-            pax_new = int(body.get("huespedes") or pax_old)
+            _ensure_reserva_cambio_table()
 
-            # Identificación de habitación
-            room_id = _get_first_attr(r, [
-                "Codigo_Habitacion","codigo_habitacion","Habitacion","habitacion_id","habitacion"
-            ])
-            if not room_id:
-                return jsonify(ok=False, message="La reserva no tiene habitación asociada."), 400
-
-            # Info de habitación (precio, capacidad…)
-            info = _habitacion_info(room_id) or {}
-            # Asegura Decimal
-            price = info.get("price")
-            try:
-                price = Decimal(str(price)) if price is not None else Decimal("0")
-            except Exception:
-                price = Decimal("0")
-            capacity = info.get("capacity")  # puede ser None
-
-            # Noches actual/nuevo
-            ci_old = _normalize_date_like(_get_first_attr(r, ["Fecha_Entrada","checkin","entrada"]))
-            co_old = _normalize_date_like(_get_first_attr(r, ["Fecha_Salida","checkout","salida"]))
-            nights_old = _nights(ci_old, co_old) or 0
-            nights_new = _nights(ci_new, co_new) or 0
-
-            # Totales
-            current_total = _calc_total(price, nights_old, pax_old)
-            new_total     = _calc_total(price, nights_new, pax_new)
-
-            # Disponibilidad de la misma habitación (excluye esta reserva)
-            overlap = db.session.execute(text("""
-                SELECT COUNT(1) AS c
-                FROM Reserva
-                WHERE Codigo_Habitacion = :room
-                  AND (Estado IS NULL OR Estado <> 'Cancelada')
-                  AND Codigo_Reserva <> :rid
-                  AND NOT ( :co <= Fecha_Entrada OR :ci >= Fecha_Salida )
-            """), {"room": room_id, "rid": reserva_id, "ci": ci_new, "co": co_new}).scalar() or 0
-            room_available = (overlap == 0)
-
-            # Capacidad (si la tabla no tiene columna, capacity será None => se omite la validación)
-            capacity_ok = True if capacity is None else (int(pax_new) <= int(capacity))
-
-            allowed = room_available and capacity_ok
-
-            # Diferencial: solo positivo requiere pago
-            delta = new_total - current_total
-            delta_payable = delta if delta > 0 else Decimal("0")
-            needs_payment = (delta_payable > 0)
-
-            # Mensaje amigable
-            if not capacity_ok:
-                msg = "Capacidad insuficiente para la cantidad de huéspedes."
-            elif not room_available:
-                msg = "La habitación asignada no está disponible para el nuevo rango."
-            else:
-                msg = "Disponible. Puedes aplicar los cambios."
-
-            return jsonify({
-                "ok": True,
-                "available": room_available,
-                "allowed": allowed,
-                "room_available": room_available,
-                "capacity_ok": capacity_ok,
-                "message": msg,
-                "nights": nights_new,
-                "price_night": float(price),
-                "current_total": float(current_total),
-                "new_total": float(new_total),
-                "delta": float(delta_payable),
-                "needs_payment": bool(needs_payment),
-                # Bloque adicional para UIs que esperan estructura 'pricing'
-                "pricing": {
-                    "nights_old": nights_old,
-                    "nights_new": nights_new,
-                    "price_night": float(price),
-                    "total_old": float(current_total),
-                    "total_new": float(new_total),
-                    "delta": float(delta_payable),
-                }
-            }), 200
-
-        except Exception as e:
-            app.logger.error(f"[QUOTE] Error cotizando reserva {reserva_id}: {e}", exc_info=True)
-            # Respondemos 200 con ok=false para que la UI muestre el mensaje sin romper
-            return jsonify(ok=False, message="No se pudo validar la cotización."), 200
-
-
-
-
-    from sqlalchemy import text
-    from flask import request, session, jsonify
-
-    @app.put("/api/portal/reservas/<int:reserva_id>/apply-changes")
-    @role_required("Cliente", "Recepcionista", "Admin")
-    def api_portal_reserva_apply(reserva_id):
-        """
-        PASO 1 (nuevo comportamiento):
-        - Ya NO se cobra con tarjeta.
-        - Al confirmar "Listo" (SINPE), se crea una solicitud de cambio en estado Pendiente.
-        - NO se actualiza la reserva todavía (eso será en Paso 3 cuando Admin apruebe).
-        """
-        try:
-            data = request.get_json(silent=True) or {}
-
-            # Esperado desde el frontend (portal-reserva-detalle)
-            old_data = data.get("old") or {}
-            new_data = data.get("new") or {}
-            quote = data.get("quote") or {}
-
-            new_checkin = (new_data.get("checkin") or "").strip()
-            new_checkout = (new_data.get("checkout") or "").strip()
-            new_guests = new_data.get("guests")
-
-            if not new_checkin or not new_checkout or new_guests is None:
-                return jsonify({"error": "Datos incompletos para solicitar cambios."}), 400
-
-            # Monto adicional (si el frontend ya cotizó, lo usamos; si no, asumimos 0)
-            try:
-                delta = float(quote.get("delta", 0) or 0)
-            except Exception:
-                delta = 0.0
-
-            monto_adicional = delta if delta > 0 else 0.0
-
-            # Validación mínima (no dejamos checkout <= checkin)
-            # Mantengo validación ligera para no depender de formatos internos;
-            # el cotizador del frontend ya lo controla.
-            if new_checkout <= new_checkin:
-                return jsonify({"error": "Rango de fechas inválido."}), 400
-
-            # Evitar múltiples solicitudes pendientes por la misma reserva
-            db.session.execute(text("""
-                CREATE TABLE IF NOT EXISTS ReservaCambioSolicitud (
-                  Id_Cambio INT NOT NULL AUTO_INCREMENT,
-                  Codigo_Reserva INT NOT NULL,
-                  Estado ENUM('Pendiente','Aprobado','Rechazado','Retractado') NOT NULL DEFAULT 'Pendiente',
-                  Monto_Adicional DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-                  Solicitud_JSON JSON NOT NULL,
-                  Creado_En DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  Decidido_En DATETIME DEFAULT NULL,
-                  Decidido_Por INT DEFAULT NULL,
-                  Rechazo_Motivo TEXT DEFAULT NULL,
-                  PRIMARY KEY (Id_Cambio),
-                  KEY IX_RCC_Reserva (Codigo_Reserva),
-                  KEY IX_RCC_Estado (Estado),
-                  KEY IX_RCC_Creado (Creado_En)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-            """))
-            db.session.commit()
-
-            pending = db.session.execute(text("""
-                SELECT COUNT(1) AS c
-                FROM ReservaCambioSolicitud
-                WHERE Codigo_Reserva = :rid AND Estado = 'Pendiente'
-            """), {"rid": reserva_id}).scalar() or 0
+            pending = db.session.execute(
+                text("""
+                    SELECT COUNT(1)
+                      FROM ReservaCambioSolicitud
+                     WHERE Codigo_Reserva = :rid
+                       AND Estado = 'Pendiente'
+                """),
+                {"rid": int(reserva_id)}
+            ).scalar() or 0
 
             if int(pending) > 0:
-                return jsonify({"error": "Ya existe una solicitud de cambio pendiente para esta reserva."}), 409
+                return jsonify({
+                    "ok": False,
+                    "available": False,
+                    "message": "Ya existe una solicitud de cambio pendiente para esta reserva.",
+                }), 409
 
-            # Identidad del actor (para auditoría, útil en Paso 3)
-            decided_by = session.get("user_id")
+            body = request.get_json(silent=True) or {}
+
+            new_ci = (
+                body.get("checkin")
+                or body.get("Fecha_Entrada")
+                or _normalize_date_like(r.get("Fecha_Entrada"))
+                or ""
+            )[:10]
+
+            new_co = (
+                body.get("checkout")
+                or body.get("Fecha_Salida")
+                or _normalize_date_like(r.get("Fecha_Salida"))
+                or ""
+            )[:10]
+
+            new_pax = (
+                body.get("huespedes")
+                or body.get("guests")
+                or body.get("pax")
+                or r.get("Huespedes")
+                or 1
+            )
+
+            quote = _server_quote_reserva_change(
+                reserva_id=int(reserva_id),
+                r=r,
+                new_ci=new_ci,
+                new_co=new_co,
+                new_pax=int(new_pax or 1),
+            )
+
+            status = 200 if quote.get("ok") else 400
+            return jsonify(quote), status
+
+        except Exception as e:
+            current_app.logger.exception("[PORTAL-CAMBIOS] Error cotizando cambio: %s", e)
+            return jsonify({
+                "ok": False,
+                "available": False,
+                "message": "No se pudo validar la cotización.",
+            }), 500
+
+
+    @app.put("/api/portal/reservas/<int:reserva_id>/apply-changes")
+    @role_required("Cliente")
+    def api_portal_reserva_apply(reserva_id: int):
+        """
+        Crea una solicitud de cambio pendiente.
+        No actualiza Reserva directamente.
+        No cobra tarjeta.
+        El flujo queda pendiente para aprobación operativa.
+        """
+        try:
+            email = _current_user_email()
+            if not email:
+                return jsonify({"ok": False, "message": "No autenticado."}), 401
+
+            if not _reserva_belongs_to_email(reserva_id, email):
+                return jsonify({"ok": False, "message": "No autorizado."}), 403
+
+            r = _get_reserva_by_id(reserva_id)
+            if not r:
+                return jsonify({"ok": False, "message": "Reserva no encontrada."}), 404
+
+            allowed, reason = _reserva_allows_change_request(r)
+            if not allowed:
+                return jsonify({"ok": False, "message": reason}), 409
+
+            data = request.get_json(silent=True) or {}
+            new_data = data.get("new") if isinstance(data.get("new"), dict) else {}
+
+            new_checkin = (
+                new_data.get("checkin")
+                or data.get("checkin")
+                or ""
+            ).strip()[:10]
+
+            new_checkout = (
+                new_data.get("checkout")
+                or data.get("checkout")
+                or ""
+            ).strip()[:10]
+
+            new_guests = (
+                new_data.get("guests")
+                or new_data.get("huespedes")
+                or data.get("huespedes")
+                or data.get("guests")
+            )
+
+            try:
+                new_guests = int(new_guests)
+            except Exception:
+                new_guests = None
+
+            if not new_checkin or not new_checkout or not new_guests:
+                return jsonify({
+                    "ok": False,
+                    "message": "Datos incompletos para solicitar cambios.",
+                }), 400
+
+            quote = _server_quote_reserva_change(
+                reserva_id=int(reserva_id),
+                r=r,
+                new_ci=new_checkin,
+                new_co=new_checkout,
+                new_pax=int(new_guests),
+            )
+
+            if not quote.get("ok") or not quote.get("available"):
+                return jsonify({
+                    "ok": False,
+                    "message": quote.get("message") or "No hay disponibilidad para los cambios solicitados.",
+                }), 409
+
+            _ensure_reserva_cambio_table()
+
+            pending = db.session.execute(
+                text("""
+                    SELECT COUNT(1)
+                      FROM ReservaCambioSolicitud
+                     WHERE Codigo_Reserva = :rid
+                       AND Estado = 'Pendiente'
+                """),
+                {"rid": int(reserva_id)}
+            ).scalar() or 0
+
+            if int(pending) > 0:
+                return jsonify({
+                    "ok": False,
+                    "message": "Ya existe una solicitud de cambio pendiente para esta reserva.",
+                }), 409
+
+            old_payload = {
+                "checkin": _normalize_date_like(r.get("Fecha_Entrada")),
+                "checkout": _normalize_date_like(r.get("Fecha_Salida")),
+                "guests": int(r.get("Huespedes") or 1),
+                "huespedes": int(r.get("Huespedes") or 1),
+                "total": float(r.get("Monto_Total") or 0.0),
+            }
+
+            new_payload = {
+                "checkin": new_checkin,
+                "checkout": new_checkout,
+                "guests": int(new_guests),
+                "huespedes": int(new_guests),
+                "observaciones": (
+                    new_data.get("observaciones")
+                    or data.get("observaciones")
+                    or ""
+                ).strip() or None,
+            }
+
+            monto_adicional = float(quote.get("delta") or 0.0)
+            uid = session.get("user_id")
 
             payload = {
-                "old": {
-                    "checkin": old_data.get("checkin"),
-                    "checkout": old_data.get("checkout"),
-                    "guests": old_data.get("guests"),
-                    "total": old_data.get("total"),
-                },
-                "new": {
-                    "checkin": new_checkin,
-                    "checkout": new_checkout,
-                    "guests": new_guests,
-                },
+                "old": old_payload,
+                "new": new_payload,
                 "quote": quote,
                 "payment": {
                     "method": "SINPE",
-                    "declared": True
+                    "declared": True,
+                    "requires_payment": monto_adicional > 0,
+                    "amount": monto_adicional,
                 },
                 "meta": {
-                    "requested_by_user_id": decided_by
-                }
+                    "requested_by_user_id": uid,
+                    "requested_from": "portal-reserva-detalle",
+                },
             }
 
-            db.session.execute(text("""
-                INSERT INTO ReservaCambioSolicitud (Codigo_Reserva, Estado, Monto_Adicional, Solicitud_JSON, Creado_En, Decidido_Por)
-                VALUES (:rid, 'Pendiente', :monto, CAST(:json_payload AS JSON), NOW(), :user_id)
-            """), {
-                "rid": reserva_id,
-                "monto": monto_adicional,
-                "json_payload": __import__("json").dumps(payload, ensure_ascii=False),
-                "user_id": decided_by
-            })
+            ins = db.session.execute(
+                text("""
+                    INSERT INTO ReservaCambioSolicitud
+                        (Codigo_Reserva, Estado, Monto_Adicional, Solicitud_JSON, Creado_En, Decidido_Por)
+                    VALUES
+                        (:rid, 'Pendiente', :monto, :payload, NOW(), :uid)
+                """),
+                {
+                    "rid": int(reserva_id),
+                    "monto": monto_adicional,
+                    "payload": json.dumps(payload, ensure_ascii=False),
+                    "uid": int(uid) if uid else None,
+                }
+            )
+
+            cambio_id = getattr(ins, "lastrowid", None)
+            if not cambio_id:
+                cambio_id = db.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+
             db.session.commit()
 
-            # NO aplicamos cambios aquí. Eso queda para Paso 3 (Aprobar/Rechazar).
             return jsonify({
                 "ok": True,
-                "message": "Solicitud de cambio creada y enviada a aprobación.",
-                "monto_adicional": monto_adicional
-            })
+                "message": "Solicitud de cambio enviada. Quedó pendiente de aprobación por el hotel.",
+                "cambio_id": int(cambio_id or 0),
+                "monto_adicional": monto_adicional,
+                "status": "Pendiente",
+            }), 200
 
         except Exception as e:
             db.session.rollback()
-            return jsonify({"error": f"Error procesando solicitud de cambio: {str(e)}"}), 500
-
-
-
+            current_app.logger.exception("[PORTAL-CAMBIOS] Error creando solicitud: %s", e)
+            return jsonify({
+                "ok": False,
+                "message": "No se pudo crear la solicitud de cambio.",
+            }), 500
 
 
     @app.post("/api/portal/reservas/<int:reserva_id>/send-confirmation")
@@ -5685,7 +5873,7 @@ def create_app() -> Flask:
         doc_number = db.Column(db.String(64), index=True, nullable=False)
         doc_image_path = db.Column(db.String(255))
         signature_path = db.Column(db.String(255))
-        key_activated = db.Column(db.Boolean, nullable=False, server_default=text("0"))
+        key_activated = db.Column(db.Boolean, nullable=False, server_default=_text("0"))
         created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
         meta = db.Column(db.JSON)
 

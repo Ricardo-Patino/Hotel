@@ -529,7 +529,7 @@
       `EFECTIVO ESPERADO:     ${esperado}`,
       `EFECTIVO CONTADO:      ${contado}`,
       `DESCUADRE:             ${desc}`,
-    ].join("\\n");
+    ].join("\n");
   }
 
   // ======= Acciones =======
@@ -649,11 +649,11 @@
       if (!r.json.resumen) {
         if (out) {
           out.textContent =
-            `No hay información registrada para esta fecha (${fecha}).\\n\\n` +
-            `Qué hacer:\\n` +
-            `1) Abrí la caja del día (Apertura).\\n` +
-            `2) Registrá movimientos manuales y/o cobros POS.\\n` +
-            `3) Volvé a presionar Buscar para ver la conciliación.\\n\\n` +
+            `No hay información registrada para esta fecha (${fecha}).\n\n` +
+            `Qué hacer:\n` +
+            `1) Abrí la caja del día (Apertura).\n` +
+            `2) Registrá movimientos manuales y/o cobros POS.\n` +
+            `3) Volvé a presionar Buscar para ver la conciliación.\n\n` +
             `Podés descargar el PDF y quedará como “SIN MOVIMIENTOS” para respaldo.`;
         }
 

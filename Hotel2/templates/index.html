@@ -316,9 +316,9 @@
             <li>
               <a href="{{ url_for('portal_perfil_html') }}">Perfil</a>
             </li>
-            <li>
-              <a href="{{ url_for('admin_users_html') }}">Roles</a>
-            </li>
+            {% if session.get('user_role') == 'Administrador' %}
+            <li><a href="{{ url_for('admin_users_html') }}">Roles</a></li>
+            {% endif %}
             <li>
               <a href="{{ url_for('logout') }}">Cerrar sesión</a>
             </li>

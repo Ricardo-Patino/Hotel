@@ -416,6 +416,49 @@ def _money(x):
     # Formato CR (separador de miles)
     return f"CRC {v:,.2f}"
 
+
+
+def _pretty_text(v) -> str:
+    s = str(v or "")
+    s = s.replace("\\r\\n", "\n")
+    s = s.replace("\\n", "\n")
+    s = s.replace("/n", "\n")
+    s = s.replace("\r\n", "\n")
+    s = s.replace("\r", "\n")
+    return s.strip()
+
+
+def _pdf_paragraph_text(v, style):
+    from html import escape as html_escape
+    safe = html_escape(_pretty_text(v))
+    safe = safe.replace("\n", "<br/>")
+    return Paragraph(safe or "—", style)
+
+
+def _movimientos_del_dia(fecha: date) -> list[dict]:
+    rows = _db().session.execute(
+        text("""
+            SELECT
+              m.id_move,
+              m.tipo,
+              m.metodo,
+              m.concepto,
+              m.referencia,
+              m.monto,
+              m.created_at
+            FROM fin_cash_movement m
+            JOIN fin_cash_session s ON s.id_session = m.session_id
+            WHERE s.fecha = :f
+              AND m.estado = 'Aplicado'
+            ORDER BY m.created_at ASC, m.id_move ASC
+        """),
+        {"f": fecha},
+    ).mappings().all()
+
+    return [dict(r) for r in rows]
+
+
+
 @fin_cash_bp.get("/reporte.pdf")
 def reporte_pdf():
     """
@@ -657,6 +700,69 @@ def reporte_pdf():
     ]))
     elements.append(tot_tbl)
     elements.append(Spacer(1, 14))
+    
+    
+    # Detalle de movimientos manuales del día.
+    # Esto permite ver ingresos aunque no sean efectivo, sin alterar el cálculo de efectivo esperado.
+    movimientos = _movimientos_del_dia(fecha)
+
+    if movimientos:
+        elements.append(Paragraph("<b>Movimientos manuales del día</b>", ParagraphStyle(
+            "h_movs",
+            parent=styles["Normal"],
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            textColor=colors.HexColor("#111827")
+        )))
+        elements.append(Spacer(1, 8))
+
+        mov_rows = [["Hora", "Tipo", "Método", "Concepto", "Monto"]]
+
+        for m in movimientos:
+            hora = "—"
+            try:
+                hora = m.get("created_at").strftime("%H:%M") if m.get("created_at") else "—"
+            except Exception:
+                hora = "—"
+
+            mov_rows.append([
+                hora,
+                str(m.get("tipo") or "—"),
+                str(m.get("metodo") or "—"),
+                _pdf_paragraph_text(m.get("concepto"), s_small),
+                _money(m.get("monto")),
+            ])
+
+        mov_tbl = Table(
+            mov_rows,
+            colWidths=[
+                (A4[0]-4*cm)*0.12,
+                (A4[0]-4*cm)*0.16,
+                (A4[0]-4*cm)*0.18,
+                (A4[0]-4*cm)*0.34,
+                (A4[0]-4*cm)*0.20,
+            ]
+        )
+
+        mov_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#1b7a4e")),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,0), 9),
+            ("GRID", (0,0), (-1,-1), 0.5, colors.HexColor("#e5e7eb")),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("ALIGN", (4,1), (4,-1), "RIGHT"),
+            ("ROWBACKGROUNDS", (0,1), (-1,-1), [colors.white, colors.HexColor("#f9fafb")]),
+            ("LEFTPADDING", (0,0), (-1,-1), 6),
+            ("RIGHTPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 5),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ]))
+
+        elements.append(mov_tbl)
+        elements.append(Spacer(1, 14))
+    
+    
 
     # Firmas / observaciones
     elements.append(Paragraph("<b>Firmas</b>", ParagraphStyle(

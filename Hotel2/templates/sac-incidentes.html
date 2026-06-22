@@ -432,61 +432,111 @@
   }
 
   frm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    msg.textContent = '';
-    btnSave.disabled = true;
-    btnSave.textContent = 'Guardando…';
+  e.preventDefault();
 
-    try {
-      const fd = new FormData(e.currentTarget);
-      const res = await fetch('/sac/incidentes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(fd.entries()))
-      });
+  const form = e.currentTarget;
 
-      let out = null;
-      try {
-        out = await res.json();
-      } catch (e) {
-        out = { ok: res.ok };
-      }
-      if (!out) out = { ok: res.ok };
+  msg.textContent = '';
+  clearAlert();
 
-      if (out.ok) {
-        clearAlert();
-        showAlert('success', `<div class="d-flex align-items-start gap-2">
-          <i class="bi bi-check-circle-fill"></i>
-          <div>
-            <div class="fw-semibold">Guardado correctamente.</div>
-            <div class="small">Id del registro: #${out.id}</div>
-          </div>
-        </div>`);
-        e.currentTarget.reset();
-        page = 1;
-        await load();
-      } else {
-        showAlert('danger', `<div class="d-flex align-items-start gap-2">
-          <i class="bi bi-exclamation-triangle-fill"></i>
-          <div>
-            <div class="fw-semibold">No se pudo guardar.</div>
-            <div class="small">${out.error || 'Intenta nuevamente.'}</div>
-          </div>
-        </div>`, 7000);
-      }
-    } catch (err) {
+  btnSave.disabled = true;
+  btnSave.textContent = 'Guardando…';
+
+  let savedOk = false;
+  let savedId = null;
+
+  try {
+    const fd = new FormData(form);
+    const payload = Object.fromEntries(fd.entries());
+
+    const res = await fetch('/sac/incidentes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+    let out = null;
+
+    if (contentType.includes('application/json')) {
+      out = await res.json();
+    } else {
+      const txt = await res.text();
+      console.error('Respuesta no JSON al guardar incidente:', txt);
+      throw new Error('El servidor no devolvió JSON.');
+    }
+
+    if (!res.ok) {
+      throw new Error(out?.error || out?.message || `Error HTTP ${res.status}`);
+    }
+
+    if (!out || !out.ok) {
       showAlert('danger', `<div class="d-flex align-items-start gap-2">
         <i class="bi bi-exclamation-triangle-fill"></i>
         <div>
-          <div class="fw-semibold">Error de conexión.</div>
-          <div class="small">Intenta nuevamente.</div>
+          <div class="fw-semibold">No se pudo guardar.</div>
+          <div class="small">${out?.error || out?.message || 'Intenta nuevamente.'}</div>
         </div>
       </div>`, 7000);
-    } finally {
-      btnSave.disabled = false;
-      btnSave.textContent = 'Guardar';
+      return;
     }
-  });
+
+    savedOk = true;
+    savedId = out.id || null;
+
+    form.reset();
+    page = 1;
+
+    showAlert('success', `<div class="d-flex align-items-start gap-2">
+      <i class="bi bi-check-circle-fill"></i>
+      <div>
+        <div class="fw-semibold">Guardado correctamente.</div>
+        <div class="small">${savedId ? `Id del registro: #${savedId}` : 'El incidente fue registrado correctamente.'}</div>
+      </div>
+    </div>`);
+
+  } catch (err) {
+    console.error('Error real al guardar incidente:', err);
+
+    showAlert('danger', `<div class="d-flex align-items-start gap-2">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div>
+        <div class="fw-semibold">No se pudo confirmar el guardado.</div>
+        <div class="small">${err?.message || 'Intenta nuevamente.'}</div>
+      </div>
+    </div>`, 7000);
+
+  } finally {
+    btnSave.disabled = false;
+    btnSave.textContent = 'Guardar';
+  }
+
+  /*
+    Importante:
+    La recarga de la tabla se hace FUERA del try/catch del guardado.
+    Así, si falla la recarga visual, no mostramos falsamente “Error de conexión”
+    cuando el incidente sí se guardó.
+  */
+  if (savedOk) {
+    try {
+      await load();
+    } catch (reloadErr) {
+      console.error('El incidente se guardó, pero falló la recarga de la tabla:', reloadErr);
+
+      showAlert('warning', `<div class="d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <div>
+          <div class="fw-semibold">El incidente se guardó correctamente.</div>
+          <div class="small">Pero no se pudo actualizar la tabla automáticamente. Presiona “Actualizar”.</div>
+        </div>
+      </div>`, 7000);
+    }
+  }
+});
 
   pager.addEventListener('click', (e) => {
     const a = e.target.closest('[data-page]');

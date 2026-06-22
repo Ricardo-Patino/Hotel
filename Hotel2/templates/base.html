@@ -153,7 +153,9 @@
               <li><a href="{{ url_for('portal_dashboard_html') }}">Portal</a></li>
               <li><a href="{{ url_for('portal_reservas_html') }}">Mis reservas</a></li>
               <li><a href="{{ url_for('portal_perfil_html') }}">Perfil</a></li>
+              {% if session.get('user_role') == 'Administrador' %}
               <li><a href="{{ url_for('admin_users_html') }}">Roles</a></li>
+              {% endif %}
               <li><a href="{{ url_for('logout') }}">Cerrar sesión</a></li>
             </ul>
           </li>
