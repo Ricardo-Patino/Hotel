@@ -7415,8 +7415,8 @@ def create_app() -> Flask:
 
     def _asset_logo_path() -> Optional[str]:
         for rel in [
-            "static/assets/img/favicon.png",
-            "static/assets/img/apple-touch-icon.png",
+            "static/assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg",
+            "static/assets/img/Hotel Villa Grace Images/476440859_1138681317956072_3801772854144705766_n.jpg",
             "static/assets/img/logo.png",
         ]:
             p = BASE_DIR / rel
